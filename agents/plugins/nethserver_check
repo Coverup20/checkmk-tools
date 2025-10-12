@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# CheckMK Agent Plugin for Nethserver 7.9 and 8
+# This plugin collects specific Nethserver metrics and service status
+# Deploy to: /usr/lib/check_mk_agent/plugins/
+
+set -e
+
+# Check if we're running on Nethserver
+if [ ! -f /etc/nethserver-release ] && [ ! -f /etc/e-smith/db/configuration/defaults/sysconfig/ProductName ]; then
+    exit 0
+fi
+
+# Determine Nethserver version
+if [ -f /etc/nethserver-release ]; then
+    NS_VERSION=$(cat /etc/nethserver-release | grep -oP '\d+\.\d+' | head -1)
+else
+    NS_VERSION="7"
+fi
+
+echo "<<<nethserver_info>>>"
+echo "version: $NS_VERSION"
+echo "hostname: $(hostname -f)"
+echo "uptime: $(uptime -p)"
+
+# Check critical Nethserver services
+echo "<<<nethserver_services>>>"
+for service in httpd-admin rsyslog cockpit.socket; do
+    if systemctl is-active --quiet $service 2>/dev/null; then
+        echo "$service: active"
+    else
+        echo "$service: inactive"
+    fi
+done
+
+# For Nethserver 7.x - check legacy services
+if [ "$NS_VERSION" == "7" ] || [ "$NS_VERSION" == "7.9" ]; then
+    for service in smb nmb clamd amavisd postfix dovecot; do
+        if systemctl is-active --quiet $service 2>/dev/null; then
+            echo "$service: active"
+        else
+            echo "$service: inactive"
+        fi
+    done
+fi
+
+# Check database status (e-smith config database)
+echo "<<<nethserver_database>>>"
+if command -v db >/dev/null 2>&1; then
+    DB_STATUS=$(db configuration show 2>&1 | wc -l)
+    echo "config_entries: $DB_STATUS"
+fi
+
+# Check backup status
+echo "<<<nethserver_backup>>>"
+if [ -d /var/lib/nethserver/backup ]; then
+    LAST_BACKUP=$(find /var/lib/nethserver/backup -name "*.info" -type f -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | awk '{print $2}')
+    if [ -n "$LAST_BACKUP" ]; then
+        BACKUP_TIME=$(stat -c %Y "$LAST_BACKUP")
+        CURRENT_TIME=$(date +%s)
+        BACKUP_AGE=$((CURRENT_TIME - BACKUP_TIME))
+        echo "last_backup_age_seconds: $BACKUP_AGE"
+    else
+        echo "last_backup_age_seconds: -1"
+    fi
+fi
+
+# Check disk usage for important partitions
+echo "<<<nethserver_disk>>>"
+df -h / /var /home 2>/dev/null | tail -n +2 | while read -r line; do
+    echo "$line"
+done
+
+# Check email queue if postfix is installed
+if command -v mailq >/dev/null 2>&1 && systemctl is-active --quiet postfix 2>/dev/null; then
+    echo "<<<nethserver_mailqueue>>>"
+    QUEUE_COUNT=$(mailq 2>/dev/null | tail -n 1 | grep -oP '^\d+' || echo "0")
+    echo "queue_count: $QUEUE_COUNT"
+fi
+
+# Check RAID status if mdadm is installed
+if command -v mdadm >/dev/null 2>&1; then
+    echo "<<<nethserver_raid>>>"
+    mdadm --detail --scan 2>/dev/null | while read -r line; do
+        DEVICE=$(echo "$line" | grep -oP '/dev/md\d+')
+        if [ -n "$DEVICE" ]; then
+            STATUS=$(mdadm --detail "$DEVICE" 2>/dev/null | grep "State :" | awk -F: '{print $2}' | xargs)
+            echo "$DEVICE: $STATUS"
+        fi
+    done
+fi

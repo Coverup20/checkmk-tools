@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# CheckMK Agent Plugin for Linux Client Systems
+# This plugin collects standard Linux client metrics and security status
+# Deploy to: /usr/lib/check_mk_agent/plugins/
+
+set -e
+
+echo "<<<linux_client_info>>>"
+echo "hostname: $(hostname -f)"
+echo "distribution: $(lsb_release -d 2>/dev/null | cut -f2 || cat /etc/os-release | grep PRETTY_NAME | cut -d'"' -f2)"
+echo "kernel: $(uname -r)"
+echo "uptime: $(uptime -p)"
+
+# Check system updates available
+echo "<<<linux_client_updates>>>"
+if command -v apt-get >/dev/null 2>&1; then
+    # Debian/Ubuntu
+    apt-get update -qq 2>/dev/null || true
+    UPDATES=$(apt list --upgradable 2>/dev/null | grep -c "upgradable" || echo "0")
+    SECURITY_UPDATES=$(apt list --upgradable 2>/dev/null | grep -c "security" || echo "0")
+    echo "updates_available: $UPDATES"
+    echo "security_updates: $SECURITY_UPDATES"
+elif command -v yum >/dev/null 2>&1; then
+    # RHEL/CentOS
+    UPDATES=$(yum check-update -q 2>/dev/null | grep -v "^$" | wc -l || echo "0")
+    SECURITY_UPDATES=$(yum --security check-update -q 2>/dev/null | wc -l || echo "0")
+    echo "updates_available: $UPDATES"
+    echo "security_updates: $SECURITY_UPDATES"
+elif command -v zypper >/dev/null 2>&1; then
+    # SUSE
+    UPDATES=$(zypper list-updates 2>/dev/null | tail -n +5 | wc -l || echo "0")
+    echo "updates_available: $UPDATES"
+else
+    echo "updates_available: unknown"
+fi
+
+# Check critical services
+echo "<<<linux_client_services>>>"
+for service in ssh sshd NetworkManager systemd-resolved; do
+    if systemctl is-active --quiet $service 2>/dev/null; then
+        echo "$service: active"
+    else
+        # Check if service exists
+        if systemctl list-unit-files | grep -q "^$service"; then
+            echo "$service: inactive"
+        fi
+    fi
+done
+
+# Check firewall status
+echo "<<<linux_client_firewall>>>"
+if command -v ufw >/dev/null 2>&1; then
+    UFW_STATUS=$(ufw status 2>/dev/null | head -1 | awk '{print $2}')
+    echo "firewall: ufw - $UFW_STATUS"
+elif command -v firewall-cmd >/dev/null 2>&1; then
+    if systemctl is-active --quiet firewalld 2>/dev/null; then
+        echo "firewall: firewalld - active"
+    else
+        echo "firewall: firewalld - inactive"
+    fi
+elif command -v iptables >/dev/null 2>&1; then
+    RULES_COUNT=$(iptables -L -n 2>/dev/null | wc -l || echo "0")
+    echo "firewall: iptables - rules=$RULES_COUNT"
+else
+    echo "firewall: none"
+fi
+
+# Check disk usage
+echo "<<<linux_client_disk>>>"
+df -h / /home 2>/dev/null | tail -n +2 | while read -r filesystem size used avail use mounted; do
+    echo "$mounted: used=$use total=$size"
+done
+
+# Check for failed services
+echo "<<<linux_client_failed_services>>>"
+FAILED_SERVICES=$(systemctl list-units --state=failed --no-pager --no-legend 2>/dev/null | wc -l)
+echo "failed_services_count: $FAILED_SERVICES"
+if [ "$FAILED_SERVICES" -gt 0 ]; then
+    systemctl list-units --state=failed --no-pager --no-legend 2>/dev/null | while read -r unit load active sub desc; do
+        echo "failed: $unit"
+    done
+fi
+
+# Check last successful login
+echo "<<<linux_client_login>>>"
+if command -v last >/dev/null 2>&1; then
+    LAST_LOGIN=$(last -1 -R 2>/dev/null | head -1 | awk '{print $1, $4, $5, $6, $7}' || echo "unknown")
+    echo "last_login: $LAST_LOGIN"
+fi
+
+# Check for security tools
+echo "<<<linux_client_security>>>"
+if command -v fail2ban-client >/dev/null 2>&1 && systemctl is-active --quiet fail2ban 2>/dev/null; then
+    echo "fail2ban: active"
+    BANNED_IPS=$(fail2ban-client status 2>/dev/null | grep -oP 'Currently banned:\s+\K\d+' || echo "0")
+    echo "banned_ips: $BANNED_IPS"
+else
+    echo "fail2ban: not_installed"
+fi
+
+if command -v clamav >/dev/null 2>&1; then
+    echo "antivirus: clamav"
+    if [ -f /var/lib/clamav/daily.cvd ]; then
+        VIRUS_DB_AGE=$(($(date +%s) - $(stat -c %Y /var/lib/clamav/daily.cvd)))
+        VIRUS_DB_AGE_DAYS=$((VIRUS_DB_AGE / 86400))
+        echo "clamav_db_age_days: $VIRUS_DB_AGE_DAYS"
+    fi
+else
+    echo "antivirus: none"
+fi
+
+# Check for unattended upgrades
+echo "<<<linux_client_auto_updates>>>"
+if command -v unattended-upgrade >/dev/null 2>&1; then
+    echo "unattended_upgrades: installed"
+    if systemctl is-enabled --quiet unattended-upgrades 2>/dev/null; then
+        echo "unattended_upgrades_enabled: yes"
+    else
+        echo "unattended_upgrades_enabled: no"
+    fi
+else
+    echo "unattended_upgrades: not_installed"
+fi
+
+# Check system load
+echo "<<<linux_client_load>>>"
+LOAD=$(uptime | awk -F'load average:' '{print $2}')
+echo "load_average: $LOAD"
+
+# Check logged in users
+echo "<<<linux_client_users>>>"
+LOGGED_USERS=$(who | wc -l)
+echo "logged_in_users: $LOGGED_USERS"
+
+# Check temperature sensors (if available)
+echo "<<<linux_client_sensors>>>"
+if command -v sensors >/dev/null 2>&1; then
+    sensors 2>/dev/null | grep -E "Core|temp" | head -5 || echo "sensors: unavailable"
+else
+    echo "sensors: not_installed"
+fi
+
+# Check docker if installed
+echo "<<<linux_client_docker>>>"
+if command -v docker >/dev/null 2>&1 && systemctl is-active --quiet docker 2>/dev/null; then
+    echo "docker: active"
+    CONTAINERS=$(docker ps -q 2>/dev/null | wc -l || echo "0")
+    echo "running_containers: $CONTAINERS"
+else
+    echo "docker: not_installed"
+fi

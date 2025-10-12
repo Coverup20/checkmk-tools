@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# CheckMK Agent Plugin for Nethsecurity (Firewall) 7.9 and 8
+# This plugin collects firewall-specific metrics and security status
+# Deploy to: /usr/lib/check_mk_agent/plugins/
+
+set -e
+
+# Check if we're running on Nethsecurity
+if [ ! -f /etc/nethsecurity-release ] && [ ! -d /etc/shorewall ]; then
+    exit 0
+fi
+
+# Determine Nethsecurity version
+if [ -f /etc/nethsecurity-release ]; then
+    NS_VERSION=$(cat /etc/nethsecurity-release | grep -oP '\d+\.\d+' | head -1)
+else
+    NS_VERSION="7"
+fi
+
+echo "<<<nethsecurity_info>>>"
+echo "version: $NS_VERSION"
+echo "hostname: $(hostname -f)"
+echo "uptime: $(uptime -p)"
+
+# Check firewall service status
+echo "<<<nethsecurity_firewall>>>"
+if command -v shorewall >/dev/null 2>&1; then
+    if shorewall status >/dev/null 2>&1; then
+        echo "shorewall: active"
+        # Get connection tracking info
+        if [ -f /proc/net/nf_conntrack ]; then
+            CONNTRACK_COUNT=$(wc -l < /proc/net/nf_conntrack)
+            echo "conntrack_entries: $CONNTRACK_COUNT"
+        fi
+    else
+        echo "shorewall: inactive"
+    fi
+fi
+
+# Check for firewall rules count
+if command -v iptables >/dev/null 2>&1; then
+    echo "<<<nethsecurity_iptables>>>"
+    RULES_COUNT=$(iptables -L -n | wc -l)
+    echo "rules_count: $RULES_COUNT"
+    
+    # Check NAT rules
+    NAT_RULES=$(iptables -t nat -L -n | wc -l)
+    echo "nat_rules_count: $NAT_RULES"
+fi
+
+# Check VPN status (OpenVPN)
+echo "<<<nethsecurity_vpn>>>"
+if systemctl is-active --quiet openvpn@* 2>/dev/null; then
+    for vpn in /etc/openvpn/*.conf; do
+        if [ -f "$vpn" ]; then
+            VPN_NAME=$(basename "$vpn" .conf)
+            if systemctl is-active --quiet "openvpn@${VPN_NAME}" 2>/dev/null; then
+                echo "${VPN_NAME}: active"
+                # Count connected clients if status file exists
+                STATUS_FILE="/var/log/openvpn/${VPN_NAME}-status.log"
+                if [ -f "$STATUS_FILE" ]; then
+                    CLIENTS=$(grep "^CLIENT_LIST" "$STATUS_FILE" 2>/dev/null | wc -l)
+                    echo "${VPN_NAME}_clients: $CLIENTS"
+                fi
+            else
+                echo "${VPN_NAME}: inactive"
+            fi
+        fi
+    done
+else
+    echo "openvpn: inactive"
+fi
+
+# Check IPS/IDS (Suricata)
+echo "<<<nethsecurity_ids>>>"
+if systemctl is-active --quiet suricata 2>/dev/null; then
+    echo "suricata: active"
+    # Check for recent alerts
+    if [ -f /var/log/suricata/fast.log ]; then
+        RECENT_ALERTS=$(find /var/log/suricata/fast.log -mmin -60 2>/dev/null | wc -l)
+        echo "recent_alerts_1h: $RECENT_ALERTS"
+    fi
+else
+    echo "suricata: inactive"
+fi
+
+# Check threat blocking services
+echo "<<<nethsecurity_threats>>>"
+for service in fail2ban snort; do
+    if systemctl is-active --quiet $service 2>/dev/null; then
+        echo "$service: active"
+        if [ "$service" == "fail2ban" ] && command -v fail2ban-client >/dev/null 2>&1; then
+            BANNED_IPS=$(fail2ban-client status 2>/dev/null | grep "Jail list" | grep -oP '\d+')
+            echo "fail2ban_jails: $BANNED_IPS"
+        fi
+    else
+        echo "$service: inactive"
+    fi
+done
+
+# Check network interfaces and traffic
+echo "<<<nethsecurity_interfaces>>>"
+for iface in $(ls /sys/class/net/ | grep -v lo); do
+    if [ -f "/sys/class/net/$iface/operstate" ]; then
+        STATE=$(cat "/sys/class/net/$iface/operstate")
+        echo "$iface: $STATE"
+    fi
+done
+
+# Check DHCP service
+echo "<<<nethsecurity_dhcp>>>"
+if systemctl is-active --quiet dnsmasq 2>/dev/null || systemctl is-active --quiet dhcpd 2>/dev/null; then
+    echo "dhcp: active"
+    if [ -f /var/lib/misc/dnsmasq.leases ]; then
+        LEASE_COUNT=$(wc -l < /var/lib/misc/dnsmasq.leases)
+        echo "dhcp_leases: $LEASE_COUNT"
+    fi
+else
+    echo "dhcp: inactive"
+fi
+
+# Check DNS service
+echo "<<<nethsecurity_dns>>>"
+if systemctl is-active --quiet named 2>/dev/null || systemctl is-active --quiet dnsmasq 2>/dev/null; then
+    echo "dns: active"
+else
+    echo "dns: inactive"
+fi
+
+# Log file monitoring
+echo "<<<nethsecurity_logs>>>"
+if [ -f /var/log/messages ]; then
+    FIREWALL_DROPS=$(grep -c "DROP" /var/log/messages 2>/dev/null | tail -1000 || echo "0")
+    echo "firewall_drops_recent: $FIREWALL_DROPS"
+fi

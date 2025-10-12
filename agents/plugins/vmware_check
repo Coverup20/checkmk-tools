@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# CheckMK Agent Plugin for VMWare ESXi Monitoring via SSH
+# This plugin collects VMware ESXi metrics when run on ESXi host or via remote execution
+# Deploy to: /usr/lib/check_mk_agent/plugins/
+# Note: For full VMware vCenter monitoring, use CheckMK's built-in VMware special agent
+
+set -e
+
+# Check if we're running on ESXi
+if [ ! -f /etc/vmware-release ] && ! command -v esxcli >/dev/null 2>&1; then
+    exit 0
+fi
+
+# Get ESXi version
+if [ -f /etc/vmware-release ]; then
+    ESXI_VERSION=$(cat /etc/vmware-release)
+else
+    ESXI_VERSION="unknown"
+fi
+
+echo "<<<vmware_info>>>"
+echo "version: $ESXI_VERSION"
+echo "hostname: $(hostname)"
+
+# Check ESXi services status
+echo "<<<vmware_services>>>"
+if command -v /etc/init.d/hostd >/dev/null 2>&1; then
+    /etc/init.d/hostd status 2>/dev/null | head -1
+fi
+
+# Get hardware information
+echo "<<<vmware_hardware>>>"
+if command -v esxcli >/dev/null 2>&1; then
+    # Get hardware model
+    esxcli hardware platform get 2>/dev/null | grep -E "Product Name|Vendor Name|Serial Number" || true
+    
+    # Get CPU info
+    CPU_COUNT=$(esxcli hardware cpu list 2>/dev/null | grep -c "^Id:" || echo "0")
+    echo "cpu_count: $CPU_COUNT"
+    
+    # Get memory info
+    MEMORY_MB=$(esxcli hardware memory get 2>/dev/null | grep "Physical Memory:" | awk '{print $3}' || echo "0")
+    echo "memory_mb: $MEMORY_MB"
+fi
+
+# Check storage adapters and datastores
+echo "<<<vmware_storage>>>"
+if command -v esxcli >/dev/null 2>&1; then
+    # List datastores
+    esxcli storage filesystem list 2>/dev/null | tail -n +3 | while read -r mount size free type uuid name; do
+        if [ -n "$mount" ]; then
+            echo "datastore: $mount - size=$size free=$free type=$type"
+        fi
+    done
+fi
+
+# Check network adapters
+echo "<<<vmware_network>>>"
+if command -v esxcli >/dev/null 2>&1; then
+    esxcli network nic list 2>/dev/null | grep -E "^vmnic" | while read -r line; do
+        echo "$line"
+    done
+fi
+
+# Check VMs status
+echo "<<<vmware_vms>>>"
+if command -v vim-cmd >/dev/null 2>&1; then
+    # List all VMs
+    for vmid in $(vim-cmd vmsvc/getallvms 2>/dev/null | tail -n +2 | awk '{print $1}'); do
+        if [ "$vmid" != "Vmid" ]; then
+            VM_NAME=$(vim-cmd vmsvc/get.summary $vmid 2>/dev/null | grep "name = " | cut -d'"' -f2)
+            VM_STATE=$(vim-cmd vmsvc/power.getstate $vmid 2>/dev/null | tail -1)
+            echo "VM_${vmid}: $VM_STATE - $VM_NAME"
+        fi
+    done
+fi
+
+# Check vSwitch configuration
+echo "<<<vmware_vswitches>>>"
+if command -v esxcli >/dev/null 2>&1; then
+    esxcli network vswitch standard list 2>/dev/null | grep -E "vSwitch Name|Uplinks|Portgroups" || true
+fi
+
+# Check system resource usage
+echo "<<<vmware_resources>>>"
+if command -v esxtop >/dev/null 2>&1; then
+    # Get CPU and memory stats (single iteration)
+    esxtop -b -n 1 2>/dev/null | tail -1 | awk '{print "cpu_usage: " $1 " memory_usage: " $2}' || true
+fi
+
+# Check for hardware errors
+echo "<<<vmware_health>>>"
+if command -v esxcli >/dev/null 2>&1; then
+    # Check hardware health
+    HEALTH_STATUS=$(esxcli hardware health status get 2>/dev/null || echo "unavailable")
+    echo "health_status: $HEALTH_STATUS"
+    
+    # Check for hardware sensors
+    esxcli system health status get 2>/dev/null || echo "health_sensors: unavailable"
+fi
+
+# Check host maintenance mode
+echo "<<<vmware_maintenance>>>"
+if command -v vim-cmd >/dev/null 2>&1; then
+    MAINT_MODE=$(vim-cmd hostsvc/hostsummary 2>/dev/null | grep "inMaintenanceMode" | awk '{print $3}' | tr -d ',')
+    echo "maintenance_mode: $MAINT_MODE"
+fi
+
+# Check license information
+echo "<<<vmware_license>>>"
+if command -v vim-cmd >/dev/null 2>&1; then
+    LICENSE_INFO=$(vim-cmd vimsvc/license --show 2>/dev/null | grep -E "Product name|License key" || echo "license: unavailable")
+    echo "$LICENSE_INFO"
+fi
+
+# Check NTP sync
+echo "<<<vmware_ntp>>>"
+if command -v esxcli >/dev/null 2>&1; then
+    NTP_STATUS=$(esxcli system ntp get 2>/dev/null || echo "ntp: unavailable")
+    echo "$NTP_STATUS"
+fi

@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# CheckMK Agent Plugin for Managed Switch Monitoring
+# This plugin uses SNMP to collect switch metrics
+# Note: This is a helper script - CheckMK has built-in SNMP support
+# For full switch monitoring, configure SNMP in CheckMK GUI
+# Deploy to: /usr/lib/check_mk_agent/plugins/
+
+set -e
+
+# This script provides additional switch-specific checks
+# Requires: snmpwalk, snmpget commands
+
+# Configuration - set these via environment or in script
+SWITCH_IP="${SWITCH_IP:-}"
+SNMP_COMMUNITY="${SNMP_COMMUNITY:-public}"
+SNMP_VERSION="${SNMP_VERSION:-2c}"
+
+# Exit if no switch IP is configured
+if [ -z "$SWITCH_IP" ]; then
+    # Look for switch config file
+    if [ -f /etc/check_mk/switch_config.conf ]; then
+        source /etc/check_mk/switch_config.conf
+    else
+        # No configuration, exit silently
+        exit 0
+    fi
+fi
+
+# Check if SNMP tools are available
+if ! command -v snmpwalk >/dev/null 2>&1; then
+    exit 0
+fi
+
+echo "<<<managed_switch_info>>>"
+# Get system information
+SYS_DESCR=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" SNMPv2-MIB::sysDescr.0 2>/dev/null | cut -d':' -f4- | xargs)
+SYS_NAME=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" SNMPv2-MIB::sysName.0 2>/dev/null | cut -d':' -f4- | xargs)
+SYS_UPTIME=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" SNMPv2-MIB::sysUpTime.0 2>/dev/null | cut -d')' -f2- | xargs)
+
+echo "switch_ip: $SWITCH_IP"
+echo "system_name: $SYS_NAME"
+echo "description: $SYS_DESCR"
+echo "uptime: $SYS_UPTIME"
+
+# Get port/interface information
+echo "<<<managed_switch_ports>>>"
+# Get interface count
+IF_NUMBER=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" IF-MIB::ifNumber.0 2>/dev/null | awk '{print $NF}')
+echo "total_ports: $IF_NUMBER"
+
+# Get interface status for each port
+for i in $(seq 1 ${IF_NUMBER:-0}); do
+    IF_DESCR=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" IF-MIB::ifDescr.$i 2>/dev/null | cut -d':' -f4- | xargs)
+    IF_STATUS=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" IF-MIB::ifOperStatus.$i 2>/dev/null | awk '{print $NF}')
+    IF_ADMIN=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" IF-MIB::ifAdminStatus.$i 2>/dev/null | awk '{print $NF}')
+    
+    if [ -n "$IF_DESCR" ]; then
+        echo "port_${i}: $IF_DESCR - admin=$IF_ADMIN oper=$IF_STATUS"
+    fi
+done
+
+# Get port statistics
+echo "<<<managed_switch_traffic>>>"
+for i in $(seq 1 ${IF_NUMBER:-0}); do
+    IF_DESCR=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" IF-MIB::ifDescr.$i 2>/dev/null | cut -d':' -f4- | xargs)
+    IF_IN_OCTETS=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" IF-MIB::ifInOctets.$i 2>/dev/null | awk '{print $NF}')
+    IF_OUT_OCTETS=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" IF-MIB::ifOutOctets.$i 2>/dev/null | awk '{print $NF}')
+    IF_IN_ERRORS=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" IF-MIB::ifInErrors.$i 2>/dev/null | awk '{print $NF}')
+    IF_OUT_ERRORS=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" IF-MIB::ifOutErrors.$i 2>/dev/null | awk '{print $NF}')
+    
+    if [ -n "$IF_DESCR" ]; then
+        echo "port_${i}: in_bytes=$IF_IN_OCTETS out_bytes=$IF_OUT_OCTETS in_errors=$IF_IN_ERRORS out_errors=$IF_OUT_ERRORS"
+    fi
+done
+
+# Get VLAN information (if supported)
+echo "<<<managed_switch_vlans>>>"
+VLAN_COUNT=$(snmpwalk -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" Q-BRIDGE-MIB::dot1qVlanStaticName 2>/dev/null | wc -l)
+echo "vlan_count: $VLAN_COUNT"
+
+# Get CPU usage (Cisco specific - may not work on all switches)
+echo "<<<managed_switch_cpu>>>"
+CPU_5SEC=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" .1.3.6.1.4.1.9.9.109.1.1.1.1.6.1 2>/dev/null | awk '{print $NF}' || echo "unavailable")
+CPU_1MIN=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" .1.3.6.1.4.1.9.9.109.1.1.1.1.7.1 2>/dev/null | awk '{print $NF}' || echo "unavailable")
+CPU_5MIN=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" .1.3.6.1.4.1.9.9.109.1.1.1.1.8.1 2>/dev/null | awk '{print $NF}' || echo "unavailable")
+echo "cpu_5sec: $CPU_5SEC"
+echo "cpu_1min: $CPU_1MIN"
+echo "cpu_5min: $CPU_5MIN"
+
+# Get memory usage (Cisco specific - may not work on all switches)
+echo "<<<managed_switch_memory>>>"
+MEM_POOL_USED=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" .1.3.6.1.4.1.9.9.48.1.1.1.5.1 2>/dev/null | awk '{print $NF}' || echo "unavailable")
+MEM_POOL_FREE=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" .1.3.6.1.4.1.9.9.48.1.1.1.6.1 2>/dev/null | awk '{print $NF}' || echo "unavailable")
+echo "memory_used: $MEM_POOL_USED"
+echo "memory_free: $MEM_POOL_FREE"
+
+# Get temperature sensors (if available)
+echo "<<<managed_switch_temperature>>>"
+TEMP_SENSORS=$(snmpwalk -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" .1.3.6.1.4.1.9.9.13.1.3.1.3 2>/dev/null)
+if [ -n "$TEMP_SENSORS" ]; then
+    echo "$TEMP_SENSORS" | while read -r line; do
+        TEMP=$(echo "$line" | awk '{print $NF}')
+        echo "temperature_celsius: $TEMP"
+    done
+else
+    echo "temperature: unavailable"
+fi
+
+# Get fan status (if available)
+echo "<<<managed_switch_fans>>>"
+FAN_STATUS=$(snmpwalk -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" .1.3.6.1.4.1.9.9.13.1.4.1.3 2>/dev/null)
+if [ -n "$FAN_STATUS" ]; then
+    echo "$FAN_STATUS"
+else
+    echo "fan_status: unavailable"
+fi
+
+# Get power supply status (if available)
+echo "<<<managed_switch_power>>>"
+PS_STATUS=$(snmpwalk -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" .1.3.6.1.4.1.9.9.13.1.5.1.3 2>/dev/null)
+if [ -n "$PS_STATUS" ]; then
+    echo "$PS_STATUS"
+else
+    echo "power_supply: unavailable"
+fi
+
+# Get spanning tree information
+echo "<<<managed_switch_stp>>>"
+STP_ROOT=$(snmpget -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" BRIDGE-MIB::dot1dStpDesignatedRoot.0 2>/dev/null | cut -d':' -f4- | xargs)
+echo "stp_root: $SYS_NAME"
+
+# Get MAC address table size
+echo "<<<managed_switch_mac_table>>>"
+MAC_COUNT=$(snmpwalk -v "$SNMP_VERSION" -c "$SNMP_COMMUNITY" "$SWITCH_IP" BRIDGE-MIB::dot1dTpFdbAddress 2>/dev/null | wc -l)
+echo "mac_addresses: $MAC_COUNT"

@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# CheckMK Agent Plugin for Proxmox VE
+# This plugin collects Proxmox-specific metrics including cluster, VM, and storage status
+# Deploy to: /usr/lib/check_mk_agent/plugins/
+
+set -e
+
+# Check if we're running on Proxmox VE
+if [ ! -f /etc/pve/.version ] && ! command -v pvesh >/dev/null 2>&1; then
+    exit 0
+fi
+
+# Get Proxmox version
+if [ -f /etc/pve/.version ]; then
+    PVE_VERSION=$(cat /etc/pve/.version)
+else
+    PVE_VERSION="unknown"
+fi
+
+echo "<<<proxmox_info>>>"
+echo "version: $PVE_VERSION"
+echo "hostname: $(hostname -f)"
+echo "uptime: $(uptime -p)"
+
+# Check cluster status
+echo "<<<proxmox_cluster>>>"
+if command -v pvecm >/dev/null 2>&1; then
+    if pvecm status >/dev/null 2>&1; then
+        CLUSTER_NAME=$(pvecm status 2>/dev/null | grep "Cluster name:" | awk '{print $3}')
+        CLUSTER_NODES=$(pvecm status 2>/dev/null | grep "Total votes:" | awk '{print $3}')
+        QUORUM=$(pvecm status 2>/dev/null | grep "Quorum:" | awk '{print $2}')
+        echo "cluster_name: $CLUSTER_NAME"
+        echo "cluster_nodes: $CLUSTER_NODES"
+        echo "quorum: $QUORUM"
+    else
+        echo "cluster_status: standalone"
+    fi
+fi
+
+# Check Proxmox services
+echo "<<<proxmox_services>>>"
+for service in pve-cluster pvedaemon pveproxy pvestatd pvescheduler; do
+    if systemctl is-active --quiet $service 2>/dev/null; then
+        echo "$service: active"
+    else
+        echo "$service: inactive"
+    fi
+done
+
+# Check VMs and Containers status
+echo "<<<proxmox_vms>>>"
+if command -v qm >/dev/null 2>&1; then
+    qm list 2>/dev/null | tail -n +2 | while read -r vmid status name; do
+        echo "VM $vmid: $status - $name"
+    done
+fi
+
+echo "<<<proxmox_containers>>>"
+if command -v pct >/dev/null 2>&1; then
+    pct list 2>/dev/null | tail -n +2 | while read -r vmid status name; do
+        echo "CT $vmid: $status - $name"
+    done
+fi
+
+# Check storage status
+echo "<<<proxmox_storage>>>"
+if command -v pvesh >/dev/null 2>&1; then
+    pvesh get /storage --output-format json 2>/dev/null | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    for storage in data:
+        print(f\"{storage.get('storage', 'unknown')}: {storage.get('type', 'unknown')} - enabled={storage.get('enabled', 0)}\")
+except:
+    pass
+" 2>/dev/null || echo "storage_info: unavailable"
+fi
+
+# Check replication status
+echo "<<<proxmox_replication>>>"
+if [ -d /etc/pve/replication.cfg ] || [ -f /etc/pve/replication.cfg ]; then
+    if command -v pvesr >/dev/null 2>&1; then
+        pvesr status 2>/dev/null | tail -n +2 | while read -r line; do
+            echo "$line"
+        done
+    fi
+fi
+
+# Check backup status
+echo "<<<proxmox_backup>>>"
+if [ -f /etc/vzdump.conf ]; then
+    echo "vzdump_configured: yes"
+    # Check last backup jobs
+    if [ -d /var/log/pve/tasks ]; then
+        RECENT_BACKUPS=$(find /var/log/pve/tasks -name "UPID:*:*:vzdump:*" -mtime -1 2>/dev/null | wc -l)
+        echo "recent_backup_jobs_24h: $RECENT_BACKUPS"
+    fi
+fi
+
+# Check Ceph status (if installed)
+echo "<<<proxmox_ceph>>>"
+if command -v ceph >/dev/null 2>&1 && systemctl is-active --quiet ceph-mon@* 2>/dev/null; then
+    CEPH_STATUS=$(ceph status --format json 2>/dev/null)
+    if [ -n "$CEPH_STATUS" ]; then
+        echo "ceph: active"
+        CEPH_HEALTH=$(echo "$CEPH_STATUS" | python3 -c "import sys, json; print(json.load(sys.stdin)['health']['status'])" 2>/dev/null || echo "UNKNOWN")
+        echo "ceph_health: $CEPH_HEALTH"
+    fi
+else
+    echo "ceph: not_installed"
+fi
+
+# Check ZFS pools (if ZFS is used)
+echo "<<<proxmox_zfs>>>"
+if command -v zpool >/dev/null 2>&1; then
+    zpool list -H 2>/dev/null | while read -r pool size alloc free frag cap dedup health; do
+        echo "$pool: $health - capacity=$cap"
+    done
+fi
+
+# Check LVM storage
+echo "<<<proxmox_lvm>>>"
+if command -v vgs >/dev/null 2>&1; then
+    vgs --noheadings --units g 2>/dev/null | while read -r vg_name pv_count lv_count snap_count vg_attr vg_size vg_free; do
+        echo "$vg_name: size=$vg_size free=$vg_free"
+    done
+fi
+
+# Network bridge status
+echo "<<<proxmox_bridges>>>"
+for bridge in $(ls /sys/class/net/ | grep -E '^vmbr'); do
+    if [ -f "/sys/class/net/$bridge/operstate" ]; then
+        STATE=$(cat "/sys/class/net/$bridge/operstate")
+        echo "$bridge: $STATE"
+    fi
+done
+
+# Check subscription status
+echo "<<<proxmox_subscription>>>"
+if [ -f /etc/apt/sources.list.d/pve-enterprise.list ]; then
+    if pvesubscription get 2>/dev/null | grep -q "status.*Active"; then
+        echo "subscription: active"
+    else
+        echo "subscription: inactive"
+    fi
+fi
+
+# CPU and Memory usage for host
+echo "<<<proxmox_resources>>>"
+CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')
+MEM_USAGE=$(free | grep Mem | awk '{print ($3/$2) * 100.0}')
+echo "cpu_usage_percent: $CPU_USAGE"
+echo "memory_usage_percent: $MEM_USAGE"
