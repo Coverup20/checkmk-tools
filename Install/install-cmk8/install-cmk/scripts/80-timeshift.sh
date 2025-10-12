@@ -6,16 +6,16 @@ echo -e "\n===== INSTALLAZIONE E CONFIGURAZIONE TIMESHiFT ====="
 LOG_FILE="/var/log/timeshift-rotation.log"
 CRON_FILE="/etc/cron.d/timeshift-rotation"
 
-# Verifica se timeshift è già installato
+# Verifica se timeshift Ã¨ giÃ  installato
 if command -v timeshift &>/dev/null; then
-    echo "[INFO] Timeshift risulta già installato." | tee -a "$LOG_FILE"
+    echo "[INFO] Timeshift risulta giÃ  installato." | tee -a "$LOG_FILE"
 else
     read -rp "Vuoi installare Timeshift e configurare gli snapshot automatici? (s/n): " risposta
     if [[ "$risposta" =~ ^[Ss]$ ]]; then
         echo "[INFO] Installazione Timeshift e dipendenze..." | tee -a "$LOG_FILE"
         apt-get update -qq >>"$LOG_FILE" 2>&1
 
-        # Se grub-btrfs è disponibile lo installa, altrimenti lo salta
+        # Se grub-btrfs Ã¨ disponibile lo installa, altrimenti lo salta
         if apt-cache show grub-btrfs >/dev/null 2>&1; then
             apt-get install -y timeshift inotify-tools grub-btrfs >>"$LOG_FILE" 2>&1 || {
                 echo "[ERRORE] Installazione fallita. Controllare il log: $LOG_FILE"
@@ -49,7 +49,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # Esegue uno snapshot ogni giorno lavorativo alle 03:00
 0 3 * * 1-5 root /usr/bin/timeshift --create --comments "Snapshot Automatico Giornaliero" >> /var/log/timeshift-rotation.log 2>&1
 
-# Pulisce snapshot più vecchi di 14 giorni
+# Pulisce snapshot piÃ¹ vecchi di 14 giorni
 30 3 * * 1 root /usr/bin/timeshift --check --scripted | grep "Removing" >> /var/log/timeshift-rotation.log 2>&1
 EOF
 

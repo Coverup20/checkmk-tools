@@ -25,7 +25,7 @@ case "$WS" in
     apt-get install -y nginx python3-certbot-nginx >/dev/null
     ;;
   standalone)
-    echo ">>> Modalità standalone selezionata (nessun webserver installato)."
+    echo ">>> ModalitÃ  standalone selezionata (nessun webserver installato)."
     ;;
   *)
     echo "ERRORE: Valore WEBSERVER non valido: $WS"

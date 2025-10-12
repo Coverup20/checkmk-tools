@@ -1,13 +1,13 @@
 #!/bin/bash
 # Wrapper Bash per aggiungere NOTIFY_HOSTLABEL_real_ip in CRE (Raw Edition)
 
-# 1. Se abbiamo già NOTIFY_HOSTLABELS, estrai real_ip:...
+# 1. Se abbiamo giÃ  NOTIFY_HOSTLABELS, estrai real_ip:...
 if [ -n "$NOTIFY_HOSTLABELS" ]; then
     REAL_IP=$(echo "$NOTIFY_HOSTLABELS" | grep -o 'real_ip:[^,]*' | cut -d: -f2)
     export NOTIFY_HOSTLABEL_real_ip="$REAL_IP"
 fi
 
-# 2. (Opzionale) Se REAL_IP è vuoto, puoi usare un mapping statico
+# 2. (Opzionale) Se REAL_IP Ã¨ vuoto, puoi usare un mapping statico
 # File CSV: hostname,ip
 MAPPING_FILE="/omd/sites/monitoring/local/etc/real_ip_map.csv"
 if [ -z "$NOTIFY_HOSTLABEL_real_ip" ] && [ -f "$MAPPING_FILE" ]; then

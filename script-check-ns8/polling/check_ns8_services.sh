@@ -3,7 +3,7 @@
 # Controllo servizi mail principali leggendo lo stato dei container
 # + numero sessioni IMAP attive da doveadm
 # + stato critico se rilevato vsz_limit nei log di Dovecot
-# + warning se VszLimit non è impostato
+# + warning se VszLimit non Ã¨ impostato
 # + conteggio delle occorrenze recenti di vsz_limit nei log
 
 echo "<<<local>>>"
@@ -28,7 +28,7 @@ for INSTANCE in $MAIL_INSTANCES; do
             if [[ "$STATE" == "Up" ]]; then
                 echo "0 ${SVC} - ${SVC} attivo"
 
-                # Se è dovecot, aggiungo controlli extra
+                # Se Ã¨ dovecot, aggiungo controlli extra
                 if [[ "$SVC" == "dovecot" ]]; then
                     # Numero sessioni IMAP
                     IMAP_COUNT=$(runagent -m "$INSTANCE" podman exec "$SVC" doveadm who 2>/dev/null | wc -l)

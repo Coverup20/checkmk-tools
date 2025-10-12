@@ -76,7 +76,7 @@ case "$OS_TYPE" in
     echo "   signal-event runlevel-adjust"
     ;;
   *)
-    echo "⚠️ Sistema operativo non riconosciuto: nessuna azione eseguita"
+    echo "âš ï¸ Sistema operativo non riconosciuto: nessuna azione eseguita"
     ;;
 esac
 
@@ -85,4 +85,4 @@ esac
 # ----------------------------
 echo
 echo "=== DRY RUN completato ==="
-echo "Nessun file è stato modificato."
+echo "Nessun file Ã¨ stato modificato."

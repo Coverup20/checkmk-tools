@@ -124,7 +124,7 @@ EOF
     systemctl enable frpc
     systemctl restart frpc
 else
-    echo "⚠️  Sistema operativo non riconosciuto: configurazione manuale necessaria"
+    echo "âš ï¸  Sistema operativo non riconosciuto: configurazione manuale necessaria"
 fi
 
 # ----------------------------

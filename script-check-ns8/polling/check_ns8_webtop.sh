@@ -1,7 +1,7 @@
 #!/bin/bash
 # check_ns8_webtop.sh
 # Monitoraggio WebTop in NS8 per Checkmk
-# Controlla la presenza delle istanze e la raggiungibilità HTTP
+# Controlla la presenza delle istanze e la raggiungibilitÃ  HTTP
 
 echo "<<<local>>>"
 
@@ -22,7 +22,7 @@ if [[ -z "$INSTANCES" ]]; then
     exit 0
 fi
 
-# Controllo raggiungibilità interfaccia
+# Controllo raggiungibilitÃ  interfaccia
 URL="https://webtop.${DOMAIN}/webtop/"
 CODE=$(curl -sk -o /dev/null -w "%{http_code}" "$URL")
 
