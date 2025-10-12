@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+# mail_realip OK
+# Bulk: yes
+
+from cmk.notification_plugins import mail
+import os
+
+def main():
+    # Se esiste la label real_ip, sostituisci tutte le variabili IP rilevanti
+    real_ip = os.environ.get("NOTIFY_HOSTLABEL_real_ip")
+    if real_ip:
+        os.environ["HOSTADDRESS"] = real_ip
+        os.environ["NOTIFY_HOSTADDRESS"] = real_ip
+        # opzionale: se l'output host contiene già l'IP vecchio, lo rimpiazziamo
+        if "NOTIFY_HOSTOUTPUT" in os.environ:
+            os.environ["NOTIFY_HOSTOUTPUT"] = os.environ["NOTIFY_HOSTOUTPUT"].replace(
+                os.environ.get("NOTIFY_HOSTADDRESS", "127.0.0.1"), real_ip
+            )
+    mail.main()
+
+if __name__ == "__main__":
+    main()

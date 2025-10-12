@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+# Debug
+# Bulk: yes
+
+import os
+import sys
+import html
+from cmk.notification_plugins.mail import construct_content
+
+def extend_context(context: dict[str, str]) -> None:
+    real_ip = os.environ.get("NOTIFY_HOSTLABEL_real_ip")
+    if real_ip:
+        # sovrascrivo HOSTADDRESS così appare nelle mail
+        context["HOSTADDRESS"] = real_ip
+
+    host = context.get("HOSTNAME")
+    svc = context.get("SERVICEDESC")
+    if host and svc:
+        base_url = "https://monitor.nethlab.it/monitoring/check_mk"
+        graph_url = (
+            f"{base_url}/ajax_graph_images.py?"
+            f"host={host}&service={svc}&num_graphs=1"
+        )
+        context["GRAPH_URL"] = graph_url
+
+def main() -> None:
+    try:
+        context = {k: v for k, v in os.environ.items()}
+        escaped_context = {k: html.escape(str(v)) for k, v in context.items()}
+
+        # --- Fallback minimi per test manuali ---
+        escaped_context.setdefault("WHAT", "SERVICE")
+        escaped_context.setdefault("HOSTNAME", "test-host")
+        escaped_context.setdefault("HOSTALIAS", "test-alias")
+        escaped_context.setdefault("SERVICEDESC", "test-service")
+        escaped_context.setdefault("SERVICESTATE", "OK")
+        escaped_context.setdefault("SERVICEOUTPUT", "Test output")
+        escaped_context.setdefault("HOSTADDRESS", "127.0.0.1")
+        escaped_context.setdefault("LINKEDSERVICEDESC", "")
+        escaped_context.setdefault("PARAMETER_GRAPHS_PER_NOTIFICATION", "0")
+        escaped_context.setdefault("NOTIFICATIONTYPE", "PROBLEM")
+        escaped_context.setdefault("PREVIOUSSERVICEHARDSTATE", "OK")
+        escaped_context.setdefault("SERVICESTATEID", "0")
+        escaped_context.setdefault("SERVICEATTEMPT", "1")
+        escaped_context.setdefault("MAXSERVICEATTEMPTS", "3")
+
+        # Applichiamo REAL_IP e grafico
+        extend_context(escaped_context)
+
+        # Costruzione contenuto
+        content_txt, content_html, attachments = construct_content(escaped_context)
+
+        if "GRAPH_URL" in escaped_context:
+            graph_html = f'<p><img src="{escaped_context["GRAPH_URL"]}" alt="Graph"></p>'
+            content_html += graph_html
+
+        print("=== TXT ===")
+        print(content_txt)
+        print("\n=== HTML ===")
+        print(content_html)
+        print("\n=== ATTACHMENTS ===")
+        print(attachments)
+
+    except Exception as e:
+        sys.stderr.write(f"ERROR in mail_realip_wrapper_inline_debug: {e}\n")
+        sys.exit(2)
+
+if __name__ == "__main__":
+    main()

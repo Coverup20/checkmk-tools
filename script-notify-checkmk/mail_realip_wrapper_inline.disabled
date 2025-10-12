@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Wrapper mail con real_ip e grafici inline (compatibile Checkmk Raw 2.4)
+
+import os
+import sys
+import html
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from cmk.notification_plugins.mail import construct_content
+
+
+def extend_context(context: dict[str, str]) -> None:
+    real_ip = os.environ.get("NOTIFY_HOSTLABEL_real_ip")
+    if real_ip:
+        # Sovrascrive HOSTADDRESS con l’IP reale
+        context["HOSTADDRESS"] = real_ip
+
+    host = context.get("HOSTNAME")
+    svc = context.get("SERVICEDESC")
+    if host and svc:
+        base_url = "https://monitor.nethlab.it/monitoring/check_mk"
+        graph_url = (
+            f"{base_url}/ajax_graph_images.py?"
+            f"host={host}&service={svc}&num_graphs=1"
+        )
+        context["GRAPH_URL"] = graph_url
+
+
+def main() -> None:
+    try:
+        context = {k: v for k, v in os.environ.items()}
+        escaped_context = {k: html.escape(str(v)) for k, v in context.items()}
+
+        # --- Fallback completi ---
+        # Notification
+        escaped_context.setdefault("WHAT", "SERVICE")
+        escaped_context.setdefault("NOTIFICATIONTYPE", "PROBLEM")
+        escaped_context.setdefault("NOTIFICATIONCOMMENT", "")
+
+        # Host
+        escaped_context.setdefault("HOSTNAME", "unknown-host")
+        escaped_context.setdefault("HOSTALIAS", "unknown-alias")
+        escaped_context.setdefault("HOSTADDRESS", "0.0.0.0")
+        escaped_context.setdefault("HOSTSTATE", "UNKNOWN")
+        escaped_context.setdefault("HOSTSTATEID", "2")
+        escaped_context.setdefault("HOSTOUTPUT", "No host output")
+        escaped_context.setdefault("LONGHOSTOUTPUT", "")
+        escaped_context.setdefault("PREVIOUSHOSTHARDSTATE", "UNKNOWN")
+        escaped_context.setdefault("MAXHOSTATTEMPTS", "3")
+        escaped_context.setdefault("HOSTATTEMPT", "1")
+        escaped_context.setdefault("SITENAME", "monitoring")
+
+        # Service
+        escaped_context.setdefault("SERVICEDESC", "unknown-service")
+        escaped_context.setdefault("SERVICEOUTPUT", "No service output")
+        escaped_context.setdefault("LONGSERVICEOUTPUT", "")
+        escaped_context.setdefault("SERVICESTATE", "UNKNOWN")
+        escaped_context.setdefault("SERVICESTATEID", "3")
+        escaped_context.setdefault("PREVIOUSSERVICEHARDSTATE", "UNKNOWN")
+        escaped_context.setdefault("MAXSERVICEATTEMPTS", "3")
+        escaped_context.setdefault("SERVICEATTEMPT", "1")
+        escaped_context.setdefault("SERVICEPERFDATA", "")
+        escaped_context.setdefault("LINKEDSERVICEDESC", "")
+
+        # Contact
+        escaped_context.setdefault("CONTACTNAME", "cmkadmin")
+        escaped_context.setdefault("CONTACTEMAIL", "monitor@nethlab.it")
+        escaped_context.setdefault("CONTACTPAGER", "")
+        escaped_context.setdefault("CONTACTGROUPNAMES", "")
+
+        # Parameters
+        escaped_context.setdefault("PARAMETER_GRAPHS_PER_NOTIFICATION", "0")
+        escaped_context.setdefault("PARAMETER_URL_PREFIX", "https://monitor.nethlab.it/monitoring")
+
+        # Estensioni: real_ip e grafico
+        extend_context(escaped_context)
+
+        # Costruzione contenuti standard
+        content_txt, content_html, attachments = construct_content(escaped_context)
+
+        # Appendiamo grafico inline
+        if "GRAPH_URL" in escaped_context:
+            graph_html = f'<p><img src="{escaped_context["GRAPH_URL"]}" alt="Graph"></p>'
+            content_html += graph_html
+
+        # Costruzione email
+        msg = MIMEMultipart("alternative")
+        msg["From"] = "checkmk-vps@nethesis.it"
+        msg["To"] = escaped_context.get("CONTACTEMAIL", "monitor@nethlab.it")
+        msg["Subject"] = f"[Checkmk] {escaped_context.get('HOSTNAME')} / {escaped_context.get('SERVICEDESC')}"
+
+        msg.attach(MIMEText(content_txt, "plain"))
+        msg.attach(MIMEText(content_html, "html"))
+
+        # Invio tramite Postfix locale
+        with smtplib.SMTP("localhost") as server:
+            server.send_message(msg)
+
+    except Exception as e:
+        sys.stderr.write(f"ERROR in mail_realip_wrapper_inline: {e}\n")
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#
+# Local check per Checkmk:
+# Monitora login, logout e tentativi falliti di root via SSH
+# Stati: 0=OK, 1=WARN, 2=CRITICAL
+
+LOGFILE="/var/log/auth.log"
+STATEFILE="/var/lib/check_mk_agent/ssh_root_session.state"
+IPFILE="/var/lib/check_mk_agent/ssh_root_session.lastip"
+
+# Ricorda l'ultima riga letta
+LASTLINE=0
+[ -f "$STATEFILE" ] && LASTLINE=$(cat "$STATEFILE")
+TOTALLINES=$(wc -l <"$LOGFILE" 2>/dev/null || echo 0)
+
+# Reset se log ruotato
+if [ "$TOTALLINES" -lt "$LASTLINE" ]; then
+  LASTLINE=0
+fi
+
+NEWLINES=$((TOTALLINES - LASTLINE))
+EVENTS=$(tail -n "$NEWLINES" "$LOGFILE" 2>/dev/null || true)
+echo "$TOTALLINES" >"$STATEFILE"
+
+# Carica ultimo IP noto
+LASTIP="unknown"
+[ -f "$IPFILE" ] && LASTIP=$(cat "$IPFILE")
+
+LOGIN=$(echo "$EVENTS"  | grep "sshd" | grep "Accepted" | grep "for root")
+LOGOUT=$(echo "$EVENTS" | grep "sshd" | grep "session closed for user root")
+FAIL=$(echo "$EVENTS"   | grep "sshd" | grep "Failed password for root")
+
+if [ -n "$FAIL" ]; then
+    TS=$(echo "$FAIL" | tail -n1 | awk '{print $1" "$2" "$3}')
+    IP=$(echo "$FAIL" | tail -n1 | awk '{for(i=1;i<=NF;i++){if($i=="from"){print $(i+1); exit}}}')
+    echo "$IP" >"$IPFILE"
+    echo "2 SSH_Session - CRITICAL: Failed root SSH login from $IP at $TS"
+
+elif [ -n "$LOGIN" ]; then
+    TS=$(echo "$LOGIN" | tail -n1 | awk '{print $1" "$2" "$3}')
+    IP=$(echo "$LOGIN" | tail -n1 | awk '{for(i=1;i<=NF;i++){if($i=="from"){print $(i+1); exit}}}')
+    echo "$IP" >"$IPFILE"
+    echo "1 SSH_Session - WARN: root SSH login from $IP at $TS"
+
+elif [ -n "$LOGOUT" ]; then
+    TS=$(echo "$LOGOUT" | tail -n1 | awk '{print $1" "$2" "$3}')
+    echo "0 SSH_Session - OK: root SSH logout (last IP $LASTIP) at $TS"
+
+else
+    NOW=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "0 SSH_Session - OK: no new root SSH events (last check $NOW)"
+fi

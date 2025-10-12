@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+#
+# Local check per Checkmk:
+# Mostra lo stato di fail2ban per la jail sshd
+
+JAIL="sshd"
+STATUS=0
+
+if ! command -v fail2ban-client >/dev/null 2>&1; then
+    echo "3 SSH_Fail2ban - FAIL: fail2ban-client non trovato"
+    exit 0
+fi
+
+OUTPUT=$(fail2ban-client status "$JAIL" 2>/dev/null)
+if [ $? -ne 0 ]; then
+    echo "3 SSH_Fail2ban - FAIL: jail $JAIL non trovata"
+    exit 0
+fi
+
+# Numero IP bannati
+BANNED=$(echo "$OUTPUT" | awk -F': ' '/Currently banned/{print $2}')
+# Ultimi IP bannati
+IPS=$(echo "$OUTPUT" | awk -F': ' '/Banned IP list/{print $2}')
+
+if [ "$BANNED" -gt 0 ]; then
+    STATUS=2
+    echo "$STATUS SSH_Fail2ban banned=$BANNED; CRITICAL: $BANNED IP attualmente bannati da fail2ban (jail=$JAIL) [$IPS]"
+else
+    echo "$STATUS SSH_Fail2ban banned=0; OK: nessun IP bannato da fail2ban (jail=$JAIL)"
+fi

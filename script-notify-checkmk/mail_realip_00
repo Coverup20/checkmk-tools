@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+# mail_realip_nograph: identico a mail_realip, ma senza grafici
+# Bulk: yes
+
+import os
+from cmk.notification_plugins import mail as _mail
+
+# no-op: evita qualsiasi tentativo di allegare grafici
+def _no_graphs(context, attachments):
+    return attachments
+
+def main():
+    # Disattiva solo l'aggiunta grafici, senza toccare altro
+    _mail._add_graphs = _no_graphs
+
+    # --- parte tua invariata ---
+    real_ip = os.environ.get("NOTIFY_HOSTLABEL_real_ip")
+    if real_ip:
+        os.environ["HOSTADDRESS"] = real_ip
+        os.environ["NOTIFY_HOSTADDRESS"] = real_ip
+        if "NOTIFY_HOSTOUTPUT" in os.environ:
+            os.environ["NOTIFY_HOSTOUTPUT"] = os.environ["NOTIFY_HOSTOUTPUT"].replace(
+                os.environ.get("NOTIFY_HOSTADDRESS", "127.0.0.1"), real_ip
+            )
+    # ---------------------------
+
+    _mail.main()
+
+if __name__ == "__main__":
+    main()

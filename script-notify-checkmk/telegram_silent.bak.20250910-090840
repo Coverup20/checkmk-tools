@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Checkmk → Telegram (silent, with emoji + inline buttons)
+set -euo pipefail
+
+# 🔇 forza silenzio totale (stdout + stderr)
+exec > /dev/null 2>&1
+
+# === CONFIG ===
+TOKEN="8264716040:AAHPjzYJz7h8pV9hzjaf45-Mrv2gf8tMXmQ"
+CHAT_ID="381764604"
+
+CMK_URL="https://monitor.nethlab.it/monitoring"
+SITE="monitoring"
+# ==============
+
+get_emoji() {
+  case "$1" in
+    OK|UP) echo "🟢" ;;
+    WARN|WARNING) echo "🟡" ;;
+    CRIT|CRITICAL|DOWN) echo "🔴" ;;
+    UNKNOWN) echo "⚪" ;;
+    *) echo "❔" ;;
+  esac
+}
+
+# URL-encode helper
+urlencode() {
+  local raw="${1:-}"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))' "$raw"
+  else
+    echo "$raw" | sed 's/ /%20/g'
+  fi
+}
+
+# Build message + buttons
+if [[ "${NOTIFY_WHAT:-SERVICE}" = "SERVICE" ]]; then
+  EMOJI="$(get_emoji "${NOTIFY_SERVICESTATE:-UNKNOWN}")"
+  SERVICE_ENC="$(urlencode "${NOTIFY_SERVICEDESC:-SERVICE}")"
+
+  SERVICE_LINK="${CMK_URL}/check_mk/view.py?view_name=service&host=${NOTIFY_HOSTNAME:-}&service=${SERVICE_ENC}&site=${SITE}"
+  HOST_LINK="${CMK_URL}/check_mk/view.py?view_name=host&host=${NOTIFY_HOSTNAME:-}&site=${SITE}"
+
+  MSG="[$EMOJI ${NOTIFY_SERVICESTATE:-UNKNOWN}] Servizio → ${NOTIFY_SERVICEDESC:-}
+Host: ${NOTIFY_HOSTNAME:-unknown} (${NOTIFY_HOSTADDRESS:-})
+Output: ${NOTIFY_SERVICEOUTPUT:-N/A}"
+
+  BUTTON='{"inline_keyboard":[[{"text":"🔗 Servizio","url":"'"$SERVICE_LINK"'"},{"text":"🖥 Host","url":"'"$HOST_LINK"'"}]]}'
+else
+  EMOJI="$(get_emoji "${NOTIFY_HOSTSTATE:-UNKNOWN}")"
+  HOST_LINK="${CMK_URL}/check_mk/view.py?view_name=host&host=${NOTIFY_HOSTNAME:-}&site=${SITE}"
+
+  MSG="[$EMOJI ${NOTIFY_HOSTSTATE:-UNKNOWN}] Host → ${NOTIFY_HOSTNAME:-unknown}
+IP: ${NOTIFY_HOSTADDRESS:-}
+Output: ${NOTIFY_HOSTOUTPUT:-N/A}"
+
+  BUTTON='{"inline_keyboard":[[{"text":"🖥 Host","url":"'"$HOST_LINK"'"}]]}'
+fi
+
+# Send Telegram
+curl -sS -o /dev/null -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+  -d chat_id="${CHAT_ID}" \
+  -d text="$MSG" \
+  --data-urlencode "reply_markup=$BUTTON"
+
+exit 0
