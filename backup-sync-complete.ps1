@@ -13,7 +13,7 @@ $total = 0
 $remotes = @(
     @{ Name = "origin"; Description = "GitHub (principale)"; Required = $true },
     @{ Name = "backup"; Description = "Backup Locale"; Required = $true },
-    @{ Name = "gitlab"; Description = "GitLab Mirror"; Required = $false },
+    @{ Name = "gitlab"; Description = "GitLab Mirror"; Required = $true },
     @{ Name = "codeberg"; Description = "Codeberg Backup"; Required = $false },
     @{ Name = "sourceforge"; Description = "SourceForge Backup"; Required = $false }
 )
