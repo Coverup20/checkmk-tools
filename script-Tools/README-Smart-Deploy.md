@@ -3,7 +3,7 @@
 ## 📁 **File nel Sistema:**
 
 - **`smart-deploy-hybrid.sh`** - 🚀 **Installatore principale** (questo è quello che usi!)
-- **`smart-wrapper-example.sh`** - 📖 **Esempio didattico** (solo per capire come funziona)
+- **`smart-wrapper-template.sh`** - � **Template base** (struttura del wrapper che viene replicata)
 - **`README-Smart-Deploy.md`** - 📚 **Documentazione** (questo file)
 
 ## 🎯 **Cos'è**

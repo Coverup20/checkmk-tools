@@ -1,6 +1,6 @@
 #!/bin/bash
-# Smart CheckMK Script Wrapper - ESEMPIO DIDATTICO
-# Questo file mostra come funziona la logica del wrapper ibrido
+# Smart CheckMK Script Wrapper - TEMPLATE
+# Questo file è il template base per creare wrapper ibridi
 # NON usare direttamente - usa smart-deploy-hybrid.sh per l'installazione
 #
 # Logica: Prova a scaricare la versione fresca, usa cache locale come fallback
