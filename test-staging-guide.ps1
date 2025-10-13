@@ -79,12 +79,12 @@ Write-Host @"
 ssh $CHECKMK_USER@$CHECKMK_SERVER
 
 # Backup configurazione esistente
-sudo cp /opt/omd/sites/$CHECKMK_SITE/local/share/check_mk/notifications/mail_realip_00 \
-    /tmp/mail_realip_00_backup_$(date +%Y%m%d) 2>/dev/null || echo "No existing script"
+sudo cp /opt/omd/sites/`$CHECKMK_SITE/local/share/check_mk/notifications/mail_realip_00 \
+    /tmp/mail_realip_00_backup_`$(date +%Y%m%d) 2>/dev/null || echo "No existing script"
 
 # Backup configurazione notifiche
-sudo cp /opt/omd/sites/$CHECKMK_SITE/etc/check_mk/conf.d/wato/notifications.mk \
-    /tmp/notifications_backup_$(date +%Y%m%d).mk 2>/dev/null || echo "No existing notifications"
+sudo cp /opt/omd/sites/`$CHECKMK_SITE/etc/check_mk/conf.d/wato/notifications.mk \
+    /tmp/notifications_backup_`$(date +%Y%m%d).mk 2>/dev/null || echo "No existing notifications"
 "@ -ForegroundColor White
 
 Write-Host "`n3. INSTALLAZIONE SCRIPT:" -ForegroundColor Cyan
@@ -97,7 +97,7 @@ ssh $CHECKMK_USER@$CHECKMK_SERVER
 sudo mkdir -p /opt/omd/sites/$CHECKMK_SITE/local/share/check_mk/notifications/
 sudo cp /tmp/mail_realip_graphs /opt/omd/sites/$CHECKMK_SITE/local/share/check_mk/notifications/
 sudo chmod +x /opt/omd/sites/$CHECKMK_SITE/local/share/check_mk/notifications/mail_realip_graphs
-sudo chown $CHECKMK_SITE:$CHECKMK_SITE /opt/omd/sites/$CHECKMK_SITE/local/share/check_mk/notifications/mail_realip_graphs
+sudo chown `${CHECKMK_SITE}:`${CHECKMK_SITE} /opt/omd/sites/`${CHECKMK_SITE}/local/share/check_mk/notifications/mail_realip_graphs
 
 # Verificare installazione
 ls -la /opt/omd/sites/$CHECKMK_SITE/local/share/check_mk/notifications/mail_realip_graphs

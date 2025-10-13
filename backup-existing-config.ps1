@@ -1,10 +1,12 @@
 # CheckMK Email Backup Script
 # Backup completo della configurazione esistente prima del deployment
+# PSScriptAnalyzer disable mixed content analysis for bash sections
 
 Write-Host "=== CHECKMK EMAIL CONFIGURATION BACKUP ===" -ForegroundColor Cyan
 Write-Host "Backup configurazione esistente mail_realip_00" -ForegroundColor Gray
 
 # Parametri di configurazione
+[CmdletBinding()]
 param(
     [string]$CheckMKServer = "",
     [string]$CheckMKSite = "",
@@ -43,7 +45,7 @@ $inventoryScript = @"
 SITE="$CheckMKSite"
 echo "=== INVENTARIO CONFIGURAZIONE CHECKMK ==="
 echo "Site: \$SITE"
-echo "Data: \$(date)"
+echo "Data: `$(date)"
 echo ""
 
 echo "📄 SCRIPT NOTIFICA ESISTENTI:"
@@ -83,7 +85,8 @@ Write-Host "📊 Esecuzione inventario remoto..." -ForegroundColor Cyan
 
 # Esegui inventario su server
 try {
-    $inventoryResult = & ssh "$CheckMKUser@$CheckMKServer" "bash -s" < "$BackupDir\inventory_script.sh"
+    $scriptContent = Get-Content "$BackupDir\inventory_script.sh" -Raw
+    $inventoryResult = & ssh "$CheckMKUser@$CheckMKServer" "bash -c '$scriptContent'"
     $inventoryResult | Out-File -FilePath "$BackupDir\inventory_output.txt" -Encoding UTF8
     Write-Host "✅ Inventario completato" -ForegroundColor Green
     
