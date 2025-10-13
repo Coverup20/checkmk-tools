@@ -125,3 +125,85 @@ if ($missingRemotes) {
     }
     Write-Host "   Usa setup-additional-remotes.ps1 per configurarli" -ForegroundColor DarkGray
 }
+
+# 🆕 ADVANCED BACKUP RETENTION SYSTEM
+Write-Host "`n📦 Sistema Retention Avanzato..." -ForegroundColor Cyan
+
+try {
+    $timestamp = Get-Date -Format "yyyy-MM-dd-HH-mm"
+    $backupDir = "C:\Backup\CheckMK"
+    $currentBackup = "$backupDir\checkmk-tools-$timestamp"
+    
+    # Crea directory se non esiste
+    if (-not (Test-Path $backupDir)) {
+        New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+    }
+    
+    Write-Host "   📁 Creando snapshot: checkmk-tools-$timestamp" -ForegroundColor Gray
+    
+    # Copia snapshot corrente
+    $sourceDir = (Get-Location).Path
+    Copy-Item -Path $sourceDir -Destination $currentBackup -Recurse -Force
+    
+    # RETENTION LOGIC AVANZATA
+    $allBackups = Get-ChildItem $backupDir -Directory | Where-Object { 
+        $_.Name -match "checkmk-tools-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}" 
+    } | Sort-Object Name -Descending
+    
+    $today = Get-Date -Format "yyyy-MM-dd"
+    $yesterday = (Get-Date).AddDays(-1).ToString("yyyy-MM-dd")
+    
+    # Separa backup per data
+    $todayBackups = $allBackups | Where-Object { $_.Name -match "checkmk-tools-$today-\d{2}-\d{2}" }
+    $yesterdayBackups = $allBackups | Where-Object { $_.Name -match "checkmk-tools-$yesterday-\d{2}-\d{2}" }
+    $olderBackups = $allBackups | Where-Object { 
+        $_.Name -notmatch "checkmk-tools-$today-\d{2}-\d{2}" -and 
+        $_.Name -notmatch "checkmk-tools-$yesterday-\d{2}-\d{2}" 
+    }
+    
+    $deleted = 0
+    
+    # Oggi: mantieni max 5
+    if ($todayBackups.Count -gt 5) {
+        $toDelete = $todayBackups | Select-Object -Skip 5
+        foreach ($backup in $toDelete) {
+            Remove-Item $backup.FullName -Recurse -Force
+            $deleted++
+        }
+        Write-Host "   🗑️  Rimossi $($toDelete.Count) backup di oggi (mantenuti 5)" -ForegroundColor DarkYellow
+    }
+    
+    # Ieri: mantieni max 2 (mattina/sera)
+    if ($yesterdayBackups.Count -gt 2) {
+        $toDelete = $yesterdayBackups | Select-Object -Skip 2
+        foreach ($backup in $toDelete) {
+            Remove-Item $backup.FullName -Recurse -Force
+            $deleted++
+        }
+        Write-Host "   🗑️  Rimossi $($toDelete.Count) backup di ieri (mantenuti 2)" -ForegroundColor DarkYellow
+    }
+    
+    # Più vecchi: mantieni 1 per giorno (raggruppa per data)
+    $olderByDate = $olderBackups | Group-Object { ($_.Name -split '-')[1..3] -join '-' }
+    foreach ($dateGroup in $olderByDate) {
+        if ($dateGroup.Group.Count -gt 1) {
+            $toDelete = $dateGroup.Group | Select-Object -Skip 1
+            foreach ($backup in $toDelete) {
+                Remove-Item $backup.FullName -Recurse -Force
+                $deleted++
+            }
+            Write-Host "   🗑️  Rimossi $($toDelete.Count) backup del $($dateGroup.Name) (mantenuto 1)" -ForegroundColor DarkYellow
+        }
+    }
+    
+    $remaining = (Get-ChildItem $backupDir -Directory).Count
+    Write-Host "   ✅ Retention completata: $remaining backup totali, $deleted rimossi" -ForegroundColor Green
+    
+    # Salva log retention
+    $logFile = "$backupDir\retention.log"
+    $logEntry = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Backup: $timestamp, Rimossi: $deleted, Totali: $remaining"
+    Add-Content -Path $logFile -Value $logEntry
+    
+} catch {
+    Write-Host "   ⚠️  Errore retention: $($_.Exception.Message)" -ForegroundColor Yellow
+}
