@@ -1,5 +1,11 @@
 # CheckMK Smart Deploy - Sistema Ibrido
 
+## 📁 **File nel Sistema:**
+
+- **`smart-deploy-hybrid.sh`** - 🚀 **Installatore principale** (questo è quello che usi!)
+- **`smart-wrapper-example.sh`** - 📖 **Esempio didattico** (solo per capire come funziona)
+- **`README-Smart-Deploy.md`** - 📚 **Documentazione** (questo file)
+
 ## 🎯 **Cos'è**
 
 Un sistema intelligente che combina:
