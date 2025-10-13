@@ -264,36 +264,37 @@ try {
 # === NOTIFICA TELEGRAM FINALE ===
 Write-Host "`n📱 Invio notifica Telegram..." -ForegroundColor Cyan
 
-$errors = $backupResults | Where-Object { $_ -like "*❌*" }
-$successes = $backupResults | Where-Object { $_ -like "*✅*" }
-$warnings = $backupResults | Where-Object { $_ -like "*⚠️*" }
+# Filtra solo repository essenziali per notifica (rimuovi Codeberg/SourceForge)
+$essentialResults = $backupResults | Where-Object { 
+    $_ -notlike "*Codeberg*" -and $_ -notlike "*SourceForge*" 
+}
+
+$errors = $essentialResults | Where-Object { $_ -like "*❌*" }
+$successes = $essentialResults | Where-Object { $_ -like "*✅*" }
+$essentialCount = $essentialResults.Count
 
 if ($errors.Count -eq 0) {
-    # Tutto OK o solo warning opzionali
+    # Tutto OK sui repository essenziali
     $message = @"
 Backup completo sincronizzato!
 
-📊 RISULTATI ($success/$total):
+📊 RISULTATI:
 $($successes -join "`n")
-
-$(if($warnings) {"⚠️ OPZIONALI:`n$($warnings -join "`n")"} else {""})
 
 $retentionInfo
 
-🎯 Stato: $(if($success -eq $total) {"Perfetto"} else {"Parziale"})
+🎯 Stato: Perfetto ✅
 "@
     Send-BackupNotification -Message $message -Type "success"
 } else {
-    # Ci sono errori critici
+    # Ci sono errori critici sui repository essenziali
     $message = @"
 Backup completo con ERRORI!
 
-❌ ERRORI CRITICI ($($errors.Count)):
+❌ ERRORI CRITICI:
 $($errors -join "`n")
 
-$(if($successes) {"✅ SUCCESSI ($($successes.Count)):`n$($successes -join "`n")"} else {""})
-
-$(if($warnings) {"⚠️ OPZIONALI:`n$($warnings -join "`n")"} else {""})
+$(if($successes) {"✅ SUCCESSI:`n$($successes -join "`n")"} else {""})
 
 $retentionInfo
 
