@@ -1,0 +1,5 @@
+{
+  "shellcheck.executablePath": "C:\\\\Users\\\\Marzio\\\\AppData\\\\Local\\\\Microsoft\\\\WinGet\\\\Packages\\\\koalaman.shellcheck_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\shellcheck.exe",
+  "shellcheck.enable": true,
+  "shellcheck.run": "onType"
+}
