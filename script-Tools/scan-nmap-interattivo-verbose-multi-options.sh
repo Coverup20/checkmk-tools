@@ -67,8 +67,8 @@ fi
 
 # VERBOSITY
 echo
-echo "Livello verbosità / debug:"
-echo "  0) Nessuna verbosità extra (default)"
+echo "Livello verbositÃ  / debug:"
+echo "  0) Nessuna verbositÃ  extra (default)"
 echo "  1) Verbose (-v)"
 echo "  2) Very verbose (-vv)"
 echo "  3) Debug (-d) + --packet-trace"
@@ -97,16 +97,16 @@ else
   echo "  Targets file: $TARGET_FILE"
 fi
 if [[ "$SCAN_CHOICE" == "1" ]]; then
-  echo "  Modalità: Scan porte"
+  echo "  ModalitÃ : Scan porte"
   echo "  Porte: $PORTS"
 else
-  echo "  Modalità: Discovery only (no port scan) - -sn"
+  echo "  ModalitÃ : Discovery only (no port scan) - -sn"
 fi
 case "$VLEVEL" in
-  0) echo "  Verbosità: nessuna extra" ;;
-  1) echo "  Verbosità: -v" ;;
-  2) echo "  Verbosità: -vv" ;;
-  3) echo "  Verbosità: -d + --packet-trace" ;;
+  0) echo "  VerbositÃ : nessuna extra" ;;
+  1) echo "  VerbositÃ : -v" ;;
+  2) echo "  VerbositÃ : -vv" ;;
+  3) echo "  VerbositÃ : -d + --packet-trace" ;;
 esac
 if [[ -n "$NMAP_EXTRA" ]]; then
   echo "  Opzioni extra (senza -o*): $NMAP_EXTRA"
@@ -145,7 +145,7 @@ OUTSUM="${OUTBASE}_summary.txt"
 # Build nmap flags depending on choices
 NMAP_OPTS=()
 
-# verbosità
+# verbositÃ 
 if [[ "$VLEVEL" -eq 1 ]]; then
   NMAP_OPTS+=( -v )
 elif [[ "$VLEVEL" -eq 2 ]]; then

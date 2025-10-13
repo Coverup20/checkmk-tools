@@ -4,18 +4,18 @@ set -euo pipefail
 # Installa Checkmk Raw chiedendo interattivamente l'URL del .deb e crea/avvia il site "monitoring".
 # Variabili opzionali (.env):
 #   CHECKMK_ADMIN_PASSWORD=   # se valorizzata, imposta la password di cmkadmin
-#   CHECKMK_DEB_URL=          # se già valorizzata, non chiede nulla e usa questo URL
+#   CHECKMK_DEB_URL=          # se giÃ  valorizzata, non chiede nulla e usa questo URL
 
 SITE="monitoring"
 DEB_PATH="/tmp/checkmk.deb"
 
 # Chiedi l'URL se non presente
 if [[ -z "${CHECKMK_DEB_URL:-}" ]]; then
-  read -rp "👉 Inserisci l'URL completo del pacchetto Checkmk (.deb): " CHECKMK_DEB_URL
+  read -rp "ðŸ‘‰ Inserisci l'URL completo del pacchetto Checkmk (.deb): " CHECKMK_DEB_URL
 fi
 
 if [[ -z "${CHECKMK_DEB_URL:-}" ]]; then
-  echo "❌ Nessun URL fornito. Interrompo."
+  echo "âŒ Nessun URL fornito. Interrompo."
   exit 1
 fi
 
@@ -48,8 +48,8 @@ fi
 
 IP="$(hostname -I | awk '{print $1}')"
 echo ""
-echo "✅ Checkmk installato e site avviato."
+echo "âœ… Checkmk installato e site avviato."
 echo "   Site: ${SITE}"
-echo "   URL:  http://${IP}/${SITE}/  (se 80 è aperta)"
+echo "   URL:  http://${IP}/${SITE}/  (se 80 Ã¨ aperta)"
 echo "         https://<tuo-dominio>/${SITE}/  (se hai certificato e 443 aperta)"
 echo ""

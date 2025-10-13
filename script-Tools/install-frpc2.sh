@@ -11,7 +11,7 @@ if [ "$OS_TYPE" = "debian" ] || [ "$OS_TYPE" = "proxmox" ]; then
         pkill -9 -f cmk-agent-ctl || true
     fi
 
-    echo ">>> Configuro agent in modalità Plaintext"
+    echo ">>> Configuro agent in modalitÃ  Plaintext"
     cat > /etc/systemd/system/check-mk-agent-plain.socket <<EOF
 [Unit]
 Description=Checkmk Agent (Plaintext Socket)

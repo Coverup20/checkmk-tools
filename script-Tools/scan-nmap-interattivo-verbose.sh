@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # scan-nmap-interattivo-verbose.sh
-# Interattivo Nmap: scelta target (range/file), scelta modalità (port-scan / discovery-only),
-# e scelta livello di verbosità (none, -v, -vv, debug/packet-trace).
+# Interattivo Nmap: scelta target (range/file), scelta modalitÃ  (port-scan / discovery-only),
+# e scelta livello di verbositÃ  (none, -v, -vv, debug/packet-trace).
 # Output: ./scans/nmap-YYYYmmddTHHMMSS_<label>.txt e _summary.txt
 #
 set -euo pipefail
@@ -72,8 +72,8 @@ fi
 
 # VERBOSITY / DEBUG (applies especially to discovery-only if selected)
 echo
-echo "Livello verbosità / debug:"
-echo "  0) Nessuna verbosità extra (default)"
+echo "Livello verbositÃ  / debug:"
+echo "  0) Nessuna verbositÃ  extra (default)"
 echo "  1) Verbose (-v)"
 echo "  2) Very verbose (-vv)"
 echo "  3) Debug (+ -d) (dettagli interni) e opzione --packet-trace (traccia pacchetti)"
@@ -97,16 +97,16 @@ else
   echo "  Targets file: $TARGET_FILE"
 fi
 if [[ "$SCAN_CHOICE" == "1" ]]; then
-  echo "  Modalità: Scan porte"
+  echo "  ModalitÃ : Scan porte"
   echo "  Porte: $PORTS"
 else
-  echo "  Modalità: Discovery only (no port scan) - equivalente a -sn"
+  echo "  ModalitÃ : Discovery only (no port scan) - equivalente a -sn"
 fi
 case "$VLEVEL" in
-  0) echo "  Verbosità: nessuna extra" ;;
-  1) echo "  Verbosità: -v" ;;
-  2) echo "  Verbosità: -vv" ;;
-  3) echo "  Verbosità: debug (-d) + --packet-trace" ;;
+  0) echo "  VerbositÃ : nessuna extra" ;;
+  1) echo "  VerbositÃ : -v" ;;
+  2) echo "  VerbositÃ : -vv" ;;
+  3) echo "  VerbositÃ : debug (-d) + --packet-trace" ;;
 esac
 echo "  Output dir: $OUTDIR"
 echo "  Timing template: -T$NT"
@@ -132,7 +132,7 @@ OUTSUM="${OUTBASE}_summary.txt"
 
 # Build nmap flags depending on choices
 NMAP_OPTS=()
-# verbosità
+# verbositÃ 
 if [[ "$VLEVEL" -eq 1 ]]; then
   NMAP_OPTS+=( -v )
 elif [[ "$VLEVEL" -eq 2 ]]; then
@@ -177,7 +177,7 @@ else
   EC=$?
 fi
 
-# Produce summary: adattivo in base alla modalità
+# Produce summary: adattivo in base alla modalitÃ 
 if [[ "$SCAN_CHOICE" == "2" ]]; then
   # discovery: includi host up + eventuale MAC/hostname e (se verbose/debug) linee di packet-trace nel file normale
   awk '

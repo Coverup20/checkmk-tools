@@ -9,7 +9,7 @@ if [[ -f .env ]]; then
   source .env
   set +a
 else
-  echo "⚠️  .env non trovato. Copia .env.example in .env e personalizza."
+  echo "âš ï¸  .env non trovato. Copia .env.example in .env e personalizza."
   exit 1
 fi
 
@@ -32,4 +32,4 @@ run 50-certbot.sh
 run 60-checkmk.sh
 run 80-timeshift.sh
 
-echo -e "\n✅ Bootstrap completato."
+echo -e "\nâœ… Bootstrap completato."

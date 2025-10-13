@@ -1,0 +1,6 @@
+# Assicura che tutti gli script bash usino line endings Unix (LF)
+*.sh text eol=lf
+# File senza estensione nelle cartelle script
+script-check-ubuntu/** text eol=lf
+script-notify-checkmk/dump_env text eol=lf
+script-notify-checkmk/telegram_* text eol=lf

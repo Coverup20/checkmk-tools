@@ -19,7 +19,7 @@ mkdir -p /var/lib/check_pkg_install >/dev/null 2>&1 || true
 
 event_line=$(grep -E 'Installed:|Updated:|Erased:|Removed:' "$YUM_LOG" | tail -n 1)
 if [[ -z "$event_line" ]]; then
-    echo "0 PKG_INSTALL - OK: nessuna attività pacchetti"
+    echo "0 PKG_INSTALL - OK: nessuna attivitÃ  pacchetti"
     exit 0
 fi
 
@@ -43,9 +43,9 @@ elapsed_min=$(( (current_ts - last_event_ts) / 60 ))
 recent_entry=$(echo "$event_line" | sed -E 's/^[A-Z][a-z]{2} +[0-9]+ +[0-9:]{2}:[0-9:]{2} +//' | sed -E 's/^.*(Installed:|Updated:|Erased:|Removed:)/\1/' | tr -d '\n')
 
 if [[ "$elapsed_min" -lt "$WARN_TIMEOUT_MINUTES" ]]; then
-    echo "1 PKG_INSTALL - WARN: attività recente ($event_date): $recent_entry"
+    echo "1 PKG_INSTALL - WARN: attivitÃ  recente ($event_date): $recent_entry"
 else
-    echo "0 PKG_INSTALL - OK: nessuna nuova attività nelle ultime $WARN_TIMEOUT_MINUTES min (Ultima: $event_date)"
+    echo "0 PKG_INSTALL - OK: nessuna nuova attivitÃ  nelle ultime $WARN_TIMEOUT_MINUTES min (Ultima: $event_date)"
 fi
 
 exit 0

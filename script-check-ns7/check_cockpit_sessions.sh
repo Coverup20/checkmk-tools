@@ -22,12 +22,12 @@ if [ -n "$NEW_LINES" ]; then
     NEW_LAST=$(echo "$NEW_LINES" | tail -n1 | awk '{print $1}')
     echo "$NEW_LAST" > "$STATEFILE"
 
-    echo "$NEW_LINES" | while read -r nr line; do
+    while read -r _nr line; do
         if [[ "$line" =~ "New connection to session from" ]]; then
             ip=$(echo "$line" | sed -n 's/.*from \([0-9\.]\+\).*/\1/p')
             if [ -n "$ip" ]; then
                 # alterna WARN/CRIT per forzare notifica ad ogni login
-                if [ $((RANDOM % 2)) -eq 0 ]; then
+                if [ $(("$RANDOM" % 2)) -eq 0 ]; then
                     echo "1 $SERVICE - $NOW cockpit login from $ip"
                 else
                     echo "2 $SERVICE - $NOW cockpit login from $ip"
@@ -37,9 +37,9 @@ if [ -n "$NEW_LINES" ]; then
             ip=$(echo "$line" | sed -n 's/.*from \([0-9\.]\+\).*/\1/p')
             [ -n "$ip" ] && echo "0 $SERVICE - $NOW cockpit logout from $ip"
         fi
-    done
+    done <<< "$NEW_LINES"
 else
-    # info di stato (non notifica perché rimane 0)
+    # info di stato (non notifica perchÃ© rimane 0)
     ACTIVE=$(ss -tnp 2>/dev/null | grep cockpit-ws | wc -l)
     echo "0 $SERVICE - $ACTIVE cockpit session(s) active"
 fi

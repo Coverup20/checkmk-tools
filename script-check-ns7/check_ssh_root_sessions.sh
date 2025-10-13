@@ -23,7 +23,7 @@ echo "$CURR_IPS" > "$STATEFILE"
 
 # trova login nuovi
 NEW_LOGINS=$(comm -13 <(echo "$PREV_IPS") <(echo "$CURR_IPS"))
-# trova logout (IP che c’erano prima e non ci sono più)
+# trova logout (IP che câ€™erano prima e non ci sono piÃ¹)
 LOGOUTS=$(comm -23 <(echo "$PREV_IPS") <(echo "$CURR_IPS"))
 
 if [ -n "$NEW_LOGINS" ]; then
