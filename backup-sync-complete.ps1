@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+c#!/usr/bin/env pwsh
 # Script di Backup Multi-Piattaforma Completo + Notifiche Telegram
 # Sincronizza su GitHub, GitLab, Codeberg e backup locale
 

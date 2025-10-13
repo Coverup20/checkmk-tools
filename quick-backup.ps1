@@ -3,47 +3,8 @@
 
 Write-Host "🔄 Quick Backup..." -ForegroundColor Cyan
 
-# === TELEGRAM CONFIG ===
-$TELEGRAM_TOKEN = "8264716040:AAHPjzYJz7h8pV9hzjaf45-Mrv2gf8tMXmQ"
-$TELEGRAM_CHAT_ID = "381764604"
-$TELEGRAM_ENABLED = $true  # Set to $false to disable notifications
-
-# Funzione notifica Telegram
-function Send-BackupNotification {
-    param(
-        [string]$Message,
-        [string]$Type = "info"
-    )
-    
-    if (-not $TELEGRAM_ENABLED) { return }
-    
-    $emoji = switch ($Type) {
-        "success" { "✅" }
-        "error" { "❌" }  
-        "warning" { "⚠️" }
-        default { "📱" }
-    }
-    
-    $fullMessage = "$emoji [BACKUP-QUICK] $Message`n`n⏰ $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-    
-    try {
-        $body = @{
-            chat_id = $TELEGRAM_CHAT_ID
-            text = $fullMessage
-        }
-        
-        $null = Invoke-RestMethod -Uri "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" -Method Post -Body $body -ErrorAction SilentlyContinue
-    }
-    catch {
-        # Silent fail - backup deve continuare anche se notifica fallisce
-    }
-}
-
-# Variabili per tracking risultati
-$results = @()
-
 # Push su GitHub
-Write-Host "🐙 GitHub..." -NoNewline
+Write-Host "� GitHub..." -NoNewline
 git push origin main *>$null
 if ($LASTEXITCODE -eq 0) { 
     Write-Host " ✅" -ForegroundColor Green 
