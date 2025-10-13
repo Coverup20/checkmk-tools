@@ -39,8 +39,8 @@ if [ -n "$NEW_LINES" ]; then
         fi
     done <<< "$NEW_LINES"
 else
-    # info di stato (non notifica perchÃ© rimane 0)
-    ACTIVE=$(ss -tnp 2>/dev/null | grep cockpit-ws | wc -l)
+    # info di stato (non notifica perché rimane 0)
+    ACTIVE=$(ss -tnp 2>/dev/null | grep -c cockpit-ws)
     echo "0 $SERVICE - $ACTIVE cockpit session(s) active"
 fi
 
