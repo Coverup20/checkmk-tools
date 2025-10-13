@@ -1,5 +1,5 @@
 #!/usr/bin/env pwsh
-# Script di Backup Multi-Piattaforma Completo
+# Script di Backup Multi-Piattaforma Completo + Notifiche Telegram
 # Sincronizza su GitHub, GitLab, Codeberg e backup locale
 
 Write-Host "🔄 Avvio sincronizzazione backup completa..." -ForegroundColor Cyan
@@ -8,6 +8,47 @@ Write-Host "📅 $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Gra
 $ErrorActionPreference = "Continue"
 $success = 0
 $total = 0
+
+# === TELEGRAM CONFIG ===
+$TELEGRAM_TOKEN = "8264716040:AAHPjzYJz7h8pV9hzjaf45-Mrv2gf8tMXmQ"
+$TELEGRAM_CHAT_ID = "381764604"
+$TELEGRAM_ENABLED = $true  # Set to $false to disable notifications
+
+# Funzione notifica Telegram
+function Send-BackupNotification {
+    param(
+        [string]$Message,
+        [string]$Type = "info"
+    )
+    
+    if (-not $TELEGRAM_ENABLED) { return }
+    
+    $emoji = switch ($Type) {
+        "success" { "✅" }
+        "error" { "❌" }  
+        "warning" { "⚠️" }
+        "info" { "📊" }
+        default { "📱" }
+    }
+    
+    $fullMessage = "$emoji [BACKUP-COMPLETE] $Message`n`n⏰ $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+    
+    try {
+        $body = @{
+            chat_id = $TELEGRAM_CHAT_ID
+            text = $fullMessage
+        }
+        
+        $null = Invoke-RestMethod -Uri "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" -Method Post -Body $body -ErrorAction SilentlyContinue
+    }
+    catch {
+        # Silent fail - backup deve continuare anche se notifica fallisce
+    }
+}
+
+# Arrays per tracking risultati dettagliati
+$backupResults = @()
+$retentionInfo = ""
 
 # Configurazione remote (aggiorna con i tuoi URL)
 $remotes = @(
@@ -32,6 +73,9 @@ function Push-Remote {
             Write-Host "⚠️  $remoteDescription - Remote non configurato" -ForegroundColor $(if ($isRequired) { "Red" } else { "DarkYellow" })
             if ($isRequired) {
                 Write-Host "❌ $remoteDescription - RICHIESTO ma mancante!" -ForegroundColor Red
+                $script:backupResults += "❌ $remoteDescription - REQUIRED but missing"
+            } else {
+                $script:backupResults += "⚠️ $remoteDescription - Not configured (optional)"
             }
             return
         }
@@ -44,19 +88,24 @@ function Push-Remote {
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "✅ $remoteDescription - OK" -ForegroundColor Green
                 $script:success++
+                $script:backupResults += "✅ $remoteDescription - OK"
             } else {
                 if ($pushResult -match "up.to.date") {
                     Write-Host "✅ $remoteDescription - Up to date" -ForegroundColor Green
                     $script:success++
+                    $script:backupResults += "✅ $remoteDescription - Up to date"
                 } else {
                     Write-Host "❌ $remoteDescription - Errore push: $pushResult" -ForegroundColor Red
+                    $script:backupResults += "❌ $remoteDescription - Push failed"
                 }
             }
         } else {
             Write-Host "❌ $remoteDescription - Errore connessione" -ForegroundColor Red
+            $script:backupResults += "❌ $remoteDescription - Connection failed"
         }
     } catch {
         Write-Host "❌ $remoteDescription - Errore: $_" -ForegroundColor Red
+        $script:backupResults += "❌ $remoteDescription - Exception: $($_.Exception.Message)"
     }
 }
 
@@ -199,6 +248,9 @@ try {
     $remaining = (Get-ChildItem $backupDir -Directory).Count
     Write-Host "   ✅ Retention completata: $remaining backup totali, $deleted rimossi" -ForegroundColor Green
     
+    # Cattura info retention per notifica
+    $script:retentionInfo = "📦 Snapshot: checkmk-tools-$timestamp`n🗃️ Retention: $remaining totali, $deleted rimossi`n📁 Backup dir: $backupDir"
+    
     # Salva log retention
     $logFile = "$backupDir\retention.log"
     $logEntry = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Backup: $timestamp, Rimossi: $deleted, Totali: $remaining"
@@ -206,4 +258,46 @@ try {
     
 } catch {
     Write-Host "   ⚠️  Errore retention: $($_.Exception.Message)" -ForegroundColor Yellow
+    $script:retentionInfo = "⚠️ Retention: Errore durante la gestione"
+}
+
+# === NOTIFICA TELEGRAM FINALE ===
+Write-Host "`n📱 Invio notifica Telegram..." -ForegroundColor Cyan
+
+$errors = $backupResults | Where-Object { $_ -like "*❌*" }
+$successes = $backupResults | Where-Object { $_ -like "*✅*" }
+$warnings = $backupResults | Where-Object { $_ -like "*⚠️*" }
+
+if ($errors.Count -eq 0) {
+    # Tutto OK o solo warning opzionali
+    $message = @"
+Backup completo sincronizzato!
+
+📊 RISULTATI ($success/$total):
+$($successes -join "`n")
+
+$(if($warnings) {"⚠️ OPZIONALI:`n$($warnings -join "`n")"} else {""})
+
+$retentionInfo
+
+🎯 Stato: $(if($success -eq $total) {"Perfetto"} else {"Parziale"})
+"@
+    Send-BackupNotification -Message $message -Type "success"
+} else {
+    # Ci sono errori critici
+    $message = @"
+Backup completo con ERRORI!
+
+❌ ERRORI CRITICI ($($errors.Count)):
+$($errors -join "`n")
+
+$(if($successes) {"✅ SUCCESSI ($($successes.Count)):`n$($successes -join "`n")"} else {""})
+
+$(if($warnings) {"⚠️ OPZIONALI:`n$($warnings -join "`n")"} else {""})
+
+$retentionInfo
+
+🔧 Azione richiesta: Verificare repository falliti
+"@
+    Send-BackupNotification -Message $message -Type "error"
 }
