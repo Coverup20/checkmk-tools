@@ -1,0 +1,6 @@
+{
+  "VpsIP": "monitor.nethlab.it",
+  "SshUser": "root",
+  "SiteCheckMK": "monitoring",
+  "SshKeyPath": "C:\\Users\\Marzio\\.ssh\\checkmk"
+}
