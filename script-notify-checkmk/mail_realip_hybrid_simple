@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+# HTML Email with FRP Support - Ultimate
+# Bulk: yes
+
+from cmk.notification_plugins import mail
+from cmk.notification_plugins.utils import substitute_context
+import os
+import sys
+import re
+
+def log_debug(message):
+    """Debug logging"""
+    if os.environ.get('DEBUG_MAIL_HYBRID', '0') == '1':
+        print(f"[DEBUG] {message}", file=sys.stderr)
+
+def detect_frp_scenario():
+    """
+    🎯 Ultimate FRP Detection
+    Returns: (is_frp, real_ip, original_address)
+    """
+    host_address = os.environ.get('NOTIFY_HOSTADDRESS', '')
+    real_ip = os.environ.get('NOTIFY_HOSTLABEL_real_ip', '')
+    
+    # FRP patterns: 127.0.0.1 (with or without port), localhost
+    frp_patterns = [
+        '127.0.0.1',      # Standard FRP localhost
+        'localhost',      # Alternative localhost  
+        '::1'            # IPv6 localhost
+    ]
+    
+    is_frp = any(host_address.startswith(pattern) for pattern in frp_patterns) and real_ip
+    
+    log_debug(f"HOSTADDRESS: {host_address}, real_ip: {real_ip}, FRP: {is_frp}")
+    
+    return is_frp, real_ip, host_address
+
+def patch_ultimate_email_content():
+    """
+    🚀 ULTIMATE: Patch AFTER graphs are generated but BEFORE email is sent
+    """
+    # Store original send_mail function
+    original_send_mail = mail.send_mail_sendmail
+    
+    def ultimate_patched_send_mail(message, target, from_address):
+        """Ultimate email content patching - AFTER graphs are included"""
+        
+        # Get FRP detection info
+        is_frp, real_ip, original_address = detect_frp_scenario()
+        
+        if is_frp and real_ip:
+            log_debug(f"🎯 ULTIMATE MESSAGE PATCHING: Converting {original_address} -> {real_ip}")
+            
+            # Convert IPs in the email message content
+            if hasattr(message, 'walk'):
+                # Multipart message - walk through all parts
+                for part in message.walk():
+                    if part.get_content_type() in ['text/plain', 'text/html']:
+                        content = part.get_payload(decode=True)
+                        if content:
+                            try:
+                                # Decode content
+                                if isinstance(content, bytes):
+                                    content = content.decode('utf-8', errors='ignore')
+                                
+                                # Convert IPs in content (but preserve graphs)
+                                new_content = content.replace(original_address, real_ip)
+                                new_content = new_content.replace('127.0.0.1', real_ip)
+                                
+                                # Set new content
+                                part.set_payload(new_content)
+                                if isinstance(content, bytes):
+                                    part.set_payload(new_content.encode('utf-8'))
+                                else:
+                                    part.set_payload(new_content)
+                                
+                                log_debug(f"Patched {part.get_content_type()} content")
+                            except Exception as e:
+                                log_debug(f"Error patching part: {e}")
+            
+            # Also patch headers
+            for header in ['Subject', 'To', 'From']:
+                if header in message:
+                    header_value = message[header]
+                    new_header_value = header_value.replace(original_address, real_ip)
+                    new_header_value = new_header_value.replace('127.0.0.1', real_ip)
+                    if new_header_value != header_value:
+                        message.replace_header(header, new_header_value)
+                        log_debug(f"Patched {header} header")
+        
+        # Call original send function
+        return original_send_mail(message, target, from_address)
+    
+    # Apply the ultimate patch
+    mail.send_mail_sendmail = ultimate_patched_send_mail
+
+def main():
+    """
+    🚀 ULTIMATE HYBRID FRP MAIN FUNCTION
+    
+    Ultimate approach:
+    1. Detect FRP scenario but DON'T modify HOSTADDRESS (preserve for graphs)
+    2. Setup email parameters normally
+    3. Patch template rendering and context substitution BEFORE calling mail.main()
+    4. Call standard CheckMK mail function (graphs generate with original IP)
+    5. Our patches convert IPs in the final rendered content
+    """
+    
+    is_frp, real_ip, original_address = detect_frp_scenario()
+    
+    # Add missing parameters that CheckMK mail plugin expects
+    if 'PARAMETER_SUBJECT' not in os.environ:
+        os.environ['PARAMETER_SUBJECT'] = '$WHAT$ on $HOSTNAME$/$SERVICEDESC$'
+    if 'PARAMETER_BODY' not in os.environ:
+        os.environ['PARAMETER_BODY'] = ''
+    
+    # Note: Graphs disabled - CheckMK 2.4 RAW Edition may require additional setup
+    # (RRD integration, pnp4nagios, or Enterprise features) for graph generation
+    log_debug("Parameters configured (graphs: native CheckMK behavior)")
+    
+    if is_frp and real_ip:
+        print(f"🎯 FRP HYBRID: {original_address} -> {real_ip} (IP conversion active)", file=sys.stderr)
+        
+        # Apply ultimate patching AFTER CheckMK generates content but BEFORE sending
+        patch_ultimate_email_content()
+        
+        log_debug(f"Ultimate patching enabled: post-generation conversion {original_address} -> {real_ip}")
+    else:
+        print("ℹ️  Standard CheckMK notification (no FRP)", file=sys.stderr)
+    
+    # Call standard CheckMK mail function
+    # - If FRP: graphs generate with original IP, content gets converted via our patches
+    # - If normal: standard behavior
+    try:
+        mail.main()
+        print("✅ Email sent successfully", file=sys.stderr)
+    except Exception as e:
+        print(f"❌ Email error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
