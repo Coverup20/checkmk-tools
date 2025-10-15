@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Mail RealIP Hybrid
+# mail_realip_hybrid: Soluzione FRP-aware per scenario PRO
 # 
 # RISOLVE IL DILEMMA: Real IP OR Grafici → Real IP AND Grafici
 # 
