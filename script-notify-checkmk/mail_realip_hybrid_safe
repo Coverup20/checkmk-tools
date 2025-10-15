@@ -15,6 +15,23 @@ import re
 import sys
 from cmk.notification_plugins import mail
 
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Mail RealIP Hybrid Safe
+#
+# Conservative FRP-aware variant:
+# - Detects FRP via label (NOTIFY_HOSTLABEL_frp=true) if present, else fallback to 127.0.0.1/localhost/::1
+# - Rewrites ONLY URLs in text/html (href/src pointing to 127.0.0.1|localhost|::1[:PORT]) to real_ip
+# - Rewrites full IP occurrences in text/plain
+# - Does NOT touch other HTML content to avoid MIME/encoding corruption
+# - Does NOT attempt to inject graphs (RAW 2.4 graph emails not guaranteed)
+# Bulk: yes
+
+import os
+import re
+import sys
+from cmk.notification_plugins import mail
+
 
 def log_debug(msg: str) -> None:
     if os.environ.get("DEBUG_MAIL_HYBRID", "0") == "1":
@@ -54,44 +71,133 @@ def rewrite_html_urls(html: str, original_addr: str, real_ip: str) -> str:
 
 
 def add_graph_links(html: str, real_ip: str) -> str:
-    """Add graph links to HTML if not present in FRP scenario"""
+    """Aggiunge link identici a quelli di Telegram, con login.py e _origtarget"""
     import urllib.parse
-    
     hostname = os.environ.get("NOTIFY_HOSTNAME", "")
     servicedesc = os.environ.get("NOTIFY_SERVICEDESC", "")
-    
+    site = "monitoring"
+    base_url = "https://monitor.nethlab.it/monitoring"
     if not hostname:
         return html
-    
-    # Build graph URLs with CheckMK server public URL (not the monitored host IP)
-    base_url = "https://monitor.nethlab.it/monitoring"
-    hostname_enc = urllib.parse.quote(hostname)
-    
-    if servicedesc:  # Service notification
-        servicedesc_enc = urllib.parse.quote(servicedesc)
-        graph_url = f"{base_url}/check_mk/view.py?view_name=service&host={hostname_enc}&service={servicedesc_enc}"
-        pnp_url = f"{base_url}/check_mk/pnp4nagios/graph?host={hostname_enc}&srv={servicedesc_enc}"
-    else:  # Host notification
-        graph_url = f"{base_url}/check_mk/view.py?view_name=host&host={hostname_enc}"
-        pnp_url = f"{base_url}/check_mk/pnp4nagios/graph?host={hostname_enc}"
-    
-    # Add graph links section if not already present
-    if "grafici" not in html.lower() and "graph" not in html.lower():
-        graph_section = f"""
+    # Costruisci _origtarget per host
+    host_target = f"view.py?host={urllib.parse.quote(hostname)}&site={site}&view_name=host"
+    host_login_url = f"{base_url}/check_mk/login.py?_origtarget=index.py%3Fstart_url%3D{urllib.parse.quote(host_target)}"
+    if servicedesc:
+        # Costruisci _origtarget per servizio
+        service_target = f"view.py?host={urllib.parse.quote(hostname)}&service={urllib.parse.quote(servicedesc)}&site={site}&view_name=service"
+        service_login_url = f"{base_url}/check_mk/login.py?_origtarget=index.py%3Fstart_url%3D{urllib.parse.quote(service_target)}"
+        links_section = f"""
 <hr>
-<p><strong>📊 Grafici:</strong></p>
+<p><strong>📊 Monitoraggio:</strong></p>
 <ul>
-<li><a href="{graph_url}">🔗 Vista CheckMK</a></li>
-<li><a href="{pnp_url}">📈 Grafici PNP</a></li>
+<li><a href=\"{service_login_url}\">🔗 Servizio</a></li>
+<li><a href=\"{host_login_url}\">🖥 Host</a></li>
 </ul>
 """
-        # Insert before closing body or at the end
+    else:
+        links_section = f"""
+<hr>
+<p><strong>📊 Monitoraggio:</strong></p>
+<ul>
+<li><a href=\"{host_login_url}\">🖥 Host</a></li>
+</ul>
+"""
+    # Inserisci solo se non già presente
+    if "monitoraggio" not in html.lower():
         if "</body>" in html:
-            html = html.replace("</body>", graph_section + "</body>")
+            html = html.replace("</body>", links_section + "</body>")
         else:
-            html += graph_section
-    
+            html += links_section
     return html
+
+
+def render_telegram_style_html() -> str:
+    import html
+    hostname = os.environ.get("NOTIFY_HOSTNAME", "")
+    servicedesc = os.environ.get("NOTIFY_SERVICEDESC", "")
+    serviceoutput = os.environ.get("NOTIFY_SERVICEOUTPUT", "")
+    state = os.environ.get("NOTIFY_SERVICESTATE", "OK")
+    emoji = "🟢" if state == "OK" else "⚠️"
+    site = "monitoring"
+    base_url = "https://monitor.nethlab.it/monitoring"
+    # Link host/servizio
+    host_target = f"view.py?host={html.escape(hostname)}&site={site}&view_name=host"
+    host_login_url = f"{base_url}/check_mk/login.py?_origtarget=index.py%3Fstart_url%3D{html.escape(host_target)}"
+    if servicedesc:
+        service_target = f"view.py?host={html.escape(hostname)}&service={html.escape(servicedesc)}&site={site}&view_name=service"
+        service_login_url = f"{base_url}/check_mk/login.py?_origtarget=index.py%3Fstart_url%3D{html.escape(service_target)}"
+        return f"""
+<div style='background:#23272e;color:#fff;padding:16px;border-radius:8px;font-family:sans-serif;'>
+  <div style='font-size:1.2em;margin-bottom:8px;'>⚠️ [VPS] ⚠️ [{emoji} {state}] Servizio → <b>{html.escape(servicedesc)}</b></div>
+  <div style='margin-bottom:8px;'>Host: <b>{html.escape(hostname)}</b></div>
+  <div style='margin-bottom:8px;'>Output: <span style='color:#ffd700;'>{html.escape(serviceoutput)}</span></div>
+  <div style='display:flex;gap:8px;margin-top:12px;'>
+    <a href='{service_login_url}' style='background:#36393f;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:bold;'>🔗 Servizio</a>
+    <a href='{host_login_url}' style='background:#36393f;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:bold;'>🖥 Host</a>
+  </div>
+</div>
+"""
+    else:
+        return f"""
+<div style='background:#23272e;color:#fff;padding:16px;border-radius:8px;font-family:sans-serif;'>
+  <div style='font-size:1.2em;margin-bottom:8px;'>⚠️ [VPS] ⚠️ [{emoji} {state}] Host → <b>{html.escape(hostname)}</b></div>
+  <div style='margin-bottom:8px;'>Output: <span style='color:#ffd700;'>{html.escape(serviceoutput)}</span></div>
+  <div style='display:flex;gap:8px;margin-top:12px;'>
+    <a href='{host_login_url}' style='background:#36393f;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:bold;'>🖥 Host</a>
+  </div>
+</div>
+"""
+
+
+def telegram_buttons_html() -> str:
+    import urllib.parse, html
+    hostname = os.environ.get("NOTIFY_HOSTNAME", "")
+    servicedesc = os.environ.get("NOTIFY_SERVICEDESC", "")
+    site = "monitoring"
+    real_ip = os.environ.get("NOTIFY_HOSTLABEL_real_ip", "")
+    base_url = "https://monitor.nethlab.it/monitoring"
+    # Link servizio (già funzionante): include site e view_name=service
+    service_view = f"/monitoring/check_mk/view.py?host={urllib.parse.quote(hostname)}&service={urllib.parse.quote(servicedesc)}&site={site}&view_name=service"
+    service_url = f"{base_url}/check_mk/index.py?start_url={urllib.parse.quote(service_view)}"
+    # Link host (corretto): view_name=hoststatus e include site
+    host_view = f"/monitoring/check_mk/view.py?host={urllib.parse.quote(hostname)}&site={site}&view_name=hoststatus"
+    host_url = f"{base_url}/check_mk/index.py?start_url={urllib.parse.quote(host_view)}"
+    # Bottoni compatti, arrotondati, dinamici, effetto hover
+    return f"""
+<style>
+.cmk-btn-tg-wrap {{
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin-top: 24px;
+    margin-bottom: 0;
+}}
+.cmk-btn-tg {{
+    background: #1de9b6;
+    color: #fff;
+    padding: 12px 48px;
+    border-radius: 32px;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1.15em;
+    display: inline-block;
+    min-width: 140px;
+    text-align: center;
+    box-shadow: 0 2px 8px #0002;
+    border: none;
+    letter-spacing: 0.5px;
+    transition: background 0.2s, color 0.2s;
+}}
+.cmk-btn-tg:hover {{
+    background: #15cba1;
+    color: #fff;
+}}
+</style>
+<div class='cmk-btn-tg-wrap'>
+    <a href='{service_url}' class='cmk-btn-tg'>Service</a>
+    <a href='{host_url}' class='cmk-btn-tg'>Host</a>
+</div>
+"""
 
 
 def patched_send(message, target, from_address):
@@ -99,7 +205,10 @@ def patched_send(message, target, from_address):
     if not (is_frp and real_ip):
         return mail._original_send(message, target, from_address)
 
-    # Walk only text/plain and text/html parts
+    # Aggiorna la variabile d'ambiente per l'IP
+    os.environ["NOTIFY_HOSTADDRESS"] = real_ip
+
+    loopbacks = ["127.0.0.1", "localhost", "::1"]
     for part in message.walk() if hasattr(message, "walk") else []:
         ctype = part.get_content_type()
         if ctype == "text/plain":
@@ -107,10 +216,10 @@ def patched_send(message, target, from_address):
             if not payload:
                 continue
             text = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
-            text = text.replace("127.0.0.1", real_ip)
+            for lb in loopbacks:
+                text = text.replace(lb, real_ip)
             if original_addr:
                 text = text.replace(original_addr, original_addr.replace("127.0.0.1", real_ip))
-            # preserve charset
             charset = part.get_content_charset() or "utf-8"
             if "Content-Transfer-Encoding" in part:
                 del part["Content-Transfer-Encoding"]
@@ -120,13 +229,17 @@ def patched_send(message, target, from_address):
             if not payload:
                 continue
             html = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
-            html2 = rewrite_html_urls(html, original_addr, real_ip)
-            # Add graph links for FRP scenario
-            html2 = add_graph_links(html2, real_ip)
+            for lb in loopbacks:
+                html = html.replace(lb, real_ip)
+            if original_addr:
+                html = html.replace(original_addr, original_addr.replace("127.0.0.1", real_ip))
+            # Assicura che i bottoni/link siano sempre aggiunti
+            if "cmk-btn-tg" not in html:
+                html += telegram_buttons_html()
             charset = part.get_content_charset() or "utf-8"
             if "Content-Transfer-Encoding" in part:
                 del part["Content-Transfer-Encoding"]
-            part.set_payload(html2, charset=charset)
+            part.set_payload(html, charset=charset)
 
     return mail._original_send(message, target, from_address)
 
