@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# ===================================================================
-# 🎯 MAIL_REALIP_HYBRID v2.4 - FRP AWARE (CheckMK 2.4.0+ Compatible)
-# ===================================================================
+# Mail RealIP Hybrid v24
+# FRP-aware (CheckMK 2.4+ compatible)
 # 
 # PRIMA SOLUZIONE AL MONDO per CheckMK con FRP tunneling
 # 
