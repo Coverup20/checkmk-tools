@@ -53,6 +53,47 @@ def rewrite_html_urls(html: str, original_addr: str, real_ip: str) -> str:
     return html2
 
 
+def add_graph_links(html: str, real_ip: str) -> str:
+    """Add graph links to HTML if not present in FRP scenario"""
+    import urllib.parse
+    
+    hostname = os.environ.get("NOTIFY_HOSTNAME", "")
+    servicedesc = os.environ.get("NOTIFY_SERVICEDESC", "")
+    
+    if not hostname:
+        return html
+    
+    # Build graph URLs with real IP and proper URL encoding
+    base_url = f"https://{real_ip}/monitoring"
+    hostname_enc = urllib.parse.quote(hostname)
+    
+    if servicedesc:  # Service notification
+        servicedesc_enc = urllib.parse.quote(servicedesc)
+        graph_url = f"{base_url}/check_mk/view.py?view_name=service&host={hostname_enc}&service={servicedesc_enc}"
+        pnp_url = f"{base_url}/check_mk/pnp4nagios/graph?host={hostname_enc}&srv={servicedesc_enc}"
+    else:  # Host notification
+        graph_url = f"{base_url}/check_mk/view.py?view_name=host&host={hostname_enc}"
+        pnp_url = f"{base_url}/check_mk/pnp4nagios/graph?host={hostname_enc}"
+    
+    # Add graph links section if not already present
+    if "grafici" not in html.lower() and "graph" not in html.lower():
+        graph_section = f"""
+<hr>
+<p><strong>📊 Grafici:</strong></p>
+<ul>
+<li><a href="{graph_url}">🔗 Vista CheckMK</a></li>
+<li><a href="{pnp_url}">📈 Grafici PNP</a></li>
+</ul>
+"""
+        # Insert before closing body or at the end
+        if "</body>" in html:
+            html = html.replace("</body>", graph_section + "</body>")
+        else:
+            html += graph_section
+    
+    return html
+
+
 def patched_send(message, target, from_address):
     is_frp, real_ip, original_addr = detect_frp()
     if not (is_frp and real_ip):
@@ -80,6 +121,8 @@ def patched_send(message, target, from_address):
                 continue
             html = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
             html2 = rewrite_html_urls(html, original_addr, real_ip)
+            # Add graph links for FRP scenario
+            html2 = add_graph_links(html2, real_ip)
             charset = part.get_content_charset() or "utf-8"
             if "Content-Transfer-Encoding" in part:
                 del part["Content-Transfer-Encoding"]
