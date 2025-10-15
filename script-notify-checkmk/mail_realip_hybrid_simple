@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-# HTML Email with FRP Support - Ultimate
+# -*- coding: utf-8 -*-
+# Mail RealIP Hybrid Simple
+#
+# Converts 127.0.0.1 to real IP in email notifications for FRP scenarios
 # Bulk: yes
 
 from cmk.notification_plugins import mail
@@ -66,14 +69,17 @@ def patch_ultimate_email_content():
                                 new_content = content.replace(original_address, real_ip)
                                 new_content = new_content.replace('127.0.0.1', real_ip)
                                 
-                                # Set new content
-                                part.set_payload(new_content)
-                                if isinstance(content, bytes):
-                                    part.set_payload(new_content.encode('utf-8'))
-                                else:
-                                    part.set_payload(new_content)
+                                # Set new content with proper encoding
+                                # Get current charset and transfer encoding to preserve them
+                                charset = part.get_content_charset() or 'utf-8'
                                 
-                                log_debug(f"Patched {part.get_content_type()} content")
+                                # Delete old payload
+                                del part['Content-Transfer-Encoding']
+                                
+                                # Set new payload with correct method
+                                part.set_payload(new_content, charset=charset)
+                                
+                                log_debug(f"Patched {part.get_content_type()} content (charset: {charset})")
                             except Exception as e:
                                 log_debug(f"Error patching part: {e}")
             
