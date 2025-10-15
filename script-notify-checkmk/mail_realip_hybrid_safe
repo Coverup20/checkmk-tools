@@ -63,8 +63,8 @@ def add_graph_links(html: str, real_ip: str) -> str:
     if not hostname:
         return html
     
-    # Build graph URLs with real IP and proper URL encoding
-    base_url = f"https://{real_ip}/monitoring"
+    # Build graph URLs with CheckMK server public URL (not the monitored host IP)
+    base_url = "https://monitor.nethlab.it/monitoring"
     hostname_enc = urllib.parse.quote(hostname)
     
     if servicedesc:  # Service notification
