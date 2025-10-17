@@ -47,23 +47,23 @@ setup_configuration() {
     print_step "Configurazione deployment"
     
     if [ -z "$CHECKMK_SITE" ]; then
-        read -p "Nome site CheckMK (es: monitoring): " CHECKMK_SITE
+        read -r -p "Nome site CheckMK (es: monitoring): " CHECKMK_SITE
     fi
-    
+
     if [ -z "$CHECKMK_USER" ]; then
-        read -p "Username CheckMK/SSH (es: cmkadmin): " CHECKMK_USER
+        read -r -p "Username CheckMK/SSH (es: cmkadmin): " CHECKMK_USER
     fi
-    
+
     if [ -z "$CHECKMK_SERVER" ]; then
-        read -p "Server CheckMK (es: checkmk.domain.com): " CHECKMK_SERVER
+        read -r -p "Server CheckMK (es: checkmk.domain.com): " CHECKMK_SERVER
     fi
-    
+
     if [ -z "$REAL_IP" ]; then
-        read -p "Real IP del server (es: 192.168.1.100): " REAL_IP
+        read -r -p "Real IP del server (es: 192.168.1.100): " REAL_IP
     fi
-    
+
     if [ -z "$TEST_EMAIL" ]; then
-        read -p "Email per test (es: admin@domain.com): " TEST_EMAIL
+        read -r -p "Email per test (es: admin@domain.com): " TEST_EMAIL
     fi
     
     echo -e "\n${YELLOW}Configurazione:${NC}"
@@ -109,10 +109,10 @@ backup_existing_config() {
     print_step "Backup configurazione esistente"
     
     BACKUP_DIR="backup_$(date +%Y%m%d_%H%M%S)"
-    mkdir -p $BACKUP_DIR
+    mkdir -p "$BACKUP_DIR"
     
     # Backup script esistente se presente
-    ssh $CHECKMK_USER@$CHECKMK_SERVER "
+    ssh "$CHECKMK_USER@$CHECKMK_SERVER" "
         if [ -f /opt/omd/sites/$CHECKMK_SITE/local/share/check_mk/notifications/mail_realip_00 ]; then
             cp /opt/omd/sites/$CHECKMK_SITE/local/share/check_mk/notifications/mail_realip_00 /tmp/mail_realip_00_backup
             echo 'Script mail_realip_00 copiato in /tmp/mail_realip_00_backup'
@@ -133,10 +133,10 @@ install_script() {
     print_step "Installazione script mail_realip_graphs"
     
     # Copia script sul server
-    scp mail_realip_graphs $CHECKMK_USER@$CHECKMK_SERVER:/tmp/
+    scp mail_realip_graphs "$CHECKMK_USER@$CHECKMK_SERVER:/tmp/"
     
     # Installa script
-    ssh $CHECKMK_USER@$CHECKMK_SERVER "
+    ssh "$CHECKMK_USER@$CHECKMK_SERVER" "
         sudo mkdir -p /opt/omd/sites/$CHECKMK_SITE/local/share/check_mk/notifications/
         sudo cp /tmp/mail_realip_graphs /opt/omd/sites/$CHECKMK_SITE/local/share/check_mk/notifications/
         sudo chmod +x /opt/omd/sites/$CHECKMK_SITE/local/share/check_mk/notifications/mail_realip_graphs
@@ -168,7 +168,7 @@ configure_host_labels() {
 test_script() {
     print_step "Test dello script"
     
-    ssh $CHECKMK_USER@$CHECKMK_SERVER "
+    ssh "$CHECKMK_USER@$CHECKMK_SERVER" "
         su - $CHECKMK_SITE -c '
             export NOTIFY_CONTACTEMAIL=\"$TEST_EMAIL\"
             export NOTIFY_HOSTNAME=\"$CHECKMK_SERVER\"
@@ -242,7 +242,7 @@ test_email_notification() {
 cleanup() {
     print_step "Cleanup file temporanei"
     
-    ssh $CHECKMK_USER@$CHECKMK_SERVER "
+    ssh "$CHECKMK_USER@$CHECKMK_SERVER" "
         rm -f /tmp/mail_realip_graphs
         echo 'File temporanei rimossi'
     " 2>/dev/null || true

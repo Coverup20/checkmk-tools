@@ -1,4 +1,4 @@
-c#!/usr/bin/env pwsh
+# ...existing code...
 # Script di Backup Multi-Piattaforma Completo + Notifiche Telegram
 # Sincronizza su GitHub, GitLab, Codeberg e backup locale
 
@@ -25,7 +25,7 @@ function Send-BackupNotification {
     
     $emoji = switch ($Type) {
         "success" { "✅" }
-        "error" { "❌" }  
+        "error" { "❌" }
         "warning" { "⚠️" }
         "info" { "📊" }
         default { "📱" }
@@ -115,17 +115,7 @@ if (-not (Test-Path ".git")) {
     exit 1
 }
 
-# Verifica stato repository
-$status = git status --porcelain
-if ($status) {
-    Write-Host "⚠️  Attenzione: Ci sono modifiche non committate:" -ForegroundColor Yellow
-    git status --short
-    $response = Read-Host "`nVuoi continuare comunque? [y/N]"
-    if ($response -notmatch "^[yY]") {
-        Write-Host "❌ Backup annullato dall'utente" -ForegroundColor Red
-        exit 1
-    }
-}
+# ...continua senza controllo commit...
 
 # Esegui backup su tutti i remote configurati
 foreach ($remote in $remotes) {
@@ -302,3 +292,6 @@ $retentionInfo
 "@
     Send-BackupNotification -Message $message -Type "error"
 }
+
+Write-Host "\nPremi INVIO per chiudere..." -ForegroundColor Yellow
+Read-Host
