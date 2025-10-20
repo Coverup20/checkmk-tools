@@ -12,14 +12,15 @@ SITE="monitoring"
 
 get_emoji() {
   case "$1" in
-    OK|UP) echo -n "🟢" ;; # green circle
-    WARN|WARNING) echo -n "🟡" ;; # yellow circle
-    CRIT|CRITICAL|DOWN) echo -n "🔴" ;; # red circle
-    UNKNOWN) echo -n "⚠" ;; # warning
-    *) echo -n "❌" ;; # cross mark
+    OK|UP) echo -n "ðŸŸ¢" ;;
+    WARN|WARNING) echo -n "ðŸŸ¡" ;;
+    CRIT|CRITICAL|DOWN) echo -n "ðŸ”´" ;;
+    UNKNOWN) echo -n "âšª" ;;
+    *) echo -n "â”" ;;
   esac
 }
 
+# URL-encode helper (returns value instead of printing directly)
 
 urlencode() {
   local raw="${1:-}"
