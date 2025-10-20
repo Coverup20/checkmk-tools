@@ -5,8 +5,12 @@
 Write-Host "📱 Test Notifica Telegram..." -ForegroundColor Cyan
 
 # === CONFIG da script CheckMK ===
-$TOKEN = "8264716040:AAHPjzYJz7h8pV9hzjaf45-Mrv2gf8tMXmQ"
-$CHAT_ID = "381764604"
+$TOKEN = $env:TELEGRAM_TOKEN
+$CHAT_ID = $env:TELEGRAM_CHAT_ID
+if (-not $TOKEN -or -not $CHAT_ID) {
+    Write-Host "❌ Errore: TELEGRAM_TOKEN o TELEGRAM_CHAT_ID non impostati come variabili d'ambiente." -ForegroundColor Red
+    exit 1
+}
 $API_URL = "https://api.telegram.org/bot$TOKEN/sendMessage"
 
 # Funzione per inviare messaggio
