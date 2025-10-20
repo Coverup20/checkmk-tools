@@ -3,8 +3,8 @@
 set -euo pipefail
 
 # === CONFIG ===
-TOKEN="8264716040:AAHPjzYJz7h8pV9hzjaf45-Mrv2gf8tMXmQ"
-CHAT_ID="381764604"
+TOKEN="${TELEGRAM_TOKEN:-}"
+CHAT_ID="${TELEGRAM_CHAT_ID:-}"
 
 CMK_URL="https://monitor.nethlab.it/monitoring"
 SITE="monitoring"
