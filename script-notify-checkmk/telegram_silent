@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# Telegram
+set -euo pipefail
+
+# === CONFIG ===
+TOKEN="${TELEGRAM_TOKEN:-}"
+CHAT_ID="${TELEGRAM_CHAT_ID:-}"
+
+CMK_URL="https://monitor.nethlab.it/monitoring"
+SITE="monitoring"
+# ==============
+
+get_emoji() {
+  case "$1" in
+    OK|UP) echo -n "🟢" ;; # green circle
+    WARN|WARNING) echo -n "🟡" ;; # yellow circle
+    CRIT|CRITICAL|DOWN) echo -n "🔴" ;; # red circle
+    UNKNOWN) echo -n "⚠" ;; # warning
+    *) echo -n "❌" ;; # cross mark
+  esac
+}
+
+# URL-encode helper (returns value instead of printing directly)
+urlencode() {
+  local raw="${1:-}"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]), end="")' "$raw" 2>/dev/null || true
+  else
+    echo -n "$raw" | sed 's/ /%20/g'
+  fi
+}
+
+# Build message + buttons based on context
+if [[ "${NOTIFY_WHAT:-SERVICE}" = "SERVICE" ]]; then
+  EMOJI="$(get_emoji "${NOTIFY_SERVICESTATE:-UNKNOWN}")"
+  SERVICE_ENC="$(urlencode "${NOTIFY_SERVICEDESC:-SERVICE}")"
+
+  SERVICE_LINK="${CMK_URL}/check_mk/view.py?view_name=service&host=${NOTIFY_HOSTNAME:-}&service=${SERVICE_ENC}&site=${SITE}"
+  HOST_LINK="${CMK_URL}/check_mk/view.py?view_name=host&host=${NOTIFY_HOSTNAME:-}&site=${SITE}"
+
+  # --- Calcolo REAL_IP con protezione ---
+if [ -n "${NOTIFY_HOSTLABELS:-}" ]; then
+    REAL_IP=$(echo "$NOTIFY_HOSTLABELS" | grep -o 'real_ip:[^,]*' | cut -d: -f2)
+else
+    REAL_IP=""
+fi
+
+  # Se REAL_IP Ã¨ vuoto (nessuna label trovata) â†’ fallback su NOTIFY_HOSTADDRESS
+[ -z "$REAL_IP" ] && REAL_IP="${NOTIFY_HOSTADDRESS:-}"
+
+  MSG="[${EMOJI} ${NOTIFY_SERVICESTATE:-UNKNOWN}] Servizio â†’ ${NOTIFY_SERVICEDESC:-}
+Host: ${NOTIFY_HOSTNAME:-unknown} (${REAL_IP})
+Output: ${NOTIFY_SERVICEOUTPUT:-N/A}"
+    BUTTON='{"inline_keyboard":[[{"text":"🔗 Servizio","url":"'"$SERVICE_LINK"'"},{"text":"🖥 Host","url":"'"$HOST_LINK"'"}]]}'
+else
+  EMOJI="$(get_emoji "${NOTIFY_HOSTSTATE:-UNKNOWN}")"
+  HOST_LINK="${CMK_URL}/check_mk/view.py?view_name=host&host=${NOTIFY_HOSTNAME:-}&site=${SITE}"
+
+  MSG="[${EMOJI} ${NOTIFY_HOSTSTATE:-UNKNOWN}] Host â†’ ${NOTIFY_HOSTNAME:-unknown}
+IP: ${NOTIFY_HOSTADDRESS:-}
+Output: ${NOTIFY_HOSTOUTPUT:-N/A}"
+    BUTTON='{"inline_keyboard":[[{"text":"🖥 Host","url":"'"$HOST_LINK"'"}]]}'
+fi
+
+# âž• Aggiunta del prefisso per riconoscere subito la VM
+MSG="⚡ [VPS] ⚡ $MSG"
+
+# Send (totally silent: no JSON on stdout/stderr)
+curl -sS -o /dev/null -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+  -d chat_id="${CHAT_ID}" \
+  -d text="$MSG" \
+  --data-urlencode "reply_markup=$BUTTON" >/dev/null 2>&1 || true
+
+exit 0
