@@ -1,0 +1,25 @@
+﻿**********************
+Inizio trascrizione Windows PowerShell
+Ora di inizio: 20251017114128
+Nome utente: NB-MARZIO-0625\Marzio
+Esegui come utente: NB-MARZIO-0625\Marzio
+Nome configurazione: 
+Computer NB-MARZIO-0625 (Microsoft Windows NT 10.0.26120.0)
+Applicazione host: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+ID processo: 23272
+PSVersion: 5.1.26100.6780
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.6780
+BuildVersion: 10.0.26100.6780
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Trascrizione avviata. File di output: C:\\Users\\Marzio\\Desktop\\CheckMK\\Script\\backup-task.log
+PS C:\Users\Marzio\Desktop\CheckMK\Script> # ...tutto il tuo script...
+PS C:\Users\Marzio\Desktop\CheckMK\Script> Stop-Transcript
+**********************
+Fine trascrizione Windows PowerShell
+Ora di fine: 20251017114130
+**********************

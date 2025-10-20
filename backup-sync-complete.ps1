@@ -23,15 +23,8 @@ function Send-BackupNotification {
     
     if (-not $TELEGRAM_ENABLED) { return }
     
-    $emoji = switch ($Type) {
-        "success" { "✅" }
-        "error" { "❌" }
-        "warning" { "⚠️" }
-        "info" { "📊" }
-        default { "📱" }
-    }
-    
-    $fullMessage = "$emoji [BACKUP-COMPLETE] $Message`n`n⏰ $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+    $emoji = ""
+    $fullMessage = "[BACKUP-COMPLETE] $Message`n`n$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
     
     try {
         $body = @{
@@ -70,7 +63,7 @@ function Push-Remote {
         # Verifica che il remote esista
         $remoteExists = git remote | Where-Object { $_ -eq $remoteName }
         if (-not $remoteExists) {
-            Write-Host "⚠️  $remoteDescription - Remote non configurato" -ForegroundColor $(if ($isRequired) { "Red" } else { "DarkYellow" })
+    Write-Host "⚠️  $remoteDescription - Remote non configurato" -ForegroundColor $(if ($isRequired) { "Red" } else { "DarkYellow" })
             if ($isRequired) {
                 Write-Host "❌ $remoteDescription - RICHIESTO ma mancante!" -ForegroundColor Red
                 $script:backupResults += "❌ $remoteDescription - REQUIRED but missing"
@@ -104,8 +97,8 @@ function Push-Remote {
             $script:backupResults += "❌ $remoteDescription - Connection failed"
         }
     } catch {
-        Write-Host "❌ $remoteDescription - Errore: $_" -ForegroundColor Red
-        $script:backupResults += "❌ $remoteDescription - Exception: $($_.Exception.Message)"
+    Write-Host "❌ $remoteDescription - Errore: $_" -ForegroundColor Red
+    $script:backupResults += "❌ $remoteDescription - Exception: $($_.Exception.Message)"
     }
 }
 
@@ -142,25 +135,16 @@ foreach ($line in $configuredRemotes) {
     $name = $parts[0]
     $url = $parts[1] -replace " \(push\)", ""
     
-    $emoji = switch ($name) {
-        "origin" { "🐙" }
-        "gitlab" { "🦊" }
-        "codeberg" { "🌿" }
-        "sourceforge" { "🔧" }
-        "backup" { "💾" }
-        default { "📡" }
-    }
-    
-    Write-Host "   $emoji $name`: $url" -ForegroundColor Gray
+    Write-Host "   ${name}: ${url}" -ForegroundColor Gray
 }
 
 # Suggerimenti per remote mancanti
 $allRemotes = git remote
 $missingRemotes = $remotes | Where-Object { $_.Name -notin $allRemotes -and -not $_.Required }
 if ($missingRemotes) {
-    Write-Host "`n💡 Remote opzionali non configurati:" -ForegroundColor DarkCyan
+    Write-Host "\nRemote opzionali non configurati:" -ForegroundColor DarkCyan
     foreach ($missing in $missingRemotes) {
-        Write-Host "   • $($missing.Description)" -ForegroundColor DarkGray
+        Write-Host "   - $($missing.Description)" -ForegroundColor DarkGray
     }
     Write-Host "   Usa setup-additional-remotes.ps1 per configurarli" -ForegroundColor DarkGray
 }
@@ -170,7 +154,7 @@ Write-Host "`n📦 Sistema Retention Avanzato..." -ForegroundColor Cyan
 
 try {
     $timestamp = Get-Date -Format "yyyy-MM-dd-HH-mm"
-    $backupDir = "C:\Backup\CheckMK"
+    $backupDir = "C:\Users\Marzio\Desktop\Backup\CheckMK"
     $currentBackup = "$backupDir\checkmk-tools-$timestamp"
     
     # Crea directory se non esiste
@@ -209,7 +193,7 @@ try {
             Remove-Item $backup.FullName -Recurse -Force
             $deleted++
         }
-        Write-Host "   🗑️  Rimossi $($toDelete.Count) backup di oggi (mantenuti 5)" -ForegroundColor DarkYellow
+    Write-Host "   🗑️  Rimossi $($toDelete.Count) backup di oggi (mantenuti 5)" -ForegroundColor DarkYellow
     }
     
     # Ieri: mantieni max 2 (mattina/sera)
@@ -219,7 +203,7 @@ try {
             Remove-Item $backup.FullName -Recurse -Force
             $deleted++
         }
-        Write-Host "   🗑️  Rimossi $($toDelete.Count) backup di ieri (mantenuti 2)" -ForegroundColor DarkYellow
+    Write-Host "   🗑️  Rimossi $($toDelete.Count) backup di ieri (mantenuti 2)" -ForegroundColor DarkYellow
     }
     
     # Più vecchi: mantieni 1 per giorno (raggruppa per data)
@@ -292,6 +276,3 @@ $retentionInfo
 "@
     Send-BackupNotification -Message $message -Type "error"
 }
-
-Write-Host "\nPremi INVIO per chiudere..." -ForegroundColor Yellow
-Read-Host
