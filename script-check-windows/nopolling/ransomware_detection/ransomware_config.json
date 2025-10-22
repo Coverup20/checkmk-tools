@@ -1,0 +1,22 @@
+﻿{
+    "SharePaths": [
+        "\\\\WS2022AD\\test00"
+    ],
+    "EnableCanaryFiles": true,
+    "MaxFilesPerSecond": 10,
+    "AlertThreshold": 50,
+    "SuspiciousExtensions": [
+        ".encrypted",
+        ".locked",
+        ".crypto",
+        ".crypt",
+        ".crypted",
+        ".enc",
+        ".locky",
+        ".zepto",
+        ".odin",
+        ".thor",
+        ".cerber",
+        ".crypt0l0cker"
+    ]
+}
