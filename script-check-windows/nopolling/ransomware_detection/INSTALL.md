@@ -2,31 +2,60 @@
 
 ## 📁 Tutti i File Necessari
 
-Nella directory `script-check-windows\nopolling\` trovi:
+Nella directory `script-check-windows\nopolling\ransomware_detection\` trovi:
 
+### Versione Locale (consigliata per ambienti senza Internet)
 1. **`check_ransomware_activity.ps1`** - Script principale PowerShell
-2. **`check_ransomware.bat`** - Wrapper BAT (necessario per CheckMK Agent)
-3. **`ransomware_config.json`** - File di configurazione
+2. **`ransomware_config.json`** - File di configurazione
 
-## 🚀 Installazione Manuale Rapida
+### Versione Remote (consigliata per aggiornamenti automatici)
+1. **`rcheck_ransomware_activity.ps1`** - Wrapper che scarica l'ultima versione da GitHub
+2. **`ransomware_config.json`** - File di configurazione
+
+> 💡 **La versione Remote** scarica sempre l'ultima versione dello script da GitHub con cache di 1 ora, ideale per mantenere aggiornato il controllo senza deployment manuale.
+
+## 🚀 Installazione Rapida - Versione Remote (Raccomandata)
 
 ### Sul Windows Server (come Amministratore):
 
+**Opzione A - Versione Remote (aggiornamenti automatici da GitHub):**
 ```powershell
-# 1. Copia i file nella directory CheckMK Agent
+# 1. Copia solo 2 file nella directory CheckMK Agent
+$dest = "C:\ProgramData\checkmk\agent\local"
+
+# Scarica direttamente da GitHub
+$remoteUrl = "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-windows/nopolling/ransomware_detection/rcheck_ransomware_activity.ps1"
+$configUrl = "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-windows/nopolling/ransomware_detection/ransomware_config.json"
+
+Invoke-WebRequest -Uri $remoteUrl -OutFile "$dest\rcheck_ransomware_activity.ps1" -UseBasicParsing
+Invoke-WebRequest -Uri $configUrl -OutFile "$dest\ransomware_config.json" -UseBasicParsing
+
+# 2. Configura le tue share
+notepad "$dest\ransomware_config.json"
+# Modifica "SharePaths": ["\\\\TUO-SERVER\\tua-share"]
+
+# 3. Test
+cd $dest
+.\rcheck_ransomware_activity.ps1
+
+# 4. Riavvia CheckMK Agent
+Restart-Service CheckMkService
+```
+
+**Opzione B - Versione Locale (per server senza Internet):**
+```powershell
+# 1. Copia i file dalla tua workstation
 $dest = "C:\ProgramData\checkmk\agent\local"
 
 Copy-Item "check_ransomware_activity.ps1" $dest
-Copy-Item "check_ransomware.bat" $dest
 Copy-Item "ransomware_config.json" $dest
 
 # 2. Modifica la configurazione con le tue share
 notepad "$dest\ransomware_config.json"
-# Modifica "SharePaths": ["\\\\TUO-SERVER\\tua-share"]
 
 # 3. Test manuale
 cd $dest
-.\check_ransomware.bat
+.\check_ransomware_activity.ps1
 
 # 4. Riavvia CheckMK Agent
 Restart-Service CheckMkService
