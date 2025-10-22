@@ -330,6 +330,7 @@ function Get-SuspiciousFiles {
     
     $suspiciousFiles = @()
     $totalScanned = 0
+    $job = $null
     
     try {
         # Usa Job con timeout per evitare blocchi su share lente
@@ -350,18 +351,23 @@ function Get-SuspiciousFiles {
         } -ArgumentList $SharePath, $Since, $MaxFiles, $ExcludePaths
         
         # Attendi con timeout
-        $completed = Wait-Job $job -Timeout $TimeoutSeconds
-        
+        Wait-Job $job -Timeout $TimeoutSeconds | Out-Null
+
         if ($job.State -eq 'Running') {
             Write-DebugLog "TIMEOUT: Scansione share $SharePath interrotta dopo $TimeoutSeconds secondi"
-            Stop-Job $job
-            Remove-Job $job
+            Stop-Job $job -ErrorAction SilentlyContinue
+            Remove-Job $job -Force -ErrorAction SilentlyContinue
             return @()
         }
-        
-        $recentFiles = Receive-Job $job
-        Remove-Job $job
-        
+
+        $recentFiles = @()
+        if ($job.State -eq 'Completed') {
+            $recentFiles = Receive-Job $job -ErrorAction SilentlyContinue
+        }
+        if ($job) {
+            Remove-Job $job -Force -ErrorAction SilentlyContinue
+        }
+
         foreach ($file in $recentFiles) {
             $totalScanned++
             $suspicionLevel = 0
@@ -416,6 +422,11 @@ function Get-SuspiciousFiles {
         
     } catch {
         Write-DebugLog "Errore scansione share $SharePath : $_"
+        # Cleanup job se esiste ancora
+        if ($job -and $job.State -ne 'Completed') {
+            Stop-Job $job -ErrorAction SilentlyContinue
+            Remove-Job $job -ErrorAction SilentlyContinue
+        }
     }
     
     return $suspiciousFiles
