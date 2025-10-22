@@ -35,7 +35,7 @@ param(
 $scriptUrl = "https://raw.githubusercontent.com/$GitHubRepo/$Branch/script-check-windows/nopolling/ransomware_detection/check_ransomware_activity.ps1"
 $tempScript = "$env:TEMP\check_ransomware_activity_remote_$(Get-Date -Format 'yyyyMMddHHmmss').ps1"
 $cacheFile = "$env:TEMP\ransomware_script_cache.ps1"
-$cacheTimeout = 3600 # 1 ora in secondi
+$cacheTimeout = 60 # 1 minuto in secondi (come gli script Linux)
 
 function Write-DebugLog {
     param([string]$Message)
