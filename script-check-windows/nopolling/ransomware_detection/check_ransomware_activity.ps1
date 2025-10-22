@@ -296,7 +296,8 @@ function Get-SuspiciousFiles {
         [string]$SharePath,
         [datetime]$Since,
         [int]$MaxFiles = 1000,
-        [string[]]$ExcludePaths = @()
+        [string[]]$ExcludePaths = @(),
+        [int]$TimeoutSeconds = 30
     )
     
     Write-DebugLog "Scansione share: $SharePath (modifiche da: $Since)"
@@ -305,19 +306,35 @@ function Get-SuspiciousFiles {
     $totalScanned = 0
     
     try {
-        # Cerca file modificati di recente
-        $recentFiles = Get-ChildItem -Path $SharePath -Recurse -File -ErrorAction SilentlyContinue |
+        # Usa Job con timeout per evitare blocchi su share lente
+        $job = Start-Job -ScriptBlock {
+            param($path, $since, $max, $excludePaths)
+            Get-ChildItem -Path $path -Recurse -File -ErrorAction SilentlyContinue |
             Where-Object {
-                $exclude = $false
-                foreach ($exPath in $ExcludePaths) {
+                $shouldExclude = $false
+                foreach ($exPath in $excludePaths) {
                     if ($_.FullName -like "*$exPath*") {
-                        $exclude = $true
+                        $shouldExclude = $true
                         break
                     }
                 }
-                -not $exclude -and $_.LastWriteTime -gt $Since
+                -not $shouldExclude -and $_.LastWriteTime -gt $since
             } |
-            Select-Object -First $MaxFiles
+            Select-Object -First $max
+        } -ArgumentList $SharePath, $Since, $MaxFiles, $ExcludePaths
+        
+        # Attendi con timeout
+        $completed = Wait-Job $job -Timeout $TimeoutSeconds
+        
+        if ($job.State -eq 'Running') {
+            Write-DebugLog "TIMEOUT: Scansione share $SharePath interrotta dopo $TimeoutSeconds secondi"
+            Stop-Job $job
+            Remove-Job $job
+            return @()
+        }
+        
+        $recentFiles = Receive-Job $job
+        Remove-Job $job
         
         foreach ($file in $recentFiles) {
             $totalScanned++
@@ -601,9 +618,9 @@ try {
             }
         }
         
-        # Cerca file sospetti
+        # Cerca file sospetti (con timeout di 30 secondi)
         $suspicious = Get-SuspiciousFiles -SharePath $share -Since $since `
-            -MaxFiles $config.MaxFilesToScan -ExcludePaths $config.ExcludePaths
+            -MaxFiles $config.MaxFilesToScan -ExcludePaths $config.ExcludePaths -TimeoutSeconds 30
         $allSuspiciousFiles += $suspicious
         
         # Cerca ransom notes
