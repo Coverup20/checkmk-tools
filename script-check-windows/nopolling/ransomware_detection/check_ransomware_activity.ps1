@@ -552,7 +552,15 @@ try {
     
     # Usa SharePaths dal parametro o dalla config
     if ($SharePaths.Count -eq 0 -and $config.SharePaths) {
-        $SharePaths = $config.SharePaths
+        # Assicura che sia sempre un array
+        if ($config.SharePaths -is [string]) {
+            $SharePaths = @($config.SharePaths)
+        } elseif ($config.SharePaths -is [array]) {
+            $SharePaths = @($config.SharePaths)
+        } else {
+            $SharePaths = @($config.SharePaths)
+        }
+        Write-DebugLog "SharePaths dalla config: $($SharePaths.Count) elementi - $($SharePaths -join ', ')"
     }
     
     # Se ancora nessuna share configurata, esci
