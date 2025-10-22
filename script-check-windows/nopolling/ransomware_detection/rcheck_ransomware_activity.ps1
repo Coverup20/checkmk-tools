@@ -13,7 +13,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$false)]
-    [string]$ConfigFile = "$PSScriptRoot\ransomware_config.json",
+    [string]$ConfigFile,
     
     [Parameter(Mandatory=$false)]
     [int]$TimeWindowMinutes = 30,
@@ -30,6 +30,11 @@ param(
     [Parameter(Mandatory=$false)]
     [string]$Branch = "main"
 )
+
+# Determina path config se non specificato
+if (-not $ConfigFile) {
+    $ConfigFile = "C:\ProgramData\checkmk\agent\local\ransomware_config.json"
+}
 
 # URL script principale su GitHub
 $scriptUrl = "https://raw.githubusercontent.com/$GitHubRepo/$Branch/script-check-windows/nopolling/ransomware_detection/check_ransomware_activity.ps1"

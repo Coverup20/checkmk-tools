@@ -44,7 +44,7 @@ param(
     [int]$AlertThreshold = 50,
     
     [Parameter(Mandatory=$false)]
-    [string]$ConfigFile = "$PSScriptRoot\ransomware_config.json",
+    [string]$ConfigFile,
     
     [Parameter(Mandatory=$false)]
     [string]$StateFile = "$env:TEMP\ransomware_state.json",
@@ -83,6 +83,32 @@ $TARGET_EXTENSIONS = @(
     '.zip', '.rar', '.7z', '.sql', '.mdb', '.accdb',
     '.pst', '.ost', '.csv', '.rtf', '.odt', '.ods'
 )
+
+# ============================================================================
+# INIZIALIZZAZIONE
+# ============================================================================
+
+# Determina il path del config file se non specificato
+if (-not $ConfigFile) {
+    # Prova diverse posizioni
+    $possiblePaths = @(
+        "$PSScriptRoot\ransomware_config.json",
+        "C:\ProgramData\checkmk\agent\local\ransomware_config.json",
+        "$env:ProgramData\checkmk\agent\local\ransomware_config.json"
+    )
+    
+    foreach ($path in $possiblePaths) {
+        if ($path -and (Test-Path $path)) {
+            $ConfigFile = $path
+            break
+        }
+    }
+    
+    # Se ancora non trovato, usa default
+    if (-not $ConfigFile) {
+        $ConfigFile = "C:\ProgramData\checkmk\agent\local\ransomware_config.json"
+    }
+}
 
 # ============================================================================
 # FUNZIONI HELPER
