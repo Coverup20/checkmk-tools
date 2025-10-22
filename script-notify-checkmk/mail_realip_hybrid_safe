@@ -153,6 +153,7 @@ def telegram_buttons_html() -> str:
     import urllib.parse, html
     hostname = os.environ.get("NOTIFY_HOSTNAME", "")
     servicedesc = os.environ.get("NOTIFY_SERVICEDESC", "")
+    state = os.environ.get("NOTIFY_SERVICESTATE", "OK")
     site = "monitoring"
     real_ip = os.environ.get("NOTIFY_HOSTLABEL_real_ip", "")
     base_url = "https://monitor.nethlab.it/monitoring"
@@ -162,40 +163,119 @@ def telegram_buttons_html() -> str:
     # Link host (corretto): view_name=hoststatus e include site
     host_view = f"/monitoring/check_mk/view.py?host={urllib.parse.quote(hostname)}&site={site}&view_name=hoststatus"
     host_url = f"{base_url}/check_mk/index.py?start_url={urllib.parse.quote(host_view)}"
-    # Bottoni compatti, arrotondati, dinamici, effetto hover
+    
+    # Determina la classe CSS in base allo stato
+    state_class = ""
+    if state == "OK":
+        state_class = "cmk-btn-ok"
+    elif state == "WARN" or state == "WARNING":
+        state_class = "cmk-btn-warn"
+    elif state == "CRIT" or state == "CRITICAL":
+        state_class = "cmk-btn-crit"
+    else:
+        state_class = "cmk-btn-unknown"
+    
+    # Bottoni compatti, arrotondati, dinamici, effetto hover, responsive per smartphone
     return f"""
 <style>
+.cmk-btn-container {{
+    background: #ffffff;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    padding: 20px 40px;
+    margin: 16px auto;
+    max-width: 600px;
+    width: auto;
+    display: block;
+    box-sizing: border-box;
+}}
 .cmk-btn-tg-wrap {{
     display: flex;
     justify-content: center;
     gap: 32px;
-    margin-top: 24px;
-    margin-bottom: 0;
+    margin: 0 auto;
+    padding: 0;
 }}
 .cmk-btn-tg {{
-    background: #1de9b6;
     color: #fff;
-    padding: 12px 48px;
-    border-radius: 32px;
+    padding: 12px 20px;
+    border-radius: 12px;
     text-decoration: none;
     font-weight: bold;
-    font-size: 1.15em;
+    font-size: 0.95em;
     display: inline-block;
-    min-width: 140px;
     text-align: center;
-    box-shadow: 0 2px 8px #0002;
-    border: none;
+    box-shadow: 0 2px 8px #0002, inset 0 0 0 1px #000;
+    border: 1px solid #000;
+    outline: 2px solid #fff;
+    outline-offset: -3px;
     letter-spacing: 0.5px;
-    transition: background 0.2s, color 0.2s;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    flex: 0 1 auto;
+    white-space: nowrap;
+    min-width: 110px;
+    max-width: 150px;
 }}
-.cmk-btn-tg:hover {{
-    background: #15cba1;
-    color: #fff;
+/* Colori in base allo stato del servizio */
+.cmk-btn-ok {{
+    background: #13ce66;
+    border-color: #000;
+}}
+.cmk-btn-ok:hover {{
+    background: #0fa957;
+    border-color: #000;
+}}
+.cmk-btn-warn {{
+    background: #ffc107;
+    border-color: #000;
+}}
+.cmk-btn-warn:hover {{
+    background: #e0a800;
+    border-color: #000;
+}}
+.cmk-btn-crit {{
+    background: #ff4757;
+    border-color: #000;
+}}
+.cmk-btn-crit:hover {{
+    background: #e63946;
+    border-color: #000;
+}}
+.cmk-btn-unknown {{
+    background: #9e9e9e;
+    border-color: #000;
+}}
+.cmk-btn-unknown:hover {{
+    background: #757575;
+    border-color: #000;
+}}
+/* Media query per smartphone - pulsanti affiancati con larghezza adattiva */
+@media (max-width: 600px) {{
+    .cmk-btn-container {{
+        max-width: 100%;
+        margin: 12px 0;
+        padding: 16px 12px;
+        border-width: 2px;
+        border-radius: 6px;
+    }}
+    .cmk-btn-tg-wrap {{
+        gap: 10px;
+    }}
+    .cmk-btn-tg {{
+        padding: 12px 20px;
+        font-size: 0.95em;
+        flex: 1 1 0;
+        min-width: 0;
+        max-width: none;
+        border-width: 2px;
+    }}
 }}
 </style>
-<div class='cmk-btn-tg-wrap'>
-    <a href='{service_url}' class='cmk-btn-tg'>Service</a>
-    <a href='{host_url}' class='cmk-btn-tg'>Host</a>
+<div class='cmk-btn-container'>
+    <div class='cmk-btn-tg-wrap'>
+        <a href='{service_url}' class='cmk-btn-tg {state_class}'>Service</a>
+        <a href='{host_url}' class='cmk-btn-tg {state_class}'>Host</a>
+    </div>
 </div>
 """
 
