@@ -1,0 +1,35 @@
+{
+  "SharePaths": [
+    "\\\\fileserver\\documents",
+    "\\\\fileserver\\finance",
+    "\\\\fileserver\\shared",
+    "C:\\SharedData"
+  ],
+  "TimeWindowMinutes": 30,
+  "AlertThreshold": 50,
+  "EnableCanaryFiles": true,
+  "CanaryFileName": ".ransomware_canary_do_not_delete.txt",
+  "EnableEntropyCheck": true,
+  "MaxFilesToScan": 1000,
+  "ExcludePaths": [
+    "$RECYCLE.BIN",
+    "System Volume Information",
+    ".git",
+    "node_modules",
+    "Temp"
+  ],
+  "NotificationEmail": "security@example.com",
+  "HighRiskExtensions": [
+    ".exe",
+    ".dll",
+    ".scr",
+    ".bat",
+    ".cmd",
+    ".vbs",
+    ".ps1"
+  ],
+  "ScanSchedule": {
+    "IntervalMinutes": 15,
+    "DeepScanHours": [2, 14]
+  }
+}
