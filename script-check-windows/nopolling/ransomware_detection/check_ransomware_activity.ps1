@@ -639,11 +639,7 @@ try {
         # Verifica accessibilità
         if (-not (Test-ShareAccessible $share)) {
             Write-DebugLog "Share non accessibile: $share"
-            $shareName = Split-Path $share -Leaf
-            if ([string]::IsNullOrEmpty($shareName)) {
-                $shareName = $share -replace '[\\:/]', '_'
-            }
-            Write-Host (Format-CheckMKOutput -Status 1 -ServiceName "Share_$shareName" `
+            Write-Host (Format-CheckMKOutput -Status 1 -ServiceName "Ransomware_Share_$($share -replace '[\\:]', '_')" `
                 -Details "WARN - Share non accessibile: $share")
             continue
         }
@@ -730,7 +726,7 @@ try {
             $details += ($fileDetails -join ', ')
         }
     } else {
-        $details = "OK - Nessuna attivita' sospetta rilevata su $accessibleShares/$totalShares shares"
+        $details = "OK - Nessuna attività sospetta rilevata su $accessibleShares/$totalShares shares"
     }
     
     # Output finale
@@ -761,15 +757,11 @@ try {
                 }
             }
             
-            # Estrae solo il nome della share (ultima parte del path)
-            $shareName = Split-Path $share -Leaf
-            if ([string]::IsNullOrEmpty($shareName)) {
-                $shareName = $share -replace '[\\:/]', '_'
-            }
+            $shareName = $share -replace '[\\:/]', '_'
             $shareMetrics = "suspicious=$($shareSuspicious.Count)|notes=$($shareNotes.Count)"
             
             Write-Host (Format-CheckMKOutput -Status $shareStatus `
-                -ServiceName "Share_$shareName" `
+                -ServiceName "Ransomware_Share$shareName" `
                 -Metrics $shareMetrics -Details $shareDetails)
         }
     }
