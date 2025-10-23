@@ -726,7 +726,7 @@ try {
             $details += ($fileDetails -join ', ')
         }
     } else {
-        $details = "OK - Nessuna attività sospetta rilevata su $accessibleShares/$totalShares shares"
+        $details = "OK - Nessuna attivita' sospetta rilevata su $accessibleShares/$totalShares shares"
     }
     
     # Output finale
