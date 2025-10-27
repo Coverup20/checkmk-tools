@@ -1,0 +1,382 @@
+================================================================================
+ELENCO DETTAGLIATO SCRIPT PROXMOX
+Repository: checkmk-tools
+Cartella: Proxmox/
+Data: 27 Ottobre 2025
+================================================================================
+
+📁 STRUTTURA CARTELLE
+├── nopolling/          (10 script)
+└── polling/            (vuota)
+
+================================================================================
+📂 PROXMOX/NOPOLLING/
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. check-proxmox-vm-snapshot-status.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Versione:      1.6
+Righe:         59
+Autore:        NethLab / Marzio Project
+Compatibilità: Proxmox VE 8.x + CheckMK Raw 2.4.x
+
+DESCRIZIONE:
+Monitora lo stato degli snapshot per VM (QEMU) e container LXC in Proxmox.
+
+FUNZIONALITÀ:
+✓ Conta numero snapshot per ogni VM/LXC
+✓ Rileva snapshot in corso (state: prepare/running)
+✓ Segnala assenza di snapshot
+✓ Trasforma nomi in Title Case per leggibilità
+
+OUTPUT CHECKMK:
+- SNAPSHOT_VM_{vmid}_{NAME}   (per macchine virtuali)
+- SNAPSHOT_CT_{ctid}_{NAME}   (per container LXC)
+
+STATI:
+0 (OK)   - N snapshot presenti: lista snapshot
+1 (WARN) - Snapshot in corso: nome snapshot
+2 (CRIT) - Nessuno snapshot presente
+
+COMANDI USATI:
+- qm list, qm listsnapshot
+- pct list, pct listsnapshot
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. check-proxmox-vm-status.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Versione:      3.5 (2025-10-07)
+Righe:         98
+Autore:        Marzio Project
+
+DESCRIZIONE:
+Monitora lo stato completo di tutte le VM e container LXC sul nodo Proxmox.
+Ogni VM/LXC viene creato come servizio distinto in CheckMK.
+
+FUNZIONALITÀ:
+✓ Status VM/LXC (running/stopped)
+✓ Uptime leggibile completo (giorni, ore, minuti, secondi)
+✓ Nomi servizi in MAIUSCOLO
+✓ Contatori globali (totale VM/LXC, running, stopped)
+✓ Conversione uptime da secondi a formato umano
+
+OUTPUT CHECKMK:
+- Proxmox_VM_Global          (servizio riepilogo)
+- VM_{vmid}_{NAME}           (per ogni VM)
+- CT_{ctid}_{NAME}           (per ogni container)
+
+METRICHE GLOBALI:
+total_vms, running_vms, stopped_vms, 
+total_lxc, running_lxc, stopped_lxc
+
+COMANDI USATI:
+- pvesh get /nodes/{node}/qemu
+- pvesh get /nodes/{node}/lxc
+- jq (per parsing JSON)
+
+ESEMPIO OUTPUT:
+"0 VM_100_WEBSERVER - Running (uptime: 15 d 3 h 45 min)"
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. proxmox_vm_api.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Righe:         ~38
+Dipendenze:    jq
+
+DESCRIZIONE:
+Script CheckMK local check per monitorare stato e RAM delle VM tramite API 
+Proxmox (pvesh).
+
+FUNZIONALITÀ:
+✓ Stato VM (accesa/spenta)
+✓ Utilizzo RAM in percentuale
+✓ Memoria allocata vs memoria usata
+✓ Supporto per VM spente (legge config da /etc/pve/qemu-server/)
+
+OUTPUT CHECKMK:
+- vm_{vmid}_{name} Stato
+- vm_{vmid}_{name} RAM
+
+METRICHE:
+used={mem};;;0;{maxmem}
+
+COMANDI USATI:
+- pvesh get /cluster/resources --type vm
+- jq per parsing JSON
+
+ESEMPIO OUTPUT:
+"0 vm_100_webserver Stato - VM 100 (webserver) accesa"
+"0 vm_100_webserver RAM used=2147483648;;;0;4294967296 RAM: 50%"
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. proxmox_vm_disks.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Righe:         ~31
+Dipendenze:    jq
+
+DESCRIZIONE:
+Script CheckMK local check per monitorare i dischi delle VM Proxmox.
+
+FUNZIONALITÀ:
+✓ Rileva tutti i dischi configurati (ide, scsi, sata, virtio)
+✓ Mostra dimensione allocata per ogni disco
+✓ Un servizio per ogni disco della VM
+
+OUTPUT CHECKMK:
+- vm_{vmid}_{name} Disk
+
+METRICHE:
+disk_used={used}%;80;90
+disk_alloc={size}
+
+COMANDI USATI:
+- pvesh get /nodes/{hostname}/qemu/{vmid}/config
+- jq per estrarre device dischi
+
+ESEMPIO OUTPUT:
+"0 vm_100_webserver Disk disk_used=0%;80;90 disk_alloc=32G - VM 100 (webserver) disco 32G"
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. proxmox_vm_monitor.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Righe:         97
+Dipendenze:    jq
+
+DESCRIZIONE:
+Monitor completo per VM Proxmox: Status, RAM e Disk (con supporto LVM-thin).
+Include calcolo percentuali e gestione soglie WARN/CRIT.
+
+CONFIGURAZIONE SOGLIE:
+WARN_RAM=80    (warning RAM al 80%)
+CRIT_RAM=90    (critical RAM al 90%)
+WARN_DISK=80   (warning disco al 80%)
+CRIT_DISK=90   (critical disco al 90%)
+
+FUNZIONALITÀ:
+✓ Status VM (accesa/spenta)
+✓ Monitoraggio RAM con soglie
+✓ Monitoraggio disco con soglie
+✓ Supporto LVM-thin storage
+✓ Calcolo percentuali uso RAM/Disk
+✓ Stati dinamici (0=OK, 1=WARN, 2=CRIT)
+
+OUTPUT CHECKMK:
+- vm_{vmid}_{name} Status
+- vm_{vmid}_{name} RAM
+- vm_{vmid}_{name} Disk
+
+METRICHE RAM:
+ram_used={used}B;{warn};{crit};0;{alloc}
+
+METRICHE DISK:
+disk_used={used}B;{warn};{crit};0;{alloc}
+
+COMANDI USATI:
+- qm list, qm status
+- pvesh get /nodes/{node}/qemu/{vmid}/config
+- pvesh get /nodes/{node}/qemu/{vmid}/status/current
+
+ESEMPIO OUTPUT:
+"0 vm_100_webserver Status VM 100 (webserver) accesa"
+"1 vm_100_webserver RAM ram_used=3355443200B;... RAM: 85.2% (3.1/4.0 GiB) - WARNING"
+"2 vm_100_webserver Disk disk_used=32212254720B;... Disk: 93.5% (30.0/32.0 GiB) - CRITICAL"
+
+
+================================================================================
+📂 SCRIPT REMOTI (WRAPPER)
+================================================================================
+
+Tutti gli script con prefisso "r" sono wrapper che scaricano ed eseguono
+la versione aggiornata dello script dal repository GitHub.
+
+FUNZIONAMENTO:
+bash <(curl -fsSL "$SCRIPT_URL") "$@"
+
+VANTAGGI:
+✓ Sempre aggiornati all'ultima versione su GitHub
+✓ Non serve copiare manualmente gli script sui server
+✓ Centralized management
+✓ Facile deployment su nuovi host
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. rcheck-proxmox-vm-snapshot-status.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SCRIPT_URL:
+https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/Proxmox/nopolling/check-proxmox-vm-snapshot-status.sh
+
+DESCRIZIONE:
+Wrapper remoto per check-proxmox-vm-snapshot-status.sh
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. rcheck-proxmox-vm-status.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SCRIPT_URL:
+https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/Proxmox/nopolling/check-proxmox-vm-status.sh
+
+DESCRIZIONE:
+Wrapper remoto per check-proxmox-vm-status.sh
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8. rproxmox_vm_api.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SCRIPT_URL:
+https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/Proxmox/nopolling/proxmox_vm_api.sh
+
+DESCRIZIONE:
+Wrapper remoto per proxmox_vm_api.sh
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9. rproxmox_vm_disks.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SCRIPT_URL:
+https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/Proxmox/nopolling/proxmox_vm_disks.sh
+
+DESCRIZIONE:
+Wrapper remoto per proxmox_vm_disks.sh
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10. rproxmox_vm_monitor.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SCRIPT_URL:
+https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/Proxmox/nopolling/proxmox_vm_monitor.sh
+
+DESCRIZIONE:
+Wrapper remoto per proxmox_vm_monitor.sh
+
+
+================================================================================
+📂 PROXMOX/POLLING/
+================================================================================
+
+STATO: Cartella vuota
+NOTA:  Non sono presenti script di polling per Proxmox
+
+
+================================================================================
+RIEPILOGO FUNZIONALITÀ
+================================================================================
+
+┌─────────────────────────┬──────────────────────────────────────────────────┐
+│ FUNZIONALITÀ            │ SCRIPT                                           │
+├─────────────────────────┼──────────────────────────────────────────────────┤
+│ Snapshot monitoring     │ check-proxmox-vm-snapshot-status.sh              │
+│                         │ rcheck-proxmox-vm-snapshot-status.sh             │
+├─────────────────────────┼──────────────────────────────────────────────────┤
+│ VM Status + Uptime      │ check-proxmox-vm-status.sh                       │
+│                         │ rcheck-proxmox-vm-status.sh                      │
+├─────────────────────────┼──────────────────────────────────────────────────┤
+│ RAM monitoring (API)    │ proxmox_vm_api.sh                                │
+│                         │ rproxmox_vm_api.sh                               │
+├─────────────────────────┼──────────────────────────────────────────────────┤
+│ Disk monitoring         │ proxmox_vm_disks.sh                              │
+│                         │ rproxmox_vm_disks.sh                             │
+├─────────────────────────┼──────────────────────────────────────────────────┤
+│ Monitor completo        │ proxmox_vm_monitor.sh                            │
+│ (Status+RAM+Disk+Soglie)│ rproxmox_vm_monitor.sh                           │
+└─────────────────────────┴──────────────────────────────────────────────────┘
+
+
+================================================================================
+DIPENDENZE
+================================================================================
+
+RICHIESTE:
+✓ Proxmox VE 8.x
+✓ CheckMK Raw 2.4.x
+✓ jq (JSON parser) - per script API-based
+✓ bash
+✓ curl (per script remoti)
+
+COMANDI PROXMOX USATI:
+- qm (gestione VM QEMU)
+- pct (gestione container LXC)
+- pvesh (API Proxmox)
+
+
+================================================================================
+UTILIZZO SCRIPT LOCALI
+================================================================================
+
+INSTALLAZIONE:
+1. Copiare script in /usr/lib/check_mk_agent/local/
+2. Rendere eseguibile: chmod +x nome_script.sh
+3. Eseguire service discovery in CheckMK
+
+ESEMPIO:
+cp check-proxmox-vm-status.sh /usr/lib/check_mk_agent/local/
+chmod +x /usr/lib/check_mk_agent/local/check-proxmox-vm-status.sh
+
+
+================================================================================
+UTILIZZO SCRIPT REMOTI
+================================================================================
+
+INSTALLAZIONE:
+1. Copiare wrapper remoto (rNOME.sh) in /usr/lib/check_mk_agent/local/
+2. Rendere eseguibile: chmod +x rNOME.sh
+3. Lo script scaricherà automaticamente l'ultima versione da GitHub
+
+ESEMPIO:
+cp rcheck-proxmox-vm-status.sh /usr/lib/check_mk_agent/local/
+chmod +x /usr/lib/check_mk_agent/local/rcheck-proxmox-vm-status.sh
+
+VANTAGGI:
+✓ Aggiornamenti automatici dal repository
+✓ No manutenzione manuale degli script
+✓ Centralized management
+
+
+================================================================================
+NOTE AGGIUNTIVE
+================================================================================
+
+FORMATO OUTPUT CHECKMK:
+Tutti gli script seguono il formato CheckMK local check:
+<<<local>>>
+STATO NOME_SERVIZIO METRICHE DETTAGLI
+
+STATI:
+0 = OK
+1 = WARNING
+2 = CRITICAL
+3 = UNKNOWN
+
+BEST PRACTICES:
+- Usare script remoti (r*) per deployment su più server
+- Usare script locali se serve personalizzazione
+- Monitorare log CheckMK per troubleshooting
+- Verificare dipendenze (jq) prima del deployment
+
+
+================================================================================
+CHANGELOG VERSIONI
+================================================================================
+
+check-proxmox-vm-snapshot-status.sh
+  v1.6 - Supporto completo VM e LXC, Title Case nomi
+
+check-proxmox-vm-status.sh
+  v3.5 (2025-10-07) - Uptime completo, nomi maiuscoli, contatori globali
+
+
+================================================================================
+AUTORE E LICENZA
+================================================================================
+
+Autore:     NethLab / Marzio Project
+Repository: https://github.com/Coverup20/checkmk-tools
+Licenza:    [Specificare licenza]
+
+================================================================================
+Fine documento
+================================================================================
