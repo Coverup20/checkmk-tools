@@ -506,23 +506,20 @@ configure_frpc() {
 # Configurazione FRPC Client
 # Generato il $(date)
 
-serverAddr = "$FRP_SERVER"
-serverPort = 7000
-
+[common]
+server_addr = "$FRP_SERVER"
+server_port = 7000
 auth.method = "token"
 auth.token  = "$AUTH_TOKEN"
-
-transport.tls.enable = true
-
+tls.enable = true
 log.to = "/var/log/frpc.log"
-log.level = "info"
-log.maxDays = 7
+log.level = "debug"
 
-[[$FRPC_HOSTNAME]]
+[$FRPC_HOSTNAME]
 type        = "tcp"
-localIP     = "127.0.0.1"
-localPort   = 6556
-remotePort  = $REMOTE_PORT
+local_ip    = "127.0.0.1"
+local_port  = 6556
+remote_port = $REMOTE_PORT
 EOF
     
     echo -e "${GREEN}✓ File di configurazione creato${NC}"

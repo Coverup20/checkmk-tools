@@ -178,24 +178,27 @@ Il file `/etc/frp/frpc.toml` viene creato automaticamente con questa struttura:
 # Configurazione FRPC Client
 # Generato il 2025-11-06
 
-serverAddr = "monitor.nethlab.it"
-serverPort = 7000
-
+[common]
+server_addr = "monitor.nethlab.it"
+server_port = 7000
 auth.method = "token"
 auth.token  = "conduit-reenact-talon-macarena-demotion-vaguely"
-
-transport.tls.enable = true
-
+tls.enable = true
 log.to = "/var/log/frpc.log"
-log.level = "info"
-log.maxDays = 7
+log.level = "debug"
 
-[[myserver]]
+[myserver]
 type        = "tcp"
-localIP     = "127.0.0.1"
-localPort   = 6556
-remotePort  = 20001
+local_ip    = "127.0.0.1"
+local_port  = 6556
+remote_port = 20001
 ```
+
+**Note sul formato:**
+- Sezione `[common]` con parametri globali
+- Sezione `[hostname]` per ogni tunnel
+- Log level `debug` per troubleshooting completo
+- Log salvato in `/var/log/frpc.log`
 
 ## 📊 Verifica Post-Installazione
 
