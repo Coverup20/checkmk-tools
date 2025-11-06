@@ -302,7 +302,12 @@ install_checkmk_agent() {
     echo -e "${YELLOW}📦 Download agent da: $AGENT_URL${NC}"
     
     cd /tmp
-    wget -q --show-progress "$AGENT_URL" -O "$AGENT_FILE"
+    wget -q "$AGENT_URL" -O "$AGENT_FILE" 2>&1 | grep -v "^$" || true
+    
+    if [ ! -f "$AGENT_FILE" ]; then
+        echo -e "${RED}✗ Errore durante il download${NC}"
+        exit 1
+    fi
     
     echo -e "${YELLOW}📦 Installazione pacchetto...${NC}"
     if [ "$PKG_TYPE" = "deb" ]; then
@@ -375,7 +380,12 @@ install_frpc() {
     
     echo -e "${YELLOW}📦 Download FRPC v${FRP_VERSION}...${NC}"
     cd /usr/local/src || exit 1
-    wget -q --show-progress "$FRP_URL" -O frp.tar.gz
+    wget -q "$FRP_URL" -O frp.tar.gz 2>&1 | grep -v "^$" || true
+    
+    if [ ! -f frp.tar.gz ]; then
+        echo -e "${RED}✗ Errore durante il download di FRPC${NC}"
+        exit 1
+    fi
     
     echo -e "${YELLOW}📦 Estrazione...${NC}"
     tar xzf frp.tar.gz
