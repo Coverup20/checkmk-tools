@@ -302,11 +302,38 @@ install_checkmk_agent() {
     echo -e "${YELLOW}📦 Download agent da: $AGENT_URL${NC}"
     
     cd /tmp
-    wget -q "$AGENT_URL" -O "$AGENT_FILE" 2>&1 | grep -v "^$" || true
+    rm -f "$AGENT_FILE" 2>/dev/null
     
-    if [ ! -f "$AGENT_FILE" ]; then
+    # Download con output visibile
+    echo -e "${CYAN}   Downloading...${NC}"
+    if wget "$AGENT_URL" -O "$AGENT_FILE" 2>&1; then
+        echo -e "${GREEN}   ✓ Download completato${NC}"
+    else
         echo -e "${RED}✗ Errore durante il download${NC}"
         exit 1
+    fi
+    
+    # Verifica che il file sia valido
+    if [ ! -f "$AGENT_FILE" ] || [ ! -s "$AGENT_FILE" ]; then
+        echo -e "${RED}✗ File scaricato non valido o vuoto${NC}"
+        exit 1
+    fi
+    
+    # Verifica che sia un file RPM/DEB valido
+    if [ "$PKG_TYPE" = "rpm" ]; then
+        if ! file "$AGENT_FILE" | grep -q "RPM"; then
+            echo -e "${RED}✗ File scaricato non è un pacchetto RPM valido${NC}"
+            echo -e "${YELLOW}Contenuto del file:${NC}"
+            head -n 5 "$AGENT_FILE"
+            exit 1
+        fi
+    else
+        if ! file "$AGENT_FILE" | grep -q "Debian"; then
+            echo -e "${RED}✗ File scaricato non è un pacchetto DEB valido${NC}"
+            echo -e "${YELLOW}Contenuto del file:${NC}"
+            head -n 5 "$AGENT_FILE"
+            exit 1
+        fi
     fi
     
     echo -e "${YELLOW}📦 Installazione pacchetto...${NC}"
@@ -380,10 +407,20 @@ install_frpc() {
     
     echo -e "${YELLOW}📦 Download FRPC v${FRP_VERSION}...${NC}"
     cd /usr/local/src || exit 1
-    wget -q "$FRP_URL" -O frp.tar.gz 2>&1 | grep -v "^$" || true
+    rm -f frp.tar.gz 2>/dev/null
     
-    if [ ! -f frp.tar.gz ]; then
+    # Download con output visibile
+    echo -e "${CYAN}   Downloading from GitHub...${NC}"
+    if wget "$FRP_URL" -O frp.tar.gz 2>&1; then
+        echo -e "${GREEN}   ✓ Download completato${NC}"
+    else
         echo -e "${RED}✗ Errore durante il download di FRPC${NC}"
+        exit 1
+    fi
+    
+    # Verifica file scaricato
+    if [ ! -f frp.tar.gz ] || [ ! -s frp.tar.gz ]; then
+        echo -e "${RED}✗ File FRPC non valido o vuoto${NC}"
         exit 1
     fi
     
