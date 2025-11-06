@@ -4,9 +4,8 @@
 # - Installa agent CheckMK in modalità plain (TCP 6556)
 # - Opzionalmente installa e configura FRPC client
 # - Configurazione guidata interattiva
+# - Supporto disinstallazione completa
 # =====================================================
-
-set -e
 
 # Colori per output
 RED='\033[0;31m'
@@ -21,9 +20,228 @@ CHECKMK_VERSION="2.4.0p12"
 FRP_VERSION="0.64.0"
 FRP_URL="https://github.com/fatedier/frp/releases/download/v${FRP_VERSION}/frp_${FRP_VERSION}_linux_amd64.tar.gz"
 
+# Modalità operativa
+MODE="install"
+
+# =====================================================
+# Funzione: Mostra uso
+# =====================================================
+show_usage() {
+    echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║  Installazione Interattiva CheckMK Agent + FRPC          ║${NC}"
+    echo -e "${CYAN}║  Version: 1.1 - $(date +%Y-%m-%d)                                ║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${YELLOW}Uso:${NC}"
+    echo -e "  $0                      ${GREEN}# Installazione interattiva${NC}"
+    echo -e "  $0 --uninstall-frpc     ${RED}# Rimuove solo FRPC${NC}"
+    echo -e "  $0 --uninstall-agent    ${RED}# Rimuove solo CheckMK Agent${NC}"
+    echo -e "  $0 --uninstall          ${RED}# Rimuove tutto (FRPC + Agent)${NC}"
+    echo -e "  $0 --help               ${CYAN}# Mostra questo messaggio${NC}"
+    echo ""
+    exit 0
+}
+
+# =====================================================
+# Funzione: Disinstalla FRPC
+# =====================================================
+uninstall_frpc() {
+    echo -e "\n${RED}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║           DISINSTALLAZIONE FRPC CLIENT                    ║${NC}"
+    echo -e "${RED}╚════════════════════════════════════════════════════════════╝${NC}"
+    
+    echo -e "\n${YELLOW}🗑️  Rimozione FRPC in corso...${NC}\n"
+    
+    # Stop e disable servizio
+    if systemctl is-active --quiet frpc 2>/dev/null; then
+        echo -e "${YELLOW}⏹️  Arresto servizio FRPC...${NC}"
+        systemctl stop frpc
+    fi
+    
+    if systemctl is-enabled --quiet frpc 2>/dev/null; then
+        echo -e "${YELLOW}⏹️  Disabilito servizio FRPC...${NC}"
+        systemctl disable frpc
+    fi
+    
+    # Rimuovi file systemd
+    if [ -f /etc/systemd/system/frpc.service ]; then
+        echo -e "${YELLOW}🗑️  Rimozione file systemd...${NC}"
+        rm -f /etc/systemd/system/frpc.service
+        systemctl daemon-reload
+    fi
+    
+    # Rimuovi eseguibile
+    if [ -f /usr/local/bin/frpc ]; then
+        echo -e "${YELLOW}🗑️  Rimozione eseguibile...${NC}"
+        rm -f /usr/local/bin/frpc
+    fi
+    
+    # Rimuovi configurazione
+    if [ -d /etc/frp ]; then
+        echo -e "${YELLOW}🗑️  Rimozione directory configurazione...${NC}"
+        rm -rf /etc/frp
+    fi
+    
+    # Rimuovi log
+    if [ -f /var/log/frpc.log ]; then
+        echo -e "${YELLOW}🗑️  Rimozione file log...${NC}"
+        rm -f /var/log/frpc.log
+    fi
+    
+    # Rimuovi sorgenti se esistono
+    if [ -d /usr/local/src/frp_${FRP_VERSION}_linux_amd64 ]; then
+        echo -e "${YELLOW}🗑️  Rimozione file sorgenti...${NC}"
+        rm -rf /usr/local/src/frp_${FRP_VERSION}_linux_amd64
+    fi
+    
+    echo -e "\n${GREEN}✅ FRPC disinstallato completamente${NC}"
+    echo -e "${CYAN}📋 File rimossi:${NC}"
+    echo -e "   • /usr/local/bin/frpc"
+    echo -e "   • /etc/frp/"
+    echo -e "   • /etc/systemd/system/frpc.service"
+    echo -e "   • /var/log/frpc.log"
+}
+
+# =====================================================
+# Funzione: Disinstalla CheckMK Agent
+# =====================================================
+uninstall_agent() {
+    echo -e "\n${RED}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║        DISINSTALLAZIONE CHECKMK AGENT                     ║${NC}"
+    echo -e "${RED}╚════════════════════════════════════════════════════════════╝${NC}"
+    
+    echo -e "\n${YELLOW}🗑️  Rimozione CheckMK Agent in corso...${NC}\n"
+    
+    # Rileva tipo pacchetto
+    if command -v dpkg &> /dev/null; then
+        PKG_TYPE="deb"
+    elif command -v rpm &> /dev/null; then
+        PKG_TYPE="rpm"
+    else
+        echo -e "${RED}✗ Impossibile determinare il tipo di pacchetto${NC}"
+        exit 1
+    fi
+    
+    # Stop e disable socket plain
+    if systemctl is-active --quiet check-mk-agent-plain.socket 2>/dev/null; then
+        echo -e "${YELLOW}⏹️  Arresto socket plain...${NC}"
+        systemctl stop check-mk-agent-plain.socket
+    fi
+    
+    if systemctl is-enabled --quiet check-mk-agent-plain.socket 2>/dev/null; then
+        echo -e "${YELLOW}⏹️  Disabilito socket plain...${NC}"
+        systemctl disable check-mk-agent-plain.socket
+    fi
+    
+    # Rimuovi unit systemd plain
+    if [ -f /etc/systemd/system/check-mk-agent-plain.socket ]; then
+        echo -e "${YELLOW}🗑️  Rimozione socket systemd plain...${NC}"
+        rm -f /etc/systemd/system/check-mk-agent-plain.socket
+    fi
+    
+    if [ -f /etc/systemd/system/check-mk-agent-plain@.service ]; then
+        echo -e "${YELLOW}🗑️  Rimozione service systemd plain...${NC}"
+        rm -f /etc/systemd/system/check-mk-agent-plain@.service
+    fi
+    
+    systemctl daemon-reload
+    
+    # Disinstalla pacchetto
+    echo -e "${YELLOW}📦 Disinstallazione pacchetto CheckMK Agent...${NC}"
+    if [ "$PKG_TYPE" = "deb" ]; then
+        if dpkg -l | grep -q check-mk-agent; then
+            apt-get remove -y check-mk-agent 2>/dev/null || dpkg --purge check-mk-agent
+        fi
+    else
+        if rpm -qa | grep -q check-mk-agent; then
+            yum remove -y check-mk-agent 2>/dev/null || rpm -e check-mk-agent
+        fi
+    fi
+    
+    # Rimuovi eventuali residui
+    if [ -d /usr/lib/check_mk_agent ]; then
+        echo -e "${YELLOW}🗑️  Rimozione directory plugin...${NC}"
+        rm -rf /usr/lib/check_mk_agent
+    fi
+    
+    if [ -d /etc/check_mk ]; then
+        echo -e "${YELLOW}🗑️  Rimozione directory configurazione...${NC}"
+        rm -rf /etc/check_mk
+    fi
+    
+    echo -e "\n${GREEN}✅ CheckMK Agent disinstallato completamente${NC}"
+    echo -e "${CYAN}📋 File rimossi:${NC}"
+    echo -e "   • Pacchetto check-mk-agent"
+    echo -e "   • /etc/systemd/system/check-mk-agent-plain.*"
+    echo -e "   • /usr/lib/check_mk_agent/"
+    echo -e "   • /etc/check_mk/"
+}
+
+# =====================================================
+# Gestione parametri
+# =====================================================
+case "$1" in
+    --help|-h)
+        show_usage
+        ;;
+    --uninstall-frpc)
+        MODE="uninstall-frpc"
+        ;;
+    --uninstall-agent)
+        MODE="uninstall-agent"
+        ;;
+    --uninstall)
+        MODE="uninstall-all"
+        ;;
+    "")
+        MODE="install"
+        ;;
+    *)
+        echo -e "${RED}✗ Parametro non valido: $1${NC}"
+        show_usage
+        ;;
+esac
+
+# Verifica permessi root
+if [ "$EUID" -ne 0 ]; then
+    echo -e "${RED}✗ Questo script deve essere eseguito come root${NC}"
+    exit 1
+fi
+
+# =====================================================
+# Esegui modalità richiesta
+# =====================================================
+if [ "$MODE" = "uninstall-frpc" ]; then
+    uninstall_frpc
+    exit 0
+elif [ "$MODE" = "uninstall-agent" ]; then
+    uninstall_agent
+    exit 0
+elif [ "$MODE" = "uninstall-all" ]; then
+    echo -e "${RED}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║        DISINSTALLAZIONE COMPLETA (Agent + FRPC)          ║${NC}"
+    echo -e "${RED}╚════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    read -p "$(echo -e ${YELLOW}Sei sicuro di voler rimuovere tutto? ${NC}[s/N]: )" CONFIRM
+    if [[ "$CONFIRM" =~ ^[sS]$ ]]; then
+        uninstall_frpc
+        echo ""
+        uninstall_agent
+        echo -e "\n${GREEN}🎉 Disinstallazione completa terminata!${NC}\n"
+    else
+        echo -e "${CYAN}❌ Operazione annullata${NC}"
+    fi
+    exit 0
+fi
+
+# =====================================================
+# Modalità installazione (resto dello script originale)
+# =====================================================
+set -e
+
 echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║  Installazione Interattiva CheckMK Agent + FRPC          ║${NC}"
-echo -e "${CYAN}║  Version: 1.0 - $(date +%Y-%m-%d)                                ║${NC}"
+echo -e "${CYAN}║  Version: 1.1 - $(date +%Y-%m-%d)                                ║${NC}"
 echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
 
 # =====================================================

@@ -1,12 +1,13 @@
 # 🚀 Install Agent Interactive - Guida Utente
 
-Script interattivo per l'installazione automatizzata di CheckMK Agent con opzione FRPC client.
+Script interattivo per l'installazione/disinstallazione automatizzata di CheckMK Agent con opzione FRPC client.
 
 ## 📋 Caratteristiche
 
 - ✅ **Installazione guidata** CheckMK Agent (plain TCP 6556)
 - ✅ **Supporto multi-distro**: Ubuntu, Debian, Rocky Linux, CentOS, RHEL, AlmaLinux
 - ✅ **Installazione opzionale FRPC** con configurazione interattiva
+- ✅ **Disinstallazione completa** con opzioni separate per Agent e FRPC
 - ✅ **Rilevamento automatico** del sistema operativo
 - ✅ **Configurazione systemd** completa
 - ✅ **Output colorato** e user-friendly
@@ -42,16 +43,50 @@ Script interattivo per l'installazione automatizzata di CheckMK Agent con opzion
 
 ## 🚀 Utilizzo
 
-### Metodo 1: Esecuzione diretta
+### 📥 Installazione
+
+#### Metodo 1: Esecuzione diretta
 ```bash
 sudo bash install-agent-interactive.sh
 ```
 
-### Metodo 2: Con permessi di esecuzione
+#### Metodo 2: Con permessi di esecuzione
 ```bash
 chmod +x install-agent-interactive.sh
 sudo ./install-agent-interactive.sh
 ```
+
+### 🗑️ Disinstallazione
+
+#### Rimuovi solo FRPC Client
+```bash
+sudo ./install-agent-interactive.sh --uninstall-frpc
+```
+
+#### Rimuovi solo CheckMK Agent
+```bash
+sudo ./install-agent-interactive.sh --uninstall-agent
+```
+
+#### Rimuovi tutto (Agent + FRPC)
+```bash
+sudo ./install-agent-interactive.sh --uninstall
+```
+
+#### Mostra help
+```bash
+./install-agent-interactive.sh --help
+```
+
+### 📋 Opzioni disponibili
+
+| Opzione | Descrizione |
+|---------|-------------|
+| _(nessuna)_ | Installazione interattiva completa |
+| `--uninstall-frpc` | Disinstalla solo FRPC client |
+| `--uninstall-agent` | Disinstalla solo CheckMK Agent |
+| `--uninstall` | Disinstalla tutto (con conferma) |
+| `--help` o `-h` | Mostra messaggio di aiuto |
 
 ## 📝 Esempio di Sessione Interattiva
 
@@ -205,6 +240,51 @@ nano /etc/frp/frpc.toml
 # Riavvia per applicare modifiche
 systemctl restart frpc
 ```
+
+## 🗑️ Esempi Disinstallazione
+
+### Disinstalla solo FRPC (mantieni Agent)
+```bash
+sudo ./install-agent-interactive.sh --uninstall-frpc
+```
+**Output:**
+```
+╔════════════════════════════════════════════════════════════╗
+║           DISINSTALLAZIONE FRPC CLIENT                    ║
+╚════════════════════════════════════════════════════════════╝
+
+🗑️  Rimozione FRPC in corso...
+
+⏹️  Arresto servizio FRPC...
+⏹️  Disabilito servizio FRPC...
+🗑️  Rimozione file systemd...
+🗑️  Rimozione eseguibile...
+🗑️  Rimozione directory configurazione...
+🗑️  Rimozione file log...
+
+✅ FRPC disinstallato completamente
+📋 File rimossi:
+   • /usr/local/bin/frpc
+   • /etc/frp/
+   • /etc/systemd/system/frpc.service
+   • /var/log/frpc.log
+```
+
+### Disinstalla solo Agent (mantieni FRPC)
+```bash
+sudo ./install-agent-interactive.sh --uninstall-agent
+```
+**Rimuove:**
+- Pacchetto check-mk-agent
+- Socket systemd plain
+- Directory /etc/check_mk
+- Plugin agent
+
+### Disinstalla tutto
+```bash
+sudo ./install-agent-interactive.sh --uninstall
+```
+**Chiede conferma** prima di procedere con la rimozione completa di Agent e FRPC.
 
 ## 🔒 File di Configurazione
 
