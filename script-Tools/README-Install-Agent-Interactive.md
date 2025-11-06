@@ -5,7 +5,7 @@ Script interattivo per l'installazione/disinstallazione automatizzata di CheckMK
 ## 📋 Caratteristiche
 
 - ✅ **Installazione guidata** CheckMK Agent (plain TCP 6556)
-- ✅ **Supporto multi-distro**: Ubuntu, Debian, Rocky Linux, CentOS, RHEL, AlmaLinux
+- ✅ **Supporto multi-distro**: Ubuntu, Debian, Rocky Linux, CentOS, RHEL, AlmaLinux, NethServer Enterprise
 - ✅ **Installazione opzionale FRPC** con configurazione interattiva
 - ✅ **Disinstallazione completa** con opzioni separate per Agent e FRPC
 - ✅ **Rilevamento automatico** del sistema operativo
@@ -36,10 +36,16 @@ Script interattivo per l'installazione/disinstallazione automatizzata di CheckMK
 
 ## 📦 Requisiti
 
-- Sistema operativo supportato: Ubuntu, Debian, Rocky Linux, CentOS, RHEL, AlmaLinux
+- Sistema operativo supportato: 
+  - **Debian-based**: Ubuntu, Debian
+  - **RHEL-based**: Rocky Linux, CentOS, RHEL, AlmaLinux
+  - **NethServer**: NethServer Enterprise (rilevato automaticamente)
 - Accesso root o sudo
 - Connessione internet
 - CheckMK Server raggiungibile (per download pacchetti)
+
+### 💡 Nota su NethServer Enterprise
+NethServer Enterprise viene **rilevato automaticamente** tramite il file `/etc/nethserver-release`. Lo script utilizzerà automaticamente i pacchetti RPM appropriati per l'installazione.
 
 ## 🚀 Utilizzo
 
@@ -359,6 +365,6 @@ Uso libero per scopi di monitoraggio CheckMK.
 
 ---
 
-**Versione**: 1.0  
+**Versione**: 1.1  
 **Data**: 2025-11-06  
-**Compatibilità**: Ubuntu, Debian, Rocky Linux, CentOS, RHEL, AlmaLinux
+**Compatibilità**: Ubuntu, Debian, Rocky Linux, CentOS, RHEL, AlmaLinux, NethServer Enterprise

@@ -252,6 +252,12 @@ detect_os() {
         . /etc/os-release
         OS=$ID
         VER=$VERSION_ID
+        
+        # Rileva NethServer Enterprise (basato su Rocky Linux)
+        if [ -f /etc/nethserver-release ]; then
+            OS="nethserver-enterprise"
+            VER=$(cat /etc/nethserver-release | grep -oP 'NethServer Enterprise \K[0-9.]+' || echo "8")
+        fi
     elif type lsb_release >/dev/null 2>&1; then
         OS=$(lsb_release -si | tr '[:upper:]' '[:lower:]')
         VER=$(lsb_release -sr)
@@ -265,7 +271,7 @@ detect_os() {
             PKG_TYPE="deb"
             PKG_MANAGER="apt"
             ;;
-        centos|rhel|rocky|almalinux)
+        centos|rhel|rocky|almalinux|nethserver-enterprise)
             PKG_TYPE="rpm"
             PKG_MANAGER="yum"
             ;;
