@@ -285,10 +285,39 @@ detect_os() {
 }
 
 # =====================================================
+# Funzione: Rileva ultima versione CheckMK Agent
+# =====================================================
+detect_latest_agent_version() {
+    echo -e "${CYAN}🔍 Rilevamento ultima versione CheckMK Agent...${NC}"
+    
+    local BASE_URL="https://monitoring.nethlab.it/monitoring/check_mk/agents"
+    
+    # Prova a rilevare l'ultima versione disponibile
+    if [ "$PKG_TYPE" = "deb" ]; then
+        # Cerca file DEB
+        LATEST_AGENT=$(wget -qO- "$BASE_URL/" 2>/dev/null | grep -oP 'check-mk-agent_\K[0-9]+\.[0-9]+\.[0-9]+p[0-9]+' | sort -V | tail -n 1)
+        if [ -n "$LATEST_AGENT" ]; then
+            CHECKMK_VERSION="$LATEST_AGENT"
+        fi
+    else
+        # Cerca file RPM
+        LATEST_AGENT=$(wget -qO- "$BASE_URL/" 2>/dev/null | grep -oP 'check-mk-agent-\K[0-9]+\.[0-9]+\.[0-9]+p[0-9]+' | sort -V | tail -n 1)
+        if [ -n "$LATEST_AGENT" ]; then
+            CHECKMK_VERSION="$LATEST_AGENT"
+        fi
+    fi
+    
+    echo -e "${GREEN}   ✓ Versione rilevata: ${CHECKMK_VERSION}${NC}"
+}
+
+# =====================================================
 # Funzione: Installa CheckMK Agent
 # =====================================================
 install_checkmk_agent() {
     echo -e "\n${BLUE}═══ INSTALLAZIONE CHECKMK AGENT ═══${NC}"
+    
+    # Rileva automaticamente l'ultima versione disponibile
+    detect_latest_agent_version
     
     # URL pacchetti
     if [ "$PKG_TYPE" = "deb" ]; then
