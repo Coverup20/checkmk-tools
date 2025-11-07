@@ -52,22 +52,35 @@ uninstall_frpc() {
     
     echo -e "\n${YELLOW}🗑️  Rimozione FRPC in corso...${NC}\n"
     
-    # Stop e disable servizio
-    if systemctl is-active --quiet frpc 2>/dev/null; then
-        echo -e "${YELLOW}⏹️  Arresto servizio FRPC...${NC}"
-        systemctl stop frpc
-    fi
+    # Kill processi FRPC
+    killall frpc 2>/dev/null || true
     
-    if systemctl is-enabled --quiet frpc 2>/dev/null; then
-        echo -e "${YELLOW}⏹️  Disabilito servizio FRPC...${NC}"
-        systemctl disable frpc
-    fi
-    
-    # Rimuovi file systemd
-    if [ -f /etc/systemd/system/frpc.service ]; then
-        echo -e "${YELLOW}🗑️  Rimozione file systemd...${NC}"
-        rm -f /etc/systemd/system/frpc.service
-        systemctl daemon-reload
+    # Gestisci servizi per il tipo di sistema
+    if [ "$PKG_TYPE" = "openwrt" ]; then
+        # OpenWrt: init.d
+        if [ -f /etc/init.d/frpc ]; then
+            echo -e "${YELLOW}⏹️  Arresto servizio FRPC...${NC}"
+            /etc/init.d/frpc stop 2>/dev/null || true
+            /etc/init.d/frpc disable 2>/dev/null || true
+            rm -f /etc/init.d/frpc
+        fi
+    else
+        # Linux: systemd
+        if systemctl is-active --quiet frpc 2>/dev/null; then
+            echo -e "${YELLOW}⏹️  Arresto servizio FRPC...${NC}"
+            systemctl stop frpc 2>/dev/null || true
+        fi
+        
+        if systemctl is-enabled --quiet frpc 2>/dev/null; then
+            echo -e "${YELLOW}⏹️  Disabilito servizio FRPC...${NC}"
+            systemctl disable frpc 2>/dev/null || true
+        fi
+        
+        if [ -f /etc/systemd/system/frpc.service ]; then
+            echo -e "${YELLOW}🗑️  Rimozione file systemd...${NC}"
+            rm -f /etc/systemd/system/frpc.service
+            systemctl daemon-reload 2>/dev/null || true
+        fi
     fi
     
     # Rimuovi eseguibile
@@ -88,17 +101,12 @@ uninstall_frpc() {
         rm -f /var/log/frpc.log
     fi
     
-    # Rimuovi sorgenti se esistono
-    if [ -d /usr/local/src/frp_${FRP_VERSION}_linux_amd64 ]; then
-        echo -e "${YELLOW}🗑️  Rimozione file sorgenti...${NC}"
-        rm -rf /usr/local/src/frp_${FRP_VERSION}_linux_amd64
-    fi
-    
     echo -e "\n${GREEN}✅ FRPC disinstallato completamente${NC}"
     echo -e "${CYAN}📋 File rimossi:${NC}"
     echo -e "   • /usr/local/bin/frpc"
     echo -e "   • /etc/frp/"
-    echo -e "   • /etc/systemd/system/frpc.service"
+    echo -e "   • /etc/systemd/system/frpc.service (Linux)"
+    echo -e "   • /etc/init.d/frpc (OpenWrt)"
     echo -e "   • /var/log/frpc.log"
 }
 
@@ -112,69 +120,69 @@ uninstall_agent() {
     
     echo -e "\n${YELLOW}🗑️  Rimozione CheckMK Agent in corso...${NC}\n"
     
-    # Rileva tipo pacchetto
-    if command -v dpkg &> /dev/null; then
-        PKG_TYPE="deb"
-    elif command -v rpm &> /dev/null; then
-        PKG_TYPE="rpm"
-    else
-        echo -e "${RED}✗ Impossibile determinare il tipo di pacchetto${NC}"
-        exit 1
-    fi
+    # Kill processi
+    killall check_mk_agent 2>/dev/null || true
+    killall socat 2>/dev/null || true
     
-    # Stop e disable socket plain
-    if systemctl is-active --quiet check-mk-agent-plain.socket 2>/dev/null; then
-        echo -e "${YELLOW}⏹️  Arresto socket plain...${NC}"
-        systemctl stop check-mk-agent-plain.socket
-    fi
-    
-    if systemctl is-enabled --quiet check-mk-agent-plain.socket 2>/dev/null; then
-        echo -e "${YELLOW}⏹️  Disabilito socket plain...${NC}"
-        systemctl disable check-mk-agent-plain.socket
-    fi
-    
-    # Rimuovi unit systemd plain
-    if [ -f /etc/systemd/system/check-mk-agent-plain.socket ]; then
-        echo -e "${YELLOW}🗑️  Rimozione socket systemd plain...${NC}"
-        rm -f /etc/systemd/system/check-mk-agent-plain.socket
-    fi
-    
-    if [ -f /etc/systemd/system/check-mk-agent-plain@.service ]; then
-        echo -e "${YELLOW}🗑️  Rimozione service systemd plain...${NC}"
-        rm -f /etc/systemd/system/check-mk-agent-plain@.service
-    fi
-    
-    systemctl daemon-reload
-    
-    # Disinstalla pacchetto
-    echo -e "${YELLOW}📦 Disinstallazione pacchetto CheckMK Agent...${NC}"
-    if [ "$PKG_TYPE" = "deb" ]; then
-        if dpkg -l | grep -q check-mk-agent; then
-            apt-get remove -y check-mk-agent 2>/dev/null || dpkg --purge check-mk-agent
+    # Gestisci servizi per il tipo di sistema
+    if [ "$PKG_TYPE" = "openwrt" ]; then
+        # OpenWrt: init.d
+        if [ -f /etc/init.d/check_mk_agent ]; then
+            echo -e "${YELLOW}⏹️  Arresto servizio agent...${NC}"
+            /etc/init.d/check_mk_agent stop 2>/dev/null || true
+            /etc/init.d/check_mk_agent disable 2>/dev/null || true
+            rm -f /etc/init.d/check_mk_agent
         fi
     else
-        if rpm -qa | grep -q check-mk-agent; then
-            yum remove -y check-mk-agent 2>/dev/null || rpm -e check-mk-agent
+        # Linux: systemd socket
+        if systemctl is-active --quiet check-mk-agent-plain.socket 2>/dev/null; then
+            echo -e "${YELLOW}⏹️  Arresto socket plain...${NC}"
+            systemctl stop check-mk-agent-plain.socket 2>/dev/null || true
         fi
+        
+        if systemctl is-enabled --quiet check-mk-agent-plain.socket 2>/dev/null; then
+            echo -e "${YELLOW}⏹️  Disabilito socket plain...${NC}"
+            systemctl disable check-mk-agent-plain.socket 2>/dev/null || true
+        fi
+        
+        if [ -f /etc/systemd/system/check-mk-agent-plain.socket ]; then
+            echo -e "${YELLOW}🗑️  Rimozione socket systemd plain...${NC}"
+            rm -f /etc/systemd/system/check-mk-agent-plain.socket
+        fi
+        
+        if [ -f /etc/systemd/system/check-mk-agent-plain@.service ]; then
+            echo -e "${YELLOW}🗑️  Rimozione service systemd plain...${NC}"
+            rm -f /etc/systemd/system/check-mk-agent-plain@.service
+        fi
+        
+        systemctl daemon-reload 2>/dev/null || true
     fi
     
-    # Rimuovi eventuali residui
-    if [ -d /usr/lib/check_mk_agent ]; then
-        echo -e "${YELLOW}🗑️  Rimozione directory plugin...${NC}"
-        rm -rf /usr/lib/check_mk_agent
+    # Rimuovi eseguibile
+    if [ -f /usr/bin/check_mk_agent ]; then
+        echo -e "${YELLOW}�️  Rimozione eseguibile agent...${NC}"
+        rm -f /usr/bin/check_mk_agent
     fi
     
+    # Rimuovi configurazione
     if [ -d /etc/check_mk ]; then
         echo -e "${YELLOW}🗑️  Rimozione directory configurazione...${NC}"
         rm -rf /etc/check_mk
     fi
     
+    # Rimuovi xinetd config (se presente)
+    if [ -f /etc/xinetd.d/check_mk ]; then
+        echo -e "${YELLOW}🗑️  Rimozione configurazione xinetd...${NC}"
+        rm -f /etc/xinetd.d/check_mk
+        systemctl reload xinetd 2>/dev/null || true
+    fi
+    
     echo -e "\n${GREEN}✅ CheckMK Agent disinstallato completamente${NC}"
     echo -e "${CYAN}📋 File rimossi:${NC}"
-    echo -e "   • Pacchetto check-mk-agent"
-    echo -e "   • /etc/systemd/system/check-mk-agent-plain.*"
-    echo -e "   • /usr/lib/check_mk_agent/"
+    echo -e "   • /usr/bin/check_mk_agent"
     echo -e "   • /etc/check_mk/"
+    echo -e "   • /etc/init.d/check_mk_agent (OpenWrt)"
+    echo -e "   • /etc/systemd/system/check-mk-agent-plain.* (Linux)"
 }
 
 # =====================================================
@@ -567,33 +575,40 @@ install_frpc() {
     echo -e "\n${BLUE}═══ INSTALLAZIONE FRPC CLIENT ═══${NC}"
     
     echo -e "${YELLOW}📦 Download FRPC v${FRP_VERSION}...${NC}"
-    cd /usr/local/src || exit 1
-    rm -f frp.tar.gz 2>/dev/null
     
-    # Download con output visibile
+    # Per OpenWrt usa /tmp, per Linux usa /usr/local/src
+    local FRP_DIR="/tmp"
+    if [ "$PKG_TYPE" != "openwrt" ] && [ -d /usr/local/src ]; then
+        FRP_DIR="/usr/local/src"
+    fi
+    
+    cd "$FRP_DIR" || exit 1
+    rm -f "frp_${FRP_VERSION}_linux_amd64.tar.gz" 2>/dev/null
+    
+    # Download
     echo -e "${CYAN}   Downloading from GitHub...${NC}"
-    if wget "$FRP_URL" -O frp.tar.gz 2>&1; then
+    if wget "$FRP_URL" -O "frp_${FRP_VERSION}_linux_amd64.tar.gz" 2>&1; then
         echo -e "${GREEN}   ✓ Download completato${NC}"
     else
         echo -e "${RED}✗ Errore durante il download di FRPC${NC}"
         exit 1
     fi
     
-    # Verifica file scaricato
-    if [ ! -f frp.tar.gz ] || [ ! -s frp.tar.gz ]; then
+    # Verifica file
+    if [ ! -f "frp_${FRP_VERSION}_linux_amd64.tar.gz" ] || [ ! -s "frp_${FRP_VERSION}_linux_amd64.tar.gz" ]; then
         echo -e "${RED}✗ File FRPC non valido o vuoto${NC}"
         exit 1
     fi
     
     echo -e "${YELLOW}📦 Estrazione...${NC}"
-    tar xzf frp.tar.gz
-    cd "frp_${FRP_VERSION}_linux_amd64" || exit 1
+    tar -xzf "frp_${FRP_VERSION}_linux_amd64.tar.gz"
+    FRP_EXTRACTED=$(tar -tzf "frp_${FRP_VERSION}_linux_amd64.tar.gz" | head -1 | cut -f1 -d"/")
     
-    systemctl stop frpc 2>/dev/null || true
-    cp frpc /usr/local/bin/frpc
+    mkdir -p /usr/local/bin
+    cp -f "$FRP_EXTRACTED/frpc" /usr/local/bin/frpc
     chmod +x /usr/local/bin/frpc
     
-    rm -f /usr/local/src/frp.tar.gz
+    rm -rf "$FRP_EXTRACTED" "frp_${FRP_VERSION}_linux_amd64.tar.gz"
     
     echo -e "${GREEN}✓ FRPC installato in /usr/local/bin/frpc${NC}"
 }
@@ -604,8 +619,8 @@ install_frpc() {
 configure_frpc() {
     echo -e "\n${BLUE}═══ CONFIGURAZIONE FRPC ═══${NC}"
     
-    # Hostname corrente come default
-    CURRENT_HOSTNAME=$(hostname)
+    # Hostname corrente come default (con fallback per OpenWrt)
+    CURRENT_HOSTNAME=$(hostname 2>/dev/null || echo "openwrt-host")
     
     echo -e "${YELLOW}Inserisci le informazioni per la configurazione FRPC:${NC}\n"
     
