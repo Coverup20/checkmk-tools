@@ -293,21 +293,6 @@ detect_os() {
     
     echo -e "${GREEN}✓ Sistema rilevato: $OS $VER ($PKG_TYPE)${NC}"
 }
-            PKG_TYPE="deb"
-            PKG_MANAGER="apt"
-            ;;
-        centos|rhel|rocky|almalinux|nethserver-enterprise)
-            PKG_TYPE="rpm"
-            PKG_MANAGER="yum"
-            ;;
-        *)
-            echo -e "${RED}✗ Sistema operativo non supportato: $OS${NC}"
-            exit 1
-            ;;
-    esac
-    
-    echo -e "${GREEN}✓ Sistema rilevato: $OS $VER ($PKG_TYPE)${NC}"
-}
 
 # =====================================================
 # Funzione: Rileva ultima versione CheckMK Agent
