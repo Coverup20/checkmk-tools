@@ -1,6 +1,6 @@
 # ...existing code...
 # Script di Backup Multi-Piattaforma Completo + Notifiche Telegram
-# Sincronizza su GitHub, GitLab, Codeberg e backup locale
+# Sincronizza su GitHub, GitLab, Codeberg, Backup Locale e Share di Rete
 
 Write-Host "🔄 Avvio sincronizzazione backup completa..." -ForegroundColor Cyan
 Write-Host "📅 $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Gray
@@ -13,6 +13,11 @@ $total = 0
 $TELEGRAM_TOKEN = "8264716040:AAHPjzYJz7h8pV9hzjaf45-Mrv2gf8tMXmQ"
 $TELEGRAM_CHAT_ID = "381764604"
 $TELEGRAM_ENABLED = $true  # Set to $false to disable notifications
+
+# === NETWORK SHARE CONFIG ===
+$NETWORK_SHARE = "\\192.168.10.132\usbshare"
+$NETWORK_SHARE_ENABLED = $true  # Set to $false to disable network backup
+$NETWORK_BACKUP_PATH = "$NETWORK_SHARE\CheckMK-Backups"
 
 # Funzione notifica Telegram
 function Send-BackupNotification {
@@ -149,8 +154,113 @@ if ($missingRemotes) {
     Write-Host "   Usa setup-additional-remotes.ps1 per configurarli" -ForegroundColor DarkGray
 }
 
+# === NETWORK SHARE BACKUP ===
+Write-Host "`n🌐 Backup su Share di Rete..." -ForegroundColor Cyan
+
+if ($NETWORK_SHARE_ENABLED) {
+    try {
+        # Verifica accessibilità della share
+        if (Test-Path $NETWORK_SHARE) {
+            Write-Host "   ✅ Share di rete raggiungibile: $NETWORK_SHARE" -ForegroundColor Green
+            
+            # Crea directory di backup se non esiste
+            if (-not (Test-Path $NETWORK_BACKUP_PATH)) {
+                New-Item -ItemType Directory -Path $NETWORK_BACKUP_PATH -Force | Out-Null
+                Write-Host "   📁 Cartella backup creata: $NETWORK_BACKUP_PATH" -ForegroundColor Gray
+            }
+            
+            # Crea snapshot con timestamp
+            $timestamp = Get-Date -Format "yyyy-MM-dd-HH-mm-ss"
+            $networkBackupSnapshot = "$NETWORK_BACKUP_PATH\checkmk-tools-$timestamp"
+            $sourceDir = (Get-Location).Path
+            
+            Write-Host "   📋 Creando snapshot: checkmk-tools-$timestamp" -ForegroundColor Gray
+            
+            # Copia i file (escludendo .git e file temporanei)
+            $excludePatterns = @('.git', '.gitignore', '__pycache__', '*.log', 'Backup', '.tmp')
+            
+            Get-ChildItem -Path $sourceDir -Recurse -File | ForEach-Object {
+                $shouldExclude = $false
+                foreach ($pattern in $excludePatterns) {
+                    if ($_.FullName -match [regex]::Escape($pattern)) {
+                        $shouldExclude = $true
+                        break
+                    }
+                }
+                
+                if (-not $shouldExclude) {
+                    $relativePath = $_.FullName.Substring($sourceDir.Length + 1)
+                    $destPath = Join-Path $networkBackupSnapshot $relativePath
+                    $destDir = Split-Path $destPath
+                    
+                    if (-not (Test-Path $destDir)) {
+                        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+                    }
+                    
+                    Copy-Item -Path $_.FullName -Destination $destPath -Force
+                }
+            }
+            
+            $script:backupResults += "✅ Share di rete - OK (snapshot: checkmk-tools-$timestamp)"
+            Write-Host "   ✅ Snapshot completato su share di rete" -ForegroundColor Green
+            
+            # NETWORK SHARE RETENTION
+            Write-Host "   🗂️  Retention snapshot di rete..." -ForegroundColor Gray
+            
+            $allNetworkBackups = Get-ChildItem $NETWORK_BACKUP_PATH -Directory | Where-Object { 
+                $_.Name -match "checkmk-tools-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}" 
+            } | Sort-Object Name -Descending
+            
+            $today = Get-Date -Format "yyyy-MM-dd"
+            
+            # Separa backup per data
+            $todayNetworkBackups = $allNetworkBackups | Where-Object { $_.Name -match "checkmk-tools-$today-\d{2}-\d{2}-\d{2}" }
+            $olderNetworkBackups = $allNetworkBackups | Where-Object { 
+                $_.Name -notmatch "checkmk-tools-$today-\d{2}-\d{2}-\d{2}" 
+            }
+            
+            $deletedNetwork = 0
+            
+            # Oggi: mantieni max 3
+            if ($todayNetworkBackups.Count -gt 3) {
+                $toDelete = $todayNetworkBackups | Select-Object -Skip 3
+                foreach ($backup in $toDelete) {
+                    Remove-Item $backup.FullName -Recurse -Force
+                    $deletedNetwork++
+                }
+                Write-Host "   🗑️  Rimossi $($toDelete.Count) snapshot di oggi (mantenuti 3)" -ForegroundColor DarkYellow
+            }
+            
+            # Più vecchi: mantieni 1 per giorno
+            $olderByDateNetwork = $olderNetworkBackups | Group-Object { ($_.Name -split '-')[1..3] -join '-' }
+            foreach ($dateGroup in $olderByDateNetwork) {
+                if ($dateGroup.Group.Count -gt 1) {
+                    $toDelete = $dateGroup.Group | Select-Object -Skip 1
+                    foreach ($backup in $toDelete) {
+                        Remove-Item $backup.FullName -Recurse -Force
+                        $deletedNetwork++
+                    }
+                }
+            }
+            
+            $remainingNetwork = (Get-ChildItem $NETWORK_BACKUP_PATH -Directory).Count
+            Write-Host "   ✅ Retention share completata: $remainingNetwork snapshot totali, $deletedNetwork rimossi" -ForegroundColor Green
+            
+        } else {
+            Write-Host "   ⚠️  Share di rete NON raggiungibile: $NETWORK_SHARE" -ForegroundColor Yellow
+            Write-Host "   💡 Verifica: Network path, credenziali di accesso, stato della rete" -ForegroundColor Gray
+            $script:backupResults += "⚠️ Share di rete - Non raggiungibile"
+        }
+    } catch {
+        Write-Host "   ❌ Errore backup share di rete: $($_.Exception.Message)" -ForegroundColor Red
+        $script:backupResults += "❌ Share di rete - Errore: $($_.Exception.Message)"
+    }
+} else {
+    Write-Host "   ⏭️  Backup share di rete disabilitato" -ForegroundColor DarkGray
+}
+
 # 🆕 ADVANCED BACKUP RETENTION SYSTEM
-Write-Host "`n📦 Sistema Retention Avanzato..." -ForegroundColor Cyan
+Write-Host "`n📦 Sistema Retention Avanzato (Locale)..." -ForegroundColor Cyan
 
 try {
     $timestamp = Get-Date -Format "yyyy-MM-dd-HH-mm"
