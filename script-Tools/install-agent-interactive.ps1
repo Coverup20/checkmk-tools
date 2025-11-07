@@ -62,6 +62,64 @@ function Test-Administrator {
 }
 
 # =====================================================
+# Funzione: Scarica e installa NSSM se non presente
+# =====================================================
+function Ensure-NSSM {
+    $nssm = Get-Command nssm.exe -ErrorAction SilentlyContinue
+    if ($nssm) {
+        Write-Host "    [OK] NSSM già disponibile" -ForegroundColor Green
+        return $true
+    }
+    
+    Write-Host "    [*] NSSM non trovato, scaricamento in corso..." -ForegroundColor Yellow
+    
+    try {
+        $NSSM_VERSION = "2.24"
+        $NSSM_URL = "https://nssm.cc/download/nssm-$NSSM_VERSION-101-g897c7ad.zip"
+        $NSSM_ZIP = "$DOWNLOAD_DIR\nssm-$NSSM_VERSION.zip"
+        
+        # Download NSSM
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        (New-Object Net.WebClient).DownloadFile($NSSM_URL, $NSSM_ZIP)
+        
+        Write-Host "    [OK] NSSM scaricato" -ForegroundColor Green
+        
+        # Extract NSSM
+        $nssm_extract = "$DOWNLOAD_DIR\nssm-extract"
+        if (Test-Path $nssm_extract) {
+            Remove-Item $nssm_extract -Recurse -Force
+        }
+        
+        Expand-Archive -Path $NSSM_ZIP -DestinationPath $nssm_extract -Force
+        
+        # Find nssm.exe in extracted folder (it's in a subfolder)
+        $nssm_exe = Get-ChildItem -Path $nssm_extract -Filter "nssm.exe" -Recurse | Select-Object -First 1
+        
+        if ($nssm_exe) {
+            # Copy to System32
+            Copy-Item -Path $nssm_exe.FullName -Destination "C:\Windows\System32\nssm.exe" -Force
+            Write-Host "    [OK] NSSM installato in System32" -ForegroundColor Green
+            
+            # Verify it works
+            $nssm = Get-Command nssm.exe -ErrorAction SilentlyContinue
+            if ($nssm) {
+                Write-Host "    [OK] NSSM pronto all'uso" -ForegroundColor Green
+                return $true
+            }
+        }
+        else {
+            Write-Host "    [WARN] nssm.exe non trovato nell'archivio" -ForegroundColor Yellow
+            return $false
+        }
+    }
+    catch {
+        Write-Host "    [WARN] Impossibile installare NSSM: $_" -ForegroundColor Yellow
+        Write-Host "    [INFO] Userò sc.exe come fallback" -ForegroundColor Cyan
+        return $false
+    }
+}
+
+# =====================================================
 # Funzione: Rileva SO Windows
 # =====================================================
 function Get-WindowsInfo {
@@ -396,10 +454,23 @@ remote_port = $remotePort
         }
         
         $frpcPath = "$FRPC_INSTALL_DIR\frpc.exe"
-        $createCmd = "sc.exe create frpc binPath= `"$frpcPath -c $tomlFile`" start= auto displayname= `"FRP Client Service`""
         
         Write-Host "    [*] Registrazione servizio Windows..." -ForegroundColor Yellow
-        Invoke-Expression $createCmd 2>$null | Out-Null
+        
+        # Try to ensure NSSM is available
+        $nssm_available = Ensure-NSSM
+        
+        if ($nssm_available) {
+            # Use NSSM for better reliability
+            Write-Host "    [*] Usando NSSM per registrazione servizio..." -ForegroundColor Cyan
+            nssm.exe install frpc "$frpcPath" "-c `"$tomlFile`"" 2>&1 | Out-Null
+            nssm.exe set frpc AppDirectory "$FRPC_CONFIG_DIR" 2>&1 | Out-Null
+            nssm.exe set frpc Start SERVICE_AUTO_START 2>&1 | Out-Null
+        } else {
+            # Fallback to sc.exe
+            Write-Host "    [*] Usando sc.exe per registrazione servizio..." -ForegroundColor Cyan
+            & cmd.exe /c "sc.exe create frpc binPath= `"$frpcPath -c $tomlFile`" start= auto displayname= `"FRP Client Service`"" 2>&1 | Out-Null
+        }
         Start-Sleep -Seconds 1
         
         # Verify service was created
