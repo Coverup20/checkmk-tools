@@ -258,6 +258,12 @@ detect_os() {
             OS="nethserver-enterprise"
             VER=$(cat /etc/nethserver-release | grep -oP 'NethServer Enterprise \K[0-9.]+' || echo "8")
         fi
+        
+        # Rileva NethServer 8 Core / OpenWrt
+        if [ -f /etc/openwrt_release ] || grep -qi "openwrt" /etc/os-release 2>/dev/null; then
+            OS="openwrt"
+            VER=$(grep DISTRIB_RELEASE /etc/openwrt_release 2>/dev/null | cut -d"'" -f2 || echo "23.05")
+        fi
     elif type lsb_release >/dev/null 2>&1; then
         OS=$(lsb_release -si | tr '[:upper:]' '[:lower:]')
         VER=$(lsb_release -sr)
@@ -268,6 +274,25 @@ detect_os() {
     
     case $OS in
         ubuntu|debian)
+            PKG_TYPE="deb"
+            PKG_MANAGER="apt"
+            ;;
+        centos|rhel|rocky|almalinux|nethserver-enterprise)
+            PKG_TYPE="rpm"
+            PKG_MANAGER="yum"
+            ;;
+        openwrt)
+            PKG_TYPE="openwrt"
+            PKG_MANAGER="opkg"
+            ;;
+        *)
+            echo -e "${RED}✗ Sistema operativo non supportato: $OS${NC}"
+            exit 1
+            ;;
+    esac
+    
+    echo -e "${GREEN}✓ Sistema rilevato: $OS $VER ($PKG_TYPE)${NC}"
+}
             PKG_TYPE="deb"
             PKG_MANAGER="apt"
             ;;
@@ -311,9 +336,123 @@ detect_latest_agent_version() {
 }
 
 # =====================================================
+# Funzione: Installa CheckMK Agent su OpenWrt/NethSec8
+# =====================================================
+install_checkmk_agent_openwrt() {
+    echo -e "\n${BLUE}═══ INSTALLAZIONE CHECKMK AGENT (OpenWrt/NethSec8) ═══${NC}"
+    
+    # Rileva versione
+    detect_latest_agent_version
+    
+    local DEB_URL="https://monitoring.nethlab.it/monitoring/check_mk/agents/check-mk-agent_${CHECKMK_VERSION}-1_all.deb"
+    local TMPDIR="/tmp/checkmk-deb"
+    
+    # Repository OpenWrt
+    echo -e "${YELLOW}📦 Configurazione repository OpenWrt...${NC}"
+    local CUSTOMFEEDS="/etc/opkg/customfeeds.conf"
+    local REPO_BASE="https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base"
+    local REPO_PACKAGES="https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/packages"
+    
+    mkdir -p "$(dirname "$CUSTOMFEEDS")"
+    touch "$CUSTOMFEEDS"
+    
+    grep -q "$REPO_BASE" "$CUSTOMFEEDS" || echo "src/gz openwrt_base $REPO_BASE" >> "$CUSTOMFEEDS"
+    grep -q "$REPO_PACKAGES" "$CUSTOMFEEDS" || echo "src/gz openwrt_packages $REPO_PACKAGES" >> "$CUSTOMFEEDS"
+    
+    # Installa tool necessari
+    echo -e "${YELLOW}📦 Installazione tool base...${NC}"
+    opkg update
+    opkg install binutils tar gzip wget socat ca-certificates 2>/dev/null || opkg install busybox-full
+    
+    if ! command -v ar >/dev/null; then
+        echo -e "${RED}✗ Comando 'ar' mancante${NC}"
+        exit 1
+    fi
+    
+    # Scarica e estrai DEB
+    echo -e "${YELLOW}📦 Download CheckMK Agent...${NC}"
+    mkdir -p "$TMPDIR"
+    cd "$TMPDIR"
+    
+    echo -e "${CYAN}   Downloading...${NC}"
+    if wget "$DEB_URL" -O check-mk-agent.deb 2>&1; then
+        echo -e "${GREEN}   ✓ Download completato${NC}"
+    else
+        echo -e "${RED}✗ Errore download${NC}"
+        exit 1
+    fi
+    
+    # Estrazione manuale DEB
+    echo -e "${YELLOW}📦 Estrazione pacchetto DEB...${NC}"
+    ar x check-mk-agent.deb
+    mkdir -p data
+    tar -xzf data.tar.gz -C data
+    
+    # Installazione
+    echo -e "${YELLOW}📦 Installazione agent...${NC}"
+    cp -f data/usr/bin/check_mk_agent /usr/bin/ 2>/dev/null || true
+    chmod +x /usr/bin/check_mk_agent
+    mkdir -p /etc/check_mk /etc/xinetd.d
+    cp -rf data/etc/check_mk/* /etc/check_mk/ 2>/dev/null || true
+    
+    rm -rf "$TMPDIR"
+    echo -e "${GREEN}✓ Agent CheckMK installato${NC}"
+    
+    # Crea servizio init.d con socat
+    echo -e "${YELLOW}🔧 Creazione servizio init.d (socat listener)...${NC}"
+    
+    cat > /etc/init.d/check_mk_agent <<'EOF'
+#!/bin/sh /etc/rc.common
+# Checkmk Agent listener for OpenWrt / NethSecurity
+START=98
+STOP=10
+USE_PROCD=1
+PROG=/usr/bin/check_mk_agent
+
+start_service() {
+    mkdir -p /var/run
+    echo "Starting Checkmk Agent on TCP port 6556..."
+    procd_open_instance
+    procd_set_param command socat TCP-LISTEN:6556,reuseaddr,fork,keepalive EXEC:$PROG
+    procd_set_param respawn
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_close_instance
+}
+
+stop_service() {
+    echo "Stopping Checkmk Agent..."
+    killall socat >/dev/null 2>&1 || true
+}
+EOF
+    
+    chmod +x /etc/init.d/check_mk_agent
+    /etc/init.d/check_mk_agent enable >/dev/null 2>&1 || true
+    /etc/init.d/check_mk_agent restart
+    
+    sleep 2
+    
+    if pgrep -f "socat TCP-LISTEN:6556" >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Agent attivo su porta 6556 (socat mode)${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Agent potrebbe non essere attivo${NC}"
+    fi
+    
+    # Test locale
+    echo -e "\n${CYAN}📊 Test agent locale:${NC}"
+    /usr/bin/check_mk_agent | head -n 5 || echo -e "${YELLOW}⚠️  Test fallito${NC}"
+}
+
+# =====================================================
 # Funzione: Installa CheckMK Agent
 # =====================================================
 install_checkmk_agent() {
+    # Se è OpenWrt, usa funzione specifica
+    if [ "$PKG_TYPE" = "openwrt" ]; then
+        install_checkmk_agent_openwrt
+        return
+    fi
+    
     echo -e "\n${BLUE}═══ INSTALLAZIONE CHECKMK AGENT ═══${NC}"
     
     # Rileva automaticamente l'ultima versione disponibile
@@ -531,10 +670,37 @@ EOF
     echo -e "   Porta remota: ${GREEN}$REMOTE_PORT${NC}"
     echo -e "   Porta locale: ${GREEN}6556${NC}"
     
-    # Crea servizio systemd
-    echo -e "\n${YELLOW}🔧 Creazione servizio systemd...${NC}"
-    
-    cat > /etc/systemd/system/frpc.service <<EOF
+    # Crea servizio (systemd o init.d)
+    if [ "$PKG_TYPE" = "openwrt" ]; then
+        # Init.d per OpenWrt
+        echo -e "\n${YELLOW}🔧 Creazione servizio init.d...${NC}"
+        
+        cat > /etc/init.d/frpc <<'EOF'
+#!/bin/sh /etc/rc.common
+START=99
+STOP=10
+USE_PROCD=1
+
+start_service() {
+    procd_open_instance
+    procd_set_param command /usr/local/bin/frpc -c /etc/frp/frpc.toml
+    procd_set_param respawn
+    procd_close_instance
+}
+
+stop_service() {
+    killall frpc >/dev/null 2>&1 || true
+}
+EOF
+        
+        chmod +x /etc/init.d/frpc
+        /etc/init.d/frpc enable >/dev/null 2>&1 || true
+        /etc/init.d/frpc start
+    else
+        # Systemd per Linux standard
+        echo -e "\n${YELLOW}🔧 Creazione servizio systemd...${NC}"
+        
+        cat > /etc/systemd/system/frpc.service <<EOF
 [Unit]
 Description=FRP Client Service
 After=network.target
@@ -552,15 +718,23 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 EOF
-    
-    systemctl daemon-reload
-    systemctl enable frpc
-    systemctl restart frpc
+        
+        systemctl daemon-reload
+        systemctl enable frpc
+        systemctl restart frpc
+    fi
     
     sleep 2
     
     # Verifica stato
-    if systemctl is-active --quiet frpc; then
+    if [ "$PKG_TYPE" = "openwrt" ]; then
+        if pgrep -f frpc >/dev/null 2>&1; then
+            echo -e "${GREEN}✓ FRPC avviato con successo${NC}"
+        else
+            echo -e "${RED}✗ Errore nell'avvio di FRPC${NC}"
+            echo -e "${YELLOW}Verifica log: tail -f /var/log/frpc.log${NC}"
+        fi
+    elif systemctl is-active --quiet frpc; then
         echo -e "${GREEN}✓ FRPC avviato con successo${NC}"
         echo -e "\n${CYAN}📊 Status:${NC}"
         systemctl status frpc --no-pager -l | head -n 10

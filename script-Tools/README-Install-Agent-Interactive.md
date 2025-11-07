@@ -5,11 +5,11 @@ Script interattivo per l'installazione/disinstallazione automatizzata di CheckMK
 ## 📋 Caratteristiche
 
 - ✅ **Installazione guidata** CheckMK Agent (plain TCP 6556)
-- ✅ **Supporto multi-distro**: Ubuntu, Debian, Rocky Linux, CentOS, RHEL, AlmaLinux, NethServer Enterprise
+- ✅ **Supporto multi-distro**: Ubuntu, Debian, Rocky Linux, CentOS, RHEL, AlmaLinux, NethServer Enterprise, **OpenWrt/NethSec8**
 - ✅ **Installazione opzionale FRPC** con configurazione interattiva
 - ✅ **Disinstallazione completa** con opzioni separate per Agent e FRPC
 - ✅ **Rilevamento automatico** del sistema operativo
-- ✅ **Configurazione systemd** completa
+- ✅ **Configurazione systemd/init.d** completa
 - ✅ **Output colorato** e user-friendly
 
 ## 🎯 Cosa fa lo script
@@ -40,12 +40,21 @@ Script interattivo per l'installazione/disinstallazione automatizzata di CheckMK
   - **Debian-based**: Ubuntu, Debian
   - **RHEL-based**: Rocky Linux, CentOS, RHEL, AlmaLinux
   - **NethServer**: NethServer Enterprise (rilevato automaticamente)
+  - **OpenWrt**: OpenWrt 23.05+, NethServer 8 Core (NethSec8)
 - Accesso root o sudo
 - Connessione internet
 - CheckMK Server raggiungibile (per download pacchetti)
 
 ### 💡 Nota su NethServer Enterprise
 NethServer Enterprise viene **rilevato automaticamente** tramite il file `/etc/nethserver-release`. Lo script utilizzerà automaticamente i pacchetti RPM appropriati per l'installazione.
+
+### 💡 Nota su OpenWrt/NethSec8
+OpenWrt e NethServer 8 Core vengono rilevati tramite `/etc/openwrt_release`. Lo script:
+- Usa **opkg** come package manager
+- Estrae manualmente il pacchetto DEB
+- Configura **socat** come listener sulla porta 6556
+- Crea servizio **init.d** con procd (non systemd)
+- Supporta FRPC con servizio init.d dedicato
 
 ## 🚀 Utilizzo
 
@@ -368,6 +377,6 @@ Uso libero per scopi di monitoraggio CheckMK.
 
 ---
 
-**Versione**: 1.1  
-**Data**: 2025-11-06  
-**Compatibilità**: Ubuntu, Debian, Rocky Linux, CentOS, RHEL, AlmaLinux, NethServer Enterprise
+**Versione**: 1.2  
+**Data**: 2025-11-07  
+**Compatibilità**: Ubuntu, Debian, Rocky Linux, CentOS, RHEL, AlmaLinux, NethServer Enterprise, OpenWrt 23.05+, NethSec8
