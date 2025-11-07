@@ -487,20 +487,22 @@ install_checkmk_agent() {
         exit 1
     fi
     
-    # Verifica che sia un file RPM/DEB valido
-    if [ "$PKG_TYPE" = "rpm" ]; then
-        if ! file "$AGENT_FILE" | grep -q "RPM"; then
-            echo -e "${RED}✗ File scaricato non è un pacchetto RPM valido${NC}"
-            echo -e "${YELLOW}Contenuto del file:${NC}"
-            head -n 5 "$AGENT_FILE"
-            exit 1
-        fi
-    else
-        if ! file "$AGENT_FILE" | grep -q "Debian"; then
-            echo -e "${RED}✗ File scaricato non è un pacchetto DEB valido${NC}"
-            echo -e "${YELLOW}Contenuto del file:${NC}"
-            head -n 5 "$AGENT_FILE"
-            exit 1
+    # Verifica che sia un file RPM/DEB valido (solo se comando 'file' disponibile)
+    if command -v file >/dev/null 2>&1; then
+        if [ "$PKG_TYPE" = "rpm" ]; then
+            if ! file "$AGENT_FILE" | grep -q "RPM"; then
+                echo -e "${RED}✗ File scaricato non è un pacchetto RPM valido${NC}"
+                echo -e "${YELLOW}Contenuto del file:${NC}"
+                head -n 5 "$AGENT_FILE"
+                exit 1
+            fi
+        else
+            if ! file "$AGENT_FILE" | grep -q "Debian"; then
+                echo -e "${RED}✗ File scaricato non è un pacchetto DEB valido${NC}"
+                echo -e "${YELLOW}Contenuto del file:${NC}"
+                head -n 5 "$AGENT_FILE"
+                exit 1
+            fi
         fi
     fi
     
