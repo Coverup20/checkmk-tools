@@ -386,27 +386,68 @@ remote_port = $remotePort
     try {
         $existingService = Get-Service -Name "frpc" -ErrorAction SilentlyContinue
         if ($existingService) {
+            Write-Host "    [*] Arresto servizio esistente..." -ForegroundColor Yellow
             Stop-Service -Name "frpc" -Force -ErrorAction SilentlyContinue
-            sc.exe delete frpc 2>$null | Out-Null
             Start-Sleep -Seconds 1
+            
+            Write-Host "    [*] Rimozione servizio precedente..." -ForegroundColor Yellow
+            sc.exe delete frpc 2>$null | Out-Null
+            Start-Sleep -Seconds 2
         }
         
         $frpcPath = "$FRPC_INSTALL_DIR\frpc.exe"
-        sc.exe create frpc binPath= "$frpcPath -c $tomlFile" start= auto displayname= "FRP Client Service" 2>$null | Out-Null
+        $createCmd = "sc.exe create frpc binPath= `"$frpcPath -c $tomlFile`" start= auto displayname= `"FRP Client Service`""
         
-        Start-Service -Name "frpc" -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 2
+        Write-Host "    [*] Registrazione servizio Windows..." -ForegroundColor Yellow
+        Invoke-Expression $createCmd 2>$null | Out-Null
+        Start-Sleep -Seconds 1
         
+        # Verify service was created
         $frpcService = Get-Service -Name "frpc" -ErrorAction SilentlyContinue
-        if ($frpcService -and $frpcService.Status -eq "Running") {
-            Write-Host "    [OK] Servizio FRPC avviato" -ForegroundColor Green
+        if (-not $frpcService) {
+            Write-Host "    [ERR] Servizio non registrato correttamente" -ForegroundColor Red
+            return $false
         }
-        else {
-            Write-Host "    [WARN] Servizio creato ma non avviato" -ForegroundColor Yellow
+        
+        Write-Host "    [OK] Servizio registrato" -ForegroundColor Green
+        
+        # Try to start service with retry logic
+        $maxRetries = 3
+        $retryCount = 0
+        $serviceRunning = $false
+        
+        While ($retryCount -lt $maxRetries -and -not $serviceRunning) {
+            $retryCount++
+            Write-Host "    [*] Tentativo di avvio ($retryCount/$maxRetries)..." -ForegroundColor Yellow
+            
+            try {
+                Start-Service -Name "frpc" -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 3
+                
+                $frpcService = Get-Service -Name "frpc" -ErrorAction SilentlyContinue
+                if ($frpcService -and $frpcService.Status -eq "Running") {
+                    Write-Host "    [OK] Servizio FRPC avviato con successo" -ForegroundColor Green
+                    $serviceRunning = $true
+                }
+                elseif ($retryCount -lt $maxRetries) {
+                    Write-Host "    [WARN] Servizio non è in esecuzione, nuovo tentativo..." -ForegroundColor Yellow
+                    Stop-Service -Name "frpc" -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 1
+                }
+            }
+            catch {
+                Write-Host "    [WARN] Errore avvio: $_" -ForegroundColor Yellow
+            }
+        }
+        
+        if (-not $serviceRunning) {
+            Write-Host "    [WARN] Servizio creato ma non avviato (may start on next boot)" -ForegroundColor Yellow
+            Write-Host "    [INFO] Tentare avvio manuale: Start-Service -Name 'frpc'" -ForegroundColor Cyan
         }
     }
     catch {
         Write-Host "    [ERR] Errore creazione servizio: $_" -ForegroundColor Red
+        return $false
     }
     
     Write-Host "`n[OK] FRPC Configurazione:" -ForegroundColor Green
@@ -414,6 +455,8 @@ remote_port = $remotePort
     Write-Host "    Tunnel:        $frpcHostname"
     Write-Host "    Porta remota:  $remotePort"
     Write-Host "    Porta locale:  6556"
+    Write-Host "    Config:        $tomlFile"
+    Write-Host "    Log:           $FRPC_LOG_DIR\frpc.log"
     
     return $true
 }
