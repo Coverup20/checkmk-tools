@@ -4,6 +4,23 @@
 # Version: 1.0 - 2025-11-07
 # ============================================================
 
+# Imposta execution policy per questo script
+#Requires -RunAsAdministrator
+#Requires -Version 5.0
+
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force -ErrorAction SilentlyContinue
+
+# Global error handling
+$ErrorActionPreference = "Continue"
+$ProgressPreference = "SilentlyContinue"
+
+# Trap per errori non gestiti
+trap {
+    Write-Host "`n❌ ERRORE CRITICO: $_" -ForegroundColor Red
+    Write-Host "Stack Trace: $($_.ScriptStackTrace)" -ForegroundColor DarkRed
+    exit 1
+}
+
 # Colori per output
 $Colors = @{
     Green  = "Green"
@@ -515,32 +532,33 @@ function Show-Summary {
 # MAIN SCRIPT
 # =====================================================
 
-# Mostra header
-Write-Host "`n"
-Write-Host "╔════════════════════════════════════════════════════════════╗" -ForegroundColor $Colors.Cyan
-Write-Host "║  Installazione Interattiva CheckMK Agent + FRPC per Windows║" -ForegroundColor $Colors.Cyan
-Write-Host "║  Version: 1.0 - 2025-11-07                                ║" -ForegroundColor $Colors.Cyan
-Write-Host "╚════════════════════════════════════════════════════════════╝" -ForegroundColor $Colors.Cyan
+try {
+    # Mostra header
+    Write-Host "`n"
+    Write-Host "╔════════════════════════════════════════════════════════════╗" -ForegroundColor $Colors.Cyan
+    Write-Host "║  Installazione Interattiva CheckMK Agent + FRPC per Windows║" -ForegroundColor $Colors.Cyan
+    Write-Host "║  Version: 1.0 - 2025-11-07                                ║" -ForegroundColor $Colors.Cyan
+    Write-Host "╚════════════════════════════════════════════════════════════╝" -ForegroundColor $Colors.Cyan
 
-# Gestione parametri
-$MODE = "install"
-if ($args.Count -gt 0) {
-    switch ($args[0]) {
-        "--help" { Show-Usage; exit 0 }
-        "-h" { Show-Usage; exit 0 }
-        "--uninstall-frpc" { $MODE = "uninstall-frpc" }
-        "--uninstall-agent" { $MODE = "uninstall-agent" }
-        "--uninstall" { $MODE = "uninstall-all" }
-        default {
-            Write-Host "❌ Parametro non valido: $($args[0])" -ForegroundColor $Colors.Red
-            Show-Usage
-            exit 1
+    # Gestione parametri
+    $MODE = "install"
+    if ($args.Count -gt 0) {
+        switch ($args[0]) {
+            "--help" { Show-Usage; exit 0 }
+            "-h" { Show-Usage; exit 0 }
+            "--uninstall-frpc" { $MODE = "uninstall-frpc" }
+            "--uninstall-agent" { $MODE = "uninstall-agent" }
+            "--uninstall" { $MODE = "uninstall-all" }
+            default {
+                Write-Host "❌ Parametro non valido: $($args[0])" -ForegroundColor $Colors.Red
+                Show-Usage
+                exit 1
+            }
         }
     }
-}
 
-# Verifica Administrator
-if (-not (Test-Administrator)) {
+    # Verifica Administrator
+    if (-not (Test-Administrator)) {
     Write-Host "❌ Errore: Questo script deve essere eseguito come Administrator" -ForegroundColor $Colors.Red
     Write-Host "   Riavvia PowerShell come Administrator e riprova." -ForegroundColor $Colors.Gray
     exit 1
@@ -626,3 +644,11 @@ else {
 
 # Mostra riepilogo
 Show-Summary
+
+} catch {
+    Write-Host "`n`n❌ ERRORE DURANTE L'ESECUZIONE:" -ForegroundColor $Colors.Red
+    Write-Host "   $_" -ForegroundColor $Colors.Red
+    Write-Host "`nTraccia stack:" -ForegroundColor $Colors.DarkYellow
+    Write-Host $_.ScriptStackTrace -ForegroundColor $Colors.Gray
+    exit 1
+}
