@@ -796,6 +796,58 @@ fi
 # Rileva sistema operativo
 detect_os
 
+# =====================================================
+# CONFERMA INIZIALE - Mostra SO rilevato
+# =====================================================
+echo -e "\n${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║             RILEVAMENTO SISTEMA OPERATIVO                 ║${NC}"
+echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
+
+echo -e "\n${YELLOW}Sistema Rilevato:${NC}"
+echo -e "   ${GREEN}OS:${NC} $OS"
+echo -e "   ${GREEN}Versione:${NC} $VER"
+echo -e "   ${GREEN}Package Manager:${NC} $PKG_TYPE"
+
+# Mapping descrittivo del sistema
+case "$OS" in
+    openwrt)
+        SYSTEM_DESC="OpenWrt / NethSecurity (init.d + procd)"
+        ;;
+    ubuntu|debian)
+        SYSTEM_DESC="Debian/Ubuntu (systemd)"
+        ;;
+    fedora|rocky|centos|rhel)
+        SYSTEM_DESC="RHEL-based: $OS (systemd)"
+        ;;
+    nethserver-enterprise)
+        SYSTEM_DESC="NethServer Enterprise (systemd)"
+        ;;
+    *)
+        SYSTEM_DESC="$OS"
+        ;;
+esac
+
+echo -e "   ${GREEN}Tipo:${NC} $SYSTEM_DESC"
+
+echo -e "\n${YELLOW}Questa installazione utilizzerà:${NC}"
+echo -e "   • CheckMK Agent (plain TCP on port 6556)"
+echo -e "   • Servizio: $([ "$PKG_TYPE" = "openwrt" ] && echo "init.d" || echo "systemd socket")"
+
+if [ "$PKG_TYPE" = "openwrt" ]; then
+    echo -e "   • TCP Listener: socat"
+fi
+
+echo -e "\n${YELLOW}════════════════════════════════════════${NC}"
+read -p "$(echo -e ${CYAN}Procedi con l\"installazione su questo sistema? ${NC}[s/N]: )" CONFIRM_SYSTEM
+echo -e "${YELLOW}════════════════════════════════════════${NC}"
+
+if [[ ! "$CONFIRM_SYSTEM" =~ ^[sS]$ ]]; then
+    echo -e "\n${CYAN}Installazione annullata dall\"utente${NC}\n"
+    exit 0
+fi
+
+echo -e "\n${GREEN}Procedendo con l\"installazione...${NC}\n"
+
 # Installa CheckMK Agent
 install_checkmk_agent
 
