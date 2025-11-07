@@ -18,7 +18,12 @@ $ProgressPreference = "SilentlyContinue"
 $CHECKMK_VERSION = "2.4.0p14"
 $FRP_VERSION = "0.64.0"
 $FRP_URL = "https://github.com/fatedier/frp/releases/download/v$FRP_VERSION/frp_$FRP_VERSION`_windows_amd64.zip"
-$CHECKMK_MSI_URL = "https://monitoring.nethlab.it/monitoring/check_mk/agents/check-mk-agent-$CHECKMK_VERSION-1_all.msi"
+# Try multiple CheckMK URLs (fallback if one fails)
+$CHECKMK_MSI_URLS = @(
+    "https://download.checkmk.com/checkmk/$CHECKMK_VERSION/check-mk-agent-$CHECKMK_VERSION-1_all.msi",
+    "https://monitoring.nethlab.it/monitoring/check_mk/agents/check-mk-agent-$CHECKMK_VERSION-1_all.msi"
+)
+$CHECKMK_MSI_URL = $CHECKMK_MSI_URLS[0]  # Primary URL
 
 $DOWNLOAD_DIR = "$env:TEMP\CheckMK-Setup"
 $AGENT_INSTALL_DIR = "C:\Program Files (x86)\checkmk\service"
@@ -201,25 +206,35 @@ function Install-CheckMKAgent {
     
     Write-Host "`n[*] Download CheckMK Agent v$CHECKMK_VERSION..." -ForegroundColor Yellow
     
-    try {
-        if (-not (Test-Path $msiFile)) {
-            Write-Host "    Scaricamento in corso..." -ForegroundColor Cyan
-            [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-            (New-Object Net.WebClient).DownloadFile($CHECKMK_MSI_URL, $msiFile)
+    # Try multiple URLs with fallback
+    $downloadSuccess = $false
+    foreach ($url in $CHECKMK_MSI_URLS) {
+        try {
+            if (-not (Test-Path $msiFile)) {
+                Write-Host "    Tentativo download da: $url" -ForegroundColor Gray
+                [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+                (New-Object Net.WebClient).DownloadFile($url, $msiFile)
+                $downloadSuccess = $true
+                break
+            }
+            else {
+                $downloadSuccess = $true
+                break
+            }
         }
-        
-        if (-not (Test-Path $msiFile) -or (Get-Item $msiFile).Length -eq 0) {
-            Write-Host "[ERR] Errore: File MSI non valido" -ForegroundColor Red
-            return $false
+        catch {
+            Write-Host "    [WARN] URL fallito: $($_.Exception.Message)" -ForegroundColor Yellow
+            Continue
         }
-        
-        $sizeMB = [math]::Round((Get-Item $msiFile).Length / 1MB, 2)
-        Write-Host "    [OK] Download completato ($sizeMB MB)" -ForegroundColor Green
     }
-    catch {
-        Write-Host "[ERR] Errore durante download: $_" -ForegroundColor Red
+    
+    if (-not $downloadSuccess -or -not (Test-Path $msiFile) -or (Get-Item $msiFile).Length -eq 0) {
+        Write-Host "[ERR] Errore: Nessun URL disponibile per il download" -ForegroundColor Red
         return $false
     }
+    
+    $sizeMB = [math]::Round((Get-Item $msiFile).Length / 1048576, 2)
+    Write-Host "    [OK] Download completato ($sizeMB MB)" -ForegroundColor Green
     
     # Installa MSI
     Write-Host "`n[*] Installazione in corso..." -ForegroundColor Yellow
