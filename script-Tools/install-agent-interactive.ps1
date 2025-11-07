@@ -20,8 +20,8 @@ $FRP_VERSION = "0.64.0"
 $FRP_URL = "https://github.com/fatedier/frp/releases/download/v$FRP_VERSION/frp_$FRP_VERSION`_windows_amd64.zip"
 # Try multiple CheckMK URLs (fallback if one fails)
 $CHECKMK_MSI_URLS = @(
-    "https://download.checkmk.com/checkmk/$CHECKMK_VERSION/check-mk-agent-$CHECKMK_VERSION-1_all.msi",
-    "https://monitoring.nethlab.it/monitoring/check_mk/agents/check-mk-agent-$CHECKMK_VERSION-1_all.msi"
+    "https://monitoring.nethlab.it/monitoring/check_mk/agents/windows/check_mk_agent.msi",
+    "https://download.checkmk.com/checkmk/$CHECKMK_VERSION/check-mk-agent-$CHECKMK_VERSION-1_all.msi"
 )
 $CHECKMK_MSI_URL = $CHECKMK_MSI_URLS[0]  # Primary URL
 
@@ -202,7 +202,7 @@ function Install-CheckMKAgent {
         New-Item -ItemType Directory -Path $DOWNLOAD_DIR -Force | Out-Null
     }
     
-    $msiFile = "$DOWNLOAD_DIR\check-mk-agent-$CHECKMK_VERSION-1_all.msi"
+    $msiFile = "$DOWNLOAD_DIR\check_mk_agent.msi"
     
     Write-Host "`n[*] Download CheckMK Agent v$CHECKMK_VERSION..." -ForegroundColor Yellow
     
