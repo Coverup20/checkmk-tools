@@ -507,6 +507,12 @@ install_checkmk_agent() {
 # Funzione: Configura Agent Plain (TCP 6556)
 # =====================================================
 configure_plain_agent() {
+    # Su OpenWrt il servizio è già configurato da install_checkmk_agent_openwrt()
+    if [ "$PKG_TYPE" = "openwrt" ]; then
+        echo -e "${GREEN}✓ Agent su OpenWrt già configurato${NC}"
+        return
+    fi
+    
     echo -e "\n${BLUE}═══ CONFIGURAZIONE AGENT PLAIN ═══${NC}"
     
     SOCKET_FILE="/etc/systemd/system/check-mk-agent-plain.socket"
