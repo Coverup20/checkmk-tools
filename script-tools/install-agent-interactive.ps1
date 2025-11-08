@@ -526,9 +526,9 @@ remote_port = $remotePort
         if ($nssm_available) {
             # Use NSSM for better reliability and features
             Write-Host "    [*] Usando NSSM per registrazione servizio..." -ForegroundColor Cyan
-            nssm.exe install frpc "$frpcPath" "-c `"$tomlFile`"" 2>&1 | Out-Null
-            nssm.exe set frpc AppDirectory "$FRPC_CONFIG_DIR" 2>&1 | Out-Null
-            nssm.exe set frpc Start SERVICE_AUTO_START 2>&1 | Out-Null
+            & "C:\Windows\System32\nssm.exe" install frpc "$frpcPath" "-c `"$tomlFile`"" 2>&1 | Out-Null
+            & "C:\Windows\System32\nssm.exe" set frpc AppDirectory "$FRPC_CONFIG_DIR" 2>&1 | Out-Null
+            & "C:\Windows\System32\nssm.exe" set frpc Start SERVICE_AUTO_START 2>&1 | Out-Null
         } else {
             # Fallback to sc.exe (built-in, always available)
             Write-Host "    [*] Usando sc.exe per registrazione servizio..." -ForegroundColor Cyan
