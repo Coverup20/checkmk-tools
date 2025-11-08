@@ -546,8 +546,8 @@ remote_port = $remotePort
         
         Write-Host "    [OK] Servizio registrato" -ForegroundColor Green
         
-        # Try to start service with retry logic
-        $maxRetries = 3
+        # Try to start service with retry logic (increased timeouts)
+        $maxRetries = 5
         $retryCount = 0
         $serviceRunning = $false
         
@@ -557,7 +557,7 @@ remote_port = $remotePort
             
             try {
                 Start-Service -Name "frpc" -ErrorAction SilentlyContinue
-                Start-Sleep -Seconds 3
+                Start-Sleep -Seconds 5
                 
                 $frpcService = Get-Service -Name "frpc" -ErrorAction SilentlyContinue
                 if ($frpcService -and $frpcService.Status -eq "Running") {
@@ -565,9 +565,9 @@ remote_port = $remotePort
                     $serviceRunning = $true
                 }
                 elseif ($retryCount -lt $maxRetries) {
-                    Write-Host "    [WARN] Servizio non è in esecuzione, nuovo tentativo..." -ForegroundColor Yellow
+                    Write-Host "    [WARN] Servizio non è in esecuzione, nuovo tentativo tra 2 secondi..." -ForegroundColor Yellow
                     Stop-Service -Name "frpc" -Force -ErrorAction SilentlyContinue
-                    Start-Sleep -Seconds 1
+                    Start-Sleep -Seconds 2
                 }
             }
             catch {
@@ -576,8 +576,9 @@ remote_port = $remotePort
         }
         
         if (-not $serviceRunning) {
-            Write-Host "    [WARN] Servizio creato ma non avviato (may start on next boot)" -ForegroundColor Yellow
-            Write-Host "    [INFO] Tentare avvio manuale: Start-Service -Name 'frpc'" -ForegroundColor Cyan
+            Write-Host "    [WARN] Servizio creato ma non avviato automaticamente" -ForegroundColor Yellow
+            Write-Host "    [INFO] Avvio manuale: Start-Service -Name 'frpc'" -ForegroundColor Cyan
+            Write-Host "    [INFO] Verifica log: Get-Content 'C:\ProgramData\frp\logs\frpc.log' -Tail 20" -ForegroundColor Cyan
         }
     }
     catch {
