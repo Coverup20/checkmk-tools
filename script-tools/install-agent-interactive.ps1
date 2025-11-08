@@ -77,6 +77,11 @@ function Ensure-NSSM {
     Write-Host "    [*] NSSM non trovato, tentando download..." -ForegroundColor Yellow
     
     try {
+        # Ensure download directory exists
+        if (-not (Test-Path $DOWNLOAD_DIR)) {
+            New-Item -ItemType Directory -Path $DOWNLOAD_DIR -Force -ErrorAction SilentlyContinue | Out-Null
+        }
+        
         # Download NSSM from official repository (direct URLs, no redirects)
         $NSSM_URLS = @(
             "https://nssm.cc/release/nssm-2.24.zip",                    # Latest stable
@@ -84,6 +89,11 @@ function Ensure-NSSM {
             "https://sourceforge.net/projects/nssm/files/nssm/2.24/nssm-2.24.zip/download"
         )
         $NSSM_ZIP = "$DOWNLOAD_DIR\nssm.zip"
+        
+        # Clean up old ZIP if exists
+        if (Test-Path $NSSM_ZIP) {
+            Remove-Item $NSSM_ZIP -Force -ErrorAction SilentlyContinue
+        }
         
         $downloadSuccess = $false
         foreach ($url in $NSSM_URLS) {
@@ -98,12 +108,12 @@ function Ensure-NSSM {
                 # Verify download
                 if ((Test-Path $NSSM_ZIP) -and (Get-Item $NSSM_ZIP).Length -gt 100KB) {
                     $downloadSuccess = $true
-                    Write-Host "    [OK] NSSM scaricato" -ForegroundColor Green
+                    Write-Host "    [OK] NSSM scaricato ($('{0:N0}' -f (Get-Item $NSSM_ZIP).Length) bytes)" -ForegroundColor Green
                     break
                 }
             }
             catch {
-                # Continue to next URL
+                Write-Host "    [WARN] Errore da $url : $($_.Exception.Message)" -ForegroundColor Yellow
             }
         }
         
@@ -113,30 +123,56 @@ function Ensure-NSSM {
         }
         
         # Extract NSSM
+        Write-Host "    [*] Estrazione archivio..." -ForegroundColor Yellow
         $nssm_extract = "$DOWNLOAD_DIR\nssm-extract"
         if (Test-Path $nssm_extract) {
-            Remove-Item $nssm_extract -Recurse -Force
+            Remove-Item $nssm_extract -Recurse -Force -ErrorAction SilentlyContinue
         }
         
-        Expand-Archive -Path $NSSM_ZIP -DestinationPath $nssm_extract -Force
+        try {
+            Expand-Archive -Path $NSSM_ZIP -DestinationPath $nssm_extract -Force -ErrorAction Stop
+            Write-Host "    [OK] Archivio estratto" -ForegroundColor Green
+        }
+        catch {
+            Write-Host "    [ERR] Errore estrazione ZIP: $_" -ForegroundColor Red
+            return $false
+        }
         
         # Find nssm.exe in extracted folder (it's in win64 subfolder)
-        $nssm_exe = Get-ChildItem -Path $nssm_extract -Filter "nssm.exe" -Recurse | Select-Object -First 1
+        $nssm_exe = Get-ChildItem -Path $nssm_extract -Filter "nssm.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
         
         if ($nssm_exe) {
+            Write-Host "    [*] Trovato: $($nssm_exe.FullName)" -ForegroundColor Cyan
             # Copy to System32
-            Copy-Item -Path $nssm_exe.FullName -Destination "C:\Windows\System32\nssm.exe" -Force
-            Write-Host "    [OK] NSSM installato in System32" -ForegroundColor Green
+            try {
+                Copy-Item -Path $nssm_exe.FullName -Destination "C:\Windows\System32\nssm.exe" -Force -ErrorAction Stop
+                Write-Host "    [OK] NSSM installato in System32" -ForegroundColor Green
+            }
+            catch {
+                Write-Host "    [ERR] Errore copia NSSM: $_" -ForegroundColor Red
+                return $false
+            }
             
             # Verify it works
+            Start-Sleep -Milliseconds 500
             $nssm = Get-Command nssm.exe -ErrorAction SilentlyContinue
             if ($nssm) {
-                Write-Host "    [OK] NSSM pronto" -ForegroundColor Green
+                Write-Host "    [OK] NSSM pronto e funzionante" -ForegroundColor Green
                 return $true
+            }
+            else {
+                Write-Host "    [WARN] nssm.exe copiato ma non trovato nel PATH" -ForegroundColor Yellow
+                # Try direct execution
+                if (Test-Path "C:\Windows\System32\nssm.exe") {
+                    Write-Host "    [OK] nssm.exe disponibile in System32" -ForegroundColor Green
+                    return $true
+                }
             }
         }
         else {
-            Write-Host "    [WARN] nssm.exe non trovato nell'archivio" -ForegroundColor Yellow
+            Write-Host "    [WARN] nssm.exe non trovato nell'archivio estratto" -ForegroundColor Yellow
+            Write-Host "    [DEBUG] Contenuto di $nssm_extract :" -ForegroundColor Gray
+            Get-ChildItem -Path $nssm_extract -Recurse | Select-Object -First 10 | ForEach-Object { Write-Host "      $_" -ForegroundColor Gray }
             return $false
         }
     }
