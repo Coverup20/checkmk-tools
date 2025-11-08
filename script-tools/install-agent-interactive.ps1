@@ -568,43 +568,101 @@ remote_port = $remotePort
     
     Write-Host "`n[OK] Configurazione completata" -ForegroundColor Green
     
-    # Crea servizio Windows
-    Write-Host "`n[*] Creazione servizio Windows..." -ForegroundColor Yellow
+    # Scarica e configura NSSM (Non-Sucking Service Manager)
+    Write-Host "`n[*] Download NSSM (Service Wrapper)..." -ForegroundColor Yellow
+    
+    $nssmZip = "$DOWNLOAD_DIR\nssm-$NSSM_VERSION.zip"
+    $nssmExtractPath = "$DOWNLOAD_DIR\nssm-$NSSM_VERSION"
     
     try {
+        if (-not (Test-Path $nssmZip)) {
+            Write-Host "    Scaricamento NSSM..." -ForegroundColor Cyan
+            [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+            (New-Object Net.WebClient).DownloadFile($NSSM_URL, $nssmZip)
+        }
+        
+        if (-not (Test-Path $nssmZip) -or (Get-Item $nssmZip).Length -eq 0) {
+            Write-Host "[ERR] Errore: File NSSM non valido" -ForegroundColor Red
+            return $false
+        }
+        
+        Write-Host "    [OK] NSSM scaricato" -ForegroundColor Green
+        
+        # Estrai NSSM
+        Write-Host "    [*] Estrazione NSSM..." -ForegroundColor Cyan
+        if (Test-Path $nssmExtractPath) {
+            Remove-Item -Recurse -Force $nssmExtractPath
+        }
+        
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($nssmZip, $DOWNLOAD_DIR)
+        
+        # Trova il file nssm.exe corretto (preferisci win64 su sistemi 64-bit)
+        $nssmExe = $null
+        if ([Environment]::Is64BitOperatingSystem) {
+            $nssmExe = Get-ChildItem -Path $nssmExtractPath -Recurse -Filter "nssm.exe" | 
+                       Where-Object { $_.FullName -like "*win64*" } | 
+                       Select-Object -First 1 -ExpandProperty FullName
+        }
+        
+        if (-not $nssmExe) {
+            $nssmExe = Get-ChildItem -Path $nssmExtractPath -Recurse -Filter "nssm.exe" | 
+                       Select-Object -First 1 -ExpandProperty FullName
+        }
+        
+        if (-not $nssmExe -or -not (Test-Path $nssmExe)) {
+            Write-Host "[ERR] Errore: NSSM.exe non trovato nell'archivio" -ForegroundColor Red
+            return $false
+        }
+        
+        # Copia NSSM in una posizione permanente
+        $nssmInstallPath = "$FRPC_INSTALL_DIR\nssm.exe"
+        Copy-Item -Path $nssmExe -Destination $nssmInstallPath -Force
+        
+        Write-Host "    [OK] NSSM estratto: $nssmInstallPath" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "[ERR] Errore configurazione NSSM: $_" -ForegroundColor Red
+        return $false
+    }
+    
+    # Crea servizio Windows con NSSM (configurazione SEMPLIFICATA)
+    Write-Host "`n[*] Creazione servizio Windows con NSSM..." -ForegroundColor Yellow
+    
+    try {
+        # Rimuovi servizio esistente se presente
         $existingService = Get-Service -Name "frpc" -ErrorAction SilentlyContinue
         if ($existingService) {
             Write-Host "    [*] Arresto servizio esistente..." -ForegroundColor Yellow
             Stop-Service -Name "frpc" -Force -ErrorAction SilentlyContinue
-            Start-Sleep -Seconds 1
+            Start-Sleep -Seconds 2
             
             Write-Host "    [*] Rimozione servizio precedente..." -ForegroundColor Yellow
-            sc.exe delete frpc 2>$null | Out-Null
+            & $nssmInstallPath remove frpc confirm 2>&1 | Out-Null
             Start-Sleep -Seconds 2
         }
         
         $frpcPath = "$FRPC_INSTALL_DIR\frpc.exe"
         
-        Write-Host "    [*] Registrazione servizio Windows..." -ForegroundColor Yellow
+        Write-Host "    [*] Registrazione servizio con NSSM..." -ForegroundColor Cyan
         
-        # Use sc.exe (simple and reliable)
-        Write-Host "    [*] Usando sc.exe per registrazione servizio..." -ForegroundColor Cyan
+        # CONFIGURAZIONE SEMPLIFICATA - Solo parametri essenziali
+        & $nssmInstallPath install frpc "$frpcPath" 2>&1 | Out-Null
+        & $nssmInstallPath set frpc AppParameters "-c `"$tomlFile`"" 2>&1 | Out-Null
+        & $nssmInstallPath set frpc AppDirectory "$FRPC_INSTALL_DIR" 2>&1 | Out-Null
+        & $nssmInstallPath set frpc DisplayName "FRP Client Service" 2>&1 | Out-Null
+        & $nssmInstallPath set frpc Description "FRP Client - Tunneling service" 2>&1 | Out-Null
+        & $nssmInstallPath set frpc Start SERVICE_AUTO_START 2>&1 | Out-Null
         
-        $frpcPath = "$FRPC_INSTALL_DIR\frpc.exe"
-        $serviceCommand = "$frpcPath -c $tomlFile"
+        # Log semplici (opzionali)
+        & $nssmInstallPath set frpc AppStdout "$FRPC_LOG_DIR\nssm-stdout.log" 2>&1 | Out-Null
+        & $nssmInstallPath set frpc AppStderr "$FRPC_LOG_DIR\nssm-stderr.log" 2>&1 | Out-Null
         
-        # Create service with sc.exe
-        & cmd.exe /c "sc.exe create frpc binPath= `"$serviceCommand`" start= auto displayname= `"FRP Client Service`" 2>&1" | Out-Null
+        Write-Host "    [OK] Servizio registrato con NSSM" -ForegroundColor Green
         
-        # Set service description
-        & cmd.exe /c "sc.exe description frpc `"FRP Client - Tunneling service`" 2>&1" | Out-Null
+        Write-Host "    [OK] Servizio registrato con NSSM" -ForegroundColor Green
         
-        # Set recovery options (restart on failure)
-        & cmd.exe /c "sc.exe failure frpc reset= 3600 actions= restart/5000 2>&1" | Out-Null
-        
-        Write-Host "    [OK] Servizio registrato con sc.exe" -ForegroundColor Green
-        
-        Start-Sleep -Seconds 1
+        Start-Sleep -Seconds 2
         
         # Verify service was created
         $frpcService = Get-Service -Name "frpc" -ErrorAction SilentlyContinue
