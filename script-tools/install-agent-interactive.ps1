@@ -587,37 +587,22 @@ remote_port = $remotePort
         
         Write-Host "    [*] Registrazione servizio Windows..." -ForegroundColor Yellow
         
-        # Try NSSM first (preferred method)
-        $nssm_available = Ensure-NSSM
+        # Use sc.exe (simple and reliable)
+        Write-Host "    [*] Usando sc.exe per registrazione servizio..." -ForegroundColor Cyan
         
-        if ($nssm_available) {
-            # Use NSSM for better reliability and features
-            Write-Host "    [*] Usando NSSM per registrazione servizio..." -ForegroundColor Cyan
-            
-            # Install service WITHOUT parameters first
-            & "C:\Windows\System32\nssm.exe" install frpc "$frpcPath" 2>&1 | Out-Null
-            
-            # Then SET the parameters SEPARATELY using nssm set
-            & "C:\Windows\System32\nssm.exe" set frpc AppParameters "-c `"$tomlFile`"" 2>&1 | Out-Null
-            
-            # Configure service parameters
-            & "C:\Windows\System32\nssm.exe" set frpc AppDirectory "$FRPC_CONFIG_DIR" 2>&1 | Out-Null
-            & "C:\Windows\System32\nssm.exe" set frpc Start SERVICE_AUTO_START 2>&1 | Out-Null
-            & "C:\Windows\System32\nssm.exe" set frpc AppStdout "$FRPC_LOG_DIR\frpc-stdout.log" 2>&1 | Out-Null
-            & "C:\Windows\System32\nssm.exe" set frpc AppStderr "$FRPC_LOG_DIR\frpc-stderr.log" 2>&1 | Out-Null
-            & "C:\Windows\System32\nssm.exe" set frpc Type SERVICE_WIN32_OWN_PROCESS 2>&1 | Out-Null
-            & "C:\Windows\System32\nssm.exe" set frpc AppNoConsole 1 2>&1 | Out-Null
-            & "C:\Windows\System32\nssm.exe" set frpc AppStopMethodSkip 0 2>&1 | Out-Null
-            & "C:\Windows\System32\nssm.exe" set frpc AppRestartDelay 2000 2>&1 | Out-Null
-            
-            Write-Host "    [OK] Servizio configurato con NSSM" -ForegroundColor Green
-        } else {
-            # Fallback to sc.exe (built-in, always available)
-            Write-Host "    [*] Usando sc.exe per registrazione servizio..." -ForegroundColor Cyan
-            & cmd.exe /c "sc.exe create frpc binPath= `"$frpcPath -c $tomlFile`" start= auto displayname= `"FRP Client Service`"" 2>&1 | Out-Null
-            
-            Write-Host "    [OK] Servizio configurato con sc.exe" -ForegroundColor Green
-        }
+        $frpcPath = "$FRPC_INSTALL_DIR\frpc.exe"
+        $serviceCommand = "$frpcPath -c $tomlFile"
+        
+        # Create service with sc.exe
+        & cmd.exe /c "sc.exe create frpc binPath= `"$serviceCommand`" start= auto displayname= `"FRP Client Service`" 2>&1" | Out-Null
+        
+        # Set service description
+        & cmd.exe /c "sc.exe description frpc `"FRP Client - Tunneling service`" 2>&1" | Out-Null
+        
+        # Set recovery options (restart on failure)
+        & cmd.exe /c "sc.exe failure frpc reset= 3600 actions= restart/5000 2>&1" | Out-Null
+        
+        Write-Host "    [OK] Servizio registrato con sc.exe" -ForegroundColor Green
         
         Start-Sleep -Seconds 1
         
