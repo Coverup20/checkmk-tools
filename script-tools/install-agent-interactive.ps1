@@ -31,11 +31,8 @@ $FRPC_INSTALL_DIR = "C:\Program Files\frp"
 $FRPC_CONFIG_DIR = "C:\ProgramData\frp"
 $FRPC_LOG_DIR = "C:\ProgramData\frp\logs"
 
-# NSSM URLs (for future use if needed)
-$NSSM_URLS = @(
-    "https://nssm.cc/release/nssm-2.24.zip",
-    "https://sourceforge.net/projects/nssm/files/nssm/2.24/nssm-2.24.zip/download"
-)
+# Note: NSSM download URLs available at https://nssm.cc/download
+# Using sc.exe as primary method (built-in, no download needed)
 
 # =====================================================
 # Funzione: Mostra utilizzo
