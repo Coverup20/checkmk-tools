@@ -522,8 +522,19 @@ function Install-FRPCService {
         $remotePort = Read-Host "Porta remota (es: 20001)"
     }
     
-    $authToken = Read-Host "Token di sicurezza [default: conduit-reenact-talon-macarena-demotion-vaguely]"
-    $authToken = if ([string]::IsNullOrEmpty($authToken)) { "conduit-reenact-talon-macarena-demotion-vaguely" } else { $authToken }
+    # Token di sicurezza (nascosto per sicurezza)
+    $useDefaultToken = Read-Host "Usare il token di sicurezza predefinito? [S/n]"
+    if ($useDefaultToken -match "^[nN]$") {
+        $authToken = Read-Host "Inserisci token personalizzato"
+        if ([string]::IsNullOrEmpty($authToken)) {
+            Write-Host "    [WARN] Token vuoto, uso quello predefinito" -ForegroundColor Yellow
+            $authToken = "conduit-reenact-talon-macarena-demotion-vaguely"
+        }
+    }
+    else {
+        $authToken = "conduit-reenact-talon-macarena-demotion-vaguely"
+        Write-Host "    [OK] Uso token predefinito" -ForegroundColor Green
+    }
     
     # Crea configurazione TOML
     $tomlConfig = @"
