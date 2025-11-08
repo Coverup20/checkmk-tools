@@ -75,14 +75,33 @@ function Ensure-NSSM {
     
     try {
         $NSSM_VERSION = "2.24"
-        $NSSM_URL = "https://nssm.cc/download/nssm-$NSSM_VERSION-101-g897c7ad.zip"
+        # Use GitHub as primary source (more reliable)
+        $NSSM_URLS = @(
+            "https://github.com/nssm-official/nssm/releases/download/2.24/nssm-2.24.zip",
+            "https://nssm.cc/download/nssm-2.24-101-g897c7ad.zip"
+        )
         $NSSM_ZIP = "$DOWNLOAD_DIR\nssm-$NSSM_VERSION.zip"
         
-        # Download NSSM
-        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-        (New-Object Net.WebClient).DownloadFile($NSSM_URL, $NSSM_ZIP)
+        # Try to download from multiple sources
+        $downloadSuccess = $false
+        foreach ($url in $NSSM_URLS) {
+            try {
+                Write-Host "    [*] Tentativo download da: $url" -ForegroundColor Cyan
+                [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+                (New-Object Net.WebClient).DownloadFile($url, $NSSM_ZIP)
+                $downloadSuccess = $true
+                Write-Host "    [OK] NSSM scaricato" -ForegroundColor Green
+                break
+            }
+            catch {
+                Write-Host "    [WARN] Fallimento da $url, tentando prossima fonte..." -ForegroundColor Yellow
+            }
+        }
         
-        Write-Host "    [OK] NSSM scaricato" -ForegroundColor Green
+        if (-not $downloadSuccess) {
+            Write-Host "    [WARN] Impossibile scaricare NSSM da nessuna fonte" -ForegroundColor Yellow
+            return $false
+        }
         
         # Extract NSSM
         $nssm_extract = "$DOWNLOAD_DIR\nssm-extract"
