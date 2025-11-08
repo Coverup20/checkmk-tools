@@ -461,6 +461,33 @@ function Install-FRPCService {
         New-Item -ItemType Directory -Path $FRPC_CONFIG_DIR -Force | Out-Null
     }
     
+    # Crea directory log
+    if (-not (Test-Path $FRPC_LOG_DIR)) {
+        New-Item -ItemType Directory -Path $FRPC_LOG_DIR -Force | Out-Null
+    }
+    
+    # Imposta permessi su FRPC_CONFIG_DIR per SYSTEM e tutti gli utenti
+    Write-Host "    [*] Configurazione permessi directory..." -ForegroundColor Cyan
+    try {
+        $acl = Get-Acl -Path $FRPC_CONFIG_DIR
+        $systemIdentity = New-Object System.Security.Principal.NTAccount("SYSTEM")
+        $everyoneIdentity = New-Object System.Security.Principal.NTAccount("Everyone")
+        
+        # Aggiungi permessi per SYSTEM (read/write)
+        $ace = New-Object System.Security.AccessControl.FileSystemAccessRule($systemIdentity, "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
+        $acl.AddAccessRule($ace)
+        
+        # Aggiungi permessi per Everyone (read)
+        $ace = New-Object System.Security.AccessControl.FileSystemAccessRule($everyoneIdentity, "Read", "ContainerInherit,ObjectInherit", "None", "Allow")
+        $acl.AddAccessRule($ace)
+        
+        Set-Acl -Path $FRPC_CONFIG_DIR -AclObject $acl
+        Write-Host "    [OK] Permessi configurati correttamente" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "    [WARN] Errore configurazione permessi (non critico): $_" -ForegroundColor Yellow
+    }
+    
     $computerName = $env:COMPUTERNAME
     Write-Host "`nInserisci le informazioni per la configurazione FRPC:`n" -ForegroundColor Yellow
     
@@ -497,9 +524,32 @@ remote_port = $remotePort
 "@
     
     $tomlFile = "$FRPC_CONFIG_DIR\frpc.toml"
-    Set-Content -Path $tomlFile -Value $tomlConfig
     
-    Write-Host "`n[OK] Configurazione salvata" -ForegroundColor Green
+    Write-Host "`n[*] Creazione file di configurazione..." -ForegroundColor Yellow
+    try {
+        Set-Content -Path $tomlFile -Value $tomlConfig -Force
+        Write-Host "    [OK] Configurazione salvata in: $tomlFile" -ForegroundColor Green
+        
+        # Verifica che il file esista e sia leggibile
+        if (-not (Test-Path $tomlFile)) {
+            Write-Host "    [ERR] Errore: File configurazione non creato" -ForegroundColor Red
+            return $false
+        }
+        
+        # Imposta permessi sul file TOML per SYSTEM
+        $acl = Get-Acl -Path $tomlFile
+        $systemIdentity = New-Object System.Security.Principal.NTAccount("SYSTEM")
+        $ace = New-Object System.Security.AccessControl.FileSystemAccessRule($systemIdentity, "FullControl", "None", "None", "Allow")
+        $acl.AddAccessRule($ace)
+        Set-Acl -Path $tomlFile -AclObject $acl
+        Write-Host "    [OK] Permessi file configurazione impostati" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "    [ERR] Errore creazione configurazione: $_" -ForegroundColor Red
+        return $false
+    }
+    
+    Write-Host "`n[OK] Configurazione completata" -ForegroundColor Green
     
     # Crea servizio Windows
     Write-Host "`n[*] Creazione servizio Windows..." -ForegroundColor Yellow
@@ -526,13 +576,24 @@ remote_port = $remotePort
         if ($nssm_available) {
             # Use NSSM for better reliability and features
             Write-Host "    [*] Usando NSSM per registrazione servizio..." -ForegroundColor Cyan
+            
+            # Install service
             & "C:\Windows\System32\nssm.exe" install frpc "$frpcPath" "-c `"$tomlFile`"" 2>&1 | Out-Null
+            
+            # Configure service parameters
             & "C:\Windows\System32\nssm.exe" set frpc AppDirectory "$FRPC_CONFIG_DIR" 2>&1 | Out-Null
             & "C:\Windows\System32\nssm.exe" set frpc Start SERVICE_AUTO_START 2>&1 | Out-Null
+            & "C:\Windows\System32\nssm.exe" set frpc AppStdout "$FRPC_LOG_DIR\frpc-stdout.log" 2>&1 | Out-Null
+            & "C:\Windows\System32\nssm.exe" set frpc AppStderr "$FRPC_LOG_DIR\frpc-stderr.log" 2>&1 | Out-Null
+            & "C:\Windows\System32\nssm.exe" set frpc Type SERVICE_WIN32_OWN_PROCESS 2>&1 | Out-Null
+            
+            Write-Host "    [OK] Servizio configurato con NSSM" -ForegroundColor Green
         } else {
             # Fallback to sc.exe (built-in, always available)
             Write-Host "    [*] Usando sc.exe per registrazione servizio..." -ForegroundColor Cyan
             & cmd.exe /c "sc.exe create frpc binPath= `"$frpcPath -c $tomlFile`" start= auto displayname= `"FRP Client Service`"" 2>&1 | Out-Null
+            
+            Write-Host "    [OK] Servizio configurato con sc.exe" -ForegroundColor Green
         }
         
         Start-Sleep -Seconds 1
@@ -577,8 +638,13 @@ remote_port = $remotePort
         
         if (-not $serviceRunning) {
             Write-Host "    [WARN] Servizio creato ma non avviato automaticamente" -ForegroundColor Yellow
-            Write-Host "    [INFO] Avvio manuale: Start-Service -Name 'frpc'" -ForegroundColor Cyan
-            Write-Host "    [INFO] Verifica log: Get-Content 'C:\ProgramData\frp\logs\frpc.log' -Tail 20" -ForegroundColor Cyan
+            Write-Host "`n    [INFO] Comandi diagnostici:" -ForegroundColor Cyan
+            Write-Host "      - Verifica permessi: icacls '$FRPC_CONFIG_DIR'" -ForegroundColor Yellow
+            Write-Host "      - Avvio manuale: Start-Service -Name 'frpc'" -ForegroundColor Yellow
+            Write-Host "      - Stato servizio: Get-Service -Name 'frpc'" -ForegroundColor Yellow
+            Write-Host "      - Log TOML: Get-Content '$tomlFile'" -ForegroundColor Yellow
+            Write-Host "      - Log errori: Get-Content '$FRPC_LOG_DIR\frpc-stderr.log' -Tail 50" -ForegroundColor Yellow
+            Write-Host "      - Log output: Get-Content '$FRPC_LOG_DIR\frpc-stdout.log' -Tail 50" -ForegroundColor Yellow
         }
     }
     catch {
