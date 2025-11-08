@@ -77,25 +77,40 @@ function Ensure-NSSM {
     Write-Host "    [*] NSSM non trovato, tentando download..." -ForegroundColor Yellow
     
     try {
-        # Download NSSM from official repository
-        $NSSM_URL = "https://nssm.cc/download"
+        # Download NSSM from official repository (direct URLs, no redirects)
+        $NSSM_URLS = @(
+            "https://nssm.cc/release/nssm-2.24.zip",                    # Latest stable
+            "https://nssm.cc/ci/nssm-2.24-101-g897c7ad.zip",           # Pre-release (recommended for Windows 10+)
+            "https://sourceforge.net/projects/nssm/files/nssm/2.24/nssm-2.24.zip/download"
+        )
         $NSSM_ZIP = "$DOWNLOAD_DIR\nssm.zip"
         
-        Write-Host "    [*] Download da $NSSM_URL..." -ForegroundColor Cyan
-        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-        
-        # Download with redirect support
-        $webClient = New-Object Net.WebClient
-        $webClient.Proxy = [Net.GlobalProxySelection]::GetEmptyWebProxy()
-        $webClient.DownloadFile($NSSM_URL, $NSSM_ZIP)
-        
-        # Verify download
-        if (-not (Test-Path $NSSM_ZIP) -or (Get-Item $NSSM_ZIP).Length -lt 50KB) {
-            Write-Host "    [WARN] Download NSSM fallito" -ForegroundColor Yellow
-            return $false
+        $downloadSuccess = $false
+        foreach ($url in $NSSM_URLS) {
+            try {
+                Write-Host "    [*] Tentativo da: $(($url -split '/')[-2])..." -ForegroundColor Cyan
+                [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+                
+                $webClient = New-Object Net.WebClient
+                $webClient.Proxy = [Net.GlobalProxySelection]::GetEmptyWebProxy()
+                $webClient.DownloadFile($url, $NSSM_ZIP)
+                
+                # Verify download
+                if ((Test-Path $NSSM_ZIP) -and (Get-Item $NSSM_ZIP).Length -gt 100KB) {
+                    $downloadSuccess = $true
+                    Write-Host "    [OK] NSSM scaricato" -ForegroundColor Green
+                    break
+                }
+            }
+            catch {
+                # Continue to next URL
+            }
         }
         
-        Write-Host "    [OK] NSSM scaricato" -ForegroundColor Green
+        if (-not $downloadSuccess) {
+            Write-Host "    [WARN] Download NSSM fallito da tutte le fonti" -ForegroundColor Yellow
+            return $false
+        }
         
         # Extract NSSM
         $nssm_extract = "$DOWNLOAD_DIR\nssm-extract"
