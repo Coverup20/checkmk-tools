@@ -594,8 +594,11 @@ remote_port = $remotePort
             # Use NSSM for better reliability and features
             Write-Host "    [*] Usando NSSM per registrazione servizio..." -ForegroundColor Cyan
             
-            # Install service with parameters PROPERLY QUOTED
-            & "C:\Windows\System32\nssm.exe" install frpc "$frpcPath" ("-c", "`"$tomlFile`"") 2>&1 | Out-Null
+            # Install service WITHOUT parameters first
+            & "C:\Windows\System32\nssm.exe" install frpc "$frpcPath" 2>&1 | Out-Null
+            
+            # Then SET the parameters SEPARATELY using nssm set
+            & "C:\Windows\System32\nssm.exe" set frpc AppParameters "-c `"$tomlFile`"" 2>&1 | Out-Null
             
             # Configure service parameters
             & "C:\Windows\System32\nssm.exe" set frpc AppDirectory "$FRPC_CONFIG_DIR" 2>&1 | Out-Null
@@ -604,6 +607,8 @@ remote_port = $remotePort
             & "C:\Windows\System32\nssm.exe" set frpc AppStderr "$FRPC_LOG_DIR\frpc-stderr.log" 2>&1 | Out-Null
             & "C:\Windows\System32\nssm.exe" set frpc Type SERVICE_WIN32_OWN_PROCESS 2>&1 | Out-Null
             & "C:\Windows\System32\nssm.exe" set frpc AppNoConsole 1 2>&1 | Out-Null
+            & "C:\Windows\System32\nssm.exe" set frpc AppStopMethodSkip 0 2>&1 | Out-Null
+            & "C:\Windows\System32\nssm.exe" set frpc AppRestartDelay 2000 2>&1 | Out-Null
             
             Write-Host "    [OK] Servizio configurato con NSSM" -ForegroundColor Green
         } else {
