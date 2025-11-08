@@ -138,11 +138,28 @@ function Ensure-NSSM {
             return $false
         }
         
-        # Find nssm.exe in extracted folder (it's in win64 subfolder)
-        $nssm_exe = Get-ChildItem -Path $nssm_extract -Filter "nssm.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        # Find nssm.exe in extracted folder - preferisci win64 per architettura 64-bit
+        $osArch = [Environment]::Is64BitOperatingSystem
+        
+        if ($osArch) {
+            # Preferisci win64 su sistemi 64-bit
+            Write-Host "    [*] Rilevato OS 64-bit, cercando NSSM 64-bit..." -ForegroundColor Cyan
+            $nssm_exe = Get-ChildItem -Path "$nssm_extract\*\win64" -Filter "nssm.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $nssm_exe) {
+                Write-Host "    [WARN] NSSM 64-bit non trovato, usando versione disponibile..." -ForegroundColor Yellow
+                $nssm_exe = Get-ChildItem -Path $nssm_extract -Filter "nssm.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            }
+        } else {
+            # Su sistemi 32-bit usa win32
+            $nssm_exe = Get-ChildItem -Path "$nssm_extract\*\win32" -Filter "nssm.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $nssm_exe) {
+                $nssm_exe = Get-ChildItem -Path $nssm_extract -Filter "nssm.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            }
+        }
         
         if ($nssm_exe) {
             Write-Host "    [*] Trovato: $($nssm_exe.FullName)" -ForegroundColor Cyan
+            Write-Host "    [*] Architettura: $(if ($nssm_exe.FullName -like '*win64*') { '64-bit' } else { '32-bit' })" -ForegroundColor Cyan
             # Copy to System32
             try {
                 Copy-Item -Path $nssm_exe.FullName -Destination "C:\Windows\System32\nssm.exe" -Force -ErrorAction Stop
