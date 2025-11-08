@@ -17,7 +17,10 @@ $ProgressPreference = "SilentlyContinue"
 # Configuration
 $CHECKMK_VERSION = "2.4.0p14"
 $FRP_VERSION = "0.64.0"
+$NSSM_VERSION = "2.24"
+
 $FRP_URL = "https://github.com/fatedier/frp/releases/download/v$FRP_VERSION/frp_$FRP_VERSION`_windows_amd64.zip"
+
 # Try multiple CheckMK URLs (fallback if one fails)
 $CHECKMK_MSI_URLS = @(
     "https://monitoring.nethlab.it/monitoring/check_mk/agents/windows/check_mk_agent.msi",
@@ -25,14 +28,19 @@ $CHECKMK_MSI_URLS = @(
 )
 $CHECKMK_MSI_URL = $CHECKMK_MSI_URLS[0]  # Primary URL
 
+# NSSM download URLs (fallback se uno fallisce)
+$NSSM_URLS = @(
+    "https://nssm.cc/release/nssm-$NSSM_VERSION.zip",
+    "https://nssm.cc/ci/nssm-$NSSM_VERSION-101-g897c7ad.zip",
+    "https://github.com/kirillkovalenko/nssm/releases/download/$NSSM_VERSION/nssm-$NSSM_VERSION.zip"
+)
+$NSSM_URL = $NSSM_URLS[0]  # Primary URL
+
 $DOWNLOAD_DIR = "$env:TEMP\CheckMK-Setup"
 $AGENT_INSTALL_DIR = "C:\Program Files (x86)\checkmk\service"
 $FRPC_INSTALL_DIR = "C:\frp"
 $FRPC_CONFIG_DIR = "C:\ProgramData\frp"
 $FRPC_LOG_DIR = "C:\ProgramData\frp\logs"
-
-# Note: NSSM download URLs available at https://nssm.cc/download
-# Using sc.exe as primary method (built-in, no download needed)
 
 # =====================================================
 # Funzione: Mostra utilizzo
@@ -82,13 +90,8 @@ function Ensure-NSSM {
             New-Item -ItemType Directory -Path $DOWNLOAD_DIR -Force -ErrorAction SilentlyContinue | Out-Null
         }
         
-        # Download NSSM from official repository (direct URLs, no redirects)
-        $NSSM_URLS = @(
-            "https://nssm.cc/release/nssm-2.24.zip",                    # Latest stable
-            "https://nssm.cc/ci/nssm-2.24-101-g897c7ad.zip",           # Pre-release (recommended for Windows 10+)
-            "https://sourceforge.net/projects/nssm/files/nssm/2.24/nssm-2.24.zip/download"
-        )
-        $NSSM_ZIP = "$DOWNLOAD_DIR\nssm.zip"
+        # Use global NSSM_URLS variable (defined at top of script)
+        $NSSM_ZIP = "$DOWNLOAD_DIR\nssm-$NSSM_VERSION.zip"
         
         # Clean up old ZIP if exists
         if (Test-Path $NSSM_ZIP) {
@@ -575,18 +578,43 @@ remote_port = $remotePort
     $nssmExtractPath = "$DOWNLOAD_DIR\nssm-$NSSM_VERSION"
     
     try {
+        # Download NSSM con fallback su URL multipli
+        $downloadSuccess = $false
+        
         if (-not (Test-Path $nssmZip)) {
-            Write-Host "    Scaricamento NSSM..." -ForegroundColor Cyan
+            Write-Host "    [*] Scaricamento NSSM..." -ForegroundColor Cyan
             [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-            (New-Object Net.WebClient).DownloadFile($NSSM_URL, $nssmZip)
+            
+            foreach ($url in $NSSM_URLS) {
+                try {
+                    Write-Host "    [*] Tentativo da: $url" -ForegroundColor Gray
+                    (New-Object Net.WebClient).DownloadFile($url, $nssmZip)
+                    
+                    # Verifica download
+                    if ((Test-Path $nssmZip) -and (Get-Item $nssmZip).Length -gt 100KB) {
+                        $downloadSuccess = $true
+                        $sizeMB = [math]::Round((Get-Item $nssmZip).Length / 1MB, 2)
+                        Write-Host "    [OK] NSSM scaricato ($sizeMB MB)" -ForegroundColor Green
+                        break
+                    }
+                }
+                catch {
+                    Write-Host "    [WARN] URL fallito: $($_.Exception.Message)" -ForegroundColor Yellow
+                    if (Test-Path $nssmZip) {
+                        Remove-Item $nssmZip -Force -ErrorAction SilentlyContinue
+                    }
+                    Continue
+                }
+            }
+            
+            if (-not $downloadSuccess) {
+                Write-Host "[ERR] Errore: Nessun URL NSSM disponibile" -ForegroundColor Red
+                return $false
+            }
         }
-        
-        if (-not (Test-Path $nssmZip) -or (Get-Item $nssmZip).Length -eq 0) {
-            Write-Host "[ERR] Errore: File NSSM non valido" -ForegroundColor Red
-            return $false
+        else {
+            Write-Host "    [OK] NSSM già scaricato" -ForegroundColor Green
         }
-        
-        Write-Host "    [OK] NSSM scaricato" -ForegroundColor Green
         
         # Estrai NSSM
         Write-Host "    [*] Estrazione NSSM..." -ForegroundColor Cyan
