@@ -585,6 +585,15 @@ remote_port = $remotePort
     # Scarica e configura NSSM (Non-Sucking Service Manager)
     Write-Host "`n[*] Download NSSM (Service Wrapper)..." -ForegroundColor Yellow
     
+    # IMPORTANTE: Ferma il servizio FRPC se esiste, prima di manipolare nssm.exe
+    $existingFrpcService = Get-Service -Name "frpc" -ErrorAction SilentlyContinue
+    if ($existingFrpcService -and $existingFrpcService.Status -eq 'Running') {
+        Write-Host "    [*] Arresto servizio FRPC esistente per evitare conflitti..." -ForegroundColor Yellow
+        Stop-Service -Name "frpc" -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 3
+        Write-Host "    [OK] Servizio FRPC arrestato" -ForegroundColor Green
+    }
+    
     $nssmZip = "$DOWNLOAD_DIR\nssm-$NSSM_VERSION.zip"
     $nssmExtractPath = "$DOWNLOAD_DIR\nssm-$NSSM_VERSION"
     
@@ -656,6 +665,31 @@ remote_port = $remotePort
         
         # Copia NSSM in una posizione permanente
         $nssmInstallPath = "$FRPC_INSTALL_DIR\nssm.exe"
+        
+        # Rimuovi file esistente se presente e non in uso
+        if (Test-Path $nssmInstallPath) {
+            try {
+                Remove-Item -Path $nssmInstallPath -Force -ErrorAction Stop
+                Start-Sleep -Milliseconds 500
+            }
+            catch {
+                Write-Host "    [WARN] Impossibile rimuovere nssm.exe esistente: $($_.Exception.Message)" -ForegroundColor Yellow
+                Write-Host "    [*] Tentativo alternativo con Stop-Process..." -ForegroundColor Cyan
+                
+                # Trova e termina eventuali processi che usano nssm.exe
+                Get-Process | Where-Object { $_.Path -eq $nssmInstallPath } | Stop-Process -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 2
+                
+                try {
+                    Remove-Item -Path $nssmInstallPath -Force -ErrorAction Stop
+                }
+                catch {
+                    Write-Host "    [WARN] File ancora in uso, tentativo rinomina..." -ForegroundColor Yellow
+                    Move-Item -Path $nssmInstallPath -Destination "$nssmInstallPath.old" -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+        
         Copy-Item -Path $nssmExe -Destination $nssmInstallPath -Force
         
         Write-Host "    [OK] NSSM estratto: $nssmInstallPath" -ForegroundColor Green
@@ -870,7 +904,11 @@ try {
     
     if ($installFRPC -match "^[sS]$") {
         if (-not (Install-FRPCService)) {
-            Write-Host "`n[WARN] FRPC non installato, ma Agent e operativo" -ForegroundColor Yellow
+            Write-Host "`n[WARN] FRPC non installato correttamente" -ForegroundColor Yellow
+            Write-Host "[INFO] L'Agent CheckMK è comunque operativo sulla porta 6556" -ForegroundColor Cyan
+            Write-Host "[INFO] Per completare l'installazione FRPC, prova:" -ForegroundColor Cyan
+            Write-Host "       1. Chiudi tutti i processi che usano NSSM" -ForegroundColor Cyan
+            Write-Host "       2. Rilancia lo script" -ForegroundColor Cyan
         }
     }
     else {
