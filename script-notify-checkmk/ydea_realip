@@ -156,10 +156,14 @@ create_ydea_ticket() {
     return 1
   }
   
-  local ticket_id
-  ticket_id=$(echo "$result" | jq -r '.id // .data.id // empty' 2>/dev/null)
+  # Estrai solo l'ultima riga JSON dalla risposta (ignora messaggi info)
+  local json_line
+  json_line=$(echo "$result" | grep -E '^\{.*\}$' | tail -n1)
   
-  if [[ -z "$ticket_id" ]]; then
+  local ticket_id
+  ticket_id=$(echo "$json_line" | jq -r '.id // .data.id // empty' 2>/dev/null)
+  
+  if [[ -z "$ticket_id" || "$ticket_id" == "null" ]]; then
     log "ERRORE: Nessun ticket_id nella risposta: $result"
     return 1
   fi
