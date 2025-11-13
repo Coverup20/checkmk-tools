@@ -187,21 +187,48 @@ create_ticket() {
   
   [[ -z "$title" ]] && { error "Specifica almeno il titolo"; return 1; }
   
+  # Mappa priorità testuale a numeri (1=bassa, 2=normale, 3=alta, 4=urgente, 5=critica)
+  local priority_num=2
+  case "${priority,,}" in
+    low|bassa)        priority_num=1 ;;
+    normal|normale)   priority_num=2 ;;
+    high|alta)        priority_num=3 ;;
+    urgent|urgente)   priority_num=4 ;;
+    critical|critica) priority_num=5 ;;
+  esac
+  
+  # Valori predefiniti da variabili ambiente o fallback
+  local azienda="${YDEA_AZIENDA:-2339268}"
+  local contatto="${YDEA_CONTATTO:-773763}"
+  local tipo="${YDEA_TIPO:-Nethserver}"
+  
   local body
   body=$(jq -n \
     --arg title "$title" \
     --arg desc "${description:-}" \
-    --arg prio "$priority" \
+    --argjson prio "$priority_num" \
+    --argjson azienda "$azienda" \
+    --argjson contatto "$contatto" \
+    --argjson anagrafica "$azienda" \
+    --arg fonte "Partner portal" \
+    --arg tipo "$tipo" \
+    --arg addebito "F" \
     --arg cat "$category_id" \
     '{
-      title: $title,
-      description: $desc,
-      priority: $prio
-    } + (if $cat != "" then {category_id: $cat} else {} end)'
+      titolo: $title,
+      testo: $desc,
+      priorita: $prio,
+      azienda: $azienda,
+      contatto: $contatto,
+      anagrafica_id: $anagrafica,
+      fonte: $fonte,
+      tipo: $tipo,
+      condizioneAddebito: $addebito
+    } + (if $cat != "" then {categoria: $cat} else {} end)'
   )
   
   info "Creazione ticket: $title"
-  ydea_api POST "/tickets" "$body"
+  ydea_api POST "/ticket" "$body"
 }
 
 # Aggiorna un ticket
