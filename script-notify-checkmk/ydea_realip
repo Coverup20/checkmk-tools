@@ -55,7 +55,7 @@ save_ticket_cache() {
      --arg state "$state" \
      --arg ts "$(date -u +%s)" \
     '.[$key] = {ticket_id: $id, state: $state, created_at: $ts, last_update: $ts}' \
-    "$TICKET_CACHE" > "${TICKET_CACHE}.tmp" && mv "${TICKET_CACHE}.tmp" "$TICKET_CACHE"
+    "$TICKET_CACHE" > "${TICKET_CACHE}.tmp" && cat "${TICKET_CACHE}.tmp" > "$TICKET_CACHE" && rm -f "${TICKET_CACHE}.tmp"
   debug "Ticket salvato in cache: $key -> $ticket_id"
 }
 
@@ -68,7 +68,7 @@ update_ticket_state() {
      --arg state "$state" \
      --arg ts "$(date -u +%s)" \
     '.[$key].state = $state | .[$key].last_update = $ts' \
-    "$TICKET_CACHE" > "${TICKET_CACHE}.tmp" && mv "${TICKET_CACHE}.tmp" "$TICKET_CACHE"
+    "$TICKET_CACHE" > "${TICKET_CACHE}.tmp" && cat "${TICKET_CACHE}.tmp" > "$TICKET_CACHE" && rm -f "${TICKET_CACHE}.tmp"
 }
 
 # ===== FLAPPING DETECTION =====
@@ -84,14 +84,14 @@ record_state_change() {
      --arg state "$state" \
      --arg ts "$now" \
     '.[$key] = ((.[$key] // []) + [{state: $state, timestamp: ($ts|tonumber)}])' \
-    "$FLAPPING_CACHE" > "${FLAPPING_CACHE}.tmp" && mv "${FLAPPING_CACHE}.tmp" "$FLAPPING_CACHE"
+    "$FLAPPING_CACHE" > "${FLAPPING_CACHE}.tmp" && cat "${FLAPPING_CACHE}.tmp" > "$FLAPPING_CACHE" && rm -f "${FLAPPING_CACHE}.tmp"
   
   # Pulisci eventi vecchi (fuori dalla finestra temporale)
   local cutoff=$((now - FLAPPING_WINDOW))
   jq --arg key "$key" \
      --arg cutoff "$cutoff" \
     '.[$key] = [.[$key][] | select(.timestamp > ($cutoff|tonumber))]' \
-    "$FLAPPING_CACHE" > "${FLAPPING_CACHE}.tmp" && mv "${FLAPPING_CACHE}.tmp" "$FLAPPING_CACHE"
+    "$FLAPPING_CACHE" > "${FLAPPING_CACHE}.tmp" && cat "${FLAPPING_CACHE}.tmp" > "$FLAPPING_CACHE" && rm -f "${FLAPPING_CACHE}.tmp"
 }
 
 # Verifica se il servizio è in flapping
