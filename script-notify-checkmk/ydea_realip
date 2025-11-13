@@ -252,8 +252,8 @@ main() {
       # Nuovo problema CRITICAL -> crea ticket
       log "Nuovo problema CRITICAL: creazione ticket"
       
-      # Determina priorità
-      PRIORITY="high"
+      # Determina priorità (sempre urgent per CRITICAL, critical per flapping)
+      PRIORITY="urgent"
       if [[ -n "$FLAPPING_STATUS" ]]; then
         PRIORITY="critical"
       fi
