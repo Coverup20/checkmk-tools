@@ -263,17 +263,23 @@ close_ticket() {
 add_comment() {
   local ticket_id="$1"
   local comment="$2"
+  local is_public="${3:-false}"
   
   [[ -z "$ticket_id" || -z "$comment" ]] && {
-    error "Uso: add_comment <ticket_id> '<commento>'"
+    error "Uso: add_comment <ticket_id> '<commento>' [pubblico:true|false]"
     return 1
   }
+  
+  # ID utente per campo creatoda (richiesto da API)
+  local user_id="${YDEA_USER_ID:-4677}"
   
   local body
   body=$(jq -n \
     --argjson tid "$ticket_id" \
-    --arg text "$comment" \
-    '{ticket_id: $tid, testo: $text, pubblico: false}')
+    --arg desc "$comment" \
+    --argjson pub "$is_public" \
+    --argjson uid "$user_id" \
+    '{ticket_id: $tid, atk: {descrizione: $desc, pubblico: $pub, creatoda: $uid}}')
   
   info "Aggiunta commento a ticket #$ticket_id..."
   ydea_api POST "/ticket/atk" "$body"
