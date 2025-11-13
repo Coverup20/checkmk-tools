@@ -1,0 +1,201 @@
+📦 YDEA TOOLKIT - Struttura Progetto
+====================================
+
+📁 File Principali
+------------------
+ydea-toolkit.sh                      → Script principale per API Ydea
+├─ Funzioni: login, list, get, create, update, close, comment, search
+├─ Gestione automatica token con refresh
+└─ Retry automatico su errori 401
+
+ydea-monitoring-integration.sh       → Integrazione con sistemi di monitoraggio
+├─ Monitoring CPU, RAM, Disk
+├─ Check servizi systemd
+├─ Webhook handler per Netdata
+└─ Cache anti-duplicazione ticket
+
+ydea-templates.sh                    → Template predefiniti per ticket comuni
+├─ Template infrastruttura (server-down, backup-failed, disk-full)
+├─ Template applicazioni (app-errors, db-slow)
+├─ Template sicurezza (security-breach, failed-login)
+└─ Template manutenzione (planned-maintenance)
+
+esempi-ydea.sh                       → Script di esempio interattivo
+├─ Report giornaliero ticket
+├─ Creazione ticket da alert
+├─ Workflow completo
+├─ Export CSV
+└─ Menu interattivo
+
+📄 Documentazione
+-----------------
+README.md                            → Documentazione completa
+├─ Caratteristiche e requisiti
+├─ Installazione e configurazione
+├─ Esempi pratici
+└─ Best practices
+
+QUICKSTART.md                        → Guida rapida (5 minuti)
+├─ Setup veloce
+├─ Comandi essenziali
+├─ Casi d'uso comuni
+└─ Troubleshooting
+
+INTEGRAZIONI.md                      → Esempi integrazione avanzata
+├─ Netdata, Docker, Email, Telegram
+├─ Grafana, GitLab CI/CD
+└─ Use cases complessi
+
+⚙️ Configurazione
+-----------------
+.env.example                         → Template configurazione
+├─ YDEA_ID e YDEA_API_KEY (obbligatori)
+├─ YDEA_BASE_URL (opzionale)
+├─ YDEA_DEBUG (opzionale)
+└─ Soglie alert monitoring
+
+🔧 Dipendenze
+-------------
+✓ bash >= 4.0
+✓ curl
+✓ jq
+
+📊 Architettura
+---------------
+
+                    ┌──────────────────┐
+                    │  Ydea API v2     │
+                    │ my.ydea.cloud    │
+                    └────────┬─────────┘
+                             │
+                    ┌────────▼──────────┐
+                    │ ydea-toolkit.sh   │◄──── Script Principale
+                    │  (Core Library)   │      • Login automatico
+                    └────────┬──────────┘      • Gestione token
+                             │                 • API wrapper
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+┌───────▼────────┐  ┌────────▼────────┐  ┌──────▼─────────┐
+│   Monitoring   │  │   Templates     │  │   Esempi       │
+│  Integration   │  │   Predefiniti   │  │  Interattivi   │
+└───────┬────────┘  └────────┬────────┘  └──────┬─────────┘
+        │                    │                    │
+        │ Crea alert         │ Fornisce          │ Dimostra
+        │ automatici         │ strutture         │ utilizzo
+        │                    │ ticket            │
+        │                    │                    │
+┌───────▼────────────────────▼────────────────────▼─────────┐
+│              Sistema di Ticketing Ydea                     │
+│  • Ticket creati automaticamente da monitoring             │
+│  • Template consistenti e professionali                    │
+│  • Workflow automatizzati                                  │
+└────────────────────────────────────────────────────────────┘
+
+🎯 Workflow Tipico
+------------------
+
+1. CONFIGURAZIONE INIZIALE
+   └─ Copia .env.example → .env
+   └─ Compila YDEA_ID e YDEA_API_KEY
+   └─ source .env
+   └─ ./ydea-toolkit.sh login
+
+2. USO MANUALE
+   └─ ./ydea-toolkit.sh list                    (lista ticket)
+   └─ ./ydea-toolkit.sh create "..." "..."      (crea ticket)
+   └─ ./ydea-toolkit.sh get 12345               (dettagli)
+   └─ ./ydea-toolkit.sh comment 12345 "..."     (commento)
+   └─ ./ydea-toolkit.sh close 12345 "..."       (chiudi)
+
+3. MONITORING AUTOMATICO
+   └─ ./ydea-monitoring-integration.sh monitor  (check sistema)
+   └─ Configura CRON per esecuzione periodica
+   └─ Ticket creati automaticamente su alert
+
+4. INTEGRAZIONE CUSTOM
+   └─ Usa ydea-templates.sh per ticket standard
+   └─ Integra con script esistenti
+   └─ Webhook da Netdata/Grafana/etc
+
+📈 Metriche e Benefici
+----------------------
+
+PRIMA (senza toolkit):
+❌ Alert persi o dimenticati
+❌ Documentazione inconsistente
+❌ Risposta lenta a problemi
+❌ Difficoltà tracking problemi
+❌ Lavoro manuale ripetitivo
+
+DOPO (con toolkit):
+✅ Alert → Ticket automatico
+✅ Template standardizzati
+✅ Risposta immediata (<1min)
+✅ Tracciamento completo
+✅ Automazione completa
+
+🚀 Quick Commands
+-----------------
+
+# Setup
+source .env
+./ydea-toolkit.sh login
+
+# Operazioni comuni
+./ydea-toolkit.sh list 10 open | jq '.data[] | {id,title}'
+./ydea-toolkit.sh create "Titolo" "Descrizione" "high"
+./ydea-toolkit.sh search "database" | jq '.data[] | {id,title}'
+
+# Monitoring
+./ydea-monitoring-integration.sh monitor
+./ydea-monitoring-integration.sh service nginx
+
+# Template
+TICKET=$(./ydea-templates.sh server-down "web-01" "nginx")
+echo "$TICKET" | ./ydea-toolkit.sh api POST /tickets -
+
+# Debug
+export YDEA_DEBUG=1
+./ydea-toolkit.sh list
+
+📞 Supporto
+-----------
+• README.md          → Documentazione completa
+• QUICKSTART.md      → Setup rapido
+• INTEGRAZIONI.md    → Esempi avanzati
+• API Ydea:          → https://my.ydea.cloud/api/doc/v2
+
+🎓 Best Practices
+-----------------
+1. Testa sempre in ambiente dev prima
+2. Usa template per consistenza
+3. Monitora con CRON per alert automatici
+4. Abilita YDEA_DEBUG per troubleshooting
+5. Backup regolare di .env (in modo sicuro!)
+6. Rate limiting per evitare sovraccarico API
+7. Log rotazione per file di log
+
+🔒 Sicurezza
+------------
+• .env con chmod 600
+• Mai committare credenziali su git
+• Usa vault in produzione (Hashicorp/AWS)
+• Token auto-rinnovato ogni ora
+• Validazione input per evitare injection
+
+📦 Estensioni Future
+--------------------
+□ Dashboard web visualizzazione ticket
+□ Webhook bidirezionali
+□ Integrazione Slack/Teams/Discord
+□ Template personalizzabili via config
+□ Reportistica avanzata PDF
+□ Supporto allegati file
+□ CLI interattiva con autocompletamento
+□ Plugin system per estensioni custom
+
+====================================
+Versione: 1.0.0
+Autore: Marzio
+Data: 2025-11-11
+====================================

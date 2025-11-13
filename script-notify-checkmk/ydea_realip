@@ -1,0 +1,377 @@
+#!/usr/bin/env bash
+# ydea_realip - CheckMK notification script per Ydea ticketing
+# Gestisce creazione automatica ticket e aggiornamenti con note private
+set -euo pipefail
+
+# ===== CONFIG =====
+YDEA_TOOLKIT_DIR="/opt/ydea-toolkit"
+YDEA_TOOLKIT="${YDEA_TOOLKIT_DIR}/ydea-toolkit.sh"
+YDEA_ENV="${YDEA_TOOLKIT_DIR}/.env"
+TICKET_CACHE="/tmp/ydea_checkmk_tickets.json"
+FLAPPING_CACHE="/tmp/ydea_checkmk_flapping.json"
+FLAPPING_THRESHOLD=5  # Numero cambi stato in finestra temporale
+FLAPPING_WINDOW=600   # Finestra temporale in secondi (10 minuti)
+
+# ===== UTILITY =====
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2; }
+debug() { [[ "${DEBUG_YDEA:-0}" == "1" ]] && log "DEBUG: $*" || true; }
+
+# Inizializza cache se non esiste
+init_cache() {
+  [[ -f "$TICKET_CACHE" ]] || echo '{}' > "$TICKET_CACHE"
+  [[ -f "$FLAPPING_CACHE" ]] || echo '{}' > "$FLAPPING_CACHE"
+}
+
+# ===== FUNZIONI CACHE =====
+# Genera chiave univoca per ticket: IP/HOSTNAME:SERVIZIO
+get_ticket_key() {
+  local host="${1}"
+  local service="${2:-HOST}"
+  echo "${host}:${service}"
+}
+
+# Verifica se esiste ticket aperto per questo alert
+ticket_exists() {
+  local key="$1"
+  init_cache
+  jq -e --arg key "$key" '.[$key] != null' "$TICKET_CACHE" >/dev/null 2>&1
+}
+
+# Ottieni ID ticket dalla cache
+get_ticket_id() {
+  local key="$1"
+  init_cache
+  jq -r --arg key "$key" '.[$key].ticket_id // empty' "$TICKET_CACHE"
+}
+
+# Salva ticket in cache
+save_ticket_cache() {
+  local key="$1"
+  local ticket_id="$2"
+  local state="$3"
+  init_cache
+  jq --arg key "$key" \
+     --arg id "$ticket_id" \
+     --arg state "$state" \
+     --arg ts "$(date -u +%s)" \
+    '.[$key] = {ticket_id: $id, state: $state, created_at: $ts, last_update: $ts}' \
+    "$TICKET_CACHE" > "${TICKET_CACHE}.tmp" && mv "${TICKET_CACHE}.tmp" "$TICKET_CACHE"
+  debug "Ticket salvato in cache: $key -> $ticket_id"
+}
+
+# Aggiorna ultimo stato in cache
+update_ticket_state() {
+  local key="$1"
+  local state="$2"
+  init_cache
+  jq --arg key "$key" \
+     --arg state "$state" \
+     --arg ts "$(date -u +%s)" \
+    '.[$key].state = $state | .[$key].last_update = $ts' \
+    "$TICKET_CACHE" > "${TICKET_CACHE}.tmp" && mv "${TICKET_CACHE}.tmp" "$TICKET_CACHE"
+}
+
+# ===== FLAPPING DETECTION =====
+# Registra cambio stato per detection flapping
+record_state_change() {
+  local key="$1"
+  local state="$2"
+  local now="$(date -u +%s)"
+  init_cache
+  
+  # Aggiungi nuovo cambio stato
+  jq --arg key "$key" \
+     --arg state "$state" \
+     --arg ts "$now" \
+    '.[$key] = ((.[$key] // []) + [{state: $state, timestamp: ($ts|tonumber)}])' \
+    "$FLAPPING_CACHE" > "${FLAPPING_CACHE}.tmp" && mv "${FLAPPING_CACHE}.tmp" "$FLAPPING_CACHE"
+  
+  # Pulisci eventi vecchi (fuori dalla finestra temporale)
+  local cutoff=$((now - FLAPPING_WINDOW))
+  jq --arg key "$key" \
+     --arg cutoff "$cutoff" \
+    '.[$key] = [.[$key][] | select(.timestamp > ($cutoff|tonumber))]' \
+    "$FLAPPING_CACHE" > "${FLAPPING_CACHE}.tmp" && mv "${FLAPPING_CACHE}.tmp" "$FLAPPING_CACHE"
+}
+
+# Verifica se il servizio è in flapping
+is_flapping() {
+  local key="$1"
+  init_cache
+  local count=$(jq --arg key "$key" '.[$key] // [] | length' "$FLAPPING_CACHE")
+  [[ "$count" -ge "$FLAPPING_THRESHOLD" ]]
+}
+
+# Ottieni conteggio cambi stato
+get_state_changes_count() {
+  local key="$1"
+  init_cache
+  jq --arg key "$key" '.[$key] // [] | length' "$FLAPPING_CACHE"
+}
+
+# ===== EMOJI PER STATI =====
+get_emoji() {
+  case "${1^^}" in
+    OK|UP) echo "🟢" ;;
+    WARN|WARNING) echo "🟡" ;;
+    CRIT|CRITICAL|DOWN) echo "🔴" ;;
+    UNKNOWN) echo "⚪" ;;
+    *) echo "❓" ;;
+  esac
+}
+
+# ===== FORMATTAZIONE OUTPUT =====
+# Formatta output plugin in modo più leggibile (sintetico)
+format_output() {
+  local output="$1"
+  # Rimuovi caratteri speciali eccessivi e limita lunghezza
+  echo "$output" | tr -d '\r' | head -c 500
+}
+
+# ===== GESTIONE TICKET YDEA =====
+# Carica ambiente Ydea
+load_ydea_env() {
+  if [[ ! -f "$YDEA_ENV" ]]; then
+    log "ERRORE: File .env non trovato in $YDEA_ENV"
+    exit 1
+  fi
+  source "$YDEA_ENV"
+  
+  if [[ ! -x "$YDEA_TOOLKIT" ]]; then
+    log "ERRORE: Script ydea-toolkit.sh non trovato o non eseguibile in $YDEA_TOOLKIT"
+    exit 1
+  fi
+}
+
+# Crea nuovo ticket su Ydea
+create_ydea_ticket() {
+  local title="$1"
+  local description="$2"
+  local priority="$3"
+  
+  debug "Creazione ticket: $title"
+  local result
+  result=$("$YDEA_TOOLKIT" create "$title" "$description" "$priority" 2>&1) || {
+    log "ERRORE creazione ticket: $result"
+    return 1
+  }
+  
+  local ticket_id
+  ticket_id=$(echo "$result" | jq -r '.id // .data.id // empty' 2>/dev/null)
+  
+  if [[ -z "$ticket_id" ]]; then
+    log "ERRORE: Nessun ticket_id nella risposta: $result"
+    return 1
+  fi
+  
+  echo "$ticket_id"
+}
+
+# Aggiungi nota privata a ticket esistente
+add_private_note() {
+  local ticket_id="$1"
+  local note="$2"
+  
+  debug "Aggiunta nota privata a ticket #$ticket_id"
+  "$YDEA_TOOLKIT" comment "$ticket_id" "$note" 2>&1 || {
+    log "ERRORE aggiunta nota a ticket #$ticket_id"
+    return 1
+  }
+}
+
+# ===== MAIN LOGIC =====
+main() {
+  # Carica configurazione Ydea
+  load_ydea_env
+  
+  # Ottieni Real IP (da label o fallback a NOTIFY_HOSTADDRESS)
+  REAL_IP="${NOTIFY_HOSTLABEL_real_ip:-${NOTIFY_HOSTADDRESS:-unknown}}"
+  HOSTNAME="${NOTIFY_HOSTNAME:-unknown}"
+  
+  # Determina se è alert HOST o SERVICE
+  if [[ "${NOTIFY_WHAT:-SERVICE}" == "SERVICE" ]]; then
+    # === ALERT SERVICE ===
+    SERVICE="${NOTIFY_SERVICEDESC:-UNKNOWN}"
+    STATE="${NOTIFY_SERVICESTATE:-UNKNOWN}"
+    LAST_STATE="${NOTIFY_LASTSERVICESTATE:-UNKNOWN}"
+    OUTPUT="${NOTIFY_SERVICEOUTPUT:-N/A}"
+    STATE_TYPE="${NOTIFY_SERVICESTATETYPE:-HARD}"
+    
+    TICKET_KEY=$(get_ticket_key "$REAL_IP" "$SERVICE")
+    
+    # Emoji per stato corrente
+    EMOJI=$(get_emoji "$STATE")
+    LAST_EMOJI=$(get_emoji "$LAST_STATE")
+    
+    # Formatta output sintetico
+    OUTPUT_SHORT=$(format_output "$OUTPUT")
+    
+    log "SERVICE Alert: $HOSTNAME ($REAL_IP) - $SERVICE | $LAST_STATE -> $STATE"
+    
+    # Registra cambio stato per flapping detection
+    record_state_change "$TICKET_KEY" "$STATE"
+    
+    # Verifica flapping
+    FLAPPING_STATUS=""
+    if is_flapping "$TICKET_KEY"; then
+      FLAPPING_COUNT=$(get_state_changes_count "$TICKET_KEY")
+      FLAPPING_STATUS="⚠️ FLAPPING (${FLAPPING_COUNT} cambi in $((FLAPPING_WINDOW/60))min)"
+      log "FLAPPING rilevato per $TICKET_KEY"
+    fi
+    
+    # === LOGICA GESTIONE TICKET ===
+    if ticket_exists "$TICKET_KEY"; then
+      # Ticket già esiste -> aggiungi nota privata
+      TICKET_ID=$(get_ticket_id "$TICKET_KEY")
+      log "Ticket esistente trovato: #$TICKET_ID"
+      
+      # Prepara nota privata sintetica
+      NOTE="🔄 [$(date '+%d/%m/%y %H:%M')] ${LAST_EMOJI}${LAST_STATE}→${EMOJI}${STATE}"
+      
+      # Aggiungi dettagli stato
+      if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
+        NOTE="${NOTE} | ✅ Allarme rientrato"
+      elif [[ -n "$FLAPPING_STATUS" ]]; then
+        NOTE="${NOTE} | ${FLAPPING_STATUS}"
+      fi
+      
+      # Aggiungi output se significativo
+      NOTE="${NOTE} | Output: ${OUTPUT_SHORT}"
+      
+      # Aggiungi nota
+      if add_private_note "$TICKET_ID" "$NOTE"; then
+        log "Nota privata aggiunta al ticket #$TICKET_ID"
+        update_ticket_state "$TICKET_KEY" "$STATE"
+      fi
+      
+    elif [[ "$STATE" == "CRIT" || "$STATE" == "CRITICAL" || "$STATE" == "DOWN" ]]; then
+      # Nuovo problema CRITICAL -> crea ticket
+      log "Nuovo problema CRITICAL: creazione ticket"
+      
+      # Determina priorità
+      PRIORITY="high"
+      if [[ -n "$FLAPPING_STATUS" ]]; then
+        PRIORITY="critical"
+      fi
+      
+      # Prepara titolo e descrizione
+      TITLE="[${EMOJI} ${STATE}] ${REAL_IP} - ${SERVICE}"
+      
+      DESCRIPTION="## 🚨 Alert CheckMK
+
+**Host:** ${HOSTNAME} (\`${REAL_IP}\`)
+**Servizio:** ${SERVICE}
+**Stato:** ${EMOJI} ${STATE}
+**Tipo:** ${STATE_TYPE}
+**Data/Ora:** $(date '+%Y-%m-%d %H:%M:%S')
+
+${FLAPPING_STATUS:+**⚠️ Stato:** ${FLAPPING_STATUS}
+
+}**Output Plugin:**
+\`\`\`
+${OUTPUT_SHORT}
+\`\`\`
+
+---
+*Alert automatico da CheckMK*"
+      
+      # Crea ticket
+      TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY")
+      
+      if [[ -n "$TICKET_ID" ]]; then
+        log "✅ Ticket creato: #$TICKET_ID per $TICKET_KEY"
+        save_ticket_cache "$TICKET_KEY" "$TICKET_ID" "$STATE"
+      else
+        log "❌ Errore creazione ticket per $TICKET_KEY"
+      fi
+    else
+      # Stato WARNING o UNKNOWN, non CRITICAL -> solo log
+      log "Stato $STATE non critico, nessun ticket creato"
+    fi
+    
+  else
+    # === ALERT HOST ===
+    STATE="${NOTIFY_HOSTSTATE:-UNKNOWN}"
+    LAST_STATE="${NOTIFY_LASTHOSTSTATE:-UNKNOWN}"
+    OUTPUT="${NOTIFY_HOSTOUTPUT:-N/A}"
+    STATE_TYPE="${NOTIFY_HOSTSTATETYPE:-HARD}"
+    
+    TICKET_KEY=$(get_ticket_key "$REAL_IP" "HOST")
+    
+    EMOJI=$(get_emoji "$STATE")
+    LAST_EMOJI=$(get_emoji "$LAST_STATE")
+    OUTPUT_SHORT=$(format_output "$OUTPUT")
+    
+    log "HOST Alert: $HOSTNAME ($REAL_IP) | $LAST_STATE -> $STATE"
+    
+    # Registra cambio stato
+    record_state_change "$TICKET_KEY" "$STATE"
+    
+    # Verifica flapping
+    FLAPPING_STATUS=""
+    if is_flapping "$TICKET_KEY"; then
+      FLAPPING_COUNT=$(get_state_changes_count "$TICKET_KEY")
+      FLAPPING_STATUS="⚠️ FLAPPING (${FLAPPING_COUNT} cambi in $((FLAPPING_WINDOW/60))min)"
+    fi
+    
+    # Gestione ticket host
+    if ticket_exists "$TICKET_KEY"; then
+      TICKET_ID=$(get_ticket_id "$TICKET_KEY")
+      
+      NOTE="🔄 [$(date '+%d/%m/%y %H:%M')] ${LAST_EMOJI}${LAST_STATE}→${EMOJI}${STATE}"
+      if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
+        NOTE="${NOTE} | ✅ Allarme rientrato"
+      elif [[ -n "$FLAPPING_STATUS" ]]; then
+        NOTE="${NOTE} | ${FLAPPING_STATUS}"
+      fi
+      NOTE="${NOTE} | Output: ${OUTPUT_SHORT}"
+      
+      if add_private_note "$TICKET_ID" "$NOTE"; then
+        log "Nota privata aggiunta al ticket #$TICKET_ID"
+        update_ticket_state "$TICKET_KEY" "$STATE"
+      fi
+      
+    elif [[ "$STATE" == "DOWN" || "$STATE" == "CRITICAL" ]]; then
+      log "Nuovo problema HOST DOWN: creazione ticket"
+      
+      PRIORITY="critical"
+      TITLE="[${EMOJI} ${STATE}] Host ${REAL_IP} - ${HOSTNAME}"
+      
+      DESCRIPTION="## 🚨 Alert CheckMK - Host Down
+
+**Host:** ${HOSTNAME}
+**IP:** \`${REAL_IP}\`
+**Stato:** ${EMOJI} ${STATE}
+**Tipo:** ${STATE_TYPE}
+**Data/Ora:** $(date '+%Y-%m-%d %H:%M:%S')
+
+${FLAPPING_STATUS:+**⚠️ Stato:** ${FLAPPING_STATUS}
+
+}**Output Check:**
+\`\`\`
+${OUTPUT_SHORT}
+\`\`\`
+
+**Azioni Immediate:**
+1. Verificare connettività di rete
+2. Controllare status hardware/VM
+3. Verificare log di sistema
+4. Tentare restart se appropriato
+
+---
+*Alert automatico da CheckMK*"
+      
+      TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY")
+      
+      if [[ -n "$TICKET_ID" ]]; then
+        log "✅ Ticket creato: #$TICKET_ID per $TICKET_KEY"
+        save_ticket_cache "$TICKET_KEY" "$TICKET_ID" "$STATE"
+      fi
+    fi
+  fi
+}
+
+# Esegui main
+main
+
+exit 0
