@@ -270,10 +270,10 @@ add_comment() {
   }
   
   local body
-  body=$(jq -n --arg text "$comment" '{text: $text}')
+  body=$(jq -n --arg text "$comment" '{testo: $text}')
   
   info "Aggiunta commento a ticket #$ticket_id..."
-  ydea_api POST "/tickets/$ticket_id/comments" "$body"
+  ydea_api POST "/ticket/$ticket_id/nota" "$body"
 }
 
 # Cerca ticket per testo
