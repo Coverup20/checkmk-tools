@@ -64,35 +64,55 @@ check_ydea_toolkit() {
 install_scripts() {
   info "Installazione script di notifica CheckMK..."
   
+  # Determina percorso script-notify-checkmk (supporta sia struttura normale che sparse-checkout)
+  local NOTIFY_SCRIPT_DIR
+  if [[ -d "${SCRIPT_DIR}/script-notify-checkmk" ]]; then
+    NOTIFY_SCRIPT_DIR="${SCRIPT_DIR}/script-notify-checkmk"
+  elif [[ -d "$(dirname "${SCRIPT_DIR}")/script-notify-checkmk" ]]; then
+    NOTIFY_SCRIPT_DIR="$(dirname "${SCRIPT_DIR}")/script-notify-checkmk"
+  else
+    error "Cartella script-notify-checkmk non trovata"
+    echo "  Provato: ${SCRIPT_DIR}/script-notify-checkmk"
+    echo "  Provato: $(dirname "${SCRIPT_DIR}")/script-notify-checkmk"
+    exit 1
+  fi
+  
+  info "Usando script da: ${NOTIFY_SCRIPT_DIR}"
+  
   # Copia ydea_realip
-  if [[ -f "${SCRIPT_DIR}/script-notify-checkmk/ydea_realip" ]]; then
-    cp "${SCRIPT_DIR}/script-notify-checkmk/ydea_realip" "$CHECKMK_NOTIFY_DIR/"
+  if [[ -f "${NOTIFY_SCRIPT_DIR}/ydea_realip" ]]; then
+    cp "${NOTIFY_SCRIPT_DIR}/ydea_realip" "$CHECKMK_NOTIFY_DIR/"
     chmod +x "${CHECKMK_NOTIFY_DIR}/ydea_realip"
     success "ydea_realip installato"
   else
-    error "File ydea_realip non trovato in ${SCRIPT_DIR}/script-notify-checkmk/"
+    error "File ydea_realip non trovato in ${NOTIFY_SCRIPT_DIR}/"
     exit 1
   fi
   
   # Copia mail_ydea_down
-  if [[ -f "${SCRIPT_DIR}/script-notify-checkmk/mail_ydea_down" ]]; then
-    cp "${SCRIPT_DIR}/script-notify-checkmk/mail_ydea_down" "$CHECKMK_NOTIFY_DIR/"
+  if [[ -f "${NOTIFY_SCRIPT_DIR}/mail_ydea_down" ]]; then
+    cp "${NOTIFY_SCRIPT_DIR}/mail_ydea_down" "$CHECKMK_NOTIFY_DIR/"
     chmod +x "${CHECKMK_NOTIFY_DIR}/mail_ydea_down"
     success "mail_ydea_down installato"
   else
     warn "File mail_ydea_down non trovato (opzionale)"
   fi
   
-  # Copia health monitor
+  # Copia health monitor (supporta sia percorso relativo che assoluto)
   info "Installazione health monitor..."
-  if [[ -f "${SCRIPT_DIR}/Ydea-Toolkit/ydea-health-monitor.sh" ]]; then
-    cp "${SCRIPT_DIR}/Ydea-Toolkit/ydea-health-monitor.sh" "$YDEA_TOOLKIT_DIR/"
-    chmod +x "${YDEA_TOOLKIT_DIR}/ydea-health-monitor.sh"
-    success "ydea-health-monitor.sh installato"
+  local HEALTH_MONITOR
+  if [[ -f "${SCRIPT_DIR}/ydea-health-monitor.sh" ]]; then
+    HEALTH_MONITOR="${SCRIPT_DIR}/ydea-health-monitor.sh"
+  elif [[ -f "${SCRIPT_DIR}/Ydea-Toolkit/ydea-health-monitor.sh" ]]; then
+    HEALTH_MONITOR="${SCRIPT_DIR}/Ydea-Toolkit/ydea-health-monitor.sh"
   else
     error "File ydea-health-monitor.sh non trovato"
     exit 1
   fi
+  
+  cp "$HEALTH_MONITOR" "$YDEA_TOOLKIT_DIR/"
+  chmod +x "${YDEA_TOOLKIT_DIR}/ydea-health-monitor.sh"
+  success "ydea-health-monitor.sh installato"
 }
 
 setup_env() {
