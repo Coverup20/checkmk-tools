@@ -239,14 +239,27 @@ update_ticket_state() {
   init_cache
   
   local updated_cache
-  updated_cache=$(jq --arg key "$key" \
-     --arg state "$state" \
-     --arg ts "$(date -u +%s)" \
-    '.[$key].state = $state | .[$key].last_update = ($ts | tonumber)' \
-    "$TICKET_CACHE" 2>/dev/null) || {
-    log "WARN: Impossibile aggiornare stato in cache per $key"
-    return 1
-  }
+  # Se stato torna CRITICAL/DOWN, resetta resolved_at a null
+  if [[ "$state" == "CRITICAL" || "$state" == "CRIT" || "$state" == "DOWN" ]]; then
+    updated_cache=$(jq --arg key "$key" \
+       --arg state "$state" \
+       --arg ts "$(date -u +%s)" \
+      '.[$key].state = $state | .[$key].last_update = ($ts | tonumber) | .[$key].resolved_at = null' \
+      "$TICKET_CACHE" 2>/dev/null) || {
+      log "WARN: Impossibile aggiornare stato in cache per $key"
+      return 1
+    }
+  else
+    # Altri stati (WARNING, UNKNOWN, ecc.) - non toccare resolved_at
+    updated_cache=$(jq --arg key "$key" \
+       --arg state "$state" \
+       --arg ts "$(date -u +%s)" \
+      '.[$key].state = $state | .[$key].last_update = ($ts | tonumber)' \
+      "$TICKET_CACHE" 2>/dev/null) || {
+      log "WARN: Impossibile aggiornare stato in cache per $key"
+      return 1
+    }
+  fi
   
   atomic_cache_write "$TICKET_CACHE" "$updated_cache"
 }
@@ -530,6 +543,15 @@ main() {
         # Nota aggiunta con successo - ticket esiste ed è aperto
         log "Nota privata aggiunta al ticket #$TICKET_ID"
         update_ticket_state "$TICKET_KEY" "$STATE"
+        
+        # Se stato è CRITICAL/DOWN, verifica se era risolto e logga riapertura
+        if [[ "$STATE" == "CRITICAL" || "$STATE" == "CRIT" || "$STATE" == "DOWN" ]]; then
+          local was_resolved
+          was_resolved=$(jq -r --arg key "$TICKET_KEY" '.[$key].resolved_at // "null"' "$TICKET_CACHE" 2>/dev/null)
+          if [[ "$was_resolved" != "null" ]]; then
+            log "⚠️ Ticket #$TICKET_ID riaperto: problema tornato CRITICAL (resolved_at resettato)"
+          fi
+        fi
         
         # Se stato passa a OK/UP, marca ticket come risolto (parte timer 5 giorni)
         if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
