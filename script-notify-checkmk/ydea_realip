@@ -583,7 +583,7 @@ main() {
           
           if [[ -n "$NEW_TICKET_ID" && "$NEW_TICKET_ID" != "null" ]]; then
             log "✅ Nuovo ticket creato: #$NEW_TICKET_ID (dopo 404 su #$TICKET_ID)"
-            save_ticket_to_cache "$TICKET_KEY" "$NEW_TICKET_ID" "$STATE"
+            save_ticket_cache "$TICKET_KEY" "$NEW_TICKET_ID" "$STATE"
           else
             log "❌ Errore creazione nuovo ticket dopo 404"
           fi
