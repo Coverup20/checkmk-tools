@@ -576,16 +576,12 @@ main() {
           
           # Prepara titolo e descrizione
           TITLE="[${STATE}] ${HOSTNAME} - ${SERVICE}"
-          DESCRIPTION="Host: ${HOSTNAME}\nServizio: ${SERVICE}\nStato: ${STATE}\nOutput: ${OUTPUT}\n\nTicket precedente #${TICKET_ID} chiuso da operatore."
+          DESCRIPTION="Host: ${HOSTNAME}\nServizio: ${SERVICE}\nStato: ${STATE}\nOutput: ${OUTPUT_SHORT}\n\nTicket precedente #${TICKET_ID} chiuso da operatore."
           
-          # Crea nuovo ticket
-          NEW_TICKET_ID=$(timeout 10s bash "$YDEA_TOOLKIT" create \
-            --title "$TITLE" \
-            --description "$DESCRIPTION" \
-            --priority "$PRIORITY" \
-            --label "$LABEL" 2>/dev/null | grep -oP 'Ticket ID: \K[0-9]+' || echo "")
+          # Crea nuovo ticket usando la funzione esistente
+          NEW_TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY")
           
-          if [[ -n "$NEW_TICKET_ID" ]]; then
+          if [[ -n "$NEW_TICKET_ID" && "$NEW_TICKET_ID" != "null" ]]; then
             log "✅ Nuovo ticket creato: #$NEW_TICKET_ID (dopo 404 su #$TICKET_ID)"
             save_ticket_to_cache "$TICKET_KEY" "$NEW_TICKET_ID" "$STATE"
           else
