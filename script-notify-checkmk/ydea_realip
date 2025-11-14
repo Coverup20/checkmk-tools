@@ -9,7 +9,7 @@ YDEA_TOOLKIT="${YDEA_TOOLKIT_DIR}/ydea-toolkit.sh"
 YDEA_ENV="${YDEA_TOOLKIT_DIR}/.env"
 TICKET_CACHE="/tmp/ydea_checkmk_tickets.json"
 FLAPPING_CACHE="/tmp/ydea_checkmk_flapping.json"
-CACHE_LOCK="/var/lock/ydea_cache.lock"
+CACHE_LOCK="/tmp/ydea_cache.lock"  # Usa /tmp invece di /var/lock per permessi
 RESOLVED_TICKET_TTL=$((5*24*3600))  # 5 giorni per ticket risolti
 CACHE_MAX_AGE=$((30*24*3600))  # 30 giorni per ticket non risolti (fallback)
 FLAPPING_THRESHOLD=5  # Numero cambi stato in finestra temporale
@@ -21,19 +21,28 @@ debug() { [[ "${DEBUG_YDEA:-0}" == "1" ]] && log "DEBUG: $*" || true; }
 
 # Inizializza cache se non esiste e valida contenuto
 init_cache() {
-  # Crea directory lock se non esiste
-  mkdir -p /var/lock 2>/dev/null || true
+  # Crea lock file con permessi permissivi se non esiste
+  if [[ ! -f "$CACHE_LOCK" ]]; then
+    touch "$CACHE_LOCK" 2>/dev/null || true
+    chmod 666 "$CACHE_LOCK" 2>/dev/null || true
+  fi
   
   # Valida e ripara TICKET_CACHE
   if [[ ! -f "$TICKET_CACHE" ]]; then
-    echo '{}' > "$TICKET_CACHE"
+    echo '{}' > "$TICKET_CACHE" 2>/dev/null || {
+      log "ERROR: Impossibile creare $TICKET_CACHE"
+      return 1
+    }
     chmod 666 "$TICKET_CACHE" 2>/dev/null || true
   else
     # Verifica che sia JSON valido
     if ! jq empty "$TICKET_CACHE" 2>/dev/null; then
       log "WARN: Cache ticket corrotta, backup e reset"
       [[ -f "$TICKET_CACHE" ]] && cp "$TICKET_CACHE" "${TICKET_CACHE}.corrupt.$(date +%s)" 2>/dev/null || true
-      echo '{}' > "$TICKET_CACHE"
+      echo '{}' > "$TICKET_CACHE" 2>/dev/null || {
+        log "ERROR: Impossibile scrivere su $TICKET_CACHE"
+        return 1
+      }
       chmod 666 "$TICKET_CACHE" 2>/dev/null || true
     else
       # Pulisci entry con ticket_id non numerici
@@ -45,19 +54,20 @@ init_cache() {
           (.value.ticket_id | type) == "string" and (.value.ticket_id | test("^[0-9]+$"))
         )
       ) | from_entries' "$TICKET_CACHE" 2>/dev/null) || cleaned='{}'
-      echo "$cleaned" > "$TICKET_CACHE"
+      echo "$cleaned" > "$TICKET_CACHE" 2>/dev/null || true
+      chmod 666 "$TICKET_CACHE" 2>/dev/null || true
     fi
   fi
   
   # Valida e ripara FLAPPING_CACHE
   if [[ ! -f "$FLAPPING_CACHE" ]]; then
-    echo '{}' > "$FLAPPING_CACHE"
+    echo '{}' > "$FLAPPING_CACHE" 2>/dev/null || true
     chmod 666 "$FLAPPING_CACHE" 2>/dev/null || true
   else
     if ! jq empty "$FLAPPING_CACHE" 2>/dev/null; then
       log "WARN: Cache flapping corrotta, backup e reset"
       [[ -f "$FLAPPING_CACHE" ]] && cp "$FLAPPING_CACHE" "${FLAPPING_CACHE}.corrupt.$(date +%s)" 2>/dev/null || true
-      echo '{}' > "$FLAPPING_CACHE"
+      echo '{}' > "$FLAPPING_CACHE" 2>/dev/null || true
       chmod 666 "$FLAPPING_CACHE" 2>/dev/null || true
     fi
   fi
@@ -106,16 +116,36 @@ atomic_cache_write() {
   local content="$2"
   local temp_file="${cache_file}.tmp.$$"
   
+  # Verifica permessi scrittura prima di procedere
+  if [[ ! -w "$(dirname "$cache_file")" ]]; then
+    log "ERROR: Nessun permesso di scrittura su $(dirname "$cache_file")"
+    return 1
+  fi
+  
   # Usa flock per garantire scrittura atomica
   (
     flock -x -w 5 200 || {
       log "WARN: Timeout acquisizione lock per $cache_file"
-      return 1
+      # Fallback: scrivi direttamente senza lock
+      echo "$content" > "$cache_file" 2>/dev/null || {
+        log "ERROR: Fallback scrittura fallito per $cache_file"
+        return 1
+      }
+      return 0
     }
     
-    echo "$content" > "$temp_file"
+    echo "$content" > "$temp_file" 2>/dev/null || {
+      log "ERROR: Impossibile scrivere temp file $temp_file"
+      return 1
+    }
+    chmod 666 "$temp_file" 2>/dev/null || true
     sync
-    mv "$temp_file" "$cache_file"
+    mv "$temp_file" "$cache_file" 2>/dev/null || {
+      log "ERROR: Impossibile spostare $temp_file a $cache_file"
+      rm -f "$temp_file" 2>/dev/null
+      return 1
+    }
+    chmod 666 "$cache_file" 2>/dev/null || true
     sync
     
   ) 200>"${CACHE_LOCK}"
