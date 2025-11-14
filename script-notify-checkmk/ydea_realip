@@ -18,8 +18,14 @@ debug() { [[ "${DEBUG_YDEA:-0}" == "1" ]] && log "DEBUG: $*" || true; }
 
 # Inizializza cache se non esiste
 init_cache() {
-  [[ -f "$TICKET_CACHE" ]] || echo '{}' > "$TICKET_CACHE"
-  [[ -f "$FLAPPING_CACHE" ]] || echo '{}' > "$FLAPPING_CACHE"
+  if [[ ! -f "$TICKET_CACHE" ]]; then
+    echo '{}' > "$TICKET_CACHE"
+    chmod 666 "$TICKET_CACHE" 2>/dev/null || true
+  fi
+  if [[ ! -f "$FLAPPING_CACHE" ]]; then
+    echo '{}' > "$FLAPPING_CACHE"
+    chmod 666 "$FLAPPING_CACHE" 2>/dev/null || true
+  fi
 }
 
 # ===== FUNZIONI CACHE =====
