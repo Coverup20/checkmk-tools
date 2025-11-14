@@ -10,7 +10,8 @@ YDEA_ENV="${YDEA_TOOLKIT_DIR}/.env"
 TICKET_CACHE="/tmp/ydea_checkmk_tickets.json"
 FLAPPING_CACHE="/tmp/ydea_checkmk_flapping.json"
 CACHE_LOCK="/var/lock/ydea_cache.lock"
-CACHE_MAX_AGE=$((30*24*3600))  # 30 giorni in secondi
+RESOLVED_TICKET_TTL=$((5*24*3600))  # 5 giorni per ticket risolti
+CACHE_MAX_AGE=$((30*24*3600))  # 30 giorni per ticket non risolti (fallback)
 FLAPPING_THRESHOLD=5  # Numero cambi stato in finestra temporale
 FLAPPING_WINDOW=600   # Finestra temporale in secondi (10 minuti)
 
@@ -66,23 +67,34 @@ init_cache() {
 }
 
 # Pulisci entry vecchie dalla cache
+# - Ticket risolti (resolved_at != null): rimossi dopo RESOLVED_TICKET_TTL (5 giorni)
+# - Ticket attivi (resolved_at == null): rimossi dopo CACHE_MAX_AGE (30 giorni)
 clean_old_cache_entries() {
   local now=$(date -u +%s)
-  local cutoff=$((now - CACHE_MAX_AGE))
+  local resolved_cutoff=$((now - RESOLVED_TICKET_TTL))
+  local active_cutoff=$((now - CACHE_MAX_AGE))
   
   if [[ -f "$TICKET_CACHE" ]] && jq empty "$TICKET_CACHE" 2>/dev/null; then
     local cleaned
-    cleaned=$(jq --arg cutoff "$cutoff" 'to_entries | map(
-      select(
-        .value.last_update != null and
-        (.value.last_update | tonumber) > ($cutoff | tonumber)
-      )
-    ) | from_entries' "$TICKET_CACHE" 2>/dev/null) || cleaned='{}'
+    cleaned=$(jq --arg resolved_cutoff "$resolved_cutoff" --arg active_cutoff "$active_cutoff" '
+      to_entries | map(
+        select(
+          # Ticket risolti: controlla resolved_at
+          if .value.resolved_at != null then
+            (.value.resolved_at | tonumber) > ($resolved_cutoff | tonumber)
+          # Ticket attivi: controlla last_update
+          else
+            .value.last_update != null and
+            (.value.last_update | tonumber) > ($active_cutoff | tonumber)
+          end
+        )
+      ) | from_entries
+    ' "$TICKET_CACHE" 2>/dev/null) || cleaned='{}'
     
     # Solo aggiorna se ci sono state modifiche
     if [[ "$cleaned" != "$(cat "$TICKET_CACHE")" ]]; then
-      echo "$cleaned" > "$TICKET_CACHE"
-      debug "Cache pulita: rimosse entry vecchie"
+      atomic_cache_write "$cleaned"
+      debug "Cache pulita: rimosse entry vecchie (resolved > 5gg, active > 30gg)"
     fi
   fi
 }
@@ -142,7 +154,7 @@ save_ticket_cache() {
      --arg id "$ticket_id" \
      --arg state "$state" \
      --arg ts "$(date -u +%s)" \
-    '.[$key] = {ticket_id: ($id | tonumber), state: $state, created_at: ($ts | tonumber), last_update: ($ts | tonumber)}' \
+    '.[$key] = {ticket_id: ($id | tonumber), state: $state, created_at: ($ts | tonumber), last_update: ($ts | tonumber), resolved_at: null}' \
     "$TICKET_CACHE" 2>/dev/null) || {
     log "ERRORE: Impossibile salvare ticket in cache"
     return 1
@@ -150,6 +162,30 @@ save_ticket_cache() {
   
   atomic_cache_write "$TICKET_CACHE" "$updated_cache"
   debug "Ticket salvato in cache: $key -> $ticket_id"
+}
+
+# Marca ticket come risolto (imposta resolved_at timestamp)
+mark_ticket_resolved() {
+  local key="$1"
+  init_cache
+  
+  # Verifica che il ticket esista in cache
+  if ! ticket_in_cache "$key"; then
+    debug "Ticket $key non in cache, skip mark_resolved"
+    return 0
+  fi
+  
+  local updated_cache
+  updated_cache=$(jq --arg key "$key" \
+     --arg ts "$(date -u +%s)" \
+    '.[$key].resolved_at = ($ts | tonumber) | .[$key].last_update = ($ts | tonumber)' \
+    "$TICKET_CACHE" 2>/dev/null) || {
+    log "WARN: Impossibile marcare ticket risolto per $key"
+    return 1
+  }
+  
+  atomic_cache_write "$TICKET_CACHE" "$updated_cache"
+  debug "Ticket $key marcato come risolto, cleanup tra 5 giorni"
 }
 
 # Aggiorna ultimo stato in cache
@@ -372,17 +408,25 @@ main() {
       ticket_is_open_on_api "$TICKET_ID"
       local api_check=$?
       
-      if [[ $api_check -eq 1 ]] || [[ $api_check -eq 2 ]]; then
-        # Ticket chiuso/risolto (1) o cancellato (2)
-        if [[ $api_check -eq 1 ]]; then
-          log "Ticket #$TICKET_ID è stato risolto/chiuso dall'operatore"
-        else
-          log "Ticket #$TICKET_ID è stato cancellato da Ydea"
-        fi
-        remove_ticket_from_cache "$TICKET_KEY"
+      if [[ $api_check -eq 1 ]]; then
+        # Ticket chiuso/risolto dall'operatore
+        log "Ticket #$TICKET_ID è stato risolto/chiuso dall'operatore"
         
-        # Non ricreare ticket - l'operatore ha chiuso volutamente
-        log "Ticket rimosso dalla cache. Nessuna ricreazione automatica (gestito dall'operatore)"
+        # Tenta comunque di aggiungere nota finale (potrebbe fallire se ticket chiuso non accetta più note)
+        if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
+          NOTE="[$(date '+%d/%m/%y %H:%M')] ${LAST_STATE} -> ${STATE} | ✅ Allarme rientrato (ticket già chiuso dall'operatore)"
+          add_private_note "$TICKET_ID" "$NOTE" 2>/dev/null || true
+        fi
+        
+        # MANTIENI in cache (non rimuovere) - verrà pulito automaticamente dopo 30 giorni
+        # Questo previene creazione duplicati se il servizio va di nuovo CRITICAL
+        log "Ticket mantenuto in cache (pulizia automatica dopo 30 giorni)"
+        
+      elif [[ $api_check -eq 2 ]]; then
+        # Ticket cancellato (404) - non esiste più su Ydea
+        log "Ticket #$TICKET_ID è stato cancellato da Ydea (404)"
+        remove_ticket_from_cache "$TICKET_KEY"
+        log "Ticket rimosso dalla cache (cancellato da sistema)"
         
       elif [[ $api_check -eq 0 ]]; then
         # Ticket ancora aperto, procedi con aggiunta nota
@@ -393,7 +437,7 @@ main() {
         
         # Aggiungi dettagli stato
         if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
-          NOTE="${NOTE} | Allarme rientrato"
+          NOTE="${NOTE} | ✅ Allarme rientrato"
         elif [[ -n "$FLAPPING_STATUS" ]]; then
           NOTE="${NOTE} | ${FLAPPING_STATUS}"
         fi
@@ -408,6 +452,12 @@ main() {
         if [[ $note_result -eq 0 ]]; then
           log "Nota privata aggiunta al ticket #$TICKET_ID"
           update_ticket_state "$TICKET_KEY" "$STATE"
+          
+          # Se stato passa a OK/UP, marca ticket come risolto (parte timer 5 giorni)
+          if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
+            mark_ticket_resolved "$TICKET_KEY"
+            log "Ticket #$TICKET_ID marcato come risolto, cleanup automatico tra 5 giorni"
+          fi
         elif [[ $note_result -eq 2 ]]; then
           # Errore 404 - ticket non esiste più (caso raro)
           log "Ticket #$TICKET_ID non più valido (404), rimozione dalla cache"
@@ -441,6 +491,12 @@ main() {
         if [[ $note_result -eq 0 ]]; then
           log "Nota privata aggiunta al ticket #$TICKET_ID"
           update_ticket_state "$TICKET_KEY" "$STATE"
+          
+          # Se stato passa a OK/UP, marca ticket come risolto (parte timer 5 giorni)
+          if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
+            mark_ticket_resolved "$TICKET_KEY"
+            log "Ticket #$TICKET_ID marcato come risolto, cleanup automatico tra 5 giorni"
+          fi
         elif [[ $note_result -eq 2 ]]; then
           # Errore 404 - ticket non esiste più
           log "Ticket #$TICKET_ID non più valido, rimozione dalla cache"
@@ -558,6 +614,12 @@ Sito: ${NOTIFY_OMD_SITE:-monitoring}
       if [[ $note_result -eq 0 ]]; then
         log "Nota privata aggiunta al ticket #$TICKET_ID"
         update_ticket_state "$TICKET_KEY" "$STATE"
+        
+        # Se stato passa a OK/UP, marca ticket come risolto (parte timer 5 giorni)
+        if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
+          mark_ticket_resolved "$TICKET_KEY"
+          log "Ticket #$TICKET_ID marcato come risolto, cleanup automatico tra 5 giorni"
+        fi
       elif [[ $note_result -eq 2 ]]; then
         # Errore 404 - ticket non esiste più
         log "Ticket #$TICKET_ID non più valido, rimozione dalla cache"
