@@ -214,7 +214,7 @@ mark_ticket_resolved() {
   init_cache
   
   # Verifica che il ticket esista in cache
-  if ! ticket_in_cache "$key"; then
+  if ! ticket_exists "$key"; then
     debug "Ticket $key non in cache, skip mark_resolved"
     return 0
   fi
