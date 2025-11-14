@@ -273,7 +273,7 @@ main() {
       fi
       
       # Prepara titolo e descrizione
-      TITLE="[${EMOJI} ${STATE}] ${HOSTNAME} - ${SERVICE}"
+      TITLE="[${STATE}] ${HOSTNAME} - ${SERVICE}"
       
       DESCRIPTION="**Ticket generato dal sistema di monitoraggio**
 
@@ -377,7 +377,7 @@ ${OUTPUT_SHORT}
       log "Nuovo problema HOST DOWN: creazione ticket"
       
       PRIORITY="critical"
-      TITLE="[${EMOJI} ${STATE}] ${HOSTNAME}"
+      TITLE="[${STATE}] ${HOSTNAME}"
       
       DESCRIPTION="**Ticket generato dal sistema di monitoraggio**
 
