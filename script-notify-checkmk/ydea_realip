@@ -167,7 +167,7 @@ create_ydea_ticket() {
   json_line=$(echo "$result" | grep -E '^\{.*\}$' | tail -n1)
   
   local ticket_id
-  ticket_id=$(echo "$json_line" | jq -r '.id // .data.id // empty' 2>/dev/null)
+  ticket_id=$(echo "$json_line" | jq -r '.ticket_id // .id // .data.id // empty' 2>/dev/null)
   
   if [[ -z "$ticket_id" || "$ticket_id" == "null" ]]; then
     log "ERRORE: Nessun ticket_id nella risposta: $result"
