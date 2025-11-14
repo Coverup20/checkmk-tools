@@ -390,6 +390,59 @@ add_private_note() {
   return 0
 }
 
+# Verifica se ticket è aperto su Ydea tramite API
+# Return codes:
+#   0 = ticket aperto
+#   1 = ticket chiuso/risolto
+#   2 = ticket non trovato (404)
+#   3 = errore API generico
+ticket_is_open_on_api() {
+  local ticket_id="$1"
+  
+  debug "Verifica stato ticket #$ticket_id su API Ydea"
+  
+  # Usa ydea-toolkit per ottenere info ticket
+  local result
+  result=$("$YDEA_TOOLKIT" get "$ticket_id" 2>&1) || {
+    # Errore nell'API call
+    if echo "$result" | grep -qi "404\|not found\|Ticket non trovato"; then
+      debug "Ticket #$ticket_id non trovato (404)"
+      return 2
+    else
+      debug "Errore API verifica ticket #$ticket_id: $result"
+      return 3
+    fi
+  }
+  
+  # Estrai JSON dalla risposta (ultima riga JSON valida)
+  local json_line
+  json_line=$(echo "$result" | grep -E '^\{.*\}$' | tail -n1)
+  
+  if [[ -z "$json_line" ]]; then
+    debug "Nessun JSON valido nella risposta API per ticket #$ticket_id"
+    return 3
+  fi
+  
+  # Verifica stato ticket (cerca campo stato/status)
+  # Stati Ydea comuni: "aperto", "in lavorazione", "chiuso", "risolto"
+  local stato
+  stato=$(echo "$json_line" | jq -r '.stato // .status // .state // empty' 2>/dev/null)
+  
+  if [[ -z "$stato" || "$stato" == "null" ]]; then
+    debug "Campo stato non trovato per ticket #$ticket_id, assume aperto"
+    return 0  # Default: assume aperto se non trova stato
+  fi
+  
+  # Verifica se chiuso/risolto (case-insensitive)
+  if echo "$stato" | grep -qiE "chiuso|risolto|closed|resolved"; then
+    debug "Ticket #$ticket_id in stato: $stato (chiuso)"
+    return 1
+  else
+    debug "Ticket #$ticket_id in stato: $stato (aperto)"
+    return 0
+  fi
+}
+
 # Rimuovi ticket dalla cache
 remove_ticket_from_cache() {
   local key="$1"
@@ -448,10 +501,9 @@ main() {
       TICKET_ID=$(get_ticket_id "$TICKET_KEY")
       log "Ticket esistente trovato in cache: #$TICKET_ID"
       
-      # TODO: Verifica stato reale su Ydea prima di aggiungere nota
-      # ticket_is_open_on_api "$TICKET_ID"
-      # local api_check=$?
-      local api_check=0  # Assume ticket aperto per ora
+      # Verifica stato reale su Ydea prima di aggiungere nota
+      ticket_is_open_on_api "$TICKET_ID"
+      local api_check=$?
       
       if [[ $api_check -eq 1 ]]; then
         # Ticket chiuso/risolto dall'operatore
