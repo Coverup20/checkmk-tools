@@ -509,107 +509,49 @@ main() {
       TICKET_ID=$(get_ticket_id "$TICKET_KEY")
       log "Ticket esistente trovato in cache: #$TICKET_ID"
       
-      # Verifica stato reale su Ydea prima di aggiungere nota
-      ticket_is_open_on_api "$TICKET_ID"
-      local api_check=$?
+      # Prepara nota privata sintetica
+      NOTE="[$(date '+%d/%m/%y %H:%M')] ${LAST_STATE} -> ${STATE}"
       
-      if [[ $api_check -eq 1 ]]; then
-        # Ticket chiuso/risolto dall'operatore
-        log "Ticket #$TICKET_ID è stato risolto/chiuso dall'operatore"
+      # Aggiungi dettagli stato
+      if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
+        NOTE="${NOTE} | ✅ Allarme rientrato"
+      elif [[ -n "$FLAPPING_STATUS" ]]; then
+        NOTE="${NOTE} | ${FLAPPING_STATUS}"
+      fi
+      
+      # Aggiungi output se significativo
+      NOTE="${NOTE} | Output: ${OUTPUT_SHORT}"
+      
+      # Aggiungi nota (verifica automaticamente se ticket esiste con 404 check)
+      add_private_note "$TICKET_ID" "$NOTE"
+      local note_result=$?
+      
+      if [[ $note_result -eq 0 ]]; then
+        # Nota aggiunta con successo - ticket esiste ed è aperto
+        log "Nota privata aggiunta al ticket #$TICKET_ID"
+        update_ticket_state "$TICKET_KEY" "$STATE"
         
-        # Tenta comunque di aggiungere nota finale (potrebbe fallire se ticket chiuso non accetta più note)
+        # Se stato passa a OK/UP, marca ticket come risolto (parte timer 5 giorni)
         if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
-          NOTE="[$(date '+%d/%m/%y %H:%M')] ${LAST_STATE} -> ${STATE} | ✅ Allarme rientrato (ticket già chiuso dall'operatore)"
-          add_private_note "$TICKET_ID" "$NOTE" 2>/dev/null || true
+          mark_ticket_resolved "$TICKET_KEY"
+          log "Ticket #$TICKET_ID marcato come risolto, cleanup automatico tra 5 giorni"
         fi
         
-        # MANTIENI in cache (non rimuovere) - verrà pulito automaticamente dopo 30 giorni
-        # Questo previene creazione duplicati se il servizio va di nuovo CRITICAL
-        log "Ticket mantenuto in cache (pulizia automatica dopo 30 giorni)"
+      elif [[ $note_result -eq 2 ]]; then
+        # Errore 404 - ticket non esiste più su Ydea
+        log "Ticket #$TICKET_ID non più valido (404), rimozione dalla cache"
         
-      elif [[ $api_check -eq 2 ]]; then
-        # Ticket cancellato (404) - non esiste più su Ydea
-        log "Ticket #$TICKET_ID è stato cancellato da Ydea (404)"
+        # Se stato OK/UP, marca come risolto prima di rimuovere
+        if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
+          mark_ticket_resolved "$TICKET_KEY"
+          log "Ticket marcato come risolto prima della rimozione"
+        fi
+        
         remove_ticket_from_cache "$TICKET_KEY"
-        log "Ticket rimosso dalla cache (cancellato da sistema)"
-        
-      elif [[ $api_check -eq 0 ]]; then
-        # Ticket ancora aperto, procedi con aggiunta nota
-        log "Ticket #$TICKET_ID verificato aperto su Ydea, aggiunta nota"
-        
-        # Prepara nota privata sintetica
-        NOTE="[$(date '+%d/%m/%y %H:%M')] ${LAST_STATE} -> ${STATE}"
-        
-        # Aggiungi dettagli stato
-        if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
-          NOTE="${NOTE} | ✅ Allarme rientrato"
-        elif [[ -n "$FLAPPING_STATUS" ]]; then
-          NOTE="${NOTE} | ${FLAPPING_STATUS}"
-        fi
-        
-        # Aggiungi output se significativo
-        NOTE="${NOTE} | Output: ${OUTPUT_SHORT}"
-        
-        # Aggiungi nota
-        add_private_note "$TICKET_ID" "$NOTE"
-        local note_result=$?
-        
-        if [[ $note_result -eq 0 ]]; then
-          log "Nota privata aggiunta al ticket #$TICKET_ID"
-          update_ticket_state "$TICKET_KEY" "$STATE"
-          
-          # Se stato passa a OK/UP, marca ticket come risolto (parte timer 5 giorni)
-          if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
-            mark_ticket_resolved "$TICKET_KEY"
-            log "Ticket #$TICKET_ID marcato come risolto, cleanup automatico tra 5 giorni"
-          fi
-        elif [[ $note_result -eq 2 ]]; then
-          # Errore 404 - ticket non esiste più (caso raro)
-          log "Ticket #$TICKET_ID non più valido (404), rimozione dalla cache"
-          remove_ticket_from_cache "$TICKET_KEY"
-        else
-          # Altro errore generico
-          log "Errore generico aggiunta nota al ticket #$TICKET_ID"
-        fi
         
       else
-        # Errore verifica API - procedi comunque con aggiunta nota per sicurezza
-        log "WARN: Impossibile verificare stato ticket #$TICKET_ID, procedo comunque"
-        
-        # Prepara nota privata sintetica
-        NOTE="[$(date '+%d/%m/%y %H:%M')] ${LAST_STATE} -> ${STATE}"
-        
-        # Aggiungi dettagli stato
-        if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
-          NOTE="${NOTE} | Allarme rientrato"
-        elif [[ -n "$FLAPPING_STATUS" ]]; then
-          NOTE="${NOTE} | ${FLAPPING_STATUS}"
-        fi
-        
-        # Aggiungi output se significativo
-        NOTE="${NOTE} | Output: ${OUTPUT_SHORT}"
-        
-        # Aggiungi nota
-        add_private_note "$TICKET_ID" "$NOTE"
-        local note_result=$?
-        
-        if [[ $note_result -eq 0 ]]; then
-          log "Nota privata aggiunta al ticket #$TICKET_ID"
-          update_ticket_state "$TICKET_KEY" "$STATE"
-          
-          # Se stato passa a OK/UP, marca ticket come risolto (parte timer 5 giorni)
-          if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
-            mark_ticket_resolved "$TICKET_KEY"
-            log "Ticket #$TICKET_ID marcato come risolto, cleanup automatico tra 5 giorni"
-          fi
-        elif [[ $note_result -eq 2 ]]; then
-          # Errore 404 - ticket non esiste più
-          log "Ticket #$TICKET_ID non più valido, rimozione dalla cache"
-          remove_ticket_from_cache "$TICKET_KEY"
-        else
-          # Altro errore generico
-          log "Errore generico aggiunta nota al ticket #$TICKET_ID"
-        fi
+        # Altro errore generico aggiunta nota
+        log "Errore generico aggiunta nota al ticket #$TICKET_ID"
       fi
       
     elif [[ "$STATE" == "CRIT" || "$STATE" == "CRITICAL" || "$STATE" == "DOWN" ]]; then
