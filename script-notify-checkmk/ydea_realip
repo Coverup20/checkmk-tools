@@ -93,7 +93,7 @@ clean_old_cache_entries() {
     
     # Solo aggiorna se ci sono state modifiche
     if [[ "$cleaned" != "$(cat "$TICKET_CACHE")" ]]; then
-      atomic_cache_write "$cleaned"
+      atomic_cache_write "$TICKET_CACHE" "$cleaned"
       debug "Cache pulita: rimosse entry vecchie (resolved > 5gg, active > 30gg)"
     fi
   fi
