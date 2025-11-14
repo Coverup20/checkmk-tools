@@ -2,13 +2,36 @@
 # ============================================================
 # Installazione Interattiva CheckMK Agent + FRPC per Windows
 # Compatibile con: Windows 10, 11, Server 2019, 2022
-# Version: 1.1 - 2025-11-07
+# Version: 1.2 - 2025-11-14
 # ============================================================
 
 #Requires -RunAsAdministrator
 #Requires -Version 5.0
 
+# =====================================================
+# SETUP INIZIALE - Abilita esecuzione script PowerShell
+# =====================================================
+Write-Host "`n[*] Configurazione ambiente PowerShell..." -ForegroundColor Cyan
+
+# Verifica policy corrente
+$currentPolicy = Get-ExecutionPolicy -Scope CurrentUser
+Write-Host "    Policy corrente (CurrentUser): $currentPolicy" -ForegroundColor Gray
+
+# Imposta ExecutionPolicy per permettere esecuzione script
+try {
+    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force -ErrorAction Stop
+    Write-Host "    [OK] ExecutionPolicy impostata a RemoteSigned per CurrentUser" -ForegroundColor Green
+}
+catch {
+    Write-Host "    [WARN] Impossibile impostare ExecutionPolicy permanente: $_" -ForegroundColor Yellow
+    Write-Host "    [*] Uso ExecutionPolicy Bypass solo per questa sessione..." -ForegroundColor Cyan
+    Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force -ErrorAction SilentlyContinue
+}
+
+# Bypass anche per il processo corrente (priorità)
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force -ErrorAction SilentlyContinue
+
+Write-Host "    [OK] Ambiente configurato correttamente" -ForegroundColor Green
 
 # Global error handling
 $ErrorActionPreference = "Continue"
@@ -203,6 +226,112 @@ function Ensure-NSSM {
 }
 
 # =====================================================
+# Funzione: Verifica e gestisce servizio CheckMK Agent
+# =====================================================
+function Test-CheckMKAgentService {
+    param(
+        [switch]$FixIfNeeded
+    )
+    
+    Write-Host "`n[*] Verifica servizio CheckMK Agent..." -ForegroundColor Yellow
+    
+    $agentService = Get-Service -Name "CheckMK Agent" -ErrorAction SilentlyContinue
+    
+    if (-not $agentService) {
+        Write-Host "    [INFO] Servizio CheckMK Agent non presente (verrà installato)" -ForegroundColor Cyan
+        return $true
+    }
+    
+    Write-Host "    [OK] Servizio CheckMK Agent trovato" -ForegroundColor Green
+    Write-Host "      Stato:     $($agentService.Status)" -ForegroundColor Gray
+    Write-Host "      StartType: $($agentService.StartType)" -ForegroundColor Gray
+    
+    # Verifica se il servizio è in esecuzione
+    if ($agentService.Status -eq "Running") {
+        Write-Host "    [OK] Servizio già in esecuzione" -ForegroundColor Green
+        
+        # Test connettività porta 6556
+        try {
+            $tcpTest = Test-NetConnection -ComputerName "127.0.0.1" -Port 6556 -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
+            if ($tcpTest.TcpTestSucceeded) {
+                Write-Host "    [OK] Agent risponde sulla porta 6556" -ForegroundColor Green
+            }
+            else {
+                Write-Host "    [WARN] Agent non risponde sulla porta 6556" -ForegroundColor Yellow
+                if ($FixIfNeeded) {
+                    Write-Host "    [*] Tentativo restart del servizio..." -ForegroundColor Cyan
+                    Restart-Service -Name "CheckMK Agent" -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 3
+                    Write-Host "    [OK] Servizio riavviato" -ForegroundColor Green
+                }
+            }
+        }
+        catch {
+            Write-Host "    [WARN] Impossibile testare porta 6556: $_" -ForegroundColor Yellow
+        }
+        
+        return $true
+    }
+    elseif ($agentService.Status -eq "Stopped") {
+        Write-Host "    [WARN] Servizio arrestato" -ForegroundColor Yellow
+        
+        if ($FixIfNeeded) {
+            Write-Host "    [*] Avvio servizio CheckMK Agent..." -ForegroundColor Cyan
+            try {
+                Start-Service -Name "CheckMK Agent" -ErrorAction Stop
+                Start-Sleep -Seconds 3
+                
+                $agentService = Get-Service -Name "CheckMK Agent" -ErrorAction SilentlyContinue
+                if ($agentService.Status -eq "Running") {
+                    Write-Host "    [OK] Servizio avviato con successo" -ForegroundColor Green
+                    return $true
+                }
+                else {
+                    Write-Host "    [ERR] Servizio non avviato: $($agentService.Status)" -ForegroundColor Red
+                    return $false
+                }
+            }
+            catch {
+                Write-Host "    [ERR] Errore avvio servizio: $_" -ForegroundColor Red
+                return $false
+            }
+        }
+        else {
+            Write-Host "    [INFO] Usa -FixIfNeeded per avviare automaticamente" -ForegroundColor Cyan
+            return $false
+        }
+    }
+    else {
+        Write-Host "    [WARN] Servizio in stato anomalo: $($agentService.Status)" -ForegroundColor Yellow
+        
+        if ($FixIfNeeded) {
+            Write-Host "    [*] Tentativo restart del servizio..." -ForegroundColor Cyan
+            try {
+                Restart-Service -Name "CheckMK Agent" -Force -ErrorAction Stop
+                Start-Sleep -Seconds 3
+                
+                $agentService = Get-Service -Name "CheckMK Agent" -ErrorAction SilentlyContinue
+                if ($agentService.Status -eq "Running") {
+                    Write-Host "    [OK] Servizio riavviato correttamente" -ForegroundColor Green
+                    return $true
+                }
+                else {
+                    Write-Host "    [ERR] Servizio ancora in stato: $($agentService.Status)" -ForegroundColor Red
+                    return $false
+                }
+            }
+            catch {
+                Write-Host "    [ERR] Errore restart servizio: $_" -ForegroundColor Red
+                return $false
+            }
+        }
+        else {
+            return $false
+        }
+    }
+}
+
+# =====================================================
 # Funzione: Rileva SO Windows
 # =====================================================
 function Get-WindowsInfo {
@@ -388,13 +517,55 @@ function Install-CheckMKAgent {
         if ($process.ExitCode -eq 0 -or $process.ExitCode -eq 3010) {
             Write-Host "    [OK] Installazione completata" -ForegroundColor Green
             
-            Start-Sleep -Seconds 2
+            Start-Sleep -Seconds 3
+            
+            # Verifica servizio e avvio
             $agentService = Get-Service -Name "CheckMK Agent" -ErrorAction SilentlyContinue
             if ($agentService) {
                 if ($agentService.Status -ne "Running") {
-                    Start-Service -Name "CheckMK Agent"
+                    Write-Host "    [*] Avvio servizio CheckMK Agent..." -ForegroundColor Cyan
+                    try {
+                        Start-Service -Name "CheckMK Agent" -ErrorAction Stop
+                        Start-Sleep -Seconds 3
+                        Write-Host "    [OK] Servizio avviato" -ForegroundColor Green
+                    }
+                    catch {
+                        Write-Host "    [WARN] Errore avvio servizio: $_" -ForegroundColor Yellow
+                    }
                 }
-                Write-Host "    [OK] Servizio CheckMK Agent avviato" -ForegroundColor Green
+                else {
+                    Write-Host "    [OK] Servizio già in esecuzione" -ForegroundColor Green
+                }
+                
+                # Verifica connettività porta 6556
+                Write-Host "    [*] Test connettività porta 6556..." -ForegroundColor Cyan
+                Start-Sleep -Seconds 2
+                try {
+                    $tcpTest = Test-NetConnection -ComputerName "127.0.0.1" -Port 6556 -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
+                    if ($tcpTest.TcpTestSucceeded) {
+                        Write-Host "    [OK] Agent risponde correttamente sulla porta 6556" -ForegroundColor Green
+                    }
+                    else {
+                        Write-Host "    [WARN] Agent non risponde sulla porta 6556" -ForegroundColor Yellow
+                        Write-Host "    [*] Tentativo restart servizio..." -ForegroundColor Cyan
+                        Restart-Service -Name "CheckMK Agent" -Force -ErrorAction SilentlyContinue
+                        Start-Sleep -Seconds 3
+                        
+                        $tcpTest2 = Test-NetConnection -ComputerName "127.0.0.1" -Port 6556 -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
+                        if ($tcpTest2.TcpTestSucceeded) {
+                            Write-Host "    [OK] Agent ora risponde correttamente" -ForegroundColor Green
+                        }
+                        else {
+                            Write-Host "    [WARN] Problema persistente - verifica firewall/configurazione" -ForegroundColor Yellow
+                        }
+                    }
+                }
+                catch {
+                    Write-Host "    [WARN] Impossibile testare porta 6556: $_" -ForegroundColor Yellow
+                }
+            }
+            else {
+                Write-Host "    [WARN] Servizio CheckMK Agent non trovato dopo installazione" -ForegroundColor Yellow
             }
             
             return $true
@@ -810,7 +981,7 @@ try {
     Write-Host "`n"
     Write-Host "====================================================================" -ForegroundColor Cyan
     Write-Host "Installazione Interattiva CheckMK Agent + FRPC per Windows" -ForegroundColor Cyan
-    Write-Host "Version: 1.1 - 2025-11-07" -ForegroundColor Cyan
+    Write-Host "Version: 1.2 - 2025-11-14" -ForegroundColor Cyan
     Write-Host "====================================================================" -ForegroundColor Cyan
     
     # Verifica Administrator
@@ -859,6 +1030,11 @@ try {
         }
         exit 0
     }
+    
+    # =====================================================
+    # VERIFICA SERVIZIO CHECKMK AGENT ESISTENTE
+    # =====================================================
+    Test-CheckMKAgentService -FixIfNeeded
     
     # Modalita' installazione
     Write-Host "`n[*] Rilevamento Sistema Operativo..." -ForegroundColor Cyan
