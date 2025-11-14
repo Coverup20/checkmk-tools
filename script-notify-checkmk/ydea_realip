@@ -360,7 +360,7 @@ create_ydea_ticket() {
   # Aggiungi descrizione come commento pubblico (l'API non supporta testo in creazione)
   if [[ -n "$description" ]]; then
     debug "Aggiunta descrizione come commento pubblico al ticket #$ticket_id"
-    "$YDEA_TOOLKIT" comment "$ticket_id" "$description" true 2>&1 || {
+    "$YDEA_TOOLKIT" comment "$ticket_id" "$description" true >&2 || {
       log "WARN: Impossibile aggiungere descrizione al ticket #$ticket_id"
     }
   fi
