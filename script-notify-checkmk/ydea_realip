@@ -401,10 +401,18 @@ ticket_is_open_on_api() {
   
   debug "Verifica stato ticket #$ticket_id su API Ydea"
   
-  # Usa ydea-toolkit per ottenere info ticket
+  # Usa ydea-toolkit per ottenere info ticket (con timeout 10 secondi)
   local result
-  result=$("$YDEA_TOOLKIT" get "$ticket_id" 2>&1) || {
-    # Errore nell'API call
+  result=$(timeout 10 "$YDEA_TOOLKIT" get "$ticket_id" 2>&1) || {
+    local exit_code=$?
+    
+    # Timeout (exit code 124)
+    if [[ $exit_code -eq 124 ]]; then
+      log "WARN: Timeout verifica API ticket #$ticket_id (>10s)"
+      return 3
+    fi
+    
+    # Errore nell'API call - verifica se 404
     if echo "$result" | grep -qi "404\|not found\|Ticket non trovato"; then
       debug "Ticket #$ticket_id non trovato (404)"
       return 2
