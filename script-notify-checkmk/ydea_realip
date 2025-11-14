@@ -122,7 +122,7 @@ get_emoji() {
     WARN|WARNING) echo "🟡" ;;
     CRIT|CRITICAL|DOWN) echo "🔴" ;;
     UNKNOWN) echo "⚪" ;;
-    *) echo "❓" ;;
+    *) echo "⚠️" ;;
   esac
 }
 
@@ -265,7 +265,7 @@ main() {
       fi
       
       # Prepara titolo e descrizione
-      TITLE="[${EMOJI} ${STATE}] ${REAL_IP} - ${SERVICE}"
+      TITLE="[${EMOJI} ${STATE}] ${HOSTNAME} - ${SERVICE}"
       
       DESCRIPTION="**Ticket generato dal sistema di monitoraggio**
 
@@ -369,7 +369,7 @@ ${OUTPUT_SHORT}
       log "Nuovo problema HOST DOWN: creazione ticket"
       
       PRIORITY="critical"
-      TITLE="[${EMOJI} ${STATE}] Host ${REAL_IP} - ${HOSTNAME}"
+      TITLE="[${EMOJI} ${STATE}] ${HOSTNAME}"
       
       DESCRIPTION="**Ticket generato dal sistema di monitoraggio**
 
