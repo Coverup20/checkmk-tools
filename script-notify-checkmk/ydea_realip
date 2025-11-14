@@ -191,10 +191,31 @@ add_private_note() {
   local note="$2"
   
   debug "Aggiunta nota privata a ticket #$ticket_id"
-  "$YDEA_TOOLKIT" comment "$ticket_id" "$note" 2>&1 || {
-    log "ERRORE aggiunta nota a ticket #$ticket_id"
-    return 1
+  local result
+  result=$("$YDEA_TOOLKIT" comment "$ticket_id" "$note" 2>&1) || {
+    # Verifica se è un errore 404 (ticket non trovato/chiuso)
+    if echo "$result" | grep -q "404\|not found\|Not Found"; then
+      log "WARN: Ticket #$ticket_id non trovato (404) - potrebbe essere stato chiuso"
+      return 2  # Return code speciale per 404
+    else
+      log "ERRORE aggiunta nota a ticket #$ticket_id: $result"
+      return 1
+    fi
   }
+  
+  # Successo
+  return 0
+}
+
+# Rimuovi ticket dalla cache
+remove_ticket_from_cache() {
+  local key="$1"
+  init_cache
+  
+  debug "Rimozione ticket dalla cache: $key"
+  jq --arg key "$key" 'del(.[$key])' "$TICKET_CACHE" > "${TICKET_CACHE}.tmp" && \
+    cat "${TICKET_CACHE}.tmp" > "$TICKET_CACHE" && \
+    rm -f "${TICKET_CACHE}.tmp"
 }
 
 # ===== MAIN LOGIC =====
@@ -253,9 +274,87 @@ main() {
       NOTE="${NOTE} | Output: ${OUTPUT_SHORT}"
       
       # Aggiungi nota
-      if add_private_note "$TICKET_ID" "$NOTE"; then
+      add_private_note "$TICKET_ID" "$NOTE"
+      local note_result=$?
+      
+      if [[ $note_result -eq 0 ]]; then
         log "Nota privata aggiunta al ticket #$TICKET_ID"
         update_ticket_state "$TICKET_KEY" "$STATE"
+      elif [[ $note_result -eq 2 ]]; then
+        # Errore 404 - ticket non esiste più
+        log "Ticket #$TICKET_ID non più valido, rimozione dalla cache"
+        remove_ticket_from_cache "$TICKET_KEY"
+        
+        # Se lo stato è ancora critico, crea un nuovo ticket
+        if [[ "$STATE" == "CRIT" || "$STATE" == "CRITICAL" || "$STATE" == "DOWN" ]]; then
+          log "Stato ancora CRITICAL, creazione nuovo ticket"
+          
+          # Determina priorità
+          PRIORITY="urgent"
+          if [[ -n "$FLAPPING_STATUS" ]]; then
+            PRIORITY="critical"
+          fi
+          
+          # Prepara titolo e descrizione (stessa logica di creazione nuovo ticket)
+          TITLE="[${STATE}] ${HOSTNAME} - ${SERVICE}"
+          
+          DESCRIPTION="ALERT DI MONITORAGGIO - CheckMK
+
+===========================================
+DETTAGLI SERVIZIO
+===========================================
+
+Host:              ${HOSTNAME}
+Indirizzo IP:      ${REAL_IP}
+Servizio:          ${SERVICE}
+Stato corrente:    ${STATE}
+Stato precedente:  ${LAST_STATE}
+Tipo notifica:     ${STATE_TYPE}
+Timestamp:         $(date '+%Y-%m-%d %H:%M:%S')
+${FLAPPING_STATUS:+
+-------------------------------------------
+ATTENZIONE: ${FLAPPING_STATUS}
+-------------------------------------------
+}
+===========================================
+OUTPUT DIAGNOSTICO
+===========================================
+
+${OUTPUT_SHORT}
+
+===========================================
+DETTAGLI TECNICI
+===========================================
+
+Tipo notifica:     ${NOTIFY_NOTIFICATIONTYPE:-N/A}
+Tentativo check:   ${NOTIFY_SERVICEATTEMPT:-N/A}/${NOTIFY_SERVICEMAXATTEMPTS:-N/A}
+Durata stato:      ${NOTIFY_SERVICESTATEID:-N/A}
+Ultimo check:      ${NOTIFY_LASTSERVICECHECK:-N/A}
+Prossimo check:    ${NOTIFY_NEXTSERVICECHECK:-N/A}
+
+-------------------------------------------
+⚠️ NOTA: Ticket precedente #${TICKET_ID} non più disponibile
+Nuovo ticket creato automaticamente
+-------------------------------------------
+Generato automaticamente da CheckMK
+Sito: ${NOTIFY_OMD_SITE:-monitoring}
+-------------------------------------------"
+          
+          # Crea nuovo ticket
+          NEW_TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY")
+          
+          if [[ -n "$NEW_TICKET_ID" ]]; then
+            log "✅ Nuovo ticket creato: #$NEW_TICKET_ID (sostituisce #$TICKET_ID)"
+            save_ticket_cache "$TICKET_KEY" "$NEW_TICKET_ID" "$STATE"
+          else
+            log "❌ Errore creazione nuovo ticket per $TICKET_KEY"
+          fi
+        else
+          log "Stato $STATE non critico, nessun nuovo ticket creato"
+        fi
+      else
+        # Altro errore generico
+        log "Errore generico aggiunta nota al ticket #$TICKET_ID"
       fi
       
     elif [[ "$STATE" == "CRIT" || "$STATE" == "CRITICAL" || "$STATE" == "DOWN" ]]; then
@@ -359,9 +458,85 @@ Sito: ${NOTIFY_OMD_SITE:-monitoring}
       fi
       NOTE="${NOTE} | Output: ${OUTPUT_SHORT}"
       
-      if add_private_note "$TICKET_ID" "$NOTE"; then
+      add_private_note "$TICKET_ID" "$NOTE"
+      local note_result=$?
+      
+      if [[ $note_result -eq 0 ]]; then
         log "Nota privata aggiunta al ticket #$TICKET_ID"
         update_ticket_state "$TICKET_KEY" "$STATE"
+      elif [[ $note_result -eq 2 ]]; then
+        # Errore 404 - ticket non esiste più
+        log "Ticket #$TICKET_ID non più valido, rimozione dalla cache"
+        remove_ticket_from_cache "$TICKET_KEY"
+        
+        # Se lo stato è ancora critico, crea un nuovo ticket
+        if [[ "$STATE" == "DOWN" || "$STATE" == "CRITICAL" ]]; then
+          log "Stato ancora CRITICAL/DOWN, creazione nuovo ticket"
+          
+          PRIORITY="critical"
+          TITLE="[${STATE}] ${HOSTNAME}"
+          
+          DESCRIPTION="ALERT DI MONITORAGGIO - CheckMK
+
+===========================================
+HOST DOWN
+===========================================
+
+Hostname:          ${HOSTNAME}
+Indirizzo IP:      ${REAL_IP}
+Stato corrente:    ${STATE}
+Stato precedente:  ${LAST_STATE}
+Tipo notifica:     ${STATE_TYPE}
+Timestamp:         $(date '+%Y-%m-%d %H:%M:%S')
+${FLAPPING_STATUS:+
+-------------------------------------------
+ATTENZIONE: ${FLAPPING_STATUS}
+-------------------------------------------
+}
+===========================================
+OUTPUT DIAGNOSTICO
+===========================================
+
+${OUTPUT_SHORT}
+
+===========================================
+AZIONI CONSIGLIATE
+===========================================
+
+1. Verificare connettivita di rete
+2. Controllare status hardware/VM
+3. Verificare log di sistema
+4. Valutare restart servizi se necessario
+
+===========================================
+DETTAGLI TECNICI
+===========================================
+
+Tipo notifica:     ${NOTIFY_NOTIFICATIONTYPE:-N/A}
+Tentativo check:   ${NOTIFY_HOSTATTEMPT:-N/A}/${NOTIFY_HOSTMAXATTEMPTS:-N/A}
+Durata stato:      ${NOTIFY_HOSTSTATEID:-N/A}
+Ultimo check:      ${NOTIFY_LASTHOSTCHECK:-N/A}
+
+-------------------------------------------
+⚠️ NOTA: Ticket precedente #${TICKET_ID} non più disponibile
+Nuovo ticket creato automaticamente
+-------------------------------------------
+Generato automaticamente da CheckMK
+Sito: ${NOTIFY_OMD_SITE:-monitoring}
+-------------------------------------------"
+          
+          NEW_TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY")
+          
+          if [[ -n "$NEW_TICKET_ID" ]]; then
+            log "✅ Nuovo ticket creato: #$NEW_TICKET_ID (sostituisce #$TICKET_ID)"
+            save_ticket_cache "$TICKET_KEY" "$NEW_TICKET_ID" "$STATE"
+          fi
+        else
+          log "Stato $STATE non critico, nessun nuovo ticket creato"
+        fi
+      else
+        # Altro errore generico
+        log "Errore generico aggiunta nota al ticket #$TICKET_ID"
       fi
       
     elif [[ "$STATE" == "DOWN" || "$STATE" == "CRITICAL" ]]; then
