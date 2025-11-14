@@ -217,10 +217,6 @@ main() {
     
     TICKET_KEY=$(get_ticket_key "$REAL_IP" "$SERVICE")
     
-    # Emoji per stato corrente
-    EMOJI=$(get_emoji "$STATE")
-    LAST_EMOJI=$(get_emoji "$LAST_STATE")
-    
     # Formatta output sintetico
     OUTPUT_SHORT=$(format_output "$OUTPUT")
     
@@ -244,11 +240,11 @@ main() {
       log "Ticket esistente trovato: #$TICKET_ID"
       
       # Prepara nota privata sintetica
-      NOTE="🔄 [$(date '+%d/%m/%y %H:%M')] ${LAST_EMOJI}${LAST_STATE}→${EMOJI}${STATE}"
+      NOTE="[$(date '+%d/%m/%y %H:%M')] ${LAST_STATE} -> ${STATE}"
       
       # Aggiungi dettagli stato
       if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
-        NOTE="${NOTE} | ✅ Allarme rientrato"
+        NOTE="${NOTE} | Allarme rientrato"
       elif [[ -n "$FLAPPING_STATUS" ]]; then
         NOTE="${NOTE} | ${FLAPPING_STATUS}"
       fi
@@ -275,47 +271,44 @@ main() {
       # Prepara titolo e descrizione
       TITLE="[${STATE}] ${HOSTNAME} - ${SERVICE}"
       
-      DESCRIPTION="**Ticket generato dal sistema di monitoraggio**
+      DESCRIPTION="ALERT DI MONITORAGGIO - CheckMK
 
----
+===========================================
+DETTAGLI SERVIZIO
+===========================================
 
-## 🚨 Dettagli Alert
+Host:              ${HOSTNAME}
+Indirizzo IP:      ${REAL_IP}
+Servizio:          ${SERVICE}
+Stato corrente:    ${STATE}
+Stato precedente:  ${LAST_STATE}
+Tipo notifica:     ${STATE_TYPE}
+Timestamp:         $(date '+%Y-%m-%d %H:%M:%S')
+${FLAPPING_STATUS:+
+-------------------------------------------
+ATTENZIONE: ${FLAPPING_STATUS}
+-------------------------------------------
+}
+===========================================
+OUTPUT DIAGNOSTICO
+===========================================
 
-**Host:** ${HOSTNAME}
-**Indirizzo IP:** \`${REAL_IP}\`
-**Servizio:** ${SERVICE}
-**Stato Attuale:** ${EMOJI} **${STATE}**
-**Stato Precedente:** $(get_emoji "$LAST_STATE") ${LAST_STATE}
-**Tipo Alert:** ${STATE_TYPE}
-**Data/Ora:** $(date '+%Y-%m-%d %H:%M:%S')
-
-${FLAPPING_STATUS:+---
-
-## ⚠️ Avviso Flapping
-${FLAPPING_STATUS}
-
-}---
-
-## 📊 Output Diagnostico
-
-\`\`\`
 ${OUTPUT_SHORT}
-\`\`\`
 
----
+===========================================
+DETTAGLI TECNICI
+===========================================
 
-## 📋 Informazioni Tecniche
+Tipo notifica:     ${NOTIFY_NOTIFICATIONTYPE:-N/A}
+Tentativo check:   ${NOTIFY_SERVICEATTEMPT:-N/A}/${NOTIFY_SERVICEMAXATTEMPTS:-N/A}
+Durata stato:      ${NOTIFY_SERVICESTATEID:-N/A}
+Ultimo check:      ${NOTIFY_LASTSERVICECHECK:-N/A}
+Prossimo check:    ${NOTIFY_NEXTSERVICECHECK:-N/A}
 
-- **Notification Type:** ${NOTIFY_NOTIFICATIONTYPE:-N/A}
-- **Check Attempt:** ${NOTIFY_SERVICEATTEMPT:-N/A}/${NOTIFY_SERVICEMAXATTEMPTS:-N/A}
-- **Durata Stato:** ${NOTIFY_SERVICESTATEID:-N/A}
-- **Ultimo Check:** ${NOTIFY_LASTSERVICECHECK:-N/A}
-- **Prossimo Check:** ${NOTIFY_NEXTSERVICECHECK:-N/A}
-
----
-
-*🤖 Ticket creato automaticamente dal sistema di monitoraggio CheckMK*
-*📍 Sito: ${NOTIFY_OMD_SITE:-monitoring} | Host: ${NOTIFY_OMD_ROOT:-N/A}*"
+-------------------------------------------
+Generato automaticamente da CheckMK
+Sito: ${NOTIFY_OMD_SITE:-monitoring}
+-------------------------------------------"
       
       # Crea ticket
       TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY")
@@ -340,8 +333,6 @@ ${OUTPUT_SHORT}
     
     TICKET_KEY=$(get_ticket_key "$REAL_IP" "HOST")
     
-    EMOJI=$(get_emoji "$STATE")
-    LAST_EMOJI=$(get_emoji "$LAST_STATE")
     OUTPUT_SHORT=$(format_output "$OUTPUT")
     
     log "HOST Alert: $HOSTNAME ($REAL_IP) | $LAST_STATE -> $STATE"
@@ -360,9 +351,9 @@ ${OUTPUT_SHORT}
     if ticket_exists "$TICKET_KEY"; then
       TICKET_ID=$(get_ticket_id "$TICKET_KEY")
       
-      NOTE="🔄 [$(date '+%d/%m/%y %H:%M')] ${LAST_EMOJI}${LAST_STATE}→${EMOJI}${STATE}"
+      NOTE="[$(date '+%d/%m/%y %H:%M')] ${LAST_STATE} -> ${STATE}"
       if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
-        NOTE="${NOTE} | ✅ Allarme rientrato"
+        NOTE="${NOTE} | Allarme rientrato"
       elif [[ -n "$FLAPPING_STATUS" ]]; then
         NOTE="${NOTE} | ${FLAPPING_STATUS}"
       fi
@@ -379,54 +370,51 @@ ${OUTPUT_SHORT}
       PRIORITY="critical"
       TITLE="[${STATE}] ${HOSTNAME}"
       
-      DESCRIPTION="**Ticket generato dal sistema di monitoraggio**
+      DESCRIPTION="ALERT DI MONITORAGGIO - CheckMK
 
----
+===========================================
+HOST DOWN
+===========================================
 
-## 🚨 Alert HOST DOWN
+Hostname:          ${HOSTNAME}
+Indirizzo IP:      ${REAL_IP}
+Stato corrente:    ${STATE}
+Stato precedente:  ${LAST_STATE}
+Tipo notifica:     ${STATE_TYPE}
+Timestamp:         $(date '+%Y-%m-%d %H:%M:%S')
+${FLAPPING_STATUS:+
+-------------------------------------------
+ATTENZIONE: ${FLAPPING_STATUS}
+-------------------------------------------
+}
+===========================================
+OUTPUT DIAGNOSTICO
+===========================================
 
-**Hostname:** ${HOSTNAME}
-**Indirizzo IP:** \`${REAL_IP}\`
-**Stato Attuale:** ${EMOJI} **${STATE}**
-**Stato Precedente:** $(get_emoji "$LAST_STATE") ${LAST_STATE}
-**Tipo Alert:** ${STATE_TYPE}
-**Data/Ora:** $(date '+%Y-%m-%d %H:%M:%S')
-
-${FLAPPING_STATUS:+---
-
-## ⚠️ Avviso Flapping
-${FLAPPING_STATUS}
-
-}---
-
-## 📊 Output Diagnostico
-
-\`\`\`
 ${OUTPUT_SHORT}
-\`\`\`
 
----
+===========================================
+AZIONI CONSIGLIATE
+===========================================
 
-## 🔧 Azioni Suggerite
+1. Verificare connettivita di rete
+2. Controllare status hardware/VM
+3. Verificare log di sistema
+4. Valutare restart servizi se necessario
 
-1. ✅ Verificare connettività di rete
-2. ✅ Controllare status hardware/VM
-3. ✅ Verificare log di sistema
-4. ✅ Tentare restart se appropriato
+===========================================
+DETTAGLI TECNICI
+===========================================
 
----
+Tipo notifica:     ${NOTIFY_NOTIFICATIONTYPE:-N/A}
+Tentativo check:   ${NOTIFY_HOSTATTEMPT:-N/A}/${NOTIFY_HOSTMAXATTEMPTS:-N/A}
+Durata stato:      ${NOTIFY_HOSTSTATEID:-N/A}
+Ultimo check:      ${NOTIFY_LASTHOSTCHECK:-N/A}
 
-## 📋 Informazioni Tecniche
-
-- **Notification Type:** ${NOTIFY_NOTIFICATIONTYPE:-N/A}
-- **Check Attempt:** ${NOTIFY_HOSTATTEMPT:-N/A}/${NOTIFY_HOSTMAXATTEMPTS:-N/A}
-- **Durata Stato:** ${NOTIFY_HOSTSTATEID:-N/A}
-- **Ultimo Check:** ${NOTIFY_LASTHOSTCHECK:-N/A}
-
----
-
-*🤖 Ticket creato automaticamente dal sistema di monitoraggio CheckMK*
-*📍 Sito: ${NOTIFY_OMD_SITE:-monitoring}*"
+-------------------------------------------
+Generato automaticamente da CheckMK
+Sito: ${NOTIFY_OMD_SITE:-monitoring}
+-------------------------------------------"
       
       TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY")
       
