@@ -560,16 +560,41 @@ main() {
         fi
         
       elif [[ $note_result -eq 2 ]]; then
-        # Errore 404 - ticket non esiste più su Ydea
+        # Errore 404 - ticket non esiste più su Ydea (chiuso da operatore)
         log "Ticket #$TICKET_ID non più valido (404), rimozione dalla cache"
-        
-        # Se stato OK/UP, marca come risolto prima di rimuovere
-        if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
-          mark_ticket_resolved "$TICKET_KEY"
-          log "Ticket marcato come risolto prima della rimozione"
-        fi
-        
         remove_ticket_from_cache "$TICKET_KEY"
+        
+        # Se stato è ancora CRITICAL/DOWN, crea un nuovo ticket
+        if [[ "$STATE" == "CRITICAL" || "$STATE" == "CRIT" || "$STATE" == "DOWN" ]]; then
+          log "⚠️ Stato ancora CRITICAL dopo 404: creazione nuovo ticket"
+          
+          # Determina priorità (sempre urgent per CRITICAL, critical per flapping)
+          PRIORITY="urgent"
+          if [[ -n "$FLAPPING_STATUS" ]]; then
+            PRIORITY="critical"
+          fi
+          
+          # Prepara titolo e descrizione
+          TITLE="[${STATE}] ${HOSTNAME} - ${SERVICE}"
+          DESCRIPTION="Host: ${HOSTNAME}\nServizio: ${SERVICE}\nStato: ${STATE}\nOutput: ${OUTPUT}\n\nTicket precedente #${TICKET_ID} chiuso da operatore."
+          
+          # Crea nuovo ticket
+          NEW_TICKET_ID=$(timeout 10s bash "$YDEA_TOOLKIT" create \
+            --title "$TITLE" \
+            --description "$DESCRIPTION" \
+            --priority "$PRIORITY" \
+            --label "$LABEL" 2>/dev/null | grep -oP 'Ticket ID: \K[0-9]+' || echo "")
+          
+          if [[ -n "$NEW_TICKET_ID" ]]; then
+            log "✅ Nuovo ticket creato: #$NEW_TICKET_ID (dopo 404 su #$TICKET_ID)"
+            save_ticket_to_cache "$TICKET_KEY" "$NEW_TICKET_ID" "$STATE"
+          else
+            log "❌ Errore creazione nuovo ticket dopo 404"
+          fi
+        elif [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
+          # Stato OK dopo 404: ticket era già chiuso, nulla da fare
+          log "Stato OK dopo 404, ticket già chiuso dall'operatore"
+        fi
         
       else
         # Altro errore generico aggiunta nota
