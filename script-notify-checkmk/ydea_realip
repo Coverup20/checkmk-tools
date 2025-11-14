@@ -194,7 +194,7 @@ add_private_note() {
   local result
   result=$("$YDEA_TOOLKIT" comment "$ticket_id" "$note" 2>&1) || {
     # Verifica se è un errore 404 (ticket non trovato/chiuso)
-    if echo "$result" | grep -q "404\|not found\|Not Found"; then
+    if echo "$result" | grep -qi "404\|not found\|Ticket non trovato"; then
       log "WARN: Ticket #$ticket_id non trovato (404) - potrebbe essere stato chiuso"
       return 2  # Return code speciale per 404
     else
