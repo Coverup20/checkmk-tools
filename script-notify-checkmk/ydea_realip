@@ -123,32 +123,43 @@ atomic_cache_write() {
   fi
   
   # Usa flock per garantire scrittura atomica
+  local write_result
   (
     flock -x -w 5 200 || {
-      log "WARN: Timeout acquisizione lock per $cache_file"
+      log "WARN: Timeout acquisizione lock per $cache_file, uso fallback"
       # Fallback: scrivi direttamente senza lock
       echo "$content" > "$cache_file" 2>/dev/null || {
         log "ERROR: Fallback scrittura fallito per $cache_file"
-        return 1
+        exit 1
       }
-      return 0
+      exit 0
     }
     
     echo "$content" > "$temp_file" 2>/dev/null || {
       log "ERROR: Impossibile scrivere temp file $temp_file"
-      return 1
+      exit 1
     }
     chmod 666 "$temp_file" 2>/dev/null || true
     sync
     mv "$temp_file" "$cache_file" 2>/dev/null || {
       log "ERROR: Impossibile spostare $temp_file a $cache_file"
       rm -f "$temp_file" 2>/dev/null
-      return 1
+      exit 1
     }
     chmod 666 "$cache_file" 2>/dev/null || true
     sync
+    exit 0
     
   ) 200>"${CACHE_LOCK}"
+  write_result=$?
+  
+  if [[ $write_result -ne 0 ]]; then
+    log "ERROR: atomic_cache_write fallito con codice $write_result"
+    return 1
+  fi
+  
+  debug "atomic_cache_write OK: $cache_file"
+  return 0
 }
 
 # Genera chiave univoca per ticket: IP/HOSTNAME:SERVIZIO
@@ -186,11 +197,14 @@ save_ticket_cache() {
      --arg ts "$(date -u +%s)" \
     '.[$key] = {ticket_id: ($id | tonumber), state: $state, created_at: ($ts | tonumber), last_update: ($ts | tonumber), resolved_at: null}' \
     "$TICKET_CACHE" 2>/dev/null) || {
-    log "ERRORE: Impossibile salvare ticket in cache"
+    log "ERRORE: Impossibile generare JSON per cache"
     return 1
   }
   
-  atomic_cache_write "$TICKET_CACHE" "$updated_cache"
+  atomic_cache_write "$TICKET_CACHE" "$updated_cache" || {
+    log "ERRORE: atomic_cache_write fallito per $key"
+    return 1
+  }
   debug "Ticket salvato in cache: $key -> $ticket_id"
 }
 
