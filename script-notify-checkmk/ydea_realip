@@ -444,13 +444,14 @@ main() {
     
     # === LOGICA GESTIONE TICKET ===
     if ticket_exists "$TICKET_KEY"; then
-      # Ticket già esiste -> verifica se è ancora aperto su Ydea
+      # Ticket già esiste -> aggiungi nota
       TICKET_ID=$(get_ticket_id "$TICKET_KEY")
       log "Ticket esistente trovato in cache: #$TICKET_ID"
       
-      # Verifica stato reale su Ydea prima di aggiungere nota
-      ticket_is_open_on_api "$TICKET_ID"
-      local api_check=$?
+      # TODO: Verifica stato reale su Ydea prima di aggiungere nota
+      # ticket_is_open_on_api "$TICKET_ID"
+      # local api_check=$?
+      local api_check=0  # Assume ticket aperto per ora
       
       if [[ $api_check -eq 1 ]]; then
         # Ticket chiuso/risolto dall'operatore
