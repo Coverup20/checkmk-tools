@@ -267,23 +267,47 @@ main() {
       # Prepara titolo e descrizione
       TITLE="[${EMOJI} ${STATE}] ${REAL_IP} - ${SERVICE}"
       
-      DESCRIPTION="## 🚨 Alert CheckMK
+      DESCRIPTION="**Ticket generato dal sistema di monitoraggio**
 
-**Host:** ${HOSTNAME} (\`${REAL_IP}\`)
+---
+
+## 🚨 Dettagli Alert
+
+**Host:** ${HOSTNAME}
+**Indirizzo IP:** \`${REAL_IP}\`
 **Servizio:** ${SERVICE}
-**Stato:** ${EMOJI} ${STATE}
-**Tipo:** ${STATE_TYPE}
+**Stato Attuale:** ${EMOJI} **${STATE}**
+**Stato Precedente:** $(get_emoji "$LAST_STATE") ${LAST_STATE}
+**Tipo Alert:** ${STATE_TYPE}
 **Data/Ora:** $(date '+%Y-%m-%d %H:%M:%S')
 
-${FLAPPING_STATUS:+**⚠️ Stato:** ${FLAPPING_STATUS}
+${FLAPPING_STATUS:+---
 
-}**Output Plugin:**
+## ⚠️ Avviso Flapping
+${FLAPPING_STATUS}
+
+}---
+
+## 📊 Output Diagnostico
+
 \`\`\`
 ${OUTPUT_SHORT}
 \`\`\`
 
 ---
-*Alert automatico da CheckMK*"
+
+## 📋 Informazioni Tecniche
+
+- **Notification Type:** ${NOTIFY_NOTIFICATIONTYPE:-N/A}
+- **Check Attempt:** ${NOTIFY_SERVICEATTEMPT:-N/A}/${NOTIFY_SERVICEMAXATTEMPTS:-N/A}
+- **Durata Stato:** ${NOTIFY_SERVICESTATEID:-N/A}
+- **Ultimo Check:** ${NOTIFY_LASTSERVICECHECK:-N/A}
+- **Prossimo Check:** ${NOTIFY_NEXTSERVICECHECK:-N/A}
+
+---
+
+*🤖 Ticket creato automaticamente dal sistema di monitoraggio CheckMK*
+*📍 Sito: ${NOTIFY_OMD_SITE:-monitoring} | Host: ${NOTIFY_OMD_ROOT:-N/A}*"
       
       # Crea ticket
       TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY")
@@ -347,29 +371,54 @@ ${OUTPUT_SHORT}
       PRIORITY="critical"
       TITLE="[${EMOJI} ${STATE}] Host ${REAL_IP} - ${HOSTNAME}"
       
-      DESCRIPTION="## 🚨 Alert CheckMK - Host Down
+      DESCRIPTION="**Ticket generato dal sistema di monitoraggio**
 
-**Host:** ${HOSTNAME}
-**IP:** \`${REAL_IP}\`
-**Stato:** ${EMOJI} ${STATE}
-**Tipo:** ${STATE_TYPE}
+---
+
+## 🚨 Alert HOST DOWN
+
+**Hostname:** ${HOSTNAME}
+**Indirizzo IP:** \`${REAL_IP}\`
+**Stato Attuale:** ${EMOJI} **${STATE}**
+**Stato Precedente:** $(get_emoji "$LAST_STATE") ${LAST_STATE}
+**Tipo Alert:** ${STATE_TYPE}
 **Data/Ora:** $(date '+%Y-%m-%d %H:%M:%S')
 
-${FLAPPING_STATUS:+**⚠️ Stato:** ${FLAPPING_STATUS}
+${FLAPPING_STATUS:+---
 
-}**Output Check:**
+## ⚠️ Avviso Flapping
+${FLAPPING_STATUS}
+
+}---
+
+## 📊 Output Diagnostico
+
 \`\`\`
 ${OUTPUT_SHORT}
 \`\`\`
 
-**Azioni Immediate:**
-1. Verificare connettività di rete
-2. Controllare status hardware/VM
-3. Verificare log di sistema
-4. Tentare restart se appropriato
+---
+
+## 🔧 Azioni Suggerite
+
+1. ✅ Verificare connettività di rete
+2. ✅ Controllare status hardware/VM
+3. ✅ Verificare log di sistema
+4. ✅ Tentare restart se appropriato
 
 ---
-*Alert automatico da CheckMK*"
+
+## 📋 Informazioni Tecniche
+
+- **Notification Type:** ${NOTIFY_NOTIFICATIONTYPE:-N/A}
+- **Check Attempt:** ${NOTIFY_HOSTATTEMPT:-N/A}/${NOTIFY_HOSTMAXATTEMPTS:-N/A}
+- **Durata Stato:** ${NOTIFY_HOSTSTATEID:-N/A}
+- **Ultimo Check:** ${NOTIFY_LASTHOSTCHECK:-N/A}
+
+---
+
+*🤖 Ticket creato automaticamente dal sistema di monitoraggio CheckMK*
+*📍 Sito: ${NOTIFY_OMD_SITE:-monitoring}*"
       
       TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY")
       
