@@ -536,8 +536,8 @@ main() {
       NOTE="${NOTE} | Output: ${OUTPUT_SHORT}"
       
       # Aggiungi nota (verifica automaticamente se ticket esiste con 404 check)
-      add_private_note "$TICKET_ID" "$NOTE"
-      local note_result=$?
+      add_private_note "$TICKET_ID" "$NOTE" || local note_result=$?
+      local note_result=${note_result:-0}
       
       if [[ $note_result -eq 0 ]]; then
         # Nota aggiunta con successo - ticket esiste ed è aperto
