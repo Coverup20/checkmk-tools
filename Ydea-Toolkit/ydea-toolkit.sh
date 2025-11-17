@@ -624,7 +624,8 @@ list_tracked_tickets() {
 
 # ===== Configurazione Interattiva =====
 interactive_config() {
-  local env_file="${TOOLKIT_DIR:-.}/.env"
+  # Usa la directory dello script, non la working directory
+  local env_file="$SCRIPT_DIR/.env"
   
   echo "🔧 Configurazione Interattiva Ydea Toolkit"
   echo "=========================================="
