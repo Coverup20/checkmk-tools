@@ -516,13 +516,13 @@ update_tracked_tickets() {
     
     log_debug "Controllo ticket #$ticket_id..."
     
-    # Recupera stato corrente usando list con filtro
+    # Recupera tutti i ticket e filtra per ID (l'API non supporta filtro ?id=X)
     local ticket_data
-    ticket_data=$(ydea_api GET "/tickets?limit=1&id=$ticket_id" 2>/dev/null || echo "{}")
+    ticket_data=$(ydea_api GET "/tickets?limit=100" 2>/dev/null || echo "{}")
     
-    # Estrai il primo ticket dall'array objs
+    # Filtra per ticket_id specifico
     local ticket_obj
-    ticket_obj=$(echo "$ticket_data" | jq -r '.objs[0] // {}' 2>/dev/null || echo "{}")
+    ticket_obj=$(echo "$ticket_data" | jq --arg tid "$ticket_id" '.objs[] | select(.id == ($tid|tonumber)) // {}' 2>/dev/null | jq -s '.[0] // {}')
     
     if [[ "$ticket_obj" == "{}" ]] || [[ "$ticket_obj" == "null" ]]; then
       log_warn "Ticket #$ticket_id non trovato, potrebbe essere stato eliminato"
