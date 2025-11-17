@@ -522,7 +522,7 @@ update_tracked_tickets() {
     
     # Filtra per ticket_id specifico
     local ticket_obj
-    ticket_obj=$(echo "$ticket_data" | jq --arg tid "$ticket_id" '.objs[] | select(.id == ($tid|tonumber)) // {}' 2>/dev/null | jq -s '.[0] // {}')
+    ticket_obj=$(echo "$ticket_data" | jq --arg tid "$ticket_id" '.objs[] | select(.id == ($tid|tonumber))' 2>/dev/null | head -n 1)
     
     if [[ "$ticket_obj" == "{}" ]] || [[ "$ticket_obj" == "null" ]]; then
       log_warn "Ticket #$ticket_id non trovato, potrebbe essere stato eliminato"
