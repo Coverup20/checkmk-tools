@@ -14,6 +14,8 @@ set -euo pipefail
 : "${YDEA_LOG_FILE:=/var/log/ydea-toolkit.log}"
 : "${YDEA_LOG_MAX_SIZE:=10485760}"  # 10MB
 : "${YDEA_LOG_LEVEL:=INFO}"  # DEBUG, INFO, WARN, ERROR
+: "${YDEA_TRACKING_FILE:=/var/log/ydea-tickets-tracking.json}"
+: "${YDEA_TRACKING_RETENTION_DAYS:=30}"  # Mantieni ticket risolti per N giorni
 
 CURL_OPTS=(
   --fail-with-body
@@ -398,6 +400,211 @@ list_users() {
   ydea_api GET "/users?limit=$limit"
 }
 
+# ===== Tracking Ticket System =====
+
+# Inizializza il file di tracking se non esiste
+init_tracking_file() {
+  if [[ ! -f "$YDEA_TRACKING_FILE" ]]; then
+    echo '{"tickets":[],"last_update":""}' > "$YDEA_TRACKING_FILE"
+    log_debug "File tracking inizializzato: $YDEA_TRACKING_FILE"
+  fi
+}
+
+# Aggiungi ticket al tracking
+track_ticket() {
+  local ticket_id="$1"
+  local codice="${2:-}"
+  local host="${3:-}"
+  local service="${4:-}"
+  local description="${5:-}"
+  
+  init_tracking_file
+  
+  local now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  
+  # Recupera dettagli ticket da API
+  local ticket_data
+  ticket_data=$(ydea_api GET "/tickets/$ticket_id" 2>/dev/null || echo "{}")
+  
+  local stato=$(echo "$ticket_data" | jq -r '.stato // "Sconosciuto"')
+  local titolo=$(echo "$ticket_data" | jq -r '.titolo // ""')
+  
+  # Aggiungi al tracking
+  local new_entry
+  new_entry=$(jq -n \
+    --arg tid "$ticket_id" \
+    --arg code "$codice" \
+    --arg host "$host" \
+    --arg svc "$service" \
+    --arg desc "$description" \
+    --arg title "$titolo" \
+    --arg stato "$stato" \
+    --arg created "$now" \
+    '{
+      ticket_id: ($tid|tonumber),
+      codice: $code,
+      host: $host,
+      service: $svc,
+      description: $desc,
+      titolo: $title,
+      stato: $stato,
+      created_at: $created,
+      last_update: $created,
+      resolved_at: null,
+      checks_count: 1
+    }')
+  
+  # Verifica se già tracciato
+  local exists
+  exists=$(jq --arg tid "$ticket_id" '.tickets[] | select(.ticket_id == ($tid|tonumber)) | .ticket_id' "$YDEA_TRACKING_FILE" 2>/dev/null || echo "")
+  
+  if [[ -n "$exists" ]]; then
+    log_warn "Ticket #$ticket_id già tracciato, aggiorno contatore"
+    jq --arg tid "$ticket_id" --arg now "$now" \
+      '.tickets |= map(if .ticket_id == ($tid|tonumber) then .checks_count += 1 | .last_update = $now else . end) | .last_update = $now' \
+      "$YDEA_TRACKING_FILE" > "${YDEA_TRACKING_FILE}.tmp" && mv "${YDEA_TRACKING_FILE}.tmp" "$YDEA_TRACKING_FILE"
+  else
+    log_info "Aggiunto ticket #$ticket_id al tracking"
+    jq --argjson entry "$new_entry" --arg now "$now" \
+      '.tickets += [$entry] | .last_update = $now' \
+      "$YDEA_TRACKING_FILE" > "${YDEA_TRACKING_FILE}.tmp" && mv "${YDEA_TRACKING_FILE}.tmp" "$YDEA_TRACKING_FILE"
+  fi
+  
+  log_success "Ticket #$ticket_id ($codice) tracciato - Host: $host, Service: $service"
+}
+
+# Aggiorna stato ticket tracciati
+update_tracked_tickets() {
+  init_tracking_file
+  
+  local count=0
+  local updated=0
+  local resolved=0
+  local now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  
+  log_info "Aggiornamento stati ticket tracciati..."
+  
+  # Leggi tutti i ticket non risolti
+  local tickets
+  tickets=$(jq -r '.tickets[] | select(.resolved_at == null) | .ticket_id' "$YDEA_TRACKING_FILE" 2>/dev/null || echo "")
+  
+  if [[ -z "$tickets" ]]; then
+    log_info "Nessun ticket da aggiornare"
+    return 0
+  fi
+  
+  while IFS= read -r ticket_id; do
+    [[ -z "$ticket_id" ]] && continue
+    count=$((count + 1))
+    
+    log_debug "Controllo ticket #$ticket_id..."
+    
+    # Recupera stato corrente
+    local ticket_data
+    ticket_data=$(ydea_api GET "/tickets/$ticket_id" 2>/dev/null || echo "{}")
+    
+    if [[ "$ticket_data" == "{}" ]]; then
+      log_warn "Ticket #$ticket_id non trovato, potrebbe essere stato eliminato"
+      continue
+    fi
+    
+    local stato=$(echo "$ticket_data" | jq -r '.stato // "Sconosciuto"')
+    
+    # Controlla se risolto
+    if [[ "$stato" =~ ^(Effettuato|Chiuso|Completato|Risolto)$ ]]; then
+      log_success "✅ Ticket #$ticket_id RISOLTO (stato: $stato)"
+      jq --arg tid "$ticket_id" --arg stato "$stato" --arg now "$now" \
+        '.tickets |= map(if .ticket_id == ($tid|tonumber) then .stato = $stato | .resolved_at = $now | .last_update = $now else . end) | .last_update = $now' \
+        "$YDEA_TRACKING_FILE" > "${YDEA_TRACKING_FILE}.tmp" && mv "${YDEA_TRACKING_FILE}.tmp" "$YDEA_TRACKING_FILE"
+      resolved=$((resolved + 1))
+    else
+      # Solo aggiorna stato
+      jq --arg tid "$ticket_id" --arg stato "$stato" --arg now "$now" \
+        '.tickets |= map(if .ticket_id == ($tid|tonumber) then .stato = $stato | .last_update = $now | .checks_count += 1 else . end) | .last_update = $now' \
+        "$YDEA_TRACKING_FILE" > "${YDEA_TRACKING_FILE}.tmp" && mv "${YDEA_TRACKING_FILE}.tmp" "$YDEA_TRACKING_FILE"
+      updated=$((updated + 1))
+    fi
+  done <<< "$tickets"
+  
+  log_info "Aggiornamento completato: $count ticket controllati, $updated aggiornati, $resolved risolti"
+}
+
+# Pulisci ticket risolti vecchi
+cleanup_resolved_tickets() {
+  init_tracking_file
+  
+  local retention_seconds=$((YDEA_TRACKING_RETENTION_DAYS * 86400))
+  local now_epoch=$(date -u +%s)
+  local cutoff_epoch=$((now_epoch - retention_seconds))
+  local cutoff_date=$(date -u -d "@$cutoff_epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -r "$cutoff_epoch" +"%Y-%m-%dT%H:%M:%SZ")
+  
+  log_info "Pulizia ticket risolti più vecchi di $YDEA_TRACKING_RETENTION_DAYS giorni (prima di $cutoff_date)..."
+  
+  local before_count
+  before_count=$(jq '.tickets | length' "$YDEA_TRACKING_FILE")
+  
+  jq --arg cutoff "$cutoff_date" \
+    '.tickets |= map(select(.resolved_at == null or .resolved_at > $cutoff))' \
+    "$YDEA_TRACKING_FILE" > "${YDEA_TRACKING_FILE}.tmp" && mv "${YDEA_TRACKING_FILE}.tmp" "$YDEA_TRACKING_FILE"
+  
+  local after_count
+  after_count=$(jq '.tickets | length' "$YDEA_TRACKING_FILE")
+  local removed=$((before_count - after_count))
+  
+  if [[ $removed -gt 0 ]]; then
+    log_success "Rimossi $removed ticket risolti vecchi"
+  else
+    log_info "Nessun ticket da rimuovere"
+  fi
+}
+
+# Mostra statistiche ticket tracciati
+show_tracking_stats() {
+  init_tracking_file
+  
+  local total open resolved
+  total=$(jq '.tickets | length' "$YDEA_TRACKING_FILE")
+  open=$(jq '[.tickets[] | select(.resolved_at == null)] | length' "$YDEA_TRACKING_FILE")
+  resolved=$(jq '[.tickets[] | select(.resolved_at != null)] | length' "$YDEA_TRACKING_FILE")
+  
+  echo "📊 Statistiche Ticket Tracking"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "Totale ticket tracciati: $total"
+  echo "  ├─ Aperti: $open"
+  echo "  └─ Risolti: $resolved"
+  echo ""
+  
+  if [[ $open -gt 0 ]]; then
+    echo "🔴 Ticket Aperti:"
+    jq -r '.tickets[] | select(.resolved_at == null) | "  [#\(.ticket_id)] \(.codice) - \(.host)/\(.service) - Stato: \(.stato) - Creato: \(.created_at)"' "$YDEA_TRACKING_FILE"
+    echo ""
+  fi
+  
+  if [[ $resolved -gt 0 ]]; then
+    echo "✅ Ultimi 5 Ticket Risolti:"
+    jq -r '.tickets[] | select(.resolved_at != null) | "\(.resolved_at) | #\(.ticket_id) | \(.codice) | \(.host)/\(.service)"' "$YDEA_TRACKING_FILE" | sort -r | head -5 | while IFS='|' read -r date tid code host; do
+      echo "  [$date] $tid $code - $host"
+    done
+    echo ""
+  fi
+  
+  # Tempo medio di risoluzione
+  local avg_resolution
+  avg_resolution=$(jq -r '[.tickets[] | select(.resolved_at != null) | 
+    (((.resolved_at | fromdateiso8601) - (.created_at | fromdateiso8601)) / 3600)] | 
+    if length > 0 then (add / length | floor) else 0 end' "$YDEA_TRACKING_FILE" 2>/dev/null || echo "0")
+  
+  if [[ "$avg_resolution" != "0" ]]; then
+    echo "⏱️  Tempo medio risoluzione: ~$avg_resolution ore"
+  fi
+}
+
+# Lista tutti i ticket tracciati
+list_tracked_tickets() {
+  init_tracking_file
+  jq '.' "$YDEA_TRACKING_FILE"
+}
+
 # ===== CLI =====
 show_usage() {
   cat >&2 <<'USAGE'
@@ -427,6 +634,14 @@ COMANDI:
     update <ticket_id> '<json>'        Aggiorna ticket (formato JSON)
     close <ticket_id> [nota]           Chiudi ticket
     comment <ticket_id> '<testo>'      Aggiungi commento
+  
+  Tracking Ticket (Monitoraggio Stati):
+    track <ticket_id> <codice> <host> <service> [desc]
+                                       Aggiungi ticket al tracking automatico
+    update-tracking                    Aggiorna stati di tutti i ticket tracciati
+    cleanup-tracking                   Rimuovi ticket risolti vecchi
+    list-tracking                      Mostra JSON completo ticket tracciati
+    stats                              Statistiche ticket (aperti/risolti/tempi)
     
   Log e Debug:
     logs [lines]                       Mostra ultimi N log (default: 50)
@@ -456,6 +671,15 @@ ESEMPI:
   # Chiudi ticket
   ./ydea-toolkit.sh close 12345 "Risolto con riavvio"
 
+  # Tracking ticket da CheckMK
+  ./ydea-toolkit.sh track 12345 "TK25/003376" "server-web" "Apache Status" "Alert da CheckMK"
+  
+  # Visualizza statistiche tracking
+  ./ydea-toolkit.sh stats
+  
+  # Aggiorna tutti i ticket tracciati
+  ./ydea-toolkit.sh update-tracking
+  
   # Visualizza log
   ./ydea-toolkit.sh logs 100
 
@@ -463,16 +687,26 @@ ESEMPI:
   ./ydea-toolkit.sh api GET /tickets/12345/history | jq .
 
 VARIABILI AMBIENTE:
-  YDEA_BASE_URL      (default: https://my.ydea.cloud/app_api_v2)
-  YDEA_TOKEN_FILE    (default: ~/.ydea_token.json)
-  YDEA_LOG_FILE      (default: /var/log/ydea-toolkit.log)
-  YDEA_LOG_MAX_SIZE  (default: 10485760 = 10MB)
-  YDEA_EXPIRY_SKEW   (default: 60 secondi)
-  YDEA_DEBUG         (default: 0, imposta 1 per debug)
+  YDEA_BASE_URL              (default: https://my.ydea.cloud/app_api_v2)
+  YDEA_TOKEN_FILE            (default: ~/.ydea_token.json)
+  YDEA_LOG_FILE              (default: /var/log/ydea-toolkit.log)
+  YDEA_LOG_MAX_SIZE          (default: 10485760 = 10MB)
+  YDEA_TRACKING_FILE         (default: /var/log/ydea-tickets-tracking.json)
+  YDEA_TRACKING_RETENTION_DAYS (default: 30 giorni)
+  YDEA_EXPIRY_SKEW           (default: 60 secondi)
+  YDEA_DEBUG                 (default: 0, imposta 1 per debug)
 
 LOG:
   Tutte le operazioni vengono registrate in: $YDEA_LOG_FILE
   Include: timestamp, livello (INFO/WARN/ERROR), PID, chiamate API con response code
+
+TRACKING:
+  I ticket possono essere tracciati automaticamente per monitorare il loro stato.
+  File tracking: $YDEA_TRACKING_FILE
+  - Mantiene storico ticket creati da monitoring
+  - Aggiorna automaticamente gli stati
+  - Rimuove ticket risolti dopo $YDEA_TRACKING_RETENTION_DAYS giorni
+  - Fornisce statistiche e tempi di risoluzione
 
 USAGE
 }
@@ -510,6 +744,13 @@ case "${1:-}" in
   close)       shift; close_ticket "$@" ;;
   comment)     shift; add_comment "$@" ;;
   search)      shift; search_tickets "$@" ;;
+  
+  # Tracking operations
+  track)              shift; track_ticket "$@" ;;
+  update-tracking)    update_tracked_tickets ;;
+  cleanup-tracking)   cleanup_resolved_tickets ;;
+  list-tracking)      list_tracked_tickets ;;
+  stats)              show_tracking_stats ;;
   
   # Log operations
   logs)        shift; show_logs "$@" ;;
