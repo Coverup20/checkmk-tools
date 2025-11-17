@@ -612,6 +612,120 @@ list_tracked_tickets() {
   jq '.' "$YDEA_TRACKING_FILE"
 }
 
+# ===== Configurazione Interattiva =====
+interactive_config() {
+  local env_file="${TOOLKIT_DIR:-.}/.env"
+  
+  echo "🔧 Configurazione Interattiva Ydea Toolkit"
+  echo "=========================================="
+  echo ""
+  
+  # Leggi valori attuali se esistono
+  local current_id=""
+  local current_key=""
+  local current_ticket_id=""
+  local current_note_id=""
+  
+  if [[ -f "$env_file" ]]; then
+    source "$env_file" 2>/dev/null || true
+    current_id="${YDEA_ID:-}"
+    current_key="${YDEA_API_KEY:-}"
+    current_ticket_id="${YDEA_USER_ID_CREATE_TICKET:-4675}"
+    current_note_id="${YDEA_USER_ID_CREATE_NOTE:-4675}"
+  fi
+  
+  echo "📋 CREDENZIALI API (obbligatorie)"
+  echo "   Ottienile da: https://my.ydea.cloud → Impostazioni → La mia azienda → API"
+  echo ""
+  
+  # YDEA_ID
+  if [[ -n "$current_id" ]]; then
+    read -p "YDEA_ID [$current_id]: " new_id
+    new_id="${new_id:-$current_id}"
+  else
+    read -p "YDEA_ID: " new_id
+    while [[ -z "$new_id" ]]; do
+      echo "❌ YDEA_ID è obbligatorio!"
+      read -p "YDEA_ID: " new_id
+    done
+  fi
+  
+  # YDEA_API_KEY
+  if [[ -n "$current_key" ]]; then
+    read -p "YDEA_API_KEY [***nascosta***] (invio per mantenere): " new_key
+    new_key="${new_key:-$current_key}"
+  else
+    read -p "YDEA_API_KEY: " new_key
+    while [[ -z "$new_key" ]]; do
+      echo "❌ YDEA_API_KEY è obbligatoria!"
+      read -p "YDEA_API_KEY: " new_key
+    done
+  fi
+  
+  echo ""
+  echo "👤 ID UTENTE PER OPERAZIONI (opzionali)"
+  echo "   Usa gli ID degli utenti Ydea per attribuire creazioni"
+  echo ""
+  
+  # YDEA_USER_ID_CREATE_TICKET
+  read -p "ID utente creazione ticket [$current_ticket_id]: " new_ticket_id
+  new_ticket_id="${new_ticket_id:-$current_ticket_id}"
+  
+  # YDEA_USER_ID_CREATE_NOTE
+  read -p "ID utente creazione note/commenti [$current_note_id]: " new_note_id
+  new_note_id="${new_note_id:-$current_note_id}"
+  
+  echo ""
+  echo "💾 Salvataggio configurazione in: $env_file"
+  
+  # Crea backup se esiste
+  if [[ -f "$env_file" ]]; then
+    cp "$env_file" "${env_file}.backup.$(date +%Y%m%d_%H%M%S)"
+    echo "   (backup creato: ${env_file}.backup.$(date +%Y%m%d_%H%M%S))"
+  fi
+  
+  # Scrivi nuovo .env
+  cat > "$env_file" <<EOF
+# ===== YDEA TOOLKIT CONFIGURATION =====
+# Generato il: $(date '+%Y-%m-%d %H:%M:%S')
+
+# Credenziali API (OBBLIGATORIE)
+export YDEA_ID="$new_id"
+export YDEA_API_KEY="$new_key"
+
+# ID Utente per operazioni (opzionali)
+export YDEA_USER_ID_CREATE_TICKET=$new_ticket_id
+export YDEA_USER_ID_CREATE_NOTE=$new_note_id
+
+# ===== CONFIGURAZIONI AVANZATE =====
+# Decommentare e modificare se necessario
+
+# export YDEA_BASE_URL="https://my.ydea.cloud/app_api_v2"
+# export YDEA_TOKEN_FILE="\${HOME}/.ydea_token.json"
+# export YDEA_LOG_FILE="/var/log/ydea-toolkit.log"
+# export YDEA_LOG_MAX_SIZE=10485760
+# export YDEA_TRACKING_FILE="/var/log/ydea-tickets-tracking.json"
+# export YDEA_TRACKING_RETENTION_DAYS=365
+# export YDEA_DEBUG=0
+EOF
+  
+  chmod 600 "$env_file"
+  
+  echo ""
+  echo "✅ Configurazione salvata con successo!"
+  echo ""
+  echo "📝 Riepilogo:"
+  echo "   YDEA_ID: $new_id"
+  echo "   YDEA_API_KEY: ${new_key:0:10}***"
+  echo "   ID creazione ticket: $new_ticket_id"
+  echo "   ID creazione note: $new_note_id"
+  echo ""
+  echo "🧪 Test configurazione:"
+  echo "   source $env_file"
+  echo "   $0 login"
+  echo ""
+}
+
 # ===== CLI =====
 show_usage() {
   cat >&2 <<'USAGE'
@@ -658,6 +772,9 @@ COMANDI:
   Log e Debug:
     logs [lines]                       Mostra ultimi N log (default: 50)
     clearlog                           Pulisci file di log
+  
+  Configurazione:
+    config                             Configurazione interattiva (ID, API key, user ID)
     
   Altro:
     categories                         Lista categorie
@@ -665,6 +782,9 @@ COMANDI:
 
 ESEMPI:
 
+  # Configurazione iniziale interattiva
+  ./ydea-toolkit.sh config
+  
   # Login iniziale
   ./ydea-toolkit.sh login
 
@@ -756,6 +876,9 @@ clear_log() {
 case "${1:-}" in
   login)       ydea_login ;;
   api)         shift; ydea_api "$@" ;;
+  
+  # Configuration
+  config)      interactive_config ;;
   
   # Ticket operations
   list)        shift; list_tickets "$@" ;;
