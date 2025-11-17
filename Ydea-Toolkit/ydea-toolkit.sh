@@ -11,7 +11,7 @@ set -euo pipefail
 : "${YDEA_TOKEN_FILE:=${HOME}/.ydea_token.json}"
 : "${YDEA_EXPIRY_SKEW:=60}"
 : "${YDEA_DEBUG:=0}"
-: "${YDEA_LOG_FILE:=/tmp/ydea-toolkit.log}"
+: "${YDEA_LOG_FILE:=/var/log/ydea-toolkit.log}"
 : "${YDEA_LOG_MAX_SIZE:=10485760}"  # 10MB
 : "${YDEA_LOG_LEVEL:=INFO}"  # DEBUG, INFO, WARN, ERROR
 
@@ -407,7 +407,7 @@ SETUP:
   export YDEA_ID="tuo_id"              # Da: Impostazioni → La mia azienda → API
   export YDEA_API_KEY="tua_chiave_api"
   export YDEA_DEBUG=1                  # (opzionale) per debug verboso
-  export YDEA_LOG_FILE=/path/log.log   # (default: /tmp/ydea-toolkit.log)
+  export YDEA_LOG_FILE=/path/log.log   # (default: /var/log/ydea-toolkit.log)
 
 COMANDI:
 
@@ -465,7 +465,7 @@ ESEMPI:
 VARIABILI AMBIENTE:
   YDEA_BASE_URL      (default: https://my.ydea.cloud/app_api_v2)
   YDEA_TOKEN_FILE    (default: ~/.ydea_token.json)
-  YDEA_LOG_FILE      (default: /tmp/ydea-toolkit.log)
+  YDEA_LOG_FILE      (default: /var/log/ydea-toolkit.log)
   YDEA_LOG_MAX_SIZE  (default: 10485760 = 10MB)
   YDEA_EXPIRY_SKEW   (default: 60 secondi)
   YDEA_DEBUG         (default: 0, imposta 1 per debug)
