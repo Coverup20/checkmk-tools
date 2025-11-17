@@ -360,7 +360,7 @@ add_comment() {
   }
   
   # ID utente per campo creatoda (richiesto da API)
-  local user_id="${YDEA_USER_ID:-4677}"
+  local user_id="${YDEA_USER_ID:-4675}"
   
   local body
   body=$(jq -n \
