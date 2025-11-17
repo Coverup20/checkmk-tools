@@ -6,8 +6,15 @@ set -euo pipefail
 # ===== Config =====
 : "${YDEA_BASE_URL:=https://my.ydea.cloud/app_api_v2}"
 : "${YDEA_LOGIN_PATH:=/login}"
+
+# Credenziali Login API
 : "${YDEA_ID:=}"
 : "${YDEA_API_KEY:=}"
+
+# ID Utente per operazioni
+: "${YDEA_USER_ID_CREATE_TICKET:=4675}"      # ID utente per creazione ticket
+: "${YDEA_USER_ID_CREATE_NOTE:=4675}"        # ID utente per creazione note/commenti privati
+
 : "${YDEA_TOKEN_FILE:=${HOME}/.ydea_token.json}"
 : "${YDEA_EXPIRY_SKEW:=60}"
 : "${YDEA_DEBUG:=0}"
@@ -361,8 +368,8 @@ add_comment() {
     return 1
   }
   
-  # ID utente per campo creatoda (richiesto da API)
-  local user_id="${YDEA_USER_ID:-4675}"
+  # ID utente per campo creatoda (usa variabile personalizzabile)
+  local user_id="${YDEA_USER_ID_CREATE_NOTE:-4675}"
   
   local body
   body=$(jq -n \
@@ -613,6 +620,11 @@ show_usage() {
 SETUP:
   export YDEA_ID="tuo_id"              # Da: Impostazioni → La mia azienda → API
   export YDEA_API_KEY="tua_chiave_api"
+  
+  # ID Utente per operazioni (opzionali)
+  export YDEA_USER_ID_CREATE_TICKET=4675    # ID per creazione ticket
+  export YDEA_USER_ID_CREATE_NOTE=4675      # ID per creazione note/commenti
+  
   export YDEA_DEBUG=1                  # (opzionale) per debug verboso
   export YDEA_LOG_FILE=/path/log.log   # (default: /var/log/ydea-toolkit.log)
 
@@ -687,12 +699,21 @@ ESEMPI:
   ./ydea-toolkit.sh api GET /tickets/12345/history | jq .
 
 VARIABILI AMBIENTE:
+  # Credenziali API (OBBLIGATORIE)
+  YDEA_ID                    ID account API Ydea
+  YDEA_API_KEY               Chiave API Ydea
+  
+  # ID Utente per operazioni (opzionali)
+  YDEA_USER_ID_CREATE_TICKET (default: 4675) ID per creazione ticket
+  YDEA_USER_ID_CREATE_NOTE   (default: 4675) ID per creazione note/commenti
+  
+  # Configurazioni generali
   YDEA_BASE_URL              (default: https://my.ydea.cloud/app_api_v2)
   YDEA_TOKEN_FILE            (default: ~/.ydea_token.json)
   YDEA_LOG_FILE              (default: /var/log/ydea-toolkit.log)
   YDEA_LOG_MAX_SIZE          (default: 10485760 = 10MB)
   YDEA_TRACKING_FILE         (default: /var/log/ydea-tickets-tracking.json)
-  YDEA_TRACKING_RETENTION_DAYS (default: 30 giorni)
+  YDEA_TRACKING_RETENTION_DAYS (default: 365 giorni)
   YDEA_EXPIRY_SKEW           (default: 60 secondi)
   YDEA_DEBUG                 (default: 0, imposta 1 per debug)
 
