@@ -1,0 +1,8 @@
+#!/bin/bash
+# Launcher per eseguire telegram_realip remoto dal repo GitHub
+# Script notifica CheckMK via Telegram con real_ip
+
+SCRIPT_URL="https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-notify-checkmk/telegram_realip"
+
+# Esegue lo script remoto
+bash <(curl -fsSL "$SCRIPT_URL") "$@"
