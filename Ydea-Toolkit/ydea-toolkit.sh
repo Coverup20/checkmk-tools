@@ -520,9 +520,9 @@ update_tracked_tickets() {
     local ticket_data
     ticket_data=$(ydea_api GET "/tickets?limit=100" 2>/dev/null || echo "{}")
     
-    # Filtra per ticket_id specifico
+    # Filtra per ticket_id specifico e prendi il primo match
     local ticket_obj
-    ticket_obj=$(echo "$ticket_data" | jq --arg tid "$ticket_id" '.objs[] | select(.id == ($tid|tonumber))' 2>/dev/null | head -n 1)
+    ticket_obj=$(echo "$ticket_data" | jq --arg tid "$ticket_id" '[.objs[] | select(.id == ($tid|tonumber))] | .[0] // {}' 2>/dev/null)
     
     if [[ "$ticket_obj" == "{}" ]] || [[ "$ticket_obj" == "null" ]]; then
       log_warn "Ticket #$ticket_id non trovato, potrebbe essere stato eliminato"
