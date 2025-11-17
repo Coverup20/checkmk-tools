@@ -15,7 +15,7 @@ set -euo pipefail
 : "${YDEA_LOG_MAX_SIZE:=10485760}"  # 10MB
 : "${YDEA_LOG_LEVEL:=INFO}"  # DEBUG, INFO, WARN, ERROR
 : "${YDEA_TRACKING_FILE:=/var/log/ydea-tickets-tracking.json}"
-: "${YDEA_TRACKING_RETENTION_DAYS:=30}"  # Mantieni ticket risolti per N giorni
+: "${YDEA_TRACKING_RETENTION_DAYS:=365}"  # Mantieni ticket risolti per N giorni (1 anno)
 
 CURL_OPTS=(
   --fail-with-body
