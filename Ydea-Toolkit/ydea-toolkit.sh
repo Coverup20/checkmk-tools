@@ -676,6 +676,38 @@ interactive_config() {
   new_note_id="${new_note_id:-$current_note_id}"
   
   echo ""
+  echo "📝 GESTIONE LOG E TRACKING (opzionali)"
+  echo "   Configurazione avanzata per logging e monitoraggio"
+  echo ""
+  
+  # Log file location
+  local current_log_file="${YDEA_LOG_FILE:-/var/log/ydea-toolkit.log}"
+  read -p "Percorso file log [$current_log_file]: " new_log_file
+  new_log_file="${new_log_file:-$current_log_file}"
+  
+  # Log max size (in MB)
+  local current_log_size_mb=$((${YDEA_LOG_MAX_SIZE:-10485760} / 1048576))
+  read -p "Dimensione massima log in MB [$current_log_size_mb]: " new_log_size_mb
+  new_log_size_mb="${new_log_size_mb:-$current_log_size_mb}"
+  local new_log_size=$((new_log_size_mb * 1048576))
+  
+  # Log level
+  local current_log_level="${YDEA_LOG_LEVEL:-INFO}"
+  read -p "Livello log (DEBUG/INFO/WARN/ERROR) [$current_log_level]: " new_log_level
+  new_log_level="${new_log_level:-$current_log_level}"
+  new_log_level=$(echo "$new_log_level" | tr '[:lower:]' '[:upper:]')
+  
+  # Tracking file
+  local current_tracking_file="${YDEA_TRACKING_FILE:-/var/log/ydea-tickets-tracking.json}"
+  read -p "Percorso file tracking ticket [$current_tracking_file]: " new_tracking_file
+  new_tracking_file="${new_tracking_file:-$current_tracking_file}"
+  
+  # Retention days
+  local current_retention="${YDEA_TRACKING_RETENTION_DAYS:-365}"
+  read -p "Giorni mantenimento ticket risolti [$current_retention]: " new_retention
+  new_retention="${new_retention:-$current_retention}"
+  
+  echo ""
   echo "💾 Salvataggio configurazione in: $env_file"
   
   # Crea backup se esiste
@@ -697,15 +729,18 @@ export YDEA_API_KEY="$new_key"
 export YDEA_USER_ID_CREATE_TICKET=$new_ticket_id
 export YDEA_USER_ID_CREATE_NOTE=$new_note_id
 
+# ===== GESTIONE LOG E TRACKING =====
+export YDEA_LOG_FILE="$new_log_file"
+export YDEA_LOG_MAX_SIZE=$new_log_size
+export YDEA_LOG_LEVEL="$new_log_level"
+export YDEA_TRACKING_FILE="$new_tracking_file"
+export YDEA_TRACKING_RETENTION_DAYS=$new_retention
+
 # ===== CONFIGURAZIONI AVANZATE =====
 # Decommentare e modificare se necessario
 
 # export YDEA_BASE_URL="https://my.ydea.cloud/app_api_v2"
 # export YDEA_TOKEN_FILE="\${HOME}/.ydea_token.json"
-# export YDEA_LOG_FILE="/var/log/ydea-toolkit.log"
-# export YDEA_LOG_MAX_SIZE=10485760
-# export YDEA_TRACKING_FILE="/var/log/ydea-tickets-tracking.json"
-# export YDEA_TRACKING_RETENTION_DAYS=365
 # export YDEA_DEBUG=0
 EOF
   
@@ -719,6 +754,13 @@ EOF
   echo "   YDEA_API_KEY: ${new_key:0:10}***"
   echo "   ID creazione ticket: $new_ticket_id"
   echo "   ID creazione note: $new_note_id"
+  echo ""
+  echo "📊 Configurazione Log & Tracking:"
+  echo "   File log: $new_log_file"
+  echo "   Dimensione max: ${new_log_size_mb}MB"
+  echo "   Livello log: $new_log_level"
+  echo "   File tracking: $new_tracking_file"
+  echo "   Retention giorni: $new_retention"
   echo ""
   echo "🧪 Test configurazione:"
   echo "   source $env_file"
