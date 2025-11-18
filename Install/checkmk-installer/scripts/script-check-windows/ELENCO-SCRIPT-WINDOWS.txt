@@ -1,0 +1,1123 @@
+================================================================================
+ELENCO DETTAGLIATO SCRIPT WINDOWS
+Repository: checkmk-tools
+Cartella: script-check-windows/
+Data: 27 Ottobre 2025
+================================================================================
+
+📁 STRUTTURA CARTELLE
+├── nopolling/
+│   └── ransomware_detection/
+│       ├── check_ransomware_activity.ps1
+│       ├── ransomware_config.json
+│       └── rcheck_ransomware_activity.ps1
+└── polling/                (vuota)
+
+================================================================================
+📂 SCRIPT-CHECK-WINDOWS/NOPOLLING/RANSOMWARE_DETECTION/
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORIA: SICUREZZA & RANSOMWARE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. check_ransomware_activity.ps1
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Righe:         766
+Linguaggio:    PowerShell 5.1+
+Service:       Ransomware_Detection (principale)
+               Ransomware_Share_{NOME_SHARE} (per ogni share monitorata)
+Path Install:  C:\ProgramData\checkmk\agent\local\
+Versione:      1.0
+
+DESCRIZIONE:
+Script avanzato di rilevamento ransomware per Windows Server. Monitora shares 
+di rete (UNC o locali) alla ricerca di attività sospette indicative di attacco 
+ransomware in corso o recente.
+
+FUNZIONALITÀ PRINCIPALI:
+✓ Rilevamento file con estensioni ransomware (50+ varianti note)
+✓ Analisi entropia file (file crittografati hanno entropia >7.5)
+✓ Rilevamento ransom notes (README, DECRYPT, HOW_TO, ecc.)
+✓ Monitoraggio cambio estensioni anomale
+✓ Canary files (file esca per early detection)
+✓ Analisi attività massiva di crittografia
+✓ Pattern di accesso sospetti
+✓ Timeout e performance optimization per grandi share
+✓ Configurazione JSON esterna
+✓ Statefile per tracking continuo
+
+CONFIGURAZIONE (ransomware_config.json):
+{
+    "SharePaths": ["\\\\SERVER\\SHARE"],
+    "EnableCanaryFiles": true,
+    "MaxFilesPerSecond": 10,
+    "AlertThreshold": 50,
+    "TimeWindowMinutes": 30,
+    "MaxFilesToScan": 10000,
+    "CanaryFileName": ".canary_donotdelete.txt",
+    "ExcludePaths": ["backup", "temp", "cache"]
+}
+
+PARAMETRI POWERSHELL:
+-SharePaths          Array di percorsi UNC o locali
+-TimeWindowMinutes   Finestra analisi attività (default: 30)
+-AlertThreshold      N. minimo file modificati per alert (default: 50)
+-ConfigFile          Path file configurazione JSON
+-StateFile           Path statefile (default: %TEMP%\ransomware_state.json)
+-VerboseLog          Abilita logging dettagliato
+
+ESTENSIONI RANSOMWARE MONITORATE (50+):
+- .encrypted, .locked, .crypto, .crypt, .crypted
+- .locky, .cerber, .zepto, .odin, .thor
+- .wannacry, .wncry, .wcry, .wncryt
+- .ryuk, .sodinokibi, .revil, .maze, .conti
+- .lockbit, .blackcat, .alphv, .royal
+- .crypz, .enc, .cipher, .coded, .sealed
+- .kraken, .darkness, .dharma, .phobos
+- .exx, .ezz, .eking, .cube, .BTCWare
+- .AES256, .RSA2048, .RSA4096, .xtbl
+- .vault, .micro, .sage, .spora, .mole
+- .redrum, .silent, .blacksuit, .play
+
+RANSOM NOTE PATTERNS:
+- *README*, *DECRYPT*, *RESTORE*, *UNLOCK*
+- *RECOVER*, *HOW_TO*, *HELP*, *ATTENTION*
+- *WARNING*, *RANSOM*, *INSTRUCTION*
+- *.hta, *.html (spesso usati per ransom notes)
+
+TARGET EXTENSIONS (file protetti):
+.doc, .docx, .xls, .xlsx, .ppt, .pptx, .pdf, .txt, 
+.jpg, .jpeg, .png, .gif, .zip, .rar, .7z, .sql, 
+.mdb, .accdb, .pst, .ost, .csv, .rtf, .odt, .ods
+
+STATI OUTPUT:
+0 (OK)   - Nessuna attività sospetta rilevata
+1 (WARN) - File sospetti rilevati sotto soglia critica
+2 (CRIT) - Ransomware rilevato o attività massiva
+
+METRICHE CHECKMK:
+suspicious_files={numero}    - Totale file sospetti
+ransom_notes={numero}        - Ransom notes trovate
+canary_alerts={numero}       - Canary file compromessi
+shares_ok={numero}           - Share accessibili
+
+LOGICA RILEVAMENTO:
+
+1. SUSPICIOUS FILES SCORING:
+   - File con estensione ransomware: +10 punti
+   - Alta entropia (>7.5): +5 punti
+   - Cambio estensione recente: +3 punti
+   - Nome file anomalo (>100 char o caratteri strani): +2 punti
+   - Score ≥5 → File sospetto
+
+2. MASS ACTIVITY DETECTION:
+   - File modificati > AlertThreshold in TimeWindow → CRITICAL
+   - Tasso modifica > MaxFilesPerSecond → CRITICAL
+   - Multiple shares colpite simultaneamente → CRITICAL
+
+3. CANARY FILES:
+   - File nascosti creati automaticamente nelle share
+   - Attributi: Hidden, ReadOnly
+   - Se modificati/eliminati → CRITICAL ALERT
+   - Early detection prima di danno esteso
+
+4. RANSOM NOTES:
+   - Pattern matching su nomi file comuni
+   - Keyword analysis (ransom, decrypt, bitcoin, payment, crypto)
+   - Presenza ≥2 keyword in file → Rilevata ransom note
+
+ALGORITMO ENTROPIA:
+Calcola entropia di Shannon su sample 1024 byte del file:
+- File testo: 3-5 bits/byte
+- File compressi: 6-7 bits/byte
+- File crittografati: >7.5 bits/byte
+Formula: H = -Σ(p(i) * log₂(p(i)))
+
+PERFORMANCE OPTIMIZATION:
+✓ Timeout 30 secondi per scan share
+✓ MaxFilesToScan limita file processati
+✓ PowerShell background jobs con timeout
+✓ Sample-based entropy analysis (primi 1KB)
+✓ Early exit su share inaccessibili
+
+ESEMPIO OUTPUT:
+
+Service principale:
+"0 Ransomware_Detection suspicious_files=0|ransom_notes=0|canary_alerts=0|shares_ok=3 OK - Nessuna attivita' sospetta rilevata su 3/3 shares"
+
+"2 Ransomware_Detection suspicious_files=156|ransom_notes=2|canary_alerts=1|shares_ok=2 ALERT: Ransom notes rilevate (2), ALERT: Canary file compromessi (1), ALERT: Attività di crittografia massiva rilevata (156 files) | Top files: document.docx.locked (score: 15), report.xlsx.encrypted (score: 15), invoice.pdf.crypto (score: 13)"
+
+Service per share:
+"0 Ransomware_Share_Documents OK - Nessun file sospetto rilevato"
+
+"2 Ransomware_Share_Finance CRIT - Ransom notes: 2"
+
+"1 Ransomware_Share_HR WARN - Suspicious files: 23"
+
+STATEFILE (ransomware_state.json):
+{
+  "LastCheck": "2025-10-27T14:30:00",
+  "ShareStates": {
+    "\\\\SERVER\\Documents": {
+      "LastSuspiciousCount": 0,
+      "CanaryFileHash": "abc123...",
+      "LastRansomNote": null
+    }
+  },
+  "AlertHistory": [...]
+}
+
+FILE UTILIZZATI:
+- Config: ransomware_config.json (configurazione)
+- State: %TEMP%\ransomware_state.json (stato tracking)
+- Canary: {SharePath}\.canary_donotdelete.txt (file esca)
+
+REQUISITI SISTEMA:
+✓ Windows Server 2016+
+✓ PowerShell 5.1 o superiore
+✓ Permessi lettura su share monitorate
+✓ Accesso scrittura per canary files (se abilitati)
+✓ CheckMK Agent 2.4.x
+
+INSTALLAZIONE:
+1. Copiare script in C:\ProgramData\checkmk\agent\local\
+2. Creare ransomware_config.json nella stessa directory
+3. Configurare SharePaths nel JSON
+4. Testare esecuzione: powershell -File check_ransomware_activity.ps1
+5. Eseguire service discovery in CheckMK
+
+ESEMPIO CONFIGURAZIONE COMPLETA:
+{
+    "SharePaths": [
+        "\\\\FS01\\Documents",
+        "\\\\FS01\\Finance", 
+        "\\\\FS02\\Projects",
+        "D:\\LocalShare"
+    ],
+    "EnableCanaryFiles": true,
+    "MaxFilesPerSecond": 10,
+    "AlertThreshold": 50,
+    "TimeWindowMinutes": 30,
+    "MaxFilesToScan": 10000,
+    "CanaryFileName": ".canary_donotdelete.txt",
+    "ExcludePaths": [
+        "backup",
+        "temp",
+        "cache",
+        "$RECYCLE.BIN",
+        "System Volume Information"
+    ],
+    "SuspiciousExtensions": [
+        ".encrypted",
+        ".locked",
+        ".crypto",
+        ".crypt"
+    ]
+}
+
+NOTA ENCODING FIX:
+⚠️ Versione corrente usa "attivita'" invece di "attività" per evitare 
+   corruzione caratteri in output CheckMK (commit f0ac3f1)
+
+NOTA SERVICE NAMING:
+⚠️ Service names per share usano solo nome share (es: "test00")
+   invece di path completo per evitare nomi troppo lunghi (commit ed28dfa)
+
+
+2. ransomware_config.json
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Righe:         7
+Formato:       JSON
+Path Install:  C:\ProgramData\checkmk\agent\local\
+Versione:      1.0
+
+DESCRIZIONE:
+File di configurazione JSON per check_ransomware_activity.ps1.
+Centralizza tutte le impostazioni di monitoraggio.
+
+STRUTTURA:
+{
+    "SharePaths": [],              // Array percorsi UNC/locali da monitorare
+    "EnableCanaryFiles": true,     // Abilita creazione canary files
+    "MaxFilesPerSecond": 10,       // Soglia tasso modifiche per alert
+    "AlertThreshold": 50,          // N. file modificati per considerare massivo
+    "SuspiciousExtensions": []     // Lista estensioni custom da monitorare
+}
+
+CAMPI:
+
+SharePaths (array, required):
+- Percorsi UNC: "\\\\SERVER\\SHARE"
+- Percorsi locali: "D:\\LocalShare"
+- Supporta escape backslash JSON: "\\\\" → "\\"
+
+EnableCanaryFiles (boolean, optional):
+- true: Crea file esca per early detection
+- false: Disabilita canary files
+- Default: true
+
+MaxFilesPerSecond (integer, optional):
+- Soglia velocità modifiche (file/secondo)
+- Alert se superato durante TimeWindow
+- Default: 10
+- Range consigliato: 5-20
+
+AlertThreshold (integer, optional):
+- N. minimo file modificati per alert massivo
+- Default: 50
+- Range: 20-200 (dipende da dimensione share)
+
+TimeWindowMinutes (integer, optional):
+- Finestra temporale analisi (minuti)
+- Default: 30
+- Range: 10-60
+
+MaxFilesToScan (integer, optional):
+- Limite max file da scansionare per share
+- Previene timeout su share molto grandi
+- Default: 10000
+
+CanaryFileName (string, optional):
+- Nome del file canary
+- Default: ".canary_donotdelete.txt"
+- Consigliato: nome nascosto con "."
+
+ExcludePaths (array, optional):
+- Sottocartelle da escludere da scan
+- Pattern matching parziale
+- Esempio: ["backup", "temp", "$RECYCLE.BIN"]
+
+SuspiciousExtensions (array, optional):
+- Estensioni custom da monitorare
+- Si aggiungono a quelle built-in
+- Esempio: [".custom", ".test"]
+
+ESEMPIO CONFIGURAZIONE MINIMA:
+{
+    "SharePaths": ["\\\\SERVER\\Documents"]
+}
+
+ESEMPIO CONFIGURAZIONE AVANZATA:
+{
+    "SharePaths": [
+        "\\\\FS01\\Documents",
+        "\\\\FS01\\Finance",
+        "D:\\Shares\\Public"
+    ],
+    "EnableCanaryFiles": true,
+    "MaxFilesPerSecond": 15,
+    "AlertThreshold": 75,
+    "TimeWindowMinutes": 20,
+    "MaxFilesToScan": 15000,
+    "CanaryFileName": ".security_monitor.txt",
+    "ExcludePaths": [
+        "backup",
+        "temp",
+        "cache",
+        "$RECYCLE.BIN",
+        "System Volume Information",
+        ".git",
+        "node_modules"
+    ],
+    "SuspiciousExtensions": [
+        ".company_locked",
+        ".custom_enc"
+    ]
+}
+
+VALIDAZIONE:
+- SharePaths: deve contenere almeno un percorso valido
+- Percorsi UNC: verificare accessibilità con Test-Path
+- MaxFilesPerSecond: valore troppo basso genera falsi positivi
+- AlertThreshold: bilanciare sensibilità vs falsi positivi
+- ExcludePaths: non escludere cartelle critiche business
+
+LOCATION AUTOMATICA:
+Script cerca config in ordine:
+1. $PSScriptRoot\ransomware_config.json
+2. C:\ProgramData\checkmk\agent\local\ransomware_config.json
+3. %ProgramData%\checkmk\agent\local\ransomware_config.json
+
+ENCODING:
+- UTF-8 (raccomandato)
+- UTF-8 BOM (supportato)
+- No ANSI (problemi con path non-ASCII)
+
+
+3. rcheck_ransomware_activity.ps1
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Righe:         78
+Linguaggio:    PowerShell 5.1+
+Service:       Ransomware_Detection (esegue script remoto)
+Path Install:  C:\ProgramData\checkmk\agent\local\
+Versione:      2.0
+
+DESCRIZIONE:
+Wrapper remoto per check_ransomware_activity.ps1. Scarica ed esegue 
+automaticamente l'ultima versione da GitHub, simile agli script wrapper Linux.
+
+FUNZIONALITÀ:
+✓ Download automatico da GitHub raw URL
+✓ Cache bypass con timestamp query string
+✓ Nessun caching locale - sempre ultima versione
+✓ Passa parametri allo script principale
+✓ Cleanup automatico file temporanei
+✓ Gestione errori con fallback
+
+PARAMETRI:
+-ConfigFile          Path config JSON (default: C:\ProgramData\checkmk\agent\local\ransomware_config.json)
+-TimeWindowMinutes   Finestra analisi (default: 30)
+-AlertThreshold      Soglia alert (default: 50)
+-VerboseLog          Abilita verbose logging
+-GitHubRepo          Repository GitHub (default: Coverup20/checkmk-tools)
+-Branch              Branch da usare (default: main)
+
+SCRIPT_URL:
+https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-windows/nopolling/ransomware_detection/check_ransomware_activity.ps1
+
+LOGICA:
+1. Costruisce URL con cache bypass: ?t={timestamp}
+2. Scarica script in %TEMP% con nome univoco
+3. Esegue script con parametri passati
+4. Cleanup file temporaneo
+5. In caso di errore, output CheckMK con stato UNKNOWN
+
+VANTAGGI:
+✓ Zero manutenzione manuale script
+✓ Aggiornamenti automatici dal repository
+✓ Centralized management
+✓ Rollback facile cambiando branch
+✓ Testing branch feature senza modificare produzione
+
+ESEMPIO ESECUZIONE:
+powershell -File rcheck_ransomware_activity.ps1 -ConfigFile "C:\custom\config.json"
+
+powershell -File rcheck_ransomware_activity.ps1 -VerboseLog -Branch "develop"
+
+GESTIONE ERRORI:
+Se download fallisce:
+"3 Ransomware_Detection - UNKNOWN: Errore download script remoto: [messaggio]"
+
+Se esecuzione fallisce:
+"3 Ransomware_Detection - UNKNOWN: Errore esecuzione script: [messaggio]"
+
+REQUISITI:
+✓ PowerShell 5.1+
+✓ Accesso Internet (HTTPS GitHub)
+✓ System.Net.WebClient disponibile
+✓ Permessi scrittura in %TEMP%
+
+INSTALLAZIONE:
+1. Copiare in C:\ProgramData\checkmk\agent\local\
+2. Configurare ransomware_config.json
+3. Testare: powershell -File rcheck_ransomware_activity.ps1
+
+SICUREZZA:
+⚠️ Script scarica e esegue codice da GitHub
+⚠️ Verificare HTTPS e validità repository
+⚠️ Possibile MITM se rete compromessa
+⚠️ Consigliato: usare script locale in ambienti critici
+
+CLEANUP:
+File temporanei creati: %TEMP%\check_ransomware_activity_{timestamp}.ps1
+Cleanup automatico dopo esecuzione (try/finally block)
+
+CACHE BYPASS:
+URL costruito con timestamp: ?t={ticks}
+Forza download fresh evitando cache browser/proxy
+
+
+================================================================================
+📂 SCRIPT-CHECK-WINDOWS/POLLING/
+================================================================================
+
+STATO: Cartella vuota
+NOTA:  Non sono presenti script polling per Windows. Tutti gli script Windows
+       sono nopolling (eseguiti sincroni ad ogni check CheckMK).
+
+
+================================================================================
+RIEPILOGO FUNZIONALITÀ
+================================================================================
+
+┌─────────────────────────┬───────────────────────────────────────────────┐
+│ CATEGORIA               │ SCRIPT                                        │
+├─────────────────────────┼───────────────────────────────────────────────┤
+│ Ransomware Detection    │ check_ransomware_activity.ps1                 │
+│                         │ rcheck_ransomware_activity.ps1 (wrapper)      │
+├─────────────────────────┼───────────────────────────────────────────────┤
+│ Configurazione          │ ransomware_config.json                        │
+└─────────────────────────┴───────────────────────────────────────────────┘
+
+TOTALE SCRIPT: 3 file
+- 1 script principale (766 righe)
+- 1 wrapper remoto (78 righe)
+- 1 file configurazione JSON
+
+
+================================================================================
+DIPENDENZE
+================================================================================
+
+RICHIESTE:
+✓ Windows Server 2016+ (testato su 2022)
+✓ PowerShell 5.1 o superiore
+✓ CheckMK Raw 2.4.x
+✓ .NET Framework 4.5+ (per System.Net.WebClient)
+
+MODULI POWERSHELL:
+- Nessun modulo esterno richiesto
+- Usa solo cmdlet built-in
+
+PERMESSI:
+- Lettura share UNC monitorate
+- Scrittura per canary files (se abilitati)
+- Scrittura in %TEMP% per statefile
+- Accesso Internet per wrapper remoto (HTTPS GitHub)
+
+FILE SYSTEM:
+- Supporta UNC paths (\\server\share)
+- Supporta local paths (D:\folder)
+- Supporta DFS namespaces
+
+NETWORK:
+- Accesso SMB alle share (porte 445, 139)
+- HTTPS outbound per wrapper remoto (porta 443)
+
+
+================================================================================
+UTILIZZO SCRIPT LOCALE
+================================================================================
+
+INSTALLAZIONE:
+
+1. Creare directory struttura:
+   mkdir "C:\ProgramData\checkmk\agent\local"
+
+2. Copiare files:
+   copy check_ransomware_activity.ps1 "C:\ProgramData\checkmk\agent\local\"
+   copy ransomware_config.json "C:\ProgramData\checkmk\agent\local\"
+
+3. Configurare ransomware_config.json:
+   notepad "C:\ProgramData\checkmk\agent\local\ransomware_config.json"
+   
+   {
+       "SharePaths": ["\\\\SERVER\\Share1", "\\\\SERVER\\Share2"]
+   }
+
+4. Testare esecuzione manuale:
+   cd "C:\ProgramData\checkmk\agent\local"
+   powershell -ExecutionPolicy Bypass -File check_ransomware_activity.ps1
+
+5. Verificare output formato CheckMK:
+   Deve iniziare con: "0 Ransomware_Detection ..."
+
+6. Service discovery in CheckMK:
+   - Accedere a CheckMK Web UI
+   - Host → Service discovery
+   - Dovrebbe apparire "Ransomware_Detection" e servizi per share
+
+EXECUTION POLICY:
+Se errore "execution policy":
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+O eseguire con bypass:
+powershell -ExecutionPolicy Bypass -File script.ps1
+
+
+================================================================================
+UTILIZZO SCRIPT REMOTO
+================================================================================
+
+INSTALLAZIONE WRAPPER:
+
+1. Copiare solo wrapper e config:
+   copy rcheck_ransomware_activity.ps1 "C:\ProgramData\checkmk\agent\local\"
+   copy ransomware_config.json "C:\ProgramData\checkmk\agent\local\"
+
+2. Configurare ransomware_config.json (come sopra)
+
+3. Testare download ed esecuzione:
+   powershell -ExecutionPolicy Bypass -File rcheck_ransomware_activity.ps1
+
+4. Verificare connettività GitHub:
+   Test-NetConnection raw.githubusercontent.com -Port 443
+
+VANTAGGI WRAPPER:
+✓ Aggiornamenti automatici (nessuna ridistribuzione)
+✓ Centralized version management
+✓ Rollback immediato (cambio branch)
+✓ Testing feature branch senza rischi
+
+SVANTAGGI WRAPPER:
+⚠️ Richiede Internet access
+⚠️ Latenza download (cache bypass)
+⚠️ Potenziale MITM risk
+⚠️ Dependency su GitHub availability
+
+CONFIGURAZIONE PROXY:
+Se ambiente usa proxy HTTP:
+[System.Net.WebRequest]::DefaultWebProxy = New-Object System.Net.WebProxy("http://proxy:8080")
+[System.Net.WebRequest]::DefaultWebProxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials
+
+FIREWALL:
+Consentire outbound HTTPS:
+- Destinazione: raw.githubusercontent.com
+- Porta: 443
+- Protocollo: TCP
+
+
+================================================================================
+NOTE AGGIUNTIVE
+================================================================================
+
+FORMATO OUTPUT:
+
+CheckMK Local Check format:
+STATO SERVIZIO METRICHE DETTAGLI
+
+Esempio:
+0 Ransomware_Detection suspicious_files=0|ransom_notes=0 OK - Nessuna attivita' sospetta
+
+STATO CODICI:
+0 = OK        - Nessun ransomware rilevato
+1 = WARNING   - Attività sospetta sotto soglia
+2 = CRITICAL  - Ransomware rilevato o attività massiva
+3 = UNKNOWN   - Errore esecuzione script
+
+METRICHE FORMATO:
+metrica=valore|metrica2=valore2
+
+Metriche disponibili:
+- suspicious_files: Totale file sospetti
+- ransom_notes: Ransom notes rilevate
+- canary_alerts: Canary file compromessi
+- shares_ok: Share accessibili/monitorate
+
+MULTIPLE SERVICES:
+Script genera un service per:
+- Check generale: "Ransomware_Detection"
+- Ogni share: "Ransomware_Share_{NOME}"
+
+Esempio con 3 share:
+- Ransomware_Detection (aggregato)
+- Ransomware_Share_Documents
+- Ransomware_Share_Finance
+- Ransomware_Share_Projects
+
+PERFORMANCE:
+- Timeout 30 secondi per scan share
+- Max 10000 file per share (configurabile)
+- Entropy analysis su primi 1KB solo
+- Background jobs con timeout
+- Early exit su share inaccessibili
+
+BEST PRACTICES:
+✓ Monitorare solo share critiche (non backup/temp)
+✓ Configurare ExcludePaths per cartelle grandi
+✓ AlertThreshold basato su dimensione share
+✓ EnableCanaryFiles per early detection
+✓ Test periodici con file .encrypted fake
+✓ Review alert history in statefile
+✓ Tune MaxFilesPerSecond per ambiente
+
+
+================================================================================
+CANARY FILES
+================================================================================
+
+CONCETTO:
+File "esca" creati automaticamente nelle share monitorate. Se ransomware 
+li modifica/elimina, genera alert immediato.
+
+CARATTERISTICHE:
+- Nome: .canary_donotdelete.txt (configurabile)
+- Attributi: Hidden, ReadOnly
+- Contenuto: Warning message con metadata
+- Posizione: Root di ogni share monitorata
+- Creazione automatica al primo run
+
+CONTENUTO TIPO:
+```
+ATTENZIONE: Questo è un file di monitoraggio ransomware.
+NON ELIMINARE, MODIFICARE O SPOSTARE questo file.
+
+Questo file viene utilizzato per rilevare attività sospette di ransomware.
+La sua modifica o eliminazione genererà un allarme di sicurezza.
+
+Data creazione: 2025-10-27 14:30:00
+Share: \\SERVER\Documents
+Sistema: WS2022AD
+```
+
+MONITORAGGIO:
+1. Script verifica esistenza canary ad ogni run
+2. Se mancante → CRITICAL alert
+3. Se modificato (LastWriteTime < 30 min) → CRITICAL alert
+4. Memorizza hash in statefile per integrity check
+
+VANTAGGI:
+✓ Early detection (prima che danni siano estesi)
+✓ Zero-day ransomware detection
+✓ Non dipende da signature
+✓ Basso overhead performance
+✓ Difficile da eludere per ransomware
+
+LIMITAZIONI:
+⚠️ Ransomware evoluto può riconoscere canary
+⚠️ Richiede permessi scrittura share
+⚠️ Può generare falsi positivi se utenti toccano file
+
+
+================================================================================
+ALGORITMI AVANZATI
+================================================================================
+
+1. ENTROPY ANALYSIS (Shannon Entropy)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Formula: H = -Σ(p(i) × log₂(p(i)))
+
+Dove:
+- p(i) = frequenza del byte i nel file
+- H = entropia in bits/byte (0-8)
+
+Interpretazione:
+- 0-3 bits: Dati molto ripetitivi (testo, log)
+- 3-5 bits: Dati normali (documenti, immagini non compresse)
+- 5-7 bits: Dati compressi (ZIP, JPEG)
+- 7-8 bits: Dati random o crittografati (ENCRYPTED)
+
+Threshold: >7.5 bits → File sospetto crittografato
+
+Performance:
+- Sample solo primi 1024 byte
+- Calcolo O(n) su sample
+- ~1ms per file
+
+
+2. SUSPICIOUS FILES SCORING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Score cumulativo:
++10 punti: Estensione in RANSOMWARE_EXTENSIONS
++5 punti:  Entropia >7.5
++3 punti:  Cambio estensione recente (backup extension diversa)
++2 punti:  Nome file anomalo (>100 char o non-ASCII)
+
+Threshold: Score ≥5 → File sospetto
+
+Esempio:
+File: "document.docx.locked" (LastWrite: 5 min ago)
+- Estensione .locked: +10
+- Entropia 7.8: +5
+- Nome normale: +0
+Score totale: 15 → HIGHLY SUSPICIOUS
+
+
+3. MASS ACTIVITY DETECTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Condizioni alert massivo:
+1. File modificati > AlertThreshold in TimeWindow
+2. Tasso modifica > MaxFilesPerSecond
+3. Multiple shares colpite simultaneamente
+
+Calcolo tasso:
+Rate = SuspiciousFilesCount / (TimeWindowMinutes × 60)
+
+Esempio:
+- 150 file sospetti in 30 minuti
+- Rate = 150 / 1800 = 0.083 file/sec
+- Se MaxFilesPerSecond = 10 → OK
+- Ma 150 > AlertThreshold (50) → CRITICAL
+
+Logica:
+Se (Count > Threshold) OR (Rate > MaxRate) → Mass Activity
+
+
+4. PATTERN MATCHING RANSOM NOTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Step 1: Nome file matching
+Pattern: README*, DECRYPT*, HOW_TO*, *.hta, *.html
+
+Step 2: Content analysis
+Keywords: [ransom, decrypt, bitcoin, payment, crypto, locked, encrypted]
+
+Step 3: Scoring
+- File creato <24h: eligibile
+- Keyword count ≥2: Identificato come ransom note
+- File non leggibile ma recente: Sospetto
+
+Esempio:
+File: "README_DECRYPT.txt"
+Content: "Your files are encrypted. Send 0.5 bitcoin to unlock..."
+Keywords found: encrypted, bitcoin, unlock (3)
+Result: RANSOM NOTE DETECTED
+
+
+================================================================================
+ESEMPI DI OUTPUT COMPLETI
+================================================================================
+
+SCENARIO 1: Tutto OK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+0 Ransomware_Detection suspicious_files=0|ransom_notes=0|canary_alerts=0|shares_ok=3 OK - Nessuna attivita' sospetta rilevata su 3/3 shares
+0 Ransomware_Share_Documents OK - Nessun file sospetto rilevato
+0 Ransomware_Share_Finance OK - Nessun file sospetto rilevato
+0 Ransomware_Share_Projects OK - Nessun file sospetto rilevato
+
+
+SCENARIO 2: Warning - File Sospetti
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1 Ransomware_Detection suspicious_files=23|ransom_notes=0|canary_alerts=0|shares_ok=3 WARNING: File sospetti rilevati (23) | Top files: backup.encrypted (score: 10), temp.locked (score: 10), data.crypto (score: 10)
+0 Ransomware_Share_Documents OK - Nessun file sospetto rilevato
+1 Ransomware_Share_Finance WARN - Suspicious files: 23
+0 Ransomware_Share_Projects OK - Nessun file sospetto rilevato
+
+
+SCENARIO 3: Critical - Attacco Ransomware
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2 Ransomware_Detection suspicious_files=276|ransom_notes=3|canary_alerts=2|shares_ok=3 ALERT: Ransom notes rilevate (3), ALERT: Canary file compromessi (2), ALERT: Attività di crittografia massiva rilevata (276 files) | Top files: invoice.pdf.lockbit (score: 18), report.xlsx.encrypted (score: 18), contract.docx.locked (score: 15), presentation.pptx.crypto (score: 15), database.mdb.sealed (score: 13)
+2 Ransomware_Share_Documents CRIT - Ransom notes: 2
+2 Ransomware_Share_Finance CRIT - Suspicious files: 187
+1 Ransomware_Share_Projects WARN - Suspicious files: 89
+
+
+SCENARIO 4: Critical - Canary Compromesso
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2 Ransomware_Detection suspicious_files=0|ransom_notes=0|canary_alerts=1|shares_ok=3 ALERT: Canary file compromessi (1)
+2 Ransomware_Share_Documents CRIT - Canary file eliminato o modificato!
+0 Ransomware_Share_Finance OK - Nessun file sospetto rilevato
+0 Ransomware_Share_Projects OK - Nessun file sospetto rilevato
+
+
+SCENARIO 5: Unknown - Errore Accesso
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3 Ransomware_Detection - UNKNOWN: Impossibile accedere a share \\SERVER\Documents - Access denied
+
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+PROBLEMA: Script non genera output
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CAUSA: Execution policy o errore syntax
+SOLUZIONE:
+1. Verificare execution policy:
+   Get-ExecutionPolicy -List
+2. Impostare RemoteSigned:
+   Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+3. Testare manualmente:
+   powershell -ExecutionPolicy Bypass -File check_ransomware_activity.ps1
+4. Verificare errori:
+   powershell -File check_ransomware_activity.ps1 -VerboseLog
+
+
+PROBLEMA: "Access denied" su share UNC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CAUSA: CheckMK agent gira come SYSTEM, non ha accesso network
+SOLUZIONE:
+1. Verificare accesso manuale:
+   Test-Path "\\SERVER\Share"
+2. CheckMK agent deve girare come service account con accesso share
+3. Configurare service account:
+   services.msc → CheckMK Service → Log On → Account con accesso share
+4. Alternativa: usare local path se share su stesso server
+
+
+PROBLEMA: Canary file non viene creato
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CAUSA: Permessi scrittura insufficienti
+SOLUZIONE:
+1. Verificare permessi account CheckMK:
+   Test-Path "\\SERVER\Share" -PathType Container
+2. Testare scrittura:
+   "test" | Set-Content "\\SERVER\Share\test.txt"
+3. Verificare share permissions (SMB):
+   - Read/Write per account CheckMK
+4. Verificare NTFS permissions:
+   - Modify per account CheckMK
+5. Disabilitare canary se non necessario:
+   "EnableCanaryFiles": false nel config
+
+
+PROBLEMA: Performance lente / timeout
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CAUSA: Share molto grande o lenta
+SOLUZIONE:
+1. Ridurre MaxFilesToScan nel config:
+   "MaxFilesToScan": 5000
+2. Aumentare ExcludePaths:
+   "ExcludePaths": ["backup", "archive", "old", "temp"]
+3. Ridurre TimeWindowMinutes:
+   "TimeWindowMinutes": 15
+4. Script ha timeout 30 sec built-in, ma può essere aumentato nel codice
+
+
+PROBLEMA: Troppi falsi positivi
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CAUSA: Threshold troppo sensibile
+SOLUZIONE:
+1. Aumentare AlertThreshold:
+   "AlertThreshold": 100
+2. Aumentare MaxFilesPerSecond:
+   "MaxFilesPerSecond": 20
+3. Escludere cartelle con alta attività:
+   "ExcludePaths": ["working", "processing", "import"]
+4. Rimuovere estensioni custom che generano falsi positivi
+
+
+PROBLEMA: Config file non trovato
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CAUSA: Path non standard o typo
+SOLUZIONE:
+1. Script cerca in 3 location automaticamente
+2. Specificare path esplicito:
+   check_ransomware_activity.ps1 -ConfigFile "C:\custom\config.json"
+3. Verificare nome file esatto:
+   dir "C:\ProgramData\checkmk\agent\local\ransomware_config.json"
+4. Creare se mancante:
+   '{"SharePaths":["\\\\SERVER\\Share"]}' | Set-Content config.json
+
+
+PROBLEMA: Wrapper remoto non scarica script
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CAUSA: Firewall, proxy, o GitHub down
+SOLUZIONE:
+1. Testare connettività GitHub:
+   Test-NetConnection raw.githubusercontent.com -Port 443
+2. Testare download manuale:
+   Invoke-WebRequest https://raw.githubusercontent.com/... -OutFile test.ps1
+3. Verificare proxy settings se presente
+4. Controllare firewall outbound rules
+5. Fallback: usare script locale invece di wrapper
+
+
+PROBLEMA: Output con caratteri corrotti
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CAUSA: Encoding console vs CheckMK
+SOLUZIONE:
+1. Script usa "attivita'" invece di "attività" (fix applicato)
+2. Evitare caratteri accentati in output
+3. Usare [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+
+================================================================================
+SICUREZZA
+================================================================================
+
+CONSIDERAZIONI:
+
+RANSOMWARE DETECTION:
+✓ Script legge file ma non scrive (eccetto canary e statefile)
+✓ Nessuna modifica ai file monitorati
+✓ Read-only access sufficiente (eccetto canary)
+✓ Non esegue file o comandi dalle share
+
+WRAPPER REMOTO:
+⚠️ Scarica ed esegue codice da GitHub
+⚠️ Rischio MITM se rete compromessa
+⚠️ Verificare HTTPS e certificato
+⚠️ Uso in produzione: script locale preferibile
+
+CREDENZIALI:
+✓ Script non memorizza credenziali
+✓ Usa context account CheckMK service
+✓ Nessun hardcoded password
+✓ Config file non contiene secrets
+
+PERMESSI MINIMI:
+- Read su share monitorate
+- Write solo per canary files (opzionale)
+- Write in %TEMP% per statefile
+
+LOG E STATEFILE:
+✓ Statefile contiene solo metadata (no file content)
+✓ Non logga contenuto file
+✓ IP e path share visibili in output CheckMK
+✓ Non espone informazioni sensibili business
+
+CANARY FILES:
+✓ Contenuto innocuo (solo warning message)
+✓ Attributi Hidden per ridurre visibility
+✓ ReadOnly per prevenire modifica accidentale
+✓ Non contiene dati sensibili
+
+
+BEST PRACTICES SICUREZZA:
+1. Eseguire CheckMK service con account dedicato (non SYSTEM)
+2. Limitare permessi account a solo share necessarie
+3. Configurare firewall per bloccare outbound eccetto GitHub (se wrapper)
+4. Monitorare statefile per manomissioni
+5. Audit log accessi alle share
+6. Rotazione periodica canary files (hash verification)
+7. Alert immediati su CRITICAL (integrazione SIEM)
+8. Backup frequenti e testati per disaster recovery
+
+
+================================================================================
+INTEGRAZIONE CHECKMK
+================================================================================
+
+SERVICE DISCOVERY:
+
+1. Accedere CheckMK Web UI
+2. Navigare a: Setup → Hosts → [HostName]
+3. Service Configuration → Full service scan
+4. Cercare servizi:
+   - Ransomware_Detection
+   - Ransomware_Share_*
+5. Accept all → Activate changes
+
+SERVICE CONFIGURATION:
+
+1. Setup → Services → Service monitoring rules
+2. Cercare: "Ransomware"
+3. Impostare check interval (default: 1 minuto OK, 5 minuti per grandi share)
+4. Configurare notifications:
+   - OK: No notification
+   - WARN: Email admins
+   - CRIT: Email + SMS + PagerDuty immediato
+5. Creare service groups per share critiche
+
+ALERTING:
+
+Esempio regola notification:
+- Service: Ransomware_* 
+- State: CRITICAL
+- Notification: Immediate (no delay)
+- Recipients: Security team + Admins
+- Methods: Email, SMS, Slack, PagerDuty
+- Escalation: After 5 min → Manager level
+
+GRAFICA E METRICHE:
+
+Metriche disponibili per grafici:
+- suspicious_files: Trend nel tempo
+- ransom_notes: Alert count
+- canary_alerts: Integrity violations
+- shares_ok: Availability monitoring
+
+Grafici consigliati:
+1. Suspicious files over time (line graph)
+2. Ransom notes detections (bar chart)
+3. Shares availability (gauge)
+4. Alert distribution by share (pie chart)
+
+
+DASHBOARDS:
+
+Creare dashboard "Ransomware Monitoring":
+- Widget 1: Service state Ransomware_Detection
+- Widget 2: Graph suspicious_files (7 giorni)
+- Widget 3: List all Ransomware_Share_* services
+- Widget 4: Recent alerts (event console)
+- Widget 5: Canary files integrity status
+
+BI (Business Intelligence):
+
+Aggregation rule:
+Name: "File Server Security"
+├─ Ransomware Detection (critical)
+│  ├─ Ransomware_Detection
+│  ├─ Ransomware_Share_Documents
+│  ├─ Ransomware_Share_Finance
+│  └─ Ransomware_Share_Projects
+└─ Share Availability (important)
+   └─ shares_ok metric
+
+
+================================================================================
+CHANGELOG E VERSIONI
+================================================================================
+
+Version 1.0 (2025-10-22):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Initial release
+- 50+ ransomware extensions database
+- Entropy analysis algorithm
+- Canary files support
+- Mass activity detection
+- Ransom notes pattern matching
+- JSON configuration support
+- Statefile tracking
+- Multiple shares support
+- Performance optimization (timeout, max files)
+
+Hotfix 1.0.1 (2025-10-27) - Commit f0ac3f1:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- FIX: Encoding error "attività" → "attivita'"
+- REASON: Carattere accentato corrotto in output CheckMK
+- IMPACT: Output messages, alert details
+
+Hotfix 1.0.2 (2025-10-27) - Commit ed28dfa:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- FIX: Service naming per share troppo lungo
+- CHANGE: Da "Ransomware_Share__WS2022AD__test00" a "Ransomware_Share_test00"
+- METHOD: Uso Split-Path -Leaf per estrarre solo nome share
+- IMPACT: Service names più leggibili
+
+
+Version 2.0 (Planned):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Machine learning file classification
+- Real-time monitoring (FSWatcher)
+- Cloud storage integration (OneDrive, SharePoint)
+- API integration con threat intelligence
+- Automatic file quarantine
+- Historical trend analysis
+- Enhanced reporting
+
+
+================================================================================
+RIFERIMENTI
+================================================================================
+
+RANSOMWARE RESOURCES:
+- No More Ransom Project: https://www.nomoreransom.org/
+- MITRE ATT&CK T1486: https://attack.mitre.org/techniques/T1486/
+- CISA Ransomware Guide: https://www.cisa.gov/ransomware
+
+ENTROPY ANALYSIS:
+- Shannon Entropy: https://en.wikipedia.org/wiki/Entropy_(information_theory)
+- File Entropy Detection: https://ieeexplore.ieee.org/document/7467346
+
+CHECKMK DOCUMENTATION:
+- Local Checks: https://docs.checkmk.com/latest/en/localchecks.html
+- Agent Plugins: https://docs.checkmk.com/latest/en/agent_windows.html
+
+GITHUB REPOSITORY:
+- Project: https://github.com/Coverup20/checkmk-tools
+- Issues: https://github.com/Coverup20/checkmk-tools/issues
+- Wiki: https://github.com/Coverup20/checkmk-tools/wiki
+
+
+================================================================================
+AUTORE E LICENZA
+================================================================================
+
+Autore:     Marzio / NethLab Project
+Repository: https://github.com/Coverup20/checkmk-tools
+Licenza:    [Specificare licenza]
+
+Compatibilità testata:
+- Windows Server 2016/2019/2022
+- PowerShell 5.1 / 7.x
+- CheckMK Raw 2.4.x
+
+Contributi:
+Bug reports e feature requests: GitHub Issues
+Pull requests: Benvenute
+
+Supporto:
+- GitHub Discussions
+- Email: [specificare]
+
+
+================================================================================
+Fine documento
+================================================================================

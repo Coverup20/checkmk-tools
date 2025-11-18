@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#
+# Local check per Checkmk:
+# Conta quante sessioni SSH (tutti gli utenti) sono attive al momento
+
+# Conta tutte le sessioni SSH attive (utenti diversi da root inclusi)
+COUNT=$(pgrep -af "sshd: " | grep -v "sshd:.*priv" | wc -l)
+
+STATUS=0
+if [ "$COUNT" -gt 0 ]; then
+    STATUS=1
+fi
+
+# Output per Checkmk
+echo "$STATUS SSH_All_Sessions count=$COUNT; Active SSH sessions (all users) = $COUNT"

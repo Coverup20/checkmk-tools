@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Bulk: yes
+# mail_realip_html
+
+import os
+from cmk.notification_plugins import utils
+from cmk.notification_plugins.mail import (
+    construct_content,
+    _add_template_attachments,
+    EmailContent,
+    main as mail_main,
+)
+from typing import Callable
+
+# -----------------------------------------------------------
+# Gestione real_ip: sostituisce l'IP 127.0.0.1 con la label real_ip se presente
+# -----------------------------------------------------------
+real_ip = os.environ.get("NOTIFY_HOSTLABEL_real_ip")
+if real_ip:
+    os.environ["HOSTADDRESS"] = real_ip
+    os.environ["NOTIFY_HOSTADDRESS"] = real_ip
+    if "NOTIFY_HOSTOUTPUT" in os.environ:
+        os.environ["NOTIFY_HOSTOUTPUT"] = os.environ["NOTIFY_HOSTOUTPUT"].replace(
+            "127.0.0.1", real_ip
+        )
+
+
+# -----------------------------------------------------------
+# Classe principale (derivata da EmailContent)
+# -----------------------------------------------------------
+class RealIPMailContent(EmailContent):
+    def __init__(self, context_function: Callable[[], dict[str, str]]) -> None:
+        context = context_function()
+        escaped_context = utils.html_escape_context(context)
+
+        # Costruisce i contenuti standard
+        content_txt, content_html, attachments = construct_content(escaped_context)
+
+        # 👇 Aggiungiamo qui il pulsante al corpo HTML
+        real_ip = escaped_context.get("NOTIFY_HOSTADDRESS", "")
+        hostname = escaped_context.get("NOTIFY_HOSTNAME", "")
+        button_html = f"""
+        <p>
+          <a href="https://monitor.nethlab.it/monitoring/check_mk/index.py?start_url=view.py%3Fview_name%3Dhost%26host={hostname}"
+             style="display:inline-block;padding:8px 16px;margin:6px 0;font-size:14px;
+                    font-family:sans-serif;color:#ffffff;background-color:#4CAF50;
+                    text-decoration:none;border-radius:6px;">
+            🔍 Apri Grafici Host ({real_ip})
+          </a>
+        </p>
+        """
+        content_html = content_html + button_html
+
+        # Allegati standard
+        attachments = _add_template_attachments(context, attachments)
+
+        # Richiama EmailContent standard ma con content_html arricchito
+        super().__init__(content_txt, content_html, attachments)
+
+
+# -----------------------------------------------------------
+# Entry point
+# -----------------------------------------------------------
+def main() -> None:
+    mail_main(content_class=RealIPMailContent)
+
+
+if __name__ == "__main__":
+    main()

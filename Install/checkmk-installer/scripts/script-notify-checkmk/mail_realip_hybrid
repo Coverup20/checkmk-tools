@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Mail RealIP Hybrid
+# 
+# RISOLVE IL DILEMMA: Real IP OR Grafici → Real IP AND Grafici
+# 
+# SCENARIO TARGET: CheckMK VPS + FRP + Host dietro firewall
+# - Host address: 127.0.0.1:PORT (per FRP tunneling)
+# - Real IP: Label custom con IP pubblico reale
+# - Risultato: Grafici funzionanti + Email con real IP
+#
+# BASATO SU: mail_realip_00 (non modificato, manteniamo sicurezza)
+# 
+# HTML Email: yes
+# Bulk: yes
+
+import os
+import sys
+import re
+from typing import Dict, Optional
+from cmk.notification_plugins import mail as _mail
+
+def detect_frp_scenario(context: Dict[str, str]) -> bool:
+    """
+    Rileva se siamo in scenario FRP (CheckMK VPS + tunneling).
+    
+    Indicatori FRP confermati dal codice CheckMK ufficiale:
+    - HOSTADDRESS = 127.0.0.1:PORT (render_cmk_graphs usa sempre localhost)
+    - HOSTADDRESS = localhost:PORT (pattern ufficiale CheckMK)
+    - Presenza di label real_ip custom
+    """
+    hostaddress = context.get("HOSTADDRESS", "")
+    real_ip_label = context.get("HOSTLABEL_real_ip")
+    
+    # Pattern FRP confermati dal repo CheckMK:
+    # render_cmk_graphs usa: f"http://localhost:{site.get_apache_port(omd_root)}"
+    frp_patterns = [
+        r"^127\.0\.0\.1:\d+$",      # FRP standard con porta
+        r"^localhost:\d+$",        # CheckMK pattern ufficiale  
+        r"^127\.0\.0\.1$",         # Solo localhost senza porta
+        r"^::1:\d+$",              # IPv6 localhost con porta
+        r"^::1$"                   # IPv6 localhost senza porta
+    ]
+    
+    is_frp_address = any(re.match(pattern, hostaddress) for pattern in frp_patterns)
+    has_real_ip_label = bool(real_ip_label)
+    
+    # Log detection per debugging (evidenze CheckMK research)
+    if is_frp_address and has_real_ip_label:
+        sys.stderr.write(f"FRP scenario detected: HOSTADDRESS={hostaddress}, real_ip={real_ip_label}\n")
+    
+    return is_frp_address and has_real_ip_label
+
+def get_context_from_env() -> Dict[str, str]:
+    """Estrae contesto CheckMK dalle variabili ambiente."""
+    context = {}
+    for key, value in os.environ.items():
+        if key.startswith("NOTIFY_"):
+            # Rimuove prefisso NOTIFY_ per compatibilità
+            context_key = key[7:]
+            context[context_key] = value
+        elif key.startswith("HOSTLABEL_"):
+            # Mantiene label host
+            context[key] = value
+    return context
+
+def get_real_ip(context: Dict[str, str]) -> Optional[str]:
+    """
+    Estrae real IP dai label host.
+    
+    Controlla varie fonti per massima compatibilità.
+    """
+    # Priorità 1: Label standard
+    real_ip = context.get("HOSTLABEL_real_ip")
+    if real_ip:
+        return real_ip.strip()
+    
+    # Priorità 2: Varianti label
+    for label_key in ["HOSTLABEL_external_ip", "HOSTLABEL_public_ip"]:
+        if label_key in context:
+            return context[label_key].strip()
+    
+    # Priorità 3: Da NOTIFY_ variables (retrocompatibilità)
+    notify_real_ip = os.environ.get("NOTIFY_HOSTLABEL_real_ip")
+    if notify_real_ip:
+        return notify_real_ip.strip()
+        
+    return None
+
+def hybrid_graph_function(context, attachments):
+    """
+    Funzione ibrida per grafici in scenario FRP.
+    
+    STRATEGIA:
+    1. Genera grafici usando HOSTADDRESS originale (127.0.0.1:PORT per FRP)
+    2. Lascia che mail standard gestisca i grafici normalmente
+    3. Sostituiamo solo gli URL nelle email dopo la generazione
+    """
+    # In scenario FRP, manteniamo il comportamento standard per i grafici
+    # I grafici useranno 127.0.0.1:PORT che funziona via FRP
+    return _mail._original_add_graphs(context, attachments)
+
+def main():
+    """
+    Funzione principale con logica ibrida FRP-aware.
+    """
+    print("=== MAIL REALIP HYBRID - FRP AWARE ===")
+    
+    # Raccoglie contesto
+    context = get_context_from_env()
+    
+    # Rileva scenario
+    is_frp = detect_frp_scenario(context)
+    real_ip = get_real_ip(context)
+    
+    print(f"FRP Scenario rilevato: {is_frp}")
+    print(f"Real IP disponibile: {real_ip or 'Nessuno'}")
+    print(f"Host Address: {context.get('HOSTADDRESS', 'N/A')}")
+    
+    if is_frp and real_ip:
+        print("🎯 MODALITÀ IBRIDA FRP ATTIVATA")
+        
+        # STRATEGIA IBRIDA:
+        # 1. Salva configurazione originale per grafici
+        original_hostaddress = os.environ.get("NOTIFY_HOSTADDRESS", "")
+        original_monitoring_host = os.environ.get("NOTIFY_MONITORING_HOST", "")
+        
+        # 2. Mantieni funzione grafici originale per FRP
+        if not hasattr(_mail, '_original_add_graphs'):
+            _mail._original_add_graphs = _mail._add_graphs
+        
+        # 3. Sostituisci _add_graphs con versione ibrida
+        _mail._add_graphs = hybrid_graph_function
+        
+        # 4. Aggiorna variabili per EMAIL URL (non per grafici)
+        # I grafici continueranno a usare 127.0.0.1:PORT
+        # Ma gli URL email useranno real_ip
+        
+        # Aggiorna solo le variabili che influenzano gli URL email
+        os.environ["NOTIFY_HOSTADDRESS"] = real_ip
+        
+        # Sostituisce riferimenti negli output
+        if "NOTIFY_HOSTOUTPUT" in os.environ:
+            os.environ["NOTIFY_HOSTOUTPUT"] = os.environ["NOTIFY_HOSTOUTPUT"].replace(
+                original_hostaddress, real_ip
+            )
+        
+        print(f"✅ Email URL useranno: {real_ip}")
+        print(f"✅ Grafici useranno: {original_hostaddress} (via FRP)")
+        
+    elif real_ip:
+        print("🔄 MODALITÀ STANDARD REAL IP")
+        
+        # Scenario non-FRP: comportamento classico mail_realip_00
+        # Disabilita grafici come nell'originale
+        _mail._add_graphs = lambda context, attachments: attachments
+        
+        # Aggiorna tutte le variabili con real_ip
+        os.environ["HOSTADDRESS"] = real_ip
+        os.environ["NOTIFY_HOSTADDRESS"] = real_ip
+        
+        if "NOTIFY_HOSTOUTPUT" in os.environ:
+            os.environ["NOTIFY_HOSTOUTPUT"] = os.environ["NOTIFY_HOSTOUTPUT"].replace(
+                os.environ.get("NOTIFY_HOSTADDRESS", "127.0.0.1"), real_ip
+            )
+            
+        print(f"✅ Modalità standard con real IP: {real_ip}")
+        
+    else:
+        print("ℹ️  MODALITÀ STANDARD CHECKMK")
+        print("Nessun real_ip trovato, comportamento CheckMK standard")
+    
+    # Chiama mail CheckMK standard
+    try:
+        _mail.main()
+        print("✅ Email inviata con successo")
+    except Exception as e:
+        print(f"❌ Errore invio email: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

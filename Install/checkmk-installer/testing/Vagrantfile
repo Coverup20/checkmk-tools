@@ -1,0 +1,54 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# CheckMK Installer Test Environment
+# Vagrant configuration for automated testing
+
+Vagrant.configure("2") do |config|
+  # Base box
+  config.vm.box = "ubuntu/jammy64"  # Ubuntu 24.04 LTS
+  
+  # VM settings
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "checkmk-installer-test"
+    vb.memory = "2048"
+    vb.cpus = 2
+    vb.gui = false
+  end
+  
+  # Network
+  config.vm.network "private_network", type: "dhcp"
+  config.vm.network "forwarded_port", guest: 5000, host: 5000, id: "checkmk"
+  config.vm.network "forwarded_port", guest: 22, host: 2222, id: "ssh"
+  
+  # Sync installer directory
+  config.vm.synced_folder "../", "/vagrant/checkmk-installer", 
+    owner: "root", group: "root"
+  
+  # Provision - install dependencies
+  config.vm.provision "shell", inline: <<-SHELL
+    echo "=== Installing dependencies ==="
+    apt-get update
+    apt-get install -y curl wget git jq
+    
+    echo "=== Copying installer to /root ==="
+    cp -r /vagrant/checkmk-installer /root/
+    chmod +x /root/checkmk-installer/*.sh
+    chmod +x /root/checkmk-installer/modules/*.sh
+    chmod +x /root/checkmk-installer/utils/*.sh
+    
+    echo "=== VM ready for testing ==="
+    echo "Run tests with: vagrant ssh -c 'sudo /root/checkmk-installer/testing/test-vm.sh'"
+  SHELL
+  
+  # Message
+  config.vm.post_up_message = <<-MSG
+    ╔════════════════════════════════════════════════════════════╗
+    ║         CheckMK Installer Test VM Ready                   ║
+    ╠════════════════════════════════════════════════════════════╣
+    ║  SSH: vagrant ssh                                          ║
+    ║  Test: vagrant ssh -c 'sudo /root/checkmk-installer/testing/test-vm.sh' ║
+    ║  CheckMK: http://localhost:5000/monitoring/               ║
+    ╚════════════════════════════════════════════════════════════╝
+  MSG
+end

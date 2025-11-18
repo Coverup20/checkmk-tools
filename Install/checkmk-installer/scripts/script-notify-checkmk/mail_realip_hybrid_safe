@@ -1,0 +1,345 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Mail RealIP Hybrid Safe
+#
+# Conservative FRP-aware variant:
+# - Detects FRP via label (NOTIFY_HOSTLABEL_frp=true) if present, else fallback to 127.0.0.1/localhost/::1
+# - Rewrites ONLY URLs in text/html (href/src pointing to 127.0.0.1|localhost|::1[:PORT]) to real_ip
+# - Rewrites full IP occurrences in text/plain
+# - Does NOT touch other HTML content to avoid MIME/encoding corruption
+# - Does NOT attempt to inject graphs (RAW 2.4 graph emails not guaranteed)
+# Bulk: yes
+
+import os
+import re
+import sys
+from cmk.notification_plugins import mail
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Mail RealIP Hybrid Safe
+#
+# Conservative FRP-aware variant:
+# - Detects FRP via label (NOTIFY_HOSTLABEL_frp=true) if present, else fallback to 127.0.0.1/localhost/::1
+# - Rewrites ONLY URLs in text/html (href/src pointing to 127.0.0.1|localhost|::1[:PORT]) to real_ip
+# - Rewrites full IP occurrences in text/plain
+# - Does NOT touch other HTML content to avoid MIME/encoding corruption
+# - Does NOT attempt to inject graphs (RAW 2.4 graph emails not guaranteed)
+# Bulk: yes
+
+import os
+import re
+import sys
+from cmk.notification_plugins import mail
+
+
+def log_debug(msg: str) -> None:
+    if os.environ.get("DEBUG_MAIL_HYBRID", "0") == "1":
+        print(f"[SAFE] {msg}", file=sys.stderr)
+
+
+URL_TARGETS = re.compile(r"(https?://)(\[::1\]|127\.0\.0\.1|localhost)(:\d+)?", re.IGNORECASE)
+
+
+def detect_frp() -> tuple[bool, str, str]:
+    host_address = os.environ.get("NOTIFY_HOSTADDRESS", "")
+    real_ip = os.environ.get("NOTIFY_HOSTLABEL_real_ip", "")
+    frp_label = os.environ.get("NOTIFY_HOSTLABEL_frp", "")
+
+    loopbacks = ("127.0.0.1", "localhost", "::1")
+    by_loopback = any(host_address.startswith(p) for p in loopbacks)
+    by_label = frp_label.lower() in ("1", "true", "yes")
+
+    is_frp = bool(real_ip) and (by_label or by_loopback)
+    log_debug(f"FRP? {is_frp} | host={host_address} real_ip={real_ip} label={frp_label}")
+    return is_frp, real_ip, host_address
+
+
+def rewrite_html_urls(html: str, original_addr: str, real_ip: str) -> str:
+    # Replace absolute URLs that point to loopback with real_ip
+    def _sub(m: re.Match) -> str:
+        proto = m.group(1)
+        port = m.group(3) or ""
+        return f"{proto}{real_ip}{port}"
+
+    html2 = URL_TARGETS.sub(_sub, html)
+    # Also replace bare original_addr when it appears inside links
+    if original_addr:
+        html2 = html2.replace(original_addr, original_addr.replace("127.0.0.1", real_ip))
+    # Do NOT touch other content (styles, classes, etc.)
+    return html2
+
+
+def add_graph_links(html: str, real_ip: str) -> str:
+    """Aggiunge link identici a quelli di Telegram, con login.py e _origtarget"""
+    import urllib.parse
+    hostname = os.environ.get("NOTIFY_HOSTNAME", "")
+    servicedesc = os.environ.get("NOTIFY_SERVICEDESC", "")
+    site = "monitoring"
+    base_url = "https://monitor.nethlab.it/monitoring"
+    if not hostname:
+        return html
+    # Costruisci _origtarget per host
+    host_target = f"view.py?host={urllib.parse.quote(hostname)}&site={site}&view_name=host"
+    host_login_url = f"{base_url}/check_mk/login.py?_origtarget=index.py%3Fstart_url%3D{urllib.parse.quote(host_target)}"
+    if servicedesc:
+        # Costruisci _origtarget per servizio
+        service_target = f"view.py?host={urllib.parse.quote(hostname)}&service={urllib.parse.quote(servicedesc)}&site={site}&view_name=service"
+        service_login_url = f"{base_url}/check_mk/login.py?_origtarget=index.py%3Fstart_url%3D{urllib.parse.quote(service_target)}"
+        links_section = f"""
+<hr>
+<p><strong>📊 Monitoraggio:</strong></p>
+<ul>
+<li><a href=\"{service_login_url}\">🔗 Servizio</a></li>
+<li><a href=\"{host_login_url}\">🖥 Host</a></li>
+</ul>
+"""
+    else:
+        links_section = f"""
+<hr>
+<p><strong>📊 Monitoraggio:</strong></p>
+<ul>
+<li><a href=\"{host_login_url}\">🖥 Host</a></li>
+</ul>
+"""
+    # Inserisci solo se non già presente
+    if "monitoraggio" not in html.lower():
+        if "</body>" in html:
+            html = html.replace("</body>", links_section + "</body>")
+        else:
+            html += links_section
+    return html
+
+
+def render_telegram_style_html() -> str:
+    import html
+    hostname = os.environ.get("NOTIFY_HOSTNAME", "")
+    servicedesc = os.environ.get("NOTIFY_SERVICEDESC", "")
+    serviceoutput = os.environ.get("NOTIFY_SERVICEOUTPUT", "")
+    state = os.environ.get("NOTIFY_SERVICESTATE", "OK")
+    emoji = "🟢" if state == "OK" else "⚠️"
+    site = "monitoring"
+    base_url = "https://monitor.nethlab.it/monitoring"
+    # Link host/servizio
+    host_target = f"view.py?host={html.escape(hostname)}&site={site}&view_name=host"
+    host_login_url = f"{base_url}/check_mk/login.py?_origtarget=index.py%3Fstart_url%3D{html.escape(host_target)}"
+    if servicedesc:
+        service_target = f"view.py?host={html.escape(hostname)}&service={html.escape(servicedesc)}&site={site}&view_name=service"
+        service_login_url = f"{base_url}/check_mk/login.py?_origtarget=index.py%3Fstart_url%3D{html.escape(service_target)}"
+        return f"""
+<div style='background:#23272e;color:#fff;padding:16px;border-radius:8px;font-family:sans-serif;'>
+  <div style='font-size:1.2em;margin-bottom:8px;'>⚠️ [VPS] ⚠️ [{emoji} {state}] Servizio → <b>{html.escape(servicedesc)}</b></div>
+  <div style='margin-bottom:8px;'>Host: <b>{html.escape(hostname)}</b></div>
+  <div style='margin-bottom:8px;'>Output: <span style='color:#ffd700;'>{html.escape(serviceoutput)}</span></div>
+  <div style='display:flex;gap:8px;margin-top:12px;'>
+    <a href='{service_login_url}' style='background:#36393f;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:bold;'>🔗 Servizio</a>
+    <a href='{host_login_url}' style='background:#36393f;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:bold;'>🖥 Host</a>
+  </div>
+</div>
+"""
+    else:
+        return f"""
+<div style='background:#23272e;color:#fff;padding:16px;border-radius:8px;font-family:sans-serif;'>
+  <div style='font-size:1.2em;margin-bottom:8px;'>⚠️ [VPS] ⚠️ [{emoji} {state}] Host → <b>{html.escape(hostname)}</b></div>
+  <div style='margin-bottom:8px;'>Output: <span style='color:#ffd700;'>{html.escape(serviceoutput)}</span></div>
+  <div style='display:flex;gap:8px;margin-top:12px;'>
+    <a href='{host_login_url}' style='background:#36393f;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:bold;'>🖥 Host</a>
+  </div>
+</div>
+"""
+
+
+def telegram_buttons_html() -> str:
+    import urllib.parse, html
+    hostname = os.environ.get("NOTIFY_HOSTNAME", "")
+    servicedesc = os.environ.get("NOTIFY_SERVICEDESC", "")
+    state = os.environ.get("NOTIFY_SERVICESTATE", "OK")
+    site = "monitoring"
+    real_ip = os.environ.get("NOTIFY_HOSTLABEL_real_ip", "")
+    base_url = "https://monitor.nethlab.it/monitoring"
+    # Link servizio (già funzionante): include site e view_name=service
+    service_view = f"/monitoring/check_mk/view.py?host={urllib.parse.quote(hostname)}&service={urllib.parse.quote(servicedesc)}&site={site}&view_name=service"
+    service_url = f"{base_url}/check_mk/index.py?start_url={urllib.parse.quote(service_view)}"
+    # Link host (corretto): view_name=hoststatus e include site
+    host_view = f"/monitoring/check_mk/view.py?host={urllib.parse.quote(hostname)}&site={site}&view_name=hoststatus"
+    host_url = f"{base_url}/check_mk/index.py?start_url={urllib.parse.quote(host_view)}"
+    
+    # Determina la classe CSS in base allo stato
+    state_class = ""
+    if state == "OK":
+        state_class = "cmk-btn-ok"
+    elif state == "WARN" or state == "WARNING":
+        state_class = "cmk-btn-warn"
+    elif state == "CRIT" or state == "CRITICAL":
+        state_class = "cmk-btn-crit"
+    else:
+        state_class = "cmk-btn-unknown"
+    
+    # Bottoni compatti, arrotondati, dinamici, effetto hover, responsive per smartphone
+    return f"""
+<style>
+.cmk-btn-container {{
+    background: #ffffff;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    padding: 20px 40px;
+    margin: 16px auto;
+    max-width: 600px;
+    width: auto;
+    display: block;
+    box-sizing: border-box;
+}}
+.cmk-btn-tg-wrap {{
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin: 0 auto;
+    padding: 0;
+}}
+.cmk-btn-tg {{
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 0.95em;
+    display: inline-block;
+    text-align: center;
+    box-shadow: 0 2px 8px #0002, inset 0 0 0 1px #000;
+    border: 1px solid #000;
+    outline: 2px solid #fff;
+    outline-offset: -3px;
+    letter-spacing: 0.5px;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    flex: 0 1 auto;
+    white-space: nowrap;
+    min-width: 110px;
+    max-width: 150px;
+}}
+/* Colori in base allo stato del servizio */
+.cmk-btn-ok {{
+    background: #13ce66;
+    border-color: #000;
+}}
+.cmk-btn-ok:hover {{
+    background: #0fa957;
+    border-color: #000;
+}}
+.cmk-btn-warn {{
+    background: #ffc107;
+    border-color: #000;
+}}
+.cmk-btn-warn:hover {{
+    background: #e0a800;
+    border-color: #000;
+}}
+.cmk-btn-crit {{
+    background: #ff4757;
+    border-color: #000;
+}}
+.cmk-btn-crit:hover {{
+    background: #e63946;
+    border-color: #000;
+}}
+.cmk-btn-unknown {{
+    background: #9e9e9e;
+    border-color: #000;
+}}
+.cmk-btn-unknown:hover {{
+    background: #757575;
+    border-color: #000;
+}}
+/* Media query per smartphone - pulsanti affiancati con larghezza adattiva */
+@media (max-width: 600px) {{
+    .cmk-btn-container {{
+        max-width: 100%;
+        margin: 12px 0;
+        padding: 16px 12px;
+        border-width: 2px;
+        border-radius: 6px;
+    }}
+    .cmk-btn-tg-wrap {{
+        gap: 10px;
+    }}
+    .cmk-btn-tg {{
+        padding: 12px 20px;
+        font-size: 0.95em;
+        flex: 1 1 0;
+        min-width: 0;
+        max-width: none;
+        border-width: 2px;
+    }}
+}}
+</style>
+<div class='cmk-btn-container'>
+    <div class='cmk-btn-tg-wrap'>
+        <a href='{service_url}' class='cmk-btn-tg {state_class}'>Service</a>
+        <a href='{host_url}' class='cmk-btn-tg {state_class}'>Host</a>
+    </div>
+</div>
+"""
+
+
+def patched_send(message, target, from_address):
+    is_frp, real_ip, original_addr = detect_frp()
+    if not (is_frp and real_ip):
+        return mail._original_send(message, target, from_address)
+
+    # Aggiorna la variabile d'ambiente per l'IP
+    os.environ["NOTIFY_HOSTADDRESS"] = real_ip
+
+    loopbacks = ["127.0.0.1", "localhost", "::1"]
+    for part in message.walk() if hasattr(message, "walk") else []:
+        ctype = part.get_content_type()
+        if ctype == "text/plain":
+            payload = part.get_payload(decode=True)
+            if not payload:
+                continue
+            text = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
+            for lb in loopbacks:
+                text = text.replace(lb, real_ip)
+            if original_addr:
+                text = text.replace(original_addr, original_addr.replace("127.0.0.1", real_ip))
+            charset = part.get_content_charset() or "utf-8"
+            if "Content-Transfer-Encoding" in part:
+                del part["Content-Transfer-Encoding"]
+            part.set_payload(text, charset=charset)
+        elif ctype == "text/html":
+            payload = part.get_payload(decode=True)
+            if not payload:
+                continue
+            html = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
+            for lb in loopbacks:
+                html = html.replace(lb, real_ip)
+            if original_addr:
+                html = html.replace(original_addr, original_addr.replace("127.0.0.1", real_ip))
+            # Assicura che i bottoni/link siano sempre aggiunti
+            if "cmk-btn-tg" not in html:
+                html += telegram_buttons_html()
+            charset = part.get_content_charset() or "utf-8"
+            if "Content-Transfer-Encoding" in part:
+                del part["Content-Transfer-Encoding"]
+            part.set_payload(html, charset=charset)
+
+    return mail._original_send(message, target, from_address)
+
+
+def main():
+    # Ensure subject/body exist to satisfy plugin expectations
+    os.environ.setdefault("PARAMETER_SUBJECT", "$WHAT$ on $HOSTNAME$/$SERVICEDESC$")
+    os.environ.setdefault("PARAMETER_BODY", "")
+
+    # Monkey-patch send function conservatively
+    if not hasattr(mail, "_original_send"):
+        mail._original_send = mail.send_mail_sendmail
+        mail.send_mail_sendmail = patched_send
+
+    try:
+        mail.main()
+    except Exception as e:
+        print(f"SAFE plugin error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

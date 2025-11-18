@@ -1,0 +1,13 @@
+# CheckMK Monitoring Scripts - Cron Jobs
+
+# Update tracked tickets every 30 minutes
+*/30 * * * * monitoring /opt/ydea-toolkit/ydea-toolkit.sh update-tracking >> /var/log/ydea-toolkit.log 2>&1
+
+# Cleanup resolved tickets daily at 3 AM
+0 3 * * * monitoring /opt/ydea-toolkit/ydea-toolkit.sh cleanup-tracking >> /var/log/ydea-toolkit.log 2>&1
+
+# Rotate logs weekly
+0 0 * * 0 root /usr/sbin/logrotate /etc/logrotate.d/checkmk-scripts
+
+# Backup CheckMK configuration daily at 2 AM
+0 2 * * * root /opt/script-tools/backup-checkmk.sh >> /var/log/checkmk-backup.log 2>&1

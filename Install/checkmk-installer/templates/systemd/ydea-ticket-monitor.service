@@ -1,0 +1,10 @@
+[Unit]
+Description=Ydea Ticket Monitor
+After=network.target
+
+[Service]
+Type=oneshot
+User=monitoring
+ExecStart=/opt/ydea-toolkit/ydea-ticket-monitor.sh
+StandardOutput=journal
+StandardError=journal

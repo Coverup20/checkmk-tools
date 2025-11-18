@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+echo "==== Notification Environment Dump ====" >> /tmp/notify_env.log
+env | sort >> /tmp/notify_env.log
+echo "---------------------------------------" >> /tmp/notify_env.log
+exit 0

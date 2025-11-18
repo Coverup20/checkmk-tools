@@ -1,0 +1,14 @@
+[Unit]
+Description=CheckMK Agent Socket
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/check_mk_agent
+StandardOutput=socket
+StandardInput=socket
+
+[Install]
+WantedBy=multi-user.target

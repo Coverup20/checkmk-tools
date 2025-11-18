@@ -1,0 +1,853 @@
+#!/usr/bin/env bash
+# ydea_realip - CheckMK notification script per Ydea ticketing
+# Gestisce creazione automatica ticket e aggiornamenti con note private
+set -euo pipefail
+
+# ===== CONFIG =====
+YDEA_TOOLKIT_DIR="/opt/ydea-toolkit"
+YDEA_TOOLKIT="${YDEA_TOOLKIT_DIR}/ydea-toolkit.sh"
+YDEA_ENV="${YDEA_TOOLKIT_DIR}/.env"
+TICKET_CACHE="/tmp/ydea_checkmk_tickets.json"
+FLAPPING_CACHE="/tmp/ydea_checkmk_flapping.json"
+CACHE_LOCK="/tmp/ydea_cache.lock"  # Usa /tmp invece di /var/lock per permessi
+RESOLVED_TICKET_TTL=$((5*24*3600))  # 5 giorni per ticket risolti
+CACHE_MAX_AGE=$((30*24*3600))  # 30 giorni per ticket non risolti (fallback)
+FLAPPING_THRESHOLD=5  # Numero cambi stato in finestra temporale
+FLAPPING_WINDOW=600   # Finestra temporale in secondi (10 minuti)
+
+# ===== UTILITY =====
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2; }
+debug() { [[ "${DEBUG_YDEA:-0}" == "1" ]] && log "DEBUG: $*" || true; }
+
+# Inizializza cache se non esiste e valida contenuto
+init_cache() {
+  # Crea lock file con permessi permissivi se non esiste
+  if [[ ! -f "$CACHE_LOCK" ]]; then
+    touch "$CACHE_LOCK" 2>/dev/null || true
+    chmod 666 "$CACHE_LOCK" 2>/dev/null || true
+  fi
+  
+  # Valida e ripara TICKET_CACHE
+  if [[ ! -f "$TICKET_CACHE" ]]; then
+    echo '{}' > "$TICKET_CACHE" 2>/dev/null || {
+      log "ERROR: Impossibile creare $TICKET_CACHE"
+      return 1
+    }
+    chmod 666 "$TICKET_CACHE" 2>/dev/null || true
+  else
+    # Verifica che sia JSON valido
+    if ! jq empty "$TICKET_CACHE" 2>/dev/null; then
+      log "WARN: Cache ticket corrotta, backup e reset"
+      [[ -f "$TICKET_CACHE" ]] && cp "$TICKET_CACHE" "${TICKET_CACHE}.corrupt.$(date +%s)" 2>/dev/null || true
+      echo '{}' > "$TICKET_CACHE" 2>/dev/null || {
+        log "ERROR: Impossibile scrivere su $TICKET_CACHE"
+        return 1
+      }
+      chmod 666 "$TICKET_CACHE" 2>/dev/null || true
+    else
+      # Pulisci entry con ticket_id non numerici
+      local cleaned
+      cleaned=$(jq 'to_entries | map(
+        select(
+          .value.ticket_id != null and 
+          (.value.ticket_id | type) == "number" or
+          (.value.ticket_id | type) == "string" and (.value.ticket_id | test("^[0-9]+$"))
+        )
+      ) | from_entries' "$TICKET_CACHE" 2>/dev/null) || cleaned='{}'
+      echo "$cleaned" > "$TICKET_CACHE" 2>/dev/null || true
+      chmod 666 "$TICKET_CACHE" 2>/dev/null || true
+    fi
+  fi
+  
+  # Valida e ripara FLAPPING_CACHE
+  if [[ ! -f "$FLAPPING_CACHE" ]]; then
+    echo '{}' > "$FLAPPING_CACHE" 2>/dev/null || true
+    chmod 666 "$FLAPPING_CACHE" 2>/dev/null || true
+  else
+    if ! jq empty "$FLAPPING_CACHE" 2>/dev/null; then
+      log "WARN: Cache flapping corrotta, backup e reset"
+      [[ -f "$FLAPPING_CACHE" ]] && cp "$FLAPPING_CACHE" "${FLAPPING_CACHE}.corrupt.$(date +%s)" 2>/dev/null || true
+      echo '{}' > "$FLAPPING_CACHE" 2>/dev/null || true
+      chmod 666 "$FLAPPING_CACHE" 2>/dev/null || true
+    fi
+  fi
+  
+  # Pulisci entry vecchie (oltre CACHE_MAX_AGE)
+  clean_old_cache_entries
+}
+
+# Pulisci entry vecchie dalla cache
+# - Ticket risolti (resolved_at != null): rimossi dopo RESOLVED_TICKET_TTL (5 giorni)
+# - Ticket attivi (resolved_at == null): rimossi dopo CACHE_MAX_AGE (30 giorni)
+clean_old_cache_entries() {
+  local now=$(date -u +%s)
+  local resolved_cutoff=$((now - RESOLVED_TICKET_TTL))
+  local active_cutoff=$((now - CACHE_MAX_AGE))
+  
+  if [[ -f "$TICKET_CACHE" ]] && jq empty "$TICKET_CACHE" 2>/dev/null; then
+    local cleaned
+    cleaned=$(jq --arg resolved_cutoff "$resolved_cutoff" --arg active_cutoff "$active_cutoff" '
+      to_entries | map(
+        select(
+          # Ticket risolti: controlla resolved_at
+          if .value.resolved_at != null then
+            (.value.resolved_at | tonumber) > ($resolved_cutoff | tonumber)
+          # Ticket attivi: controlla last_update
+          else
+            .value.last_update != null and
+            (.value.last_update | tonumber) > ($active_cutoff | tonumber)
+          end
+        )
+      ) | from_entries
+    ' "$TICKET_CACHE" 2>/dev/null) || cleaned='{}'
+    
+    # Solo aggiorna se ci sono state modifiche
+    if [[ "$cleaned" != "$(cat "$TICKET_CACHE")" ]]; then
+      atomic_cache_write "$TICKET_CACHE" "$cleaned"
+      debug "Cache pulita: rimosse entry vecchie (resolved > 5gg, active > 30gg)"
+    fi
+  fi
+}
+
+# ===== FUNZIONI CACHE =====
+# Scrittura atomica con lock per evitare race conditions
+atomic_cache_write() {
+  local cache_file="$1"
+  local content="$2"
+  local temp_file="${cache_file}.tmp.$$"
+  
+  # Verifica permessi scrittura prima di procedere
+  if [[ ! -w "$(dirname "$cache_file")" ]]; then
+    log "ERROR: Nessun permesso di scrittura su $(dirname "$cache_file")"
+    return 1
+  fi
+  
+  # Usa flock per garantire scrittura atomica
+  local write_result
+  (
+    flock -x -w 5 200 || {
+      log "WARN: Timeout acquisizione lock per $cache_file, uso fallback"
+      # Fallback: scrivi direttamente senza lock
+      echo "$content" > "$cache_file" 2>/dev/null || {
+        log "ERROR: Fallback scrittura fallito per $cache_file"
+        exit 1
+      }
+      exit 0
+    }
+    
+    echo "$content" > "$temp_file" 2>/dev/null || {
+      log "ERROR: Impossibile scrivere temp file $temp_file"
+      exit 1
+    }
+    chmod 666 "$temp_file" 2>/dev/null || true
+    sync
+    mv "$temp_file" "$cache_file" 2>/dev/null || {
+      log "ERROR: Impossibile spostare $temp_file a $cache_file"
+      rm -f "$temp_file" 2>/dev/null
+      exit 1
+    }
+    chmod 666 "$cache_file" 2>/dev/null || true
+    sync
+    exit 0
+    
+  ) 200>"${CACHE_LOCK}"
+  write_result=$?
+  
+  if [[ $write_result -ne 0 ]]; then
+    log "ERROR: atomic_cache_write fallito con codice $write_result"
+    return 1
+  fi
+  
+  debug "atomic_cache_write OK: $cache_file"
+  return 0
+}
+
+# Genera chiave univoca per ticket: IP/HOSTNAME:SERVIZIO
+get_ticket_key() {
+  local host="${1}"
+  local service="${2:-HOST}"
+  echo "${host}:${service}"
+}
+
+# Verifica se esiste ticket aperto per questo alert
+ticket_exists() {
+  local key="$1"
+  init_cache
+  jq -e --arg key "$key" '.[$key] != null' "$TICKET_CACHE" >/dev/null 2>&1
+}
+
+# Ottieni ID ticket dalla cache
+get_ticket_id() {
+  local key="$1"
+  init_cache
+  jq -r --arg key "$key" '.[$key].ticket_id // empty' "$TICKET_CACHE"
+}
+
+# Salva ticket in cache
+save_ticket_cache() {
+  local key="$1"
+  local ticket_id="$2"
+  local state="$3"
+  init_cache
+  
+  local updated_cache
+  updated_cache=$(jq --arg key "$key" \
+     --arg id "$ticket_id" \
+     --arg state "$state" \
+     --arg ts "$(date -u +%s)" \
+    '.[$key] = {ticket_id: ($id | tonumber), state: $state, created_at: ($ts | tonumber), last_update: ($ts | tonumber), resolved_at: null}' \
+    "$TICKET_CACHE" 2>/dev/null) || {
+    log "ERRORE: Impossibile generare JSON per cache"
+    return 1
+  }
+  
+  atomic_cache_write "$TICKET_CACHE" "$updated_cache" || {
+    log "ERRORE: atomic_cache_write fallito per $key"
+    return 1
+  }
+  debug "Ticket salvato in cache: $key -> $ticket_id"
+}
+
+# Marca ticket come risolto (imposta resolved_at timestamp)
+mark_ticket_resolved() {
+  local key="$1"
+  init_cache
+  
+  # Verifica che il ticket esista in cache
+  if ! ticket_exists "$key"; then
+    debug "Ticket $key non in cache, skip mark_resolved"
+    return 0
+  fi
+  
+  local updated_cache
+  updated_cache=$(jq --arg key "$key" \
+     --arg ts "$(date -u +%s)" \
+    '.[$key].resolved_at = ($ts | tonumber) | .[$key].last_update = ($ts | tonumber)' \
+    "$TICKET_CACHE" 2>/dev/null) || {
+    log "WARN: Impossibile marcare ticket risolto per $key"
+    return 1
+  }
+  
+  atomic_cache_write "$TICKET_CACHE" "$updated_cache"
+  debug "Ticket $key marcato come risolto, cleanup tra 5 giorni"
+}
+
+# Aggiorna ultimo stato in cache
+update_ticket_state() {
+  local key="$1"
+  local state="$2"
+  init_cache
+  
+  local updated_cache
+  # Se stato torna CRITICAL/DOWN, resetta resolved_at a null
+  if [[ "$state" == "CRITICAL" || "$state" == "CRIT" || "$state" == "DOWN" ]]; then
+    updated_cache=$(jq --arg key "$key" \
+       --arg state "$state" \
+       --arg ts "$(date -u +%s)" \
+      '.[$key].state = $state | .[$key].last_update = ($ts | tonumber) | .[$key].resolved_at = null' \
+      "$TICKET_CACHE" 2>/dev/null) || {
+      log "WARN: Impossibile aggiornare stato in cache per $key"
+      return 1
+    }
+  else
+    # Altri stati (WARNING, UNKNOWN, ecc.) - non toccare resolved_at
+    updated_cache=$(jq --arg key "$key" \
+       --arg state "$state" \
+       --arg ts "$(date -u +%s)" \
+      '.[$key].state = $state | .[$key].last_update = ($ts | tonumber)' \
+      "$TICKET_CACHE" 2>/dev/null) || {
+      log "WARN: Impossibile aggiornare stato in cache per $key"
+      return 1
+    }
+  fi
+  
+  atomic_cache_write "$TICKET_CACHE" "$updated_cache"
+}
+
+# ===== FLAPPING DETECTION =====
+# Registra cambio stato per detection flapping
+record_state_change() {
+  local key="$1"
+  local state="$2"
+  local now
+  now="$(date -u +%s)"
+  init_cache
+  
+  # Aggiungi nuovo cambio stato
+  local updated_cache
+  updated_cache=$(jq --arg key "$key" \
+     --arg state "$state" \
+     --arg ts "$now" \
+    '.[$key] = ((.[$key] // []) + [{state: $state, timestamp: ($ts|tonumber)}])' \
+    "$FLAPPING_CACHE" 2>/dev/null) || {
+    log "WARN: Impossibile registrare cambio stato per $key"
+    return 1
+  }
+  
+  atomic_cache_write "$FLAPPING_CACHE" "$updated_cache"
+  
+  # Pulisci eventi vecchi (fuori dalla finestra temporale)
+  local cutoff=$((now - FLAPPING_WINDOW))
+  updated_cache=$(jq --arg key "$key" \
+     --arg cutoff "$cutoff" \
+    '.[$key] = [.[$key][] | select(.timestamp > ($cutoff|tonumber))]' \
+    "$FLAPPING_CACHE" 2>/dev/null) || return 0
+  
+  atomic_cache_write "$FLAPPING_CACHE" "$updated_cache"
+}
+
+# Verifica se il servizio è in flapping
+is_flapping() {
+  local key="$1"
+  init_cache
+  local count=$(jq --arg key "$key" '.[$key] // [] | length' "$FLAPPING_CACHE")
+  [[ "$count" -ge "$FLAPPING_THRESHOLD" ]]
+}
+
+# Ottieni conteggio cambi stato
+get_state_changes_count() {
+  local key="$1"
+  init_cache
+  jq --arg key "$key" '.[$key] // [] | length' "$FLAPPING_CACHE"
+}
+
+# ===== EMOJI PER STATI =====
+get_emoji() {
+  case "${1^^}" in
+    OK|UP) echo "🟢" ;;
+    WARN|WARNING) echo "🟡" ;;
+    CRIT|CRITICAL|DOWN) echo "🔴" ;;
+    UNKNOWN) echo "⚪" ;;
+    *) echo "⚠️" ;;
+  esac
+}
+
+# ===== FORMATTAZIONE OUTPUT =====
+# Formatta output plugin in modo più leggibile (sintetico)
+format_output() {
+  local output="$1"
+  # Rimuovi caratteri speciali eccessivi e limita lunghezza
+  echo "$output" | tr -d '\r' | head -c 500
+}
+
+# ===== GESTIONE TICKET YDEA =====
+# Carica ambiente Ydea
+load_ydea_env() {
+  if [[ ! -f "$YDEA_ENV" ]]; then
+    log "ERRORE: File .env non trovato in $YDEA_ENV"
+    exit 1
+  fi
+  source "$YDEA_ENV"
+  
+  if [[ ! -x "$YDEA_TOOLKIT" ]]; then
+    log "ERRORE: Script ydea-toolkit.sh non trovato o non eseguibile in $YDEA_TOOLKIT"
+    exit 1
+  fi
+}
+
+# Crea nuovo ticket su Ydea
+create_ydea_ticket() {
+  local title="$1"
+  local description="$2"
+  local priority="$3"
+  
+  debug "Creazione ticket: $title"
+  local result
+  result=$("$YDEA_TOOLKIT" create "$title" "$description" "$priority" 2>&1) || {
+    log "ERRORE creazione ticket: $result"
+    return 1
+  }
+  
+  # Estrai solo l'ultima riga JSON dalla risposta (ignora messaggi info)
+  local json_line
+  json_line=$(echo "$result" | grep -E '^\{.*\}$' | tail -n1)
+  
+  local ticket_id
+  ticket_id=$(echo "$json_line" | jq -r '.ticket_id // .id // .data.id // empty' 2>/dev/null)
+  
+  if [[ -z "$ticket_id" || "$ticket_id" == "null" ]]; then
+    log "ERRORE: Nessun ticket_id nella risposta: $result"
+    return 1
+  fi
+  
+  # Aggiungi descrizione come commento pubblico (l'API non supporta testo in creazione)
+  if [[ -n "$description" ]]; then
+    debug "Aggiunta descrizione come commento pubblico al ticket #$ticket_id"
+    "$YDEA_TOOLKIT" comment "$ticket_id" "$description" true >&2 || {
+      log "WARN: Impossibile aggiungere descrizione al ticket #$ticket_id"
+    }
+  fi
+  
+  echo "$ticket_id"
+}
+
+# Aggiungi nota privata a ticket esistente
+add_private_note() {
+  local ticket_id="$1"
+  local note="$2"
+  
+  debug "Aggiunta nota privata a ticket #$ticket_id"
+  local result
+  result=$("$YDEA_TOOLKIT" comment "$ticket_id" "$note" 2>&1) || {
+    # Verifica se è un errore 404 (ticket non trovato/chiuso)
+    if echo "$result" | grep -qi "404\|not found\|Ticket non trovato"; then
+      log "WARN: Ticket #$ticket_id non trovato (404) - potrebbe essere stato chiuso"
+      return 2  # Return code speciale per 404
+    else
+      log "ERRORE aggiunta nota a ticket #$ticket_id: $result"
+      return 1
+    fi
+  }
+  
+  # Successo
+  return 0
+}
+
+# Verifica se ticket è aperto su Ydea tramite API
+# Return codes:
+#   0 = ticket aperto
+#   1 = ticket chiuso/risolto
+#   2 = ticket non trovato (404)
+#   3 = errore API generico
+ticket_is_open_on_api() {
+  local ticket_id="$1"
+  
+  debug "Verifica stato ticket #$ticket_id su API Ydea"
+  
+  # Usa ydea-toolkit per ottenere info ticket (con timeout 10 secondi)
+  local result
+  result=$(timeout 10 "$YDEA_TOOLKIT" get "$ticket_id" 2>&1) || {
+    local exit_code=$?
+    
+    # Timeout (exit code 124)
+    if [[ $exit_code -eq 124 ]]; then
+      log "WARN: Timeout verifica API ticket #$ticket_id (>10s)"
+      return 3
+    fi
+    
+    # Errore nell'API call - verifica se 404
+    if echo "$result" | grep -qi "404\|not found\|Ticket non trovato"; then
+      debug "Ticket #$ticket_id non trovato (404)"
+      return 2
+    else
+      debug "Errore API verifica ticket #$ticket_id: $result"
+      return 3
+    fi
+  }
+  
+  # Estrai JSON dalla risposta (ultima riga JSON valida)
+  local json_line
+  json_line=$(echo "$result" | grep -E '^\{.*\}$' | tail -n1)
+  
+  if [[ -z "$json_line" ]]; then
+    debug "Nessun JSON valido nella risposta API per ticket #$ticket_id"
+    return 3
+  fi
+  
+  # Verifica stato ticket (cerca campo stato/status)
+  # Stati Ydea comuni: "aperto", "in lavorazione", "chiuso", "risolto"
+  local stato
+  stato=$(echo "$json_line" | jq -r '.stato // .status // .state // empty' 2>/dev/null)
+  
+  if [[ -z "$stato" || "$stato" == "null" ]]; then
+    debug "Campo stato non trovato per ticket #$ticket_id, assume aperto"
+    return 0  # Default: assume aperto se non trova stato
+  fi
+  
+  # Verifica se chiuso/risolto (case-insensitive)
+  if echo "$stato" | grep -qiE "chiuso|risolto|closed|resolved"; then
+    debug "Ticket #$ticket_id in stato: $stato (chiuso)"
+    return 1
+  else
+    debug "Ticket #$ticket_id in stato: $stato (aperto)"
+    return 0
+  fi
+}
+
+# Rimuovi ticket dalla cache
+remove_ticket_from_cache() {
+  local key="$1"
+  init_cache
+  
+  debug "Rimozione ticket dalla cache: $key"
+  
+  local updated_cache
+  updated_cache=$(jq --arg key "$key" 'del(.[$key])' "$TICKET_CACHE" 2>/dev/null) || {
+    log "WARN: Impossibile rimuovere $key dalla cache"
+    return 1
+  }
+  
+  atomic_cache_write "$TICKET_CACHE" "$updated_cache"
+}
+
+# ===== CONTROLLO SERVIZI ESTERNI =====
+main() {
+  # Carica configurazione Ydea
+  load_ydea_env
+  
+  # Ottieni Real IP (da label o fallback a NOTIFY_HOSTADDRESS)
+  REAL_IP="${NOTIFY_HOSTLABEL_real_ip:-${NOTIFY_HOSTADDRESS:-unknown}}"
+  HOSTNAME="${NOTIFY_HOSTNAME:-unknown}"
+  
+  # Determina se è alert HOST o SERVICE
+  if [[ "${NOTIFY_WHAT:-SERVICE}" == "SERVICE" ]]; then
+    # === ALERT SERVICE ===
+    SERVICE="${NOTIFY_SERVICEDESC:-UNKNOWN}"
+    STATE="${NOTIFY_SERVICESTATE:-UNKNOWN}"
+    LAST_STATE="${NOTIFY_LASTSERVICESTATE:-UNKNOWN}"
+    OUTPUT="${NOTIFY_SERVICEOUTPUT:-N/A}"
+    STATE_TYPE="${NOTIFY_SERVICESTATETYPE:-HARD}"
+    
+    TICKET_KEY=$(get_ticket_key "$REAL_IP" "$SERVICE")
+    
+    # Formatta output sintetico
+    OUTPUT_SHORT=$(format_output "$OUTPUT")
+    
+    log "SERVICE Alert: $HOSTNAME ($REAL_IP) - $SERVICE | $LAST_STATE -> $STATE"
+    
+    # Registra cambio stato per flapping detection
+    record_state_change "$TICKET_KEY" "$STATE"
+    
+    # Verifica flapping
+    FLAPPING_STATUS=""
+    if is_flapping "$TICKET_KEY"; then
+      FLAPPING_COUNT=$(get_state_changes_count "$TICKET_KEY")
+      FLAPPING_STATUS="⚠️ FLAPPING (${FLAPPING_COUNT} cambi in $((FLAPPING_WINDOW/60))min)"
+      log "FLAPPING rilevato per $TICKET_KEY"
+    fi
+    
+    # === LOGICA GESTIONE TICKET ===
+    if ticket_exists "$TICKET_KEY"; then
+      # Ticket già esiste -> aggiungi nota
+      TICKET_ID=$(get_ticket_id "$TICKET_KEY")
+      log "Ticket esistente trovato in cache: #$TICKET_ID"
+      
+      # Prepara nota privata sintetica
+      NOTE="[$(date '+%d/%m/%y %H:%M')] ${LAST_STATE} -> ${STATE}"
+      
+      # Aggiungi dettagli stato
+      if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
+        NOTE="${NOTE} | ✅ Allarme rientrato"
+      elif [[ -n "$FLAPPING_STATUS" ]]; then
+        NOTE="${NOTE} | ${FLAPPING_STATUS}"
+      fi
+      
+      # Aggiungi output se significativo
+      NOTE="${NOTE} | Output: ${OUTPUT_SHORT}"
+      
+      # Aggiungi nota (verifica automaticamente se ticket esiste con 404 check)
+      add_private_note "$TICKET_ID" "$NOTE" || local note_result=$?
+      local note_result=${note_result:-0}
+      
+      if [[ $note_result -eq 0 ]]; then
+        # Nota aggiunta con successo - ticket esiste ed è aperto
+        log "Nota privata aggiunta al ticket #$TICKET_ID"
+        update_ticket_state "$TICKET_KEY" "$STATE"
+        
+        # Se stato è CRITICAL/DOWN, verifica se era risolto e logga riapertura
+        if [[ "$STATE" == "CRITICAL" || "$STATE" == "CRIT" || "$STATE" == "DOWN" ]]; then
+          local was_resolved
+          was_resolved=$(jq -r --arg key "$TICKET_KEY" '.[$key].resolved_at // "null"' "$TICKET_CACHE" 2>/dev/null)
+          if [[ "$was_resolved" != "null" ]]; then
+            log "⚠️ Ticket #$TICKET_ID riaperto: problema tornato CRITICAL (resolved_at resettato)"
+          fi
+        fi
+        
+        # Se stato passa a OK/UP, marca ticket come risolto (parte timer 5 giorni)
+        if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
+          mark_ticket_resolved "$TICKET_KEY"
+          log "Ticket #$TICKET_ID marcato come risolto, cleanup automatico tra 5 giorni"
+        fi
+        
+      elif [[ $note_result -eq 2 ]]; then
+        # Errore 404 - ticket non esiste più su Ydea (chiuso da operatore)
+        log "Ticket #$TICKET_ID non più valido (404), rimozione dalla cache"
+        remove_ticket_from_cache "$TICKET_KEY"
+        
+        # Se stato è ancora CRITICAL/DOWN, crea un nuovo ticket
+        if [[ "$STATE" == "CRITICAL" || "$STATE" == "CRIT" || "$STATE" == "DOWN" ]]; then
+          log "⚠️ Stato ancora CRITICAL dopo 404: creazione nuovo ticket"
+          
+          # Determina priorità (sempre urgent per CRITICAL, critical per flapping)
+          PRIORITY="urgent"
+          if [[ -n "$FLAPPING_STATUS" ]]; then
+            PRIORITY="critical"
+          fi
+          
+          # Prepara titolo e descrizione
+          TITLE="[${STATE}] ${HOSTNAME} - ${SERVICE}"
+          DESCRIPTION="Host: ${HOSTNAME}\nServizio: ${SERVICE}\nStato: ${STATE}\nOutput: ${OUTPUT_SHORT}\n\nTicket precedente #${TICKET_ID} chiuso da operatore."
+          
+          # Crea nuovo ticket usando la funzione esistente
+          NEW_TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY")
+          
+          if [[ -n "$NEW_TICKET_ID" && "$NEW_TICKET_ID" != "null" ]]; then
+            log "✅ Nuovo ticket creato: #$NEW_TICKET_ID (dopo 404 su #$TICKET_ID)"
+            save_ticket_cache "$TICKET_KEY" "$NEW_TICKET_ID" "$STATE"
+          else
+            log "❌ Errore creazione nuovo ticket dopo 404"
+          fi
+        elif [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
+          # Stato OK dopo 404: ticket era già chiuso, nulla da fare
+          log "Stato OK dopo 404, ticket già chiuso dall'operatore"
+        fi
+        
+      else
+        # Altro errore generico aggiunta nota
+        log "Errore generico aggiunta nota al ticket #$TICKET_ID"
+      fi
+      
+    elif [[ "$STATE" == "CRIT" || "$STATE" == "CRITICAL" || "$STATE" == "DOWN" ]]; then
+      # Nuovo problema CRITICAL -> crea ticket
+      log "Nuovo problema CRITICAL: creazione ticket"
+      
+      # Determina priorità (sempre urgent per CRITICAL, critical per flapping)
+      PRIORITY="urgent"
+      if [[ -n "$FLAPPING_STATUS" ]]; then
+        PRIORITY="critical"
+      fi
+      
+      # Prepara titolo e descrizione
+      TITLE="[${STATE}] ${HOSTNAME} - ${SERVICE}"
+      
+      DESCRIPTION="ALERT DI MONITORAGGIO - CheckMK
+
+===========================================
+DETTAGLI SERVIZIO
+===========================================
+
+Host:              ${HOSTNAME}
+Indirizzo IP:      ${REAL_IP}
+Servizio:          ${SERVICE}
+Stato corrente:    ${STATE}
+Stato precedente:  ${LAST_STATE}
+Tipo notifica:     ${STATE_TYPE}
+Timestamp:         $(date '+%Y-%m-%d %H:%M:%S')
+${FLAPPING_STATUS:+
+-------------------------------------------
+ATTENZIONE: ${FLAPPING_STATUS}
+-------------------------------------------
+}
+===========================================
+OUTPUT DIAGNOSTICO
+===========================================
+
+${OUTPUT_SHORT}
+
+===========================================
+DETTAGLI TECNICI
+===========================================
+
+Tipo notifica:     ${NOTIFY_NOTIFICATIONTYPE:-N/A}
+Tentativo check:   ${NOTIFY_SERVICEATTEMPT:-N/A}/${NOTIFY_SERVICEMAXATTEMPTS:-N/A}
+Durata stato:      ${NOTIFY_SERVICESTATEID:-N/A}
+Ultimo check:      ${NOTIFY_LASTSERVICECHECK:-N/A}
+Prossimo check:    ${NOTIFY_NEXTSERVICECHECK:-N/A}
+
+-------------------------------------------
+Generato automaticamente da CheckMK
+Sito: ${NOTIFY_OMD_SITE:-monitoring}
+-------------------------------------------"
+      
+      # Crea ticket
+      TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY")
+      
+      if [[ -n "$TICKET_ID" ]]; then
+        log "✅ Ticket creato: #$TICKET_ID per $TICKET_KEY"
+        save_ticket_cache "$TICKET_KEY" "$TICKET_ID" "$STATE"
+      else
+        log "❌ Errore creazione ticket per $TICKET_KEY"
+      fi
+    else
+      # Stato WARNING o UNKNOWN, non CRITICAL -> solo log
+      log "Stato $STATE non critico, nessun ticket creato"
+    fi
+    
+  else
+    # === ALERT HOST ===
+    STATE="${NOTIFY_HOSTSTATE:-UNKNOWN}"
+    LAST_STATE="${NOTIFY_LASTHOSTSTATE:-UNKNOWN}"
+    OUTPUT="${NOTIFY_HOSTOUTPUT:-N/A}"
+    STATE_TYPE="${NOTIFY_HOSTSTATETYPE:-HARD}"
+    
+    TICKET_KEY=$(get_ticket_key "$REAL_IP" "HOST")
+    
+    OUTPUT_SHORT=$(format_output "$OUTPUT")
+    
+    log "HOST Alert: $HOSTNAME ($REAL_IP) | $LAST_STATE -> $STATE"
+    
+    # Registra cambio stato
+    record_state_change "$TICKET_KEY" "$STATE"
+    
+    # Verifica flapping
+    FLAPPING_STATUS=""
+    if is_flapping "$TICKET_KEY"; then
+      FLAPPING_COUNT=$(get_state_changes_count "$TICKET_KEY")
+      FLAPPING_STATUS="⚠️ FLAPPING (${FLAPPING_COUNT} cambi in $((FLAPPING_WINDOW/60))min)"
+    fi
+    
+    # Gestione ticket host
+    if ticket_exists "$TICKET_KEY"; then
+      TICKET_ID=$(get_ticket_id "$TICKET_KEY")
+      
+      NOTE="[$(date '+%d/%m/%y %H:%M')] ${LAST_STATE} -> ${STATE}"
+      if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
+        NOTE="${NOTE} | Allarme rientrato"
+      elif [[ -n "$FLAPPING_STATUS" ]]; then
+        NOTE="${NOTE} | ${FLAPPING_STATUS}"
+      fi
+      NOTE="${NOTE} | Output: ${OUTPUT_SHORT}"
+      
+      add_private_note "$TICKET_ID" "$NOTE"
+      local note_result=$?
+      
+      if [[ $note_result -eq 0 ]]; then
+        log "Nota privata aggiunta al ticket #$TICKET_ID"
+        update_ticket_state "$TICKET_KEY" "$STATE"
+        
+        # Se stato passa a OK/UP, marca ticket come risolto (parte timer 5 giorni)
+        if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
+          mark_ticket_resolved "$TICKET_KEY"
+          log "Ticket #$TICKET_ID marcato come risolto, cleanup automatico tra 5 giorni"
+        fi
+      elif [[ $note_result -eq 2 ]]; then
+        # Errore 404 - ticket non esiste più
+        log "Ticket #$TICKET_ID non più valido, rimozione dalla cache"
+        remove_ticket_from_cache "$TICKET_KEY"
+        
+        # Se lo stato è ancora critico, crea un nuovo ticket
+        if [[ "$STATE" == "DOWN" || "$STATE" == "CRITICAL" ]]; then
+          log "Stato ancora CRITICAL/DOWN, creazione nuovo ticket"
+          
+          PRIORITY="critical"
+          TITLE="[${STATE}] ${HOSTNAME}"
+          
+          DESCRIPTION="ALERT DI MONITORAGGIO - CheckMK
+
+===========================================
+HOST DOWN
+===========================================
+
+Hostname:          ${HOSTNAME}
+Indirizzo IP:      ${REAL_IP}
+Stato corrente:    ${STATE}
+Stato precedente:  ${LAST_STATE}
+Tipo notifica:     ${STATE_TYPE}
+Timestamp:         $(date '+%Y-%m-%d %H:%M:%S')
+${FLAPPING_STATUS:+
+-------------------------------------------
+ATTENZIONE: ${FLAPPING_STATUS}
+-------------------------------------------
+}
+===========================================
+OUTPUT DIAGNOSTICO
+===========================================
+
+${OUTPUT_SHORT}
+
+===========================================
+AZIONI CONSIGLIATE
+===========================================
+
+1. Verificare connettivita di rete
+2. Controllare status hardware/VM
+3. Verificare log di sistema
+4. Valutare restart servizi se necessario
+
+===========================================
+DETTAGLI TECNICI
+===========================================
+
+Tipo notifica:     ${NOTIFY_NOTIFICATIONTYPE:-N/A}
+Tentativo check:   ${NOTIFY_HOSTATTEMPT:-N/A}/${NOTIFY_HOSTMAXATTEMPTS:-N/A}
+Durata stato:      ${NOTIFY_HOSTSTATEID:-N/A}
+Ultimo check:      ${NOTIFY_LASTHOSTCHECK:-N/A}
+
+-------------------------------------------
+⚠️ NOTA: Ticket precedente #${TICKET_ID} non più disponibile
+Nuovo ticket creato automaticamente
+-------------------------------------------
+Generato automaticamente da CheckMK
+Sito: ${NOTIFY_OMD_SITE:-monitoring}
+-------------------------------------------"
+          
+          NEW_TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY")
+          
+          if [[ -n "$NEW_TICKET_ID" ]]; then
+            log "✅ Nuovo ticket creato: #$NEW_TICKET_ID (sostituisce #$TICKET_ID)"
+            save_ticket_cache "$TICKET_KEY" "$NEW_TICKET_ID" "$STATE"
+          fi
+        else
+          log "Stato $STATE non critico, nessun nuovo ticket creato"
+        fi
+      else
+        # Altro errore generico
+        log "Errore generico aggiunta nota al ticket #$TICKET_ID"
+      fi
+      
+    elif [[ "$STATE" == "DOWN" || "$STATE" == "CRITICAL" ]]; then
+      log "Nuovo problema HOST DOWN: creazione ticket"
+      
+      PRIORITY="critical"
+      TITLE="[${STATE}] ${HOSTNAME}"
+      
+      DESCRIPTION="ALERT DI MONITORAGGIO - CheckMK
+
+===========================================
+HOST DOWN
+===========================================
+
+Hostname:          ${HOSTNAME}
+Indirizzo IP:      ${REAL_IP}
+Stato corrente:    ${STATE}
+Stato precedente:  ${LAST_STATE}
+Tipo notifica:     ${STATE_TYPE}
+Timestamp:         $(date '+%Y-%m-%d %H:%M:%S')
+${FLAPPING_STATUS:+
+-------------------------------------------
+ATTENZIONE: ${FLAPPING_STATUS}
+-------------------------------------------
+}
+===========================================
+OUTPUT DIAGNOSTICO
+===========================================
+
+${OUTPUT_SHORT}
+
+===========================================
+AZIONI CONSIGLIATE
+===========================================
+
+1. Verificare connettivita di rete
+2. Controllare status hardware/VM
+3. Verificare log di sistema
+4. Valutare restart servizi se necessario
+
+===========================================
+DETTAGLI TECNICI
+===========================================
+
+Tipo notifica:     ${NOTIFY_NOTIFICATIONTYPE:-N/A}
+Tentativo check:   ${NOTIFY_HOSTATTEMPT:-N/A}/${NOTIFY_HOSTMAXATTEMPTS:-N/A}
+Durata stato:      ${NOTIFY_HOSTSTATEID:-N/A}
+Ultimo check:      ${NOTIFY_LASTHOSTCHECK:-N/A}
+
+-------------------------------------------
+Generato automaticamente da CheckMK
+Sito: ${NOTIFY_OMD_SITE:-monitoring}
+-------------------------------------------"
+      
+      TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY")
+      
+      if [[ -n "$TICKET_ID" ]]; then
+        log "✅ Ticket creato: #$TICKET_ID per $TICKET_KEY"
+        save_ticket_cache "$TICKET_KEY" "$TICKET_ID" "$STATE"
+      fi
+    fi
+  fi
+}
+
+# Esegui main
+main
+
+exit 0

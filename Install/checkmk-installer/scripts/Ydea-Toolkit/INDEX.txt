@@ -1,0 +1,295 @@
+╔══════════════════════════════════════════════════════════════╗
+║           🛠️  YDEA API TOOLKIT - Package Completo           ║
+║                      Versione 1.1.0                          ║
+╚══════════════════════════════════════════════════════════════╝
+
+👋 Benvenuto nel toolkit completo per la gestione delle API Ydea!
+
+Questo package ti aiuterà a:
+✅ Automatizzare la creazione di ticket da sistemi di monitoraggio
+✅ Gestire ticket via command line in modo efficiente
+✅ Integrare Ydea con i tuoi sistemi esistenti (CheckMK, Netdata, ecc.)
+✅ Standardizzare la creazione di ticket con template
+✅ **[NUOVO]** Integrazione completa CheckMK con gestione automatica ticket
+
+═══════════════════════════════════════════════════════════════
+
+📚 INDICE DOCUMENTAZIONE
+
+🆕 INTEGRAZIONE CHECKMK (NUOVO!)
+   
+   1. 🎫 README-CHECKMK-INTEGRATION.md
+      Guida completa integrazione CheckMK → Ydea
+      ├─ Setup notifica rule CheckMK
+      ├─ Configurazione cron per health monitoring
+      ├─ Gestione automatica ticket con note private
+      ├─ Rilevamento flapping
+      ├─ Test e verifica
+      └─ Troubleshooting completo
+   
+   2. 🚀 QUICK-REFERENCE.md
+      Comandi rapidi e configurazioni
+      ├─ Installazione one-liner
+      ├─ Test manuali
+      ├─ Debug e log
+      ├─ Manutenzione cache
+      └─ Esempi configurazione
+
+═══════════════════════════════════════════════════════════════
+
+📖 DOCUMENTAZIONE BASE
+
+1. 🚀 INIZIA QUI: QUICKSTART.md
+   Guida rapida per setup in 5 minuti
+   ├─ Installazione dipendenze
+   ├─ Configurazione credenziali
+   ├─ Test connessione
+   └─ Comandi essenziali
+
+2. 📖 DOCUMENTAZIONE COMPLETA: README.md
+   Manuale completo con tutti i dettagli
+   ├─ Caratteristiche del toolkit
+   ├─ Requisiti e installazione
+   ├─ Configurazione avanzata
+   ├─ Tutti i comandi disponibili
+   ├─ Esempi pratici
+   └─ Best practices
+
+3. 🔌 INTEGRAZIONI: INTEGRAZIONI.md
+   Esempi di integrazione con altri sistemi
+   ├─ Netdata (monitoring)
+   ├─ Docker (container)
+   ├─ Email (parsing)
+   ├─ Telegram (notifiche)
+   ├─ Grafana (metriche)
+   └─ GitLab CI/CD (deploy)
+
+4. 🗺️  PANORAMICA: STRUTTURA_PROGETTO.txt
+   Visione d'insieme del progetto
+   ├─ Architettura
+   ├─ File principali
+   ├─ Workflow tipico
+   └─ Quick reference
+
+═══════════════════════════════════════════════════════════════
+
+🔧 SCRIPT DISPONIBILI
+
+┌─────────────────────────────────────────────────────────────┐
+│ ydea-toolkit.sh                                             │
+├─────────────────────────────────────────────────────────────┤
+│ Script principale per tutte le operazioni API               │
+│                                                              │
+│ Comandi:                                                     │
+│  • login              Login e salvataggio token             │
+│  • list [limit]       Lista ticket                          │
+│  • get <id>           Dettagli ticket                       │
+│  • create             Crea nuovo ticket                     │
+│  • update             Aggiorna ticket                       │
+│  • comment            Aggiungi commento                     │
+│  • close              Chiudi ticket                         │
+│  • search             Cerca ticket                          │
+│  • categories         Lista categorie                       │
+│  • users              Lista utenti                          │
+│  • api                Chiamata API generica                 │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ ydea-monitoring-integration.sh                              │
+├─────────────────────────────────────────────────────────────┤
+│ Integrazione con sistemi di monitoraggio                    │
+│                                                              │
+│ Comandi:                                                     │
+│  • monitor            Check completo (CPU, RAM, Disk)       │
+│  • service <nome>     Monitora servizio systemd             │
+│  • netdata-webhook    Handler per Netdata alarms            │
+│  • cleanup            Pulisci cache ticket                  │
+│                                                              │
+│ Features:                                                    │
+│  ✓ Auto-creazione ticket su alert                           │
+│  ✓ Prevenzione duplicati                                    │
+│  ✓ Template dettagliati con diagnostica                     │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ ydea-templates.sh                                           │
+├─────────────────────────────────────────────────────────────┤
+│ Template predefiniti per ticket comuni                      │
+│                                                              │
+│ Template disponibili:                                        │
+│  • server-down        Server non raggiungibile              │
+│  • backup-failed      Backup fallito                        │
+│  • disk-full          Disco pieno                           │
+│  • ssl-expiring       Certificato SSL in scadenza           │
+│  • app-errors         Error rate applicazione elevato       │
+│  • db-slow            Query database lente                  │
+│  • security-breach    Incidente sicurezza                   │
+│  • failed-login       Tentativi login falliti               │
+│  • maintenance        Manutenzione programmata              │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ esempi-ydea.sh                                              │
+├─────────────────────────────────────────────────────────────┤
+│ Script interattivo con esempi pratici                       │
+│                                                              │
+│ Esempi inclusi:                                              │
+│  1. Report giornaliero ticket                               │
+│  2. Creazione ticket da alert monitoraggio                  │
+│  3. Ricerca e aggiornamento ticket                          │
+│  4. Workflow completo (crea → aggiorna → chiudi)            │
+│  5. Export ticket in CSV                                    │
+│                                                              │
+│ Uso: ./esempi-ydea.sh --menu                                │
+└─────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════
+
+⚙️  CONFIGURAZIONE
+
+File: .env.example
+├─ Copia come .env e compila con le tue credenziali
+├─ YDEA_ID e YDEA_API_KEY sono obbligatori
+└─ Altre variabili opzionali per configurazione avanzata
+
+Ottieni le credenziali:
+1. Accedi a https://my.ydea.cloud
+2. Impostazioni → La mia azienda → API
+3. Copia ID e API Key
+
+═══════════════════════════════════════════════════════════════
+
+🚀 QUICK START (3 comandi)
+
+1. Configura credenziali:
+   $ cp .env.example .env
+   $ nano .env  # Compila YDEA_ID e YDEA_API_KEY
+
+2. Test login:
+   $ source .env
+   $ ./ydea-toolkit.sh login
+
+3. Lista ticket:
+   $ ./ydea-toolkit.sh list 10
+
+Fatto! 🎉
+
+═══════════════════════════════════════════════════════════════
+
+💡 ESEMPI VELOCI
+
+# Crea ticket
+./ydea-toolkit.sh create "Server down" "Descrizione problema" "high"
+
+# Cerca ticket
+./ydea-toolkit.sh search "database" | jq '.data[] | {id,title}'
+
+# Monitoring automatico
+./ydea-monitoring-integration.sh monitor
+
+# Usa template
+TICKET=$(./ydea-templates.sh disk-full "server-01" "/" "92")
+echo "$TICKET" | ./ydea-toolkit.sh api POST /tickets -
+
+═══════════════════════════════════════════════════════════════
+
+📊 WORKFLOW CONSIGLIATO
+
+Per Setup Iniziale:
+1. Leggi QUICKSTART.md (5 minuti)
+2. Configura .env con le tue credenziali
+3. Testa con ./ydea-toolkit.sh login
+4. Prova ./esempi-ydea.sh --menu
+
+Per Monitoring Automatico:
+1. Configura soglie in .env
+2. Testa ./ydea-monitoring-integration.sh monitor
+3. Aggiungi a CRON per esecuzione automatica
+4. (Opzionale) Integra con Netdata
+
+Per Integrazioni Custom:
+1. Leggi INTEGRAZIONI.md per esempi
+2. Usa ydea-templates.sh per ticket standard
+3. Scrivi script custom usando ydea-toolkit.sh
+4. Testa in ambiente dev prima di produzione
+
+═══════════════════════════════════════════════════════════════
+
+🔒 SICUREZZA
+
+⚠️  IMPORTANTE:
+• Mai committare .env su git
+• Usa chmod 600 .env per proteggere credenziali
+• Token JWT rinnovato automaticamente ogni ora
+• Considera vault (Hashicorp/AWS) per produzione
+
+═══════════════════════════════════════════════════════════════
+
+🐛 TROUBLESHOOTING
+
+Problema: Login fallisce
+└─ Verifica YDEA_ID e YDEA_API_KEY in .env
+└─ Test: curl -X POST https://my.ydea.cloud/app_api_v2/login \
+         -H "Content-Type: application/json" \
+         -d '{"id":"TUO_ID","api_key":"TUA_KEY"}'
+
+Problema: jq non trovato
+└─ Installa: sudo apt-get install jq
+
+Problema: Script non eseguibile
+└─ Rendi eseguibile: chmod +x *.sh
+
+Problema: Debug
+└─ Abilita: export YDEA_DEBUG=1
+└─ Esegui comando per vedere output verboso
+
+═══════════════════════════════════════════════════════════════
+
+📞 SUPPORTO E RISORSE
+
+• API Ydea:     https://my.ydea.cloud/api/doc/v2
+• Documentazione locale: README.md
+• Quick Start:  QUICKSTART.md
+• Integrazioni: INTEGRAZIONI.md
+
+═══════════════════════════════════════════════════════════════
+
+📦 CONTENUTO PACKAGE
+
+File Script:
+✓ ydea-toolkit.sh                 (9.4 KB) - Core library
+✓ ydea-monitoring-integration.sh  (13 KB)  - Monitoring
+✓ ydea-templates.sh               (12 KB)  - Template
+✓ esempi-ydea.sh                  (5.5 KB) - Esempi
+
+Documentazione:
+✓ README.md                       (9.7 KB) - Doc completa
+✓ QUICKSTART.md                   (4.0 KB) - Guida rapida
+✓ INTEGRAZIONI.md                 (12 KB)  - Integrazioni
+✓ STRUTTURA_PROGETTO.txt          (7.2 KB) - Panoramica
+✓ INDEX.txt                       (questo file)
+
+Configurazione:
+✓ .env.example                    Template config
+
+═══════════════════════════════════════════════════════════════
+
+🎯 PROSSIMI PASSI
+
+□ Leggi QUICKSTART.md
+□ Configura credenziali in .env
+□ Testa ydea-toolkit.sh login
+□ Prova esempi interattivi
+□ Configura monitoring automatico
+□ Leggi documentazione completa
+□ Esplora integrazioni avanzate
+
+═══════════════════════════════════════════════════════════════
+
+Buon lavoro con Ydea Toolkit! 🚀
+
+Versione: 1.0.0
+Autore: Marzio
+Data: 2025-11-11
+
+═══════════════════════════════════════════════════════════════

@@ -1,0 +1,43 @@
+# FRPC Client Configuration Template
+# This file will be populated by the installer
+
+[common]
+server_addr = {{FRPC_SERVER_ADDR}}
+server_port = {{FRPC_SERVER_PORT}}
+token = {{FRPC_TOKEN}}
+log_file = /var/log/frpc.log
+log_level = info
+log_max_days = 7
+
+# Admin interface (optional)
+admin_addr = 127.0.0.1
+admin_port = 7400
+admin_user = {{FRPC_ADMIN_USER}}
+admin_pwd = {{FRPC_ADMIN_PWD}}
+
+# CheckMK Agent Proxy
+[checkmk-{{HOSTNAME}}]
+type = tcp
+local_ip = 127.0.0.1
+local_port = 6556
+remote_port = {{FRPC_REMOTE_PORT}}
+use_encryption = true
+use_compression = true
+
+# SSH Proxy (optional)
+[ssh-{{HOSTNAME}}]
+type = tcp
+local_ip = 127.0.0.1
+local_port = 22
+remote_port = {{FRPC_SSH_REMOTE_PORT}}
+use_encryption = true
+use_compression = true
+
+# HTTP/HTTPS Proxy (optional - for web services)
+# [http-{{HOSTNAME}}]
+# type = http
+# local_ip = 127.0.0.1
+# local_port = 80
+# custom_domains = {{HOSTNAME}}.{{FRPC_DOMAIN}}
+# use_encryption = true
+# use_compression = true

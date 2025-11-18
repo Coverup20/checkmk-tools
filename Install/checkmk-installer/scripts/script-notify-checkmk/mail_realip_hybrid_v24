@@ -1,0 +1,205 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Mail RealIP Hybrid v24
+# ===================================================================
+# 🎯 MAIL_REALIP_HYBRID v2.4 - FRP AWARE (CheckMK 2.4.0+ Compatible)
+# ===================================================================
+# 
+# PRIMA SOLUZIONE AL MONDO per CheckMK con FRP tunneling
+# 
+# 🔥 PROBLEMA RISOLTO: IP vs Grafici
+# Con FRP tutti gli host hanno HOSTADDRESS=127.0.0.1:PORT
+# ma serve IP reale per URL email e localhost per grafici
+# 
+# 🎯 SOLUZIONE IBRIDA:
+# - Rileva automaticamente scenari FRP (127.0.0.1:PORT)
+# - Usa real_ip label per URL email  
+# - Mantiene localhost per generazione grafici
+# - Fallback su comportamento CheckMK standard
+#
+# 📋 SUPPORTO:
+# - CheckMK RAW/CEE 2.4.0+
+# - Host labels: real_ip, frp_port, external_ip
+# - Backward compatibility con mail_realip_00
+# 
+# 🔬 EVIDENZE GITHUB: 
+# render_cmk_graphs() in cmk/notification_plugins/utils.py
+# usa sempre localhost - confermato no supporto FRP nativo
+#
+# ===================================================================
+
+import os
+import sys
+from cmk.notification_plugins import mail
+
+def log_debug(message):
+    """Debug logging if enabled"""
+    if os.environ.get('DEBUG_MAIL_HYBRID', '0') == '1':
+        print(f"[DEBUG] {message}", file=sys.stderr)
+
+def detect_frp_scenario():
+    """
+    🎯 DETECTION FRP SCENARIO
+    
+    Rileva se siamo in uno scenario FRP analizzando:
+    1. HOSTADDRESS pattern 127.0.0.1:PORT
+    2. Presenza real_ip label  
+    3. Pattern localhost con porta
+    
+    Returns:
+        tuple: (is_frp, real_ip, host_address)
+    """
+    host_address = os.environ.get('NOTIFY_HOSTADDRESS', '')
+    real_ip = os.environ.get('NOTIFY_HOSTLABEL_real_ip', '')
+    
+    log_debug(f"HOSTADDRESS: {host_address}")
+    log_debug(f"real_ip label: {real_ip}")
+    
+    # Pattern FRP detection migliorata
+    frp_patterns = [
+        '127.0.0.1:',      # Standard FRP localhost
+        'localhost:',      # Alternative localhost  
+        '::1:',           # IPv6 localhost
+        '0.0.0.0:'        # Bind all con porta
+    ]
+    
+    is_frp = any(host_address.startswith(pattern) for pattern in frp_patterns) and real_ip
+    
+    log_debug(f"FRP detected: {is_frp}")
+    
+    return is_frp, real_ip, host_address
+
+def get_email_context():
+    """Costruisce context per email con IP corretto"""
+    is_frp, real_ip, host_address = detect_frp_scenario()
+    
+    if is_frp:
+        log_debug(f"Using real IP for email context: {real_ip}")
+        # Override HOSTADDRESS per email con real IP
+        original_hostaddress = os.environ.get('NOTIFY_HOSTADDRESS')
+        os.environ['NOTIFY_HOSTADDRESS'] = real_ip
+        return original_hostaddress
+    
+    return None
+
+def restore_context(original_hostaddress):
+    """Ripristina context originale"""
+    if original_hostaddress:
+        os.environ['NOTIFY_HOSTADDRESS'] = original_hostaddress
+        log_debug(f"Restored original HOSTADDRESS: {original_hostaddress}")
+
+def hybrid_graph_function():
+    """
+    🎯 GENERAZIONE GRAFICI IBRIDA
+    
+    CheckMK 2.4.0 Compatible Version
+    - Usa render_cmk_graphs/render_performance_graphs invece di _add_graphs
+    - Forza localhost per generazione grafici in scenari FRP
+    - Mantiene compatibilità con versioni precedenti
+    """
+    is_frp, real_ip, host_address = detect_frp_scenario()
+    
+    if not is_frp:
+        log_debug("Standard scenario - using default graph generation")
+        return None
+    
+    log_debug(f"FRP scenario - forcing localhost for graphs, HOSTADDRESS={host_address}")
+    
+    try:
+        # CheckMK 2.4.0+ usa render_cmk_graphs invece di _add_graphs
+        if hasattr(mail, 'render_cmk_graphs'):
+            original_render = mail.render_cmk_graphs
+            log_debug("Found render_cmk_graphs method - CheckMK 2.4.0+ compatible")
+            
+            def hybrid_render_graphs(*args, **kwargs):
+                """Wrapper che forza localhost per grafici in FRP"""
+                # Salva real IP
+                original_hostaddress = os.environ.get('NOTIFY_HOSTADDRESS')
+                
+                # Forza localhost per grafici (comportamento CheckMK originale)
+                os.environ['NOTIFY_HOSTADDRESS'] = host_address  # Mantiene 127.0.0.1:PORT
+                log_debug(f"Graph generation using: {host_address}")
+                
+                try:
+                    result = original_render(*args, **kwargs)
+                    log_debug("Graph generation completed successfully")
+                    return result
+                finally:
+                    # Ripristina real IP per email
+                    if original_hostaddress:
+                        os.environ['NOTIFY_HOSTADDRESS'] = original_hostaddress
+                        log_debug(f"Restored HOSTADDRESS to: {original_hostaddress}")
+            
+            # Sostituisce temporaneamente il metodo
+            mail.render_cmk_graphs = hybrid_render_graphs
+            return original_render
+            
+        else:
+            log_debug("render_cmk_graphs not found - possibly older CheckMK version")
+            return None
+            
+    except Exception as e:
+        log_debug(f"Error in hybrid graph function: {e}")
+        return None
+
+def main():
+    """
+    🚀 MAIN FUNCTION - HYBRID EMAIL PROCESSING
+    
+    Flow ibrido CheckMK 2.4.0:
+    1. Detect FRP scenario
+    2. Override graph generation per localhost  
+    3. Override email context per real IP
+    4. Esegui mail CheckMK standard
+    5. Restore context originale
+    """
+    
+    print("=== MAIL REALIP HYBRID - FRP AWARE ===")
+    
+    # 1. Detection FRP
+    is_frp, real_ip, host_address = detect_frp_scenario()
+    
+    print(f"FRP Scenario rilevato: {is_frp}")
+    print(f"Real IP disponibile: {real_ip if real_ip else 'Nessuno'}")
+    print(f"Host Address: {host_address if host_address else 'N/A'}")
+    
+    if is_frp:
+        print("🎯 MODALITÀ IBRIDA FRP ATTIVATA")
+        print(f"FRP scenario detected: HOSTADDRESS={host_address}, real_ip={real_ip}")
+    else:
+        print("ℹ️  MODALITÀ STANDARD CHECKMK")
+        if not real_ip:
+            print("Nessun real_ip trovato, comportamento CheckMK standard")
+    
+    # 2. Setup hybrid graph generation
+    original_render = hybrid_graph_function()
+    
+    # 3. Setup email context con real IP
+    original_hostaddress = get_email_context()
+    
+    try:
+        # 4. Esegui CheckMK mail standard (ora con context ibrido)
+        mail.main()
+        
+        print("✅ Email inviata con successo (modalità ibrida)")
+        
+    except Exception as e:
+        print(f"❌ Errore invio email: {e}")
+        return 1
+        
+    finally:
+        # 5. Cleanup: ripristina tutto
+        if original_hostaddress:
+            restore_context(original_hostaddress)
+            
+        if original_render:
+            try:
+                mail.render_cmk_graphs = original_render
+                log_debug("Graph function restored")
+            except:
+                pass
+    
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -1,0 +1,599 @@
+================================================================================
+ELENCO DETTAGLIATO SCRIPT UBUNTU
+Repository: checkmk-tools
+Cartella: script-check-ubuntu/
+Data: 27 Ottobre 2025
+================================================================================
+
+📁 STRUTTURA CARTELLE
+├── nopolling/          (vuota)
+└── polling/            (10 script: 5 principali + 5 wrapper remoti)
+
+================================================================================
+📂 SCRIPT-CHECK-UBUNTU/NOPOLLING/
+================================================================================
+
+STATO: Cartella vuota
+NOTA:  Non sono presenti script nopolling per Ubuntu
+
+
+================================================================================
+📂 SCRIPT-CHECK-UBUNTU/POLLING/
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORIA: SISTEMA & DISCO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. check_disk_space.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Righe:         20
+Service:       (usa exit code standard, non formato CheckMK local)
+Path Install:  /usr/lib/check_mk_agent/plugins/
+
+DESCRIZIONE:
+Script base per monitorare lo spazio disco utilizzato sul filesystem root (/).
+Usa exit code standard Nagios/CheckMK.
+
+FUNZIONALITÀ:
+✓ Controlla percentuale utilizzo disco root (/)
+✓ Soglie configurabili (default: 80% WARN, 95% CRIT)
+✓ Exit code standard Nagios
+
+CONFIGURAZIONE:
+THRESHOLD=80  (percentuale soglia warning)
+
+STATI (EXIT CODE):
+0 - OK: Utilizzo < 80%
+1 - WARNING: Utilizzo 80-94%
+2 - CRITICAL: Utilizzo ≥ 95%
+
+COMANDI USATI:
+- df / (spazio disco root)
+
+ESEMPIO OUTPUT:
+"OK - Spazio disco utilizzato: 45%"           (exit 0)
+"WARNING - Spazio disco utilizzato: 85%"      (exit 1)
+"CRITICAL - Spazio disco utilizzato: 96%"     (exit 2)
+
+NOTE:
+⚠️ Usa exit code standard, non formato <<<local>>>
+⚠️ Monitora solo filesystem root /
+⚠️ Soglie hardcoded (modificare THRESHOLD nello script)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORIA: SSH & SICUREZZA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2. ssh_sessions_count
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Righe:         15
+Service:       SSH_Session_Count
+Path Install:  /usr/lib/check_mk_agent/local/
+
+DESCRIZIONE:
+Conta il numero di sessioni SSH attive per l'utente root.
+
+FUNZIONALITÀ:
+✓ Conta processi sshd con pattern "sshd: root@"
+✓ Genera metrica count per grafici CheckMK
+
+STATI:
+0 (OK)   - Nessuna sessione root attiva
+1 (WARN) - Una o più sessioni root attive
+
+COMANDI USATI:
+- pgrep -af "sshd: root@"
+
+METRICHE:
+count={numero}
+
+ESEMPIO OUTPUT:
+"0 SSH_Session_Count count=0; Active root SSH sessions = 0"
+"1 SSH_Session_Count count=2; Active root SSH sessions = 2"
+
+
+3. ssh_all_sessions_count
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Righe:         13
+Service:       SSH_All_Sessions
+Path Install:  /usr/lib/check_mk_agent/local/
+
+DESCRIZIONE:
+Conta il numero totale di sessioni SSH attive (tutti gli utenti, non solo root).
+
+FUNZIONALITÀ:
+✓ Conta tutti i processi sshd attivi (esclusi processi privilegiati)
+✓ Include sessioni di tutti gli utenti
+✓ Genera metrica count per grafici
+
+STATI:
+0 (OK)   - Nessuna sessione SSH attiva
+1 (WARN) - Una o più sessioni SSH attive
+
+COMANDI USATI:
+- pgrep -af "sshd: "
+- grep -v "sshd:.*priv" (esclude processi privilegiati/listener)
+
+METRICHE:
+count={numero}
+
+ESEMPIO OUTPUT:
+"0 SSH_All_Sessions count=0; Active SSH sessions (all users) = 0"
+"1 SSH_All_Sessions count=3; Active SSH sessions (all users) = 3"
+
+NOTE:
+Esclude il processo master sshd e i processi privilege separation.
+
+
+4. ssh_root_session
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Righe:         56
+Service:       SSH_Session
+Path Install:  /usr/lib/check_mk_agent/local/
+
+DESCRIZIONE:
+Monitora eventi SSH root (login, logout, tentativi falliti) leggendo 
+/var/log/auth.log e notifica ogni nuovo evento.
+
+FUNZIONALITÀ:
+✓ Legge log auth.log incrementalmente (usa statefile)
+✓ Rileva login root SSH riusciti (Accepted)
+✓ Rileva logout root SSH (session closed)
+✓ Rileva tentativi falliti (Failed password)
+✓ Estrae IP di provenienza
+✓ Memorizza ultimo IP in file separato
+
+FILE UTILIZZATI:
+- Log: /var/log/auth.log
+- State: /var/lib/check_mk_agent/ssh_root_session.state
+- Last IP: /var/lib/check_mk_agent/ssh_root_session.lastip
+
+PATTERN RICERCATI:
+- "Accepted" + "for root" (login riuscito)
+- "session closed for user root" (logout)
+- "Failed password for root" (tentativo fallito)
+
+STATI:
+0 (OK)   - Logout o nessun evento nuovo
+1 (WARN) - Login root riuscito
+2 (CRIT) - Tentativo fallito di login root
+
+LOGICA STATEFILE:
+- Memorizza numero ultima riga processata
+- Reset automatico se log ruotato (logrotate)
+- Processa solo nuove righe ad ogni esecuzione
+
+ESEMPIO OUTPUT:
+"0 SSH_Session - OK: no new root SSH events (last check 2025-10-27 15:30:00)"
+"1 SSH_Session - WARN: root SSH login from 192.168.1.50 at Oct 27 14:25:10"
+"2 SSH_Session - CRITICAL: Failed root SSH login from 203.0.113.5 at Oct 27 14:30:05"
+"0 SSH_Session - OK: root SSH logout (last IP 192.168.1.50) at Oct 27 15:00:00"
+
+
+5. ssh_fail2ban_status
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Righe:         31
+Service:       SSH_Fail2ban
+Path Install:  /usr/lib/check_mk_agent/local/
+
+DESCRIZIONE:
+Monitora lo stato della jail fail2ban per SSH e mostra numero IP bannati.
+
+FUNZIONALITÀ:
+✓ Verifica presenza comando fail2ban-client
+✓ Interroga jail "sshd"
+✓ Conta IP attualmente bannati
+✓ Mostra lista IP bannati
+✓ Genera metrica banned per grafici
+
+CONFIGURAZIONE:
+JAIL="sshd"
+
+STATI:
+0 (OK)   - Nessun IP bannato
+2 (CRIT) - Uno o più IP bannati
+3 (UNKNOWN) - fail2ban non trovato o jail non configurata
+
+COMANDI USATI:
+- fail2ban-client status sshd
+
+METRICHE:
+banned={numero}
+
+PARSING OUTPUT:
+- "Currently banned:" → numero IP
+- "Banned IP list:" → lista IP
+
+ESEMPIO OUTPUT:
+"0 SSH_Fail2ban banned=0; OK: nessun IP bannato da fail2ban (jail=sshd)"
+"2 SSH_Fail2ban banned=2; CRITICAL: 2 IP attualmente bannati da fail2ban (jail=sshd) [203.0.113.5 198.51.100.10]"
+"3 SSH_Fail2ban - FAIL: fail2ban-client non trovato"
+"3 SSH_Fail2ban - FAIL: jail sshd non trovata"
+
+NOTE:
+Richiede fail2ban installato e configurato con jail sshd.
+
+
+================================================================================
+📂 SCRIPT REMOTI (WRAPPER)
+================================================================================
+
+6. rcheck_disk_space.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DESCRIZIONE:
+Wrapper remoto per check_disk_space.sh
+
+SCRIPT_URL:
+https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ubuntu/polling/check_disk_space.sh
+
+
+7. rssh_sessions_count
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DESCRIZIONE:
+Wrapper remoto per ssh_sessions_count
+
+SCRIPT_URL:
+https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ubuntu/polling/ssh_sessions_count
+
+
+8. rssh_all_sessions_count
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DESCRIZIONE:
+Wrapper remoto per ssh_all_sessions_count
+
+SCRIPT_URL:
+https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ubuntu/polling/ssh_all_sessions_count
+
+
+9. rssh_root_session
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DESCRIZIONE:
+Wrapper remoto per ssh_root_session
+
+SCRIPT_URL:
+https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ubuntu/polling/ssh_root_session
+
+
+10. rssh_fail2ban_status
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DESCRIZIONE:
+Wrapper remoto per ssh_fail2ban_status
+
+SCRIPT_URL:
+https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ubuntu/polling/ssh_fail2ban_status
+
+
+FUNZIONAMENTO WRAPPER:
+bash <(curl -fsSL "$SCRIPT_URL") "$@"
+
+
+================================================================================
+RIEPILOGO FUNZIONALITÀ
+================================================================================
+
+┌──────────────────────────┬────────────────────────────────────────────────┐
+│ CATEGORIA                │ SCRIPT                                         │
+├──────────────────────────┼────────────────────────────────────────────────┤
+│ Spazio Disco             │ check_disk_space.sh                            │
+│                          │ rcheck_disk_space.sh                           │
+├──────────────────────────┼────────────────────────────────────────────────┤
+│ SSH Sessions Root        │ ssh_sessions_count                             │
+│                          │ rssh_sessions_count                            │
+├──────────────────────────┼────────────────────────────────────────────────┤
+│ SSH Sessions All Users   │ ssh_all_sessions_count                         │
+│                          │ rssh_all_sessions_count                        │
+├──────────────────────────┼────────────────────────────────────────────────┤
+│ SSH Events Root          │ ssh_root_session                               │
+│                          │ rssh_root_session                              │
+├──────────────────────────┼────────────────────────────────────────────────┤
+│ Fail2ban SSH             │ ssh_fail2ban_status                            │
+│                          │ rssh_fail2ban_status                           │
+└──────────────────────────┴────────────────────────────────────────────────┘
+
+
+================================================================================
+DIPENDENZE
+================================================================================
+
+RICHIESTE:
+✓ Ubuntu Linux (testato su Ubuntu 20.04+)
+✓ CheckMK Raw 2.4.x
+✓ bash
+✓ curl (per script remoti)
+✓ fail2ban (opzionale, per ssh_fail2ban_status)
+
+COMANDI LINUX USATI:
+- df (disk free)
+- pgrep (process grep)
+- grep, awk, sed (text processing)
+- wc (word count)
+- tail (file reading)
+
+LOG DI SISTEMA:
+- /var/log/auth.log (eventi SSH autenticazione)
+
+FAIL2BAN:
+- fail2ban-client (interrogazione jail)
+
+
+================================================================================
+UTILIZZO SCRIPT LOCALI
+================================================================================
+
+INSTALLAZIONE POLLING:
+
+METODO 1 - Script formato CheckMK local (ssh_*):
+1. Copiare script in /usr/lib/check_mk_agent/local/
+2. Rendere eseguibile: chmod +x nome_script
+3. Eseguire service discovery in CheckMK
+
+ESEMPIO:
+cp ssh_sessions_count /usr/lib/check_mk_agent/local/
+chmod +x /usr/lib/check_mk_agent/local/ssh_sessions_count
+
+METODO 2 - Script formato Nagios (check_disk_space.sh):
+1. Copiare script in /usr/lib/check_mk_agent/plugins/
+2. Rendere eseguibile: chmod +x nome_script.sh
+3. Configurare in CheckMK come plugin standard
+
+ESEMPIO:
+cp check_disk_space.sh /usr/lib/check_mk_agent/plugins/
+chmod +x /usr/lib/check_mk_agent/plugins/check_disk_space.sh
+
+
+================================================================================
+UTILIZZO SCRIPT REMOTI
+================================================================================
+
+INSTALLAZIONE:
+1. Copiare wrapper remoto (rNOME) nella directory appropriata
+2. Rendere eseguibile: chmod +x rNOME
+3. Lo script scaricherà automaticamente l'ultima versione da GitHub
+
+ESEMPIO LOCAL (ssh_* scripts):
+cp rssh_sessions_count /usr/lib/check_mk_agent/local/
+chmod +x /usr/lib/check_mk_agent/local/rssh_sessions_count
+
+ESEMPIO PLUGINS (check_disk_space):
+cp rcheck_disk_space.sh /usr/lib/check_mk_agent/plugins/
+chmod +x /usr/lib/check_mk_agent/plugins/rcheck_disk_space.sh
+
+VANTAGGI:
+✓ Aggiornamenti automatici dal repository
+✓ No manutenzione manuale degli script
+✓ Centralized management
+
+
+================================================================================
+NOTE AGGIUNTIVE
+================================================================================
+
+FORMATO OUTPUT:
+
+FORMATO 1 - CheckMK Local (ssh_* scripts):
+STATO NOME_SERVIZIO METRICHE DETTAGLI
+
+FORMATO 2 - Nagios/Plugin (check_disk_space.sh):
+MESSAGGIO
+exit CODE
+
+DIFFERENZA FORMATI:
+- Local: Script eseguiti ad ogni check, output formato "<<<local>>>" implicito
+- Plugin: Script eseguiti periodicamente, usano exit code standard
+
+STATI CHECKMK LOCAL:
+0 = OK
+1 = WARNING
+2 = CRITICAL
+3 = UNKNOWN
+
+EXIT CODE NAGIOS:
+0 = OK
+1 = WARNING
+2 = CRITICAL
+3 = UNKNOWN
+
+BEST PRACTICES:
+- Usare script locali per check frequenti (sessioni SSH)
+- check_disk_space.sh può essere convertito in formato local se necessario
+- Monitorare auth.log per sicurezza SSH
+- Configurare fail2ban per protezione brute-force
+- Verificare rotazione log auth.log (logrotate)
+
+
+================================================================================
+STATEFILE E LOG
+================================================================================
+
+SCRIPT CON STATEFILE:
+ssh_root_session               → /var/lib/check_mk_agent/ssh_root_session.state
+                               → /var/lib/check_mk_agent/ssh_root_session.lastip
+
+LOG DI SISTEMA LETTI:
+/var/log/auth.log              (SSH authentication events)
+
+
+================================================================================
+ESEMPI DI OUTPUT COMPLETI
+================================================================================
+
+DISK SPACE:
+OK - Spazio disco utilizzato: 45%
+WARNING - Spazio disco utilizzato: 85%
+CRITICAL - Spazio disco utilizzato: 96%
+
+SSH SESSIONS:
+0 SSH_Session_Count count=0; Active root SSH sessions = 0
+1 SSH_Session_Count count=1; Active root SSH sessions = 1
+0 SSH_All_Sessions count=0; Active SSH sessions (all users) = 0
+1 SSH_All_Sessions count=5; Active SSH sessions (all users) = 5
+
+SSH EVENTS:
+0 SSH_Session - OK: no new root SSH events (last check 2025-10-27 15:30:00)
+1 SSH_Session - WARN: root SSH login from 192.168.1.100 at Oct 27 14:25:10
+2 SSH_Session - CRITICAL: Failed root SSH login from 45.76.123.45 at Oct 27 14:30:05
+0 SSH_Session - OK: root SSH logout (last IP 192.168.1.100) at Oct 27 15:00:00
+
+FAIL2BAN:
+0 SSH_Fail2ban banned=0; OK: nessun IP bannato da fail2ban (jail=sshd)
+2 SSH_Fail2ban banned=3; CRITICAL: 3 IP attualmente bannati da fail2ban (jail=sshd) [45.76.123.45 198.51.100.10 203.0.113.5]
+
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+PROBLEMA: Script non genera output
+SOLUZIONE:
+- Verificare permessi esecuzione: ls -l /usr/lib/check_mk_agent/local/
+- Testare manualmente: bash /usr/lib/check_mk_agent/local/ssh_sessions_count
+- Verificare shebang: deve essere #!/usr/bin/env bash o #!/bin/bash
+
+PROBLEMA: ssh_root_session non rileva eventi
+SOLUZIONE:
+- Verificare path log: ls -l /var/log/auth.log
+- Su alcune distro Ubuntu: potrebbe essere /var/log/auth.log o syslog
+- Verificare permessi lettura log
+- Testare grep: grep "sshd" /var/log/auth.log
+
+PROBLEMA: Statefile non viene creato
+SOLUZIONE:
+- Verificare permessi cartella: ls -ld /var/lib/check_mk_agent/
+- Creare manualmente: mkdir -p /var/lib/check_mk_agent
+- Verificare owner: chown checkmk:checkmk /var/lib/check_mk_agent
+
+PROBLEMA: fail2ban script ritorna UNKNOWN
+SOLUZIONE:
+- Verificare fail2ban installato: which fail2ban-client
+- Verificare jail configurata: fail2ban-client status
+- Verificare jail sshd: fail2ban-client status sshd
+- Installare se mancante: apt install fail2ban
+
+PROBLEMA: check_disk_space non appare in CheckMK
+SOLUZIONE:
+- Script usa exit code, non formato local
+- Metterlo in plugins/ non in local/
+- Configurare come check_mk plugin standard
+- Alternativa: convertire in formato local (modificare output)
+
+
+================================================================================
+SICUREZZA
+================================================================================
+
+CONSIDERAZIONI:
+✓ Gli script leggono log di sistema (richiedono permessi)
+✓ Statefile contengono timestamp e IP
+✓ ssh_root_session memorizza IP degli accessi
+✓ Script remoti scaricano codice da GitHub - verificare HTTPS
+
+PERMESSI CONSIGLIATI:
+- Script: 755 (rwxr-xr-x)
+- Statefile: 644 (rw-r--r--)
+- Directory /var/lib/check_mk_agent: 755, owner checkmk
+
+LOG AUTH.LOG:
+- Contiene informazioni sensibili (IP, tentativi accesso)
+- Verificare rotazione con logrotate
+- Monitorare accessi sospetti
+
+
+================================================================================
+COMPATIBILITÀ UBUNTU
+================================================================================
+
+VERSIONI TESTATE:
+✓ Ubuntu 20.04 LTS (Focal Fossa)
+✓ Ubuntu 22.04 LTS (Jammy Jellyfish)
+✓ Ubuntu 24.04 LTS (Noble Numbat)
+
+PATH LOG:
+Ubuntu usa /var/log/auth.log per eventi SSH/autenticazione
+(Diverso da CentOS/RHEL che usa /var/log/secure)
+
+SYSTEMD LOG:
+Alternativa a auth.log: journalctl -u ssh
+Script attuale usa auth.log per compatibilità
+
+
+================================================================================
+DIFFERENZE UBUNTU vs NETHSERVER vs WINDOWS
+================================================================================
+
+┌─────────────────────────┬────────────────┬────────────────┬──────────────┐
+│ CARATTERISTICA          │ UBUNTU         │ NETHSERVER 7   │ WINDOWS      │
+├─────────────────────────┼────────────────┼────────────────┼──────────────┤
+│ Script Type             │ Bash           │ Bash           │ PowerShell   │
+├─────────────────────────┼────────────────┼────────────────┼──────────────┤
+│ Path local/             │ Sì             │ Sì             │ N/A          │
+├─────────────────────────┼────────────────┼────────────────┼──────────────┤
+│ Path plugins/           │ Sì             │ Sì             │ N/A          │
+├─────────────────────────┼────────────────┼────────────────┼──────────────┤
+│ SSH Monitoring          │ Sì             │ Sì             │ N/A          │
+├─────────────────────────┼────────────────┼────────────────┼──────────────┤
+│ Fail2ban                │ Sì             │ Sì             │ N/A          │
+├─────────────────────────┼────────────────┼────────────────┼──────────────┤
+│ Auth Log                │ /var/log/      │ /var/log/      │ Event Viewer │
+│                         │ auth.log       │ secure         │              │
+├─────────────────────────┼────────────────┼────────────────┼──────────────┤
+│ Service Management      │ systemctl      │ systemctl      │ Services.msc │
+├─────────────────────────┼────────────────┼────────────────┼──────────────┤
+│ Package Manager         │ apt            │ yum            │ N/A          │
+└─────────────────────────┴────────────────┴────────────────┴──────────────┘
+
+
+================================================================================
+CONVERSIONE SCRIPT DA PLUGIN A LOCAL
+================================================================================
+
+ESEMPIO: Convertire check_disk_space.sh in formato local
+
+PRIMA (Plugin format):
+```bash
+if [ "$USAGE" -lt "$THRESHOLD" ]; then
+    echo "OK - Spazio disco utilizzato: $USAGE%"
+    exit 0
+elif [ "$USAGE" -lt 95 ]; then
+    echo "WARNING - Spazio disco utilizzato: $USAGE%"
+    exit 1
+else
+    echo "CRITICAL - Spazio disco utilizzato: $USAGE%"
+    exit 2
+fi
+```
+
+DOPO (Local format):
+```bash
+if [ "$USAGE" -lt "$THRESHOLD" ]; then
+    echo "0 Disk_Space usage=$USAGE%;80;95; OK - Spazio disco utilizzato: $USAGE%"
+elif [ "$USAGE" -lt 95 ]; then
+    echo "1 Disk_Space usage=$USAGE%;80;95; WARNING - Spazio disco utilizzato: $USAGE%"
+else
+    echo "2 Disk_Space usage=$USAGE%;80;95; CRITICAL - Spazio disco utilizzato: $USAGE%"
+fi
+```
+
+VANTAGGI LOCAL FORMAT:
+✓ Metriche integrate per grafici
+✓ Non serve exit code
+✓ Output unificato
+✓ Più flessibile
+
+
+================================================================================
+AUTORE E LICENZA
+================================================================================
+
+Autore:     NethLab / Marzio Project
+Repository: https://github.com/Coverup20/checkmk-tools
+Licenza:    [Specificare licenza]
+
+Compatibilità testata:
+- Ubuntu 20.04/22.04/24.04 LTS
+- CheckMK Raw 2.4.x
+
+================================================================================
+Fine documento
+================================================================================

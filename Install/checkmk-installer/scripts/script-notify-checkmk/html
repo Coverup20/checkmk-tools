@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+import os
+import smtplib
+from email.message import EmailMessage
+
+# Configura questi parametri
+SMTP_SERVER = "localhost"
+FROM_ADDR = "checkmk@tuodominio.it"
+TO_ADDR = os.environ.get("NOTIFY_CONTACTEMAIL", "destinatario@dominio.it")
+
+# Recupera variabili di notifica Checkmk
+hostname = os.environ.get("NOTIFY_HOSTNAME", "N/A")
+service = os.environ.get("NOTIFY_SERVICEDESC", "N/A")
+state = os.environ.get("NOTIFY_SERVICESTATE", "N/A")
+output = os.environ.get("NOTIFY_SERVICEOUTPUT", "N/A")
+real_ip = os.environ.get("NOTIFY_HOSTLABEL_real_ip", "N/A")
+
+# Percorso al grafico da allegare (devi generarlo tu, ad esempio con uno snapshot web)
+graph_path = "/tmp/grafico.png"
+
+msg = EmailMessage()
+msg['Subject'] = f"Checkmk Alert: {hostname} - {service} - {state}"
+msg['From'] = FROM_ADDR
+msg['To'] = TO_ADDR
+
+html = f"""
+<html>
+  <body>
+    <h2>Notifica Checkmk</h2>
+    <p><b>Host:</b> {hostname}<br>
+    <b>Host reale:</b> {real_ip}<br>
+    <b>Servizio:</b> {service}<br>
+    <b>Stato:</b> {state}<br>
+    <b>Output:</b> {output}</p>
+    <p><b>Grafico:</b><br>
+    <img src="cid:graph1"></p>
+  </body>
+</html>
+"""
+
+msg.set_content("Notifica Checkmk (HTML non supportato)")
+msg.add_alternative(html, subtype='html')
+
+# Allegato grafico (se esiste)
+if os.path.exists(graph_path):
+    with open(graph_path, 'rb') as img:
+        msg.get_payload()[1].add_related(img.read(), 'image', 'png', cid='graph1')
+
+with smtplib.SMTP(SMTP_SERVER) as s:
+    s.send_message(msg)
