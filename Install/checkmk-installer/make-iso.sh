@@ -9,13 +9,29 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Source utilities
 source "${SCRIPT_DIR}/utils/colors.sh"
 source "${SCRIPT_DIR}/utils/logger.sh"
+# source "${SCRIPT_DIR}/utils/menu.sh"  # Not needed for ISO building
+
+# Simple display_box function for ISO builder
+display_box() {
+  local title="$1"
+  shift
+  echo ""
+  echo "============================================================"
+  echo "  $title"
+  echo "============================================================"
+  for line in "$@"; do
+    echo "  $line"
+  done
+  echo "============================================================"
+  echo ""
+}
 
 # Configuration
 ISO_NAME="checkmk-installer-v1.0-amd64.iso"
 ISO_OUTPUT_DIR="${SCRIPT_DIR}/iso-output"
 WORK_DIR="/tmp/checkmk-iso-build"
-UBUNTU_VERSION="24.04"
-UBUNTU_ISO_URL="https://releases.ubuntu.com/${UBUNTU_VERSION}/ubuntu-${UBUNTU_VERSION}-live-server-amd64.iso"
+UBUNTU_VERSION="22.04.5"
+UBUNTU_ISO_URL="https://releases.ubuntu.com/22.04/ubuntu-${UBUNTU_VERSION}-live-server-amd64.iso"
 UBUNTU_ISO_NAME="ubuntu-${UBUNTU_VERSION}-live-server-amd64.iso"
 
 init_logging
@@ -28,7 +44,7 @@ print_header "CheckMK Installer ISO Builder"
 check_dependencies() {
   log_info "Checking dependencies..."
   
-  local deps=("wget" "xorriso" "isolinux" "squashfs-tools" "genisoimage")
+  local deps=("wget" "xorriso" "mksquashfs" "genisoimage")
   local missing=()
   
   for dep in "${deps[@]}"; do
@@ -36,6 +52,11 @@ check_dependencies() {
       missing+=("$dep")
     fi
   done
+  
+  # Check for isolinux files
+  if [[ ! -f "/usr/lib/ISOLINUX/isolinux.bin" ]] && [[ ! -f "/usr/lib/isolinux/isolinux.bin" ]]; then
+    missing+=("isolinux")
+  fi
   
   if [[ ${#missing[@]} -gt 0 ]]; then
     log_error "Missing dependencies: ${missing[*]}"
@@ -53,20 +74,27 @@ download_ubuntu_iso() {
   local iso_cache="${SCRIPT_DIR}/${UBUNTU_ISO_NAME}"
   
   if [[ -f "$iso_cache" ]]; then
-    log_info "Using cached Ubuntu ISO"
+    log_info "Using cached Ubuntu ISO" >&2
     echo "$iso_cache"
     return 0
   fi
   
-  log_info "Downloading Ubuntu ${UBUNTU_VERSION} ISO..."
-  log_warning "This may take several minutes (~2.5GB download)"
+  log_info "Downloading Ubuntu ${UBUNTU_VERSION} ISO..." >&2
+  log_warning "This may take several minutes (~2.5GB download)" >&2
   
-  if ! wget -O "$iso_cache" "$UBUNTU_ISO_URL"; then
-    log_error "Failed to download Ubuntu ISO"
+  if ! wget --progress=bar:force -O "$iso_cache" "$UBUNTU_ISO_URL" 2>&1 | 
+       stdbuf -o0 tr '\r' '\n' | 
+       grep --line-buffered -oP '\d+%' | 
+       while read -r percent; do
+         echo -ne "\r${CYAN}Progress: ${WHITE}${percent}${NC} " >&2
+       done; then
+    echo "" >&2
+    log_error "Failed to download Ubuntu ISO" >&2
     return 1
   fi
+  echo "" >&2
   
-  log_success "Ubuntu ISO downloaded"
+  log_success "Ubuntu ISO downloaded" >&2
   echo "$iso_cache"
 }
 
@@ -81,22 +109,34 @@ extract_iso() {
   
   mkdir -p "$extract_dir"
   
-  # Mount ISO
-  local mount_point="${WORK_DIR}/mnt"
-  mkdir -p "$mount_point"
+  # Extract using bsdtar (best for ISO files in containers)
+  log_info "Extracting ISO contents with bsdtar..."
+  cd "$extract_dir"
   
-  if ! mount -o loop "$iso_file" "$mount_point" 2>/dev/null; then
-    log_error "Failed to mount ISO (need root privileges)"
+  # Show spinner during extraction
+  bsdtar -xf "$iso_file" 2>&1 | tee -a "$LOG_FILE" &
+  local pid=$!
+  
+  local spin='-\|/'
+  local i=0
+  while kill -0 $pid 2>/dev/null; do
+    i=$(( (i+1) %4 ))
+    echo -ne "\r${CYAN}Extracting... ${spin:$i:1}${NC} "
+    sleep 0.1
+  done
+  wait $pid
+  local exit_code=$?
+  echo -ne "\r${CYAN}Extracting... Done!${NC}\n"
+  
+  cd - > /dev/null
+  
+  if [ $exit_code -ne 0 ]; then
+    log_error "Failed to extract ISO"
     return 1
   fi
   
-  # Copy contents
-  log_info "Copying ISO contents..."
-  rsync -a "$mount_point/" "$extract_dir/"
-  
-  # Unmount
-  umount "$mount_point"
-  rmdir "$mount_point"
+  # Make files writable
+  chmod -R u+w "$extract_dir"
   
   log_success "ISO extracted"
 }
@@ -123,6 +163,59 @@ add_installer_to_iso() {
   
   log_success "Installer added to ISO"
 }
+
+#############################################
+# Setup hybrid boot (isolinux for USB)
+#############################################
+setup_hybrid_boot() {
+  local iso_root="$1"
+  
+  log_info "Setting up hybrid boot support..."
+  
+  # Create isolinux directory if doesn't exist
+  local isolinux_dir="${iso_root}/isolinux"
+  mkdir -p "$isolinux_dir"
+  
+  # Copy isolinux files
+  if [[ -f "/usr/lib/ISOLINUX/isolinux.bin" ]]; then
+    cp /usr/lib/ISOLINUX/isolinux.bin "$isolinux_dir/"
+  elif [[ -f "/usr/lib/syslinux/modules/bios/isolinux.bin" ]]; then
+    cp /usr/lib/syslinux/modules/bios/isolinux.bin "$isolinux_dir/"
+  fi
+  
+  # Copy required syslinux modules
+  for module in ldlinux.c32 libcom32.c32 libutil.c32 vesamenu.c32; do
+    if [[ -f "/usr/lib/syslinux/modules/bios/$module" ]]; then
+      cp "/usr/lib/syslinux/modules/bios/$module" "$isolinux_dir/"
+    fi
+  done
+  
+  # Create isolinux.cfg
+  cat > "${isolinux_dir}/isolinux.cfg" <<'EOF'
+DEFAULT vesamenu.c32
+TIMEOUT 300
+PROMPT 0
+
+MENU TITLE CheckMK Installer Boot Menu
+
+LABEL ubuntu
+  MENU LABEL Boot CheckMK Installer (Ubuntu Live)
+  KERNEL /casper/vmlinuz
+  APPEND initrd=/casper/initrd boot=casper quiet splash ---
+
+LABEL grub
+  MENU LABEL Boot using GRUB (UEFI)
+  COM32 chain.c32
+  APPEND grub
+
+LABEL local
+  MENU LABEL Boot from local disk
+  LOCALBOOT 0
+EOF
+  
+  log_success "Hybrid boot configured"
+}
+
 
 #############################################
 # Create autostart script
@@ -265,13 +358,14 @@ build_iso() {
   
   log_info "Building ISO image..."
   log_info "This may take several minutes..."
+  echo -ne "${CYAN}Progress: ${WHITE}0%${NC} "
   
   # Create output directory
   mkdir -p "$(dirname "$output_iso")"
   
-  # Build ISO with xorriso
-  if ! xorriso -as mkisofs \
-    -r -V "CheckMK Installer" \
+  # Build ISO with xorriso (UEFI + Legacy BIOS via isolinux)
+  xorriso -as mkisofs \
+    -r -V "CheckMK_Installer" \
     -o "$output_iso" \
     -J -joliet-long \
     -b isolinux/isolinux.bin \
@@ -280,11 +374,19 @@ build_iso() {
     -boot-load-size 4 \
     -boot-info-table \
     -eltorito-alt-boot \
-    -e boot/grub/efi.img \
+    -e EFI/boot/bootx64.efi \
     -no-emul-boot \
     -isohybrid-gpt-basdat \
-    -isohybrid-apm-hfsplus \
-    "$iso_root" 2>&1 | tee -a "$LOG_FILE"; then
+    "$iso_root" 2>&1 | \
+    grep --line-buffered -oP '\d+\.\d+%' | \
+    while read -r percent; do
+      echo -ne "\r${CYAN}Progress: ${WHITE}${percent}${NC} "
+    done
+  
+  local exit_code=${PIPESTATUS[0]}
+  echo ""
+  
+  if [ $exit_code -ne 0 ]; then
     log_error "Failed to build ISO"
     return 1
   fi
@@ -413,6 +515,7 @@ main() {
   
   # Customize ISO
   add_installer_to_iso "$iso_root"
+  setup_hybrid_boot "$iso_root"
   create_autostart "$iso_root"
   create_preseed "$iso_root"
   update_boot_menu "$iso_root"
