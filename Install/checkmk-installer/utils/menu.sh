@@ -1,23 +1,22 @@
 #!/usr/bin/env bash
-# menu.sh - Interactive menu system
+# menu.sh - Menu and UI utilities
 
-# Source dependencies
-UTILS_DIR="$(dirname "${BASH_SOURCE[0]}")"
-source "${UTILS_DIR}/colors.sh"
-source "${UTILS_DIR}/logger.sh"
+# Source colors if not already loaded
+[[ -z "$GREEN" ]] && source "$(dirname "${BASH_SOURCE[0]}")/colors.sh"
 
-# Menu state
-declare -g MENU_SELECTION=""
-declare -g MENU_CONTINUE=true
-
-# Display menu with options
+#############################################
+# Show menu with options
+#############################################
 show_menu() {
   local title="$1"
   shift
   local options=("$@")
   
-  clear
-  print_header "$title"
+  echo ""
+  echo -e "${CYAN}${BOX_TL}$(printf "${BOX_H}%.0s" {1..60})${BOX_TR}${NC}"
+  printf "${CYAN}${BOX_V}${NC}%20s${BOLD}${WHITE} %s ${NC}%*s${CYAN}${BOX_V}${NC}\n" "" "$title" $((60 - ${#title} - 20)) ""
+  echo -e "${CYAN}${BOX_BL}$(printf "${BOX_H}%.0s" {1..60})${BOX_BR}${NC}"
+  echo ""
   
   for i in "${!options[@]}"; do
     local num=$((i + 1))
@@ -25,49 +24,50 @@ show_menu() {
   done
   
   echo ""
-  print_separator
-  echo ""
 }
 
+#############################################
 # Get user selection
+#############################################
 get_selection() {
-  local max="$1"
+  local max=$1
   local prompt="${2:-Scegli un'opzione}"
   
   while true; do
-    echo -ne "${MAGENTA}${SYMBOL_ARROW}${NC} ${WHITE}${prompt} [1-${max}]:${NC} "
-    read -r selection
+    read -p "${MAGENTA}${SYMBOL_ARROW}${NC} ${WHITE}${prompt} (1-${max}):${NC} " MENU_SELECTION
     
-    if [[ "$selection" =~ ^[0-9]+$ ]] && [[ $selection -ge 1 ]] && [[ $selection -le $max ]]; then
-      MENU_SELECTION="$selection"
+    if [[ "$MENU_SELECTION" =~ ^[0-9]+$ ]] && \
+       [[ $MENU_SELECTION -ge 1 ]] && \
+       [[ $MENU_SELECTION -le $max ]]; then
+      export MENU_SELECTION
       return 0
-    else
-      print_error "Selezione non valida. Inserisci un numero tra 1 e $max"
     fi
+    
+    print_error "Selezione non valida. Inserisci un numero tra 1 e ${max}"
   done
 }
 
+#############################################
 # Confirm action
+#############################################
 confirm() {
-  local prompt="${1:-Continuare?}"
+  local prompt="$1"
   local default="${2:-n}"
   
-  local yn_prompt="[s/n]"
-  [[ "$default" == "y" ]] && yn_prompt="[S/n]"
-  [[ "$default" == "n" ]] && yn_prompt="[s/N]"
-  
   while true; do
-    echo -ne "${YELLOW}${SYMBOL_QUESTION}${NC} ${WHITE}${prompt} ${yn_prompt}:${NC} "
-    read -r answer
+    if [[ "$default" == "y" ]]; then
+      read -p "${YELLOW}${prompt} (Y/n):${NC} " -r response
+      response=${response:-y}
+    else
+      read -p "${YELLOW}${prompt} (y/N):${NC} " -r response
+      response=${response:-n}
+    fi
     
-    # Use default if empty
-    [[ -z "$answer" ]] && answer="$default"
-    
-    case "${answer,,}" in
-      s|y|si|yes)
+    case "$response" in
+      [yY]|[yY][eE][sS])
         return 0
         ;;
-      n|no)
+      [nN]|[nN][oO])
         return 1
         ;;
       *)
@@ -77,106 +77,17 @@ confirm() {
   done
 }
 
-# Press any key to continue
-press_any_key() {
-  local prompt="${1:-Premi un tasto per continuare...}"
-  echo ""
-  echo -ne "${GRAY}${prompt}${NC}"
-  read -n 1 -s -r
-  echo ""
-}
-
-# Input text with validation
-input_text() {
-  local prompt="$1"
-  local default="$2"
-  local validation="${3:-.*}"  # Regex for validation
-  
-  local default_display=""
-  [[ -n "$default" ]] && default_display=" [${default}]"
-  
-  while true; do
-    echo -ne "${CYAN}${SYMBOL_ARROW}${NC} ${WHITE}${prompt}${default_display}:${NC} "
-    read -r input
-    
-    # Use default if empty
-    [[ -z "$input" ]] && input="$default"
-    
-    # Validate
-    if [[ "$input" =~ $validation ]]; then
-      echo "$input"
-      return 0
-    else
-      print_error "Input non valido. Riprova."
-    fi
-  done
-}
-
-# Input password (hidden)
-input_password() {
-  local prompt="$1"
-  local confirm="${2:-false}"
-  
-  while true; do
-    echo -ne "${CYAN}${SYMBOL_ARROW}${NC} ${WHITE}${prompt}:${NC} "
-    read -s -r password
-    echo ""
-    
-    if [[ "$confirm" == "true" ]]; then
-      echo -ne "${CYAN}${SYMBOL_ARROW}${NC} ${WHITE}Conferma password:${NC} "
-      read -s -r password2
-      echo ""
-      
-      if [[ "$password" == "$password2" ]]; then
-        echo "$password"
-        return 0
-      else
-        print_error "Le password non corrispondono. Riprova."
-      fi
-    else
-      echo "$password"
-      return 0
-    fi
-  done
-}
-
-# Select from list
-select_from_list() {
-  local prompt="$1"
-  shift
-  local items=("$@")
-  
-  echo -e "${WHITE}${prompt}:${NC}"
-  echo ""
-  
-  for i in "${!items[@]}"; do
-    local num=$((i + 1))
-    echo -e "  ${CYAN}${num})${NC} ${items[$i]}"
-  done
-  
-  echo ""
-  
-  while true; do
-    echo -ne "${MAGENTA}${SYMBOL_ARROW}${NC} ${WHITE}Selezione [1-${#items[@]}]:${NC} "
-    read -r selection
-    
-    if [[ "$selection" =~ ^[0-9]+$ ]] && [[ $selection -ge 1 ]] && [[ $selection -le ${#items[@]} ]]; then
-      echo "${items[$((selection - 1))]}"
-      return 0
-    else
-      print_error "Selezione non valida"
-    fi
-  done
-}
-
-# Multi-select from list (returns array indices)
+#############################################
+# Multi-select menu
+#############################################
 multi_select() {
   local prompt="$1"
   shift
   local items=("$@")
-  local -a selected=()
+  local selected=()
   
-  echo -e "${WHITE}${prompt}${NC}"
+  echo ""
+  echo -e "${CYAN}${prompt}${NC}"
   echo -e "${GRAY}(Inserisci i numeri separati da spazi, o 'all' per tutti)${NC}"
   echo ""
   
@@ -208,21 +119,23 @@ multi_select() {
       fi
     done
     
-    if [[ "$valid" == "true" ]]; then
+    if $valid; then
       for sel in "${selections[@]}"; do
         selected+=("$((sel - 1))")
       done
       break
-    else
-      print_error "Selezione non valida. Riprova."
     fi
+    
+    print_error "Selezione non valida"
   done
   
   # Return selected indices
   echo "${selected[@]}"
 }
 
+#############################################
 # Show progress with steps
+#############################################
 show_progress_steps() {
   local current="$1"
   local total="$2"
@@ -232,7 +145,9 @@ show_progress_steps() {
   print_progress "$current" "$total"
 }
 
+#############################################
 # Display a fancy box with text
+#############################################
 display_box() {
   local title="$1"
   shift
@@ -248,26 +163,114 @@ display_box() {
   max_width=$((max_width + 4))
   
   # Top border
+  echo ""
   echo -e "${CYAN}${BOX_TL}$(printf "${BOX_H}%.0s" $(seq 1 $max_width))${BOX_TR}${NC}"
   
   # Title
-  if [[ -n "$title" ]]; then
-    local title_padding=$(( (max_width - ${#title} - 2) / 2 ))
-    printf "${CYAN}${BOX_V}${NC}%${title_padding}s${BOLD}${WHITE} %s ${NC}%${title_padding}s${CYAN}${BOX_V}${NC}\n" "" "$title" ""
-    echo -e "${CYAN}${BOX_VR}$(printf "${BOX_H}%.0s" $(seq 1 $max_width))${BOX_VL}${NC}"
-  fi
+  local title_len=${#title}
+  local padding=$(( (max_width - title_len - 2) / 2 ))
+  printf "${CYAN}${BOX_V}${NC}%${padding}s${BOLD}${WHITE} %s ${NC}%*s${CYAN}${BOX_V}${NC}\n" \
+    "" "$title" $((max_width - title_len - padding - 2)) ""
   
-  # Content lines
+  # Middle border
+  echo -e "${CYAN}${BOX_VR}$(printf "${BOX_H}%.0s" $(seq 1 $max_width))${BOX_VL}${NC}"
+  
+  # Content
   for line in "${lines[@]}"; do
-    local padding=$((max_width - ${#line} - 2))
-    printf "${CYAN}${BOX_V}${NC} ${WHITE}%s${NC}%${padding}s${CYAN}${BOX_V}${NC}\n" "$line" ""
+    printf "${CYAN}${BOX_V}${NC}  %-*s${CYAN}${BOX_V}${NC}\n" $((max_width - 2)) "$line"
   done
   
   # Bottom border
   echo -e "${CYAN}${BOX_BL}$(printf "${BOX_H}%.0s" $(seq 1 $max_width))${BOX_BR}${NC}"
+  echo ""
 }
 
+#############################################
+# Input functions
+#############################################
+input_text() {
+  local prompt="$1"
+  local default="$2"
+  local result
+  
+  if [[ -n "$default" ]]; then
+    read -p "${WHITE}${prompt}${NC} [${CYAN}${default}${NC}]: " result
+    echo "${result:-$default}"
+  else
+    read -p "${WHITE}${prompt}${NC}: " result
+    echo "$result"
+  fi
+}
+
+input_password() {
+  local prompt="$1"
+  local result
+  
+  read -s -p "${WHITE}${prompt}${NC}: " result
+  echo "" >&2
+  echo "$result"
+}
+
+input_number() {
+  local prompt="$1"
+  local default="$2"
+  local result
+  
+  while true; do
+    if [[ -n "$default" ]]; then
+      read -p "${WHITE}${prompt}${NC} [${CYAN}${default}${NC}]: " result
+      result="${result:-$default}"
+    else
+      read -p "${WHITE}${prompt}${NC}: " result
+    fi
+    
+    if [[ "$result" =~ ^[0-9]+$ ]]; then
+      echo "$result"
+      return 0
+    fi
+    
+    print_error "Inserisci un numero valido"
+  done
+}
+
+select_from_list() {
+  local prompt="$1"
+  shift
+  local options=("$@")
+  
+  echo ""
+  echo -e "${CYAN}${prompt}${NC}"
+  echo ""
+  
+  for i in "${!options[@]}"; do
+    local num=$((i + 1))
+    echo -e "  ${CYAN}${num})${NC} ${options[$i]}"
+  done
+  
+  echo ""
+  
+  while true; do
+    read -p "${MAGENTA}${SYMBOL_ARROW}${NC} ${WHITE}Seleziona (1-${#options[@]}):${NC} " selection
+    
+    if [[ "$selection" =~ ^[0-9]+$ ]] && \
+       [[ $selection -ge 1 ]] && \
+       [[ $selection -le ${#options[@]} ]]; then
+      echo "${options[$((selection - 1))]}"
+      return 0
+    fi
+    
+    print_error "Selezione non valida"
+  done
+}
+
+press_any_key() {
+  read -n 1 -s -r -p "Press any key to continue..."
+  echo ""
+}
+
+#############################################
 # Show main installer menu
+#############################################
 show_main_menu() {
   local options=(
     "${SYMBOL_SERVER} Installazione Server Completa (CheckMK + Scripts + Ydea + FRPC)"
