@@ -298,8 +298,7 @@ configure_postfix() {
       echo "Authentication credentials required:"
       echo ""
       read -p "SMTP username: " smtp_user
-      read -s -p "SMTP password: " smtp_pass
-      echo ""
+      read -p "SMTP password: " smtp_pass
     fi
     
     # Configure SMTP authentication if credentials provided
