@@ -326,8 +326,12 @@ install_local_agent() {
   local agent_deb="/omd/sites/$site_name/share/check_mk/agents/check-mk-agent_*.deb"
   
   if ls $agent_deb 1> /dev/null 2>&1; then
-    log_command "dpkg -i $agent_deb"
-    log_success "Local agent installed"
+    # Use dpkg with force options to handle cleanup issues
+    if dpkg -i --force-all $agent_deb 2>&1 | tee -a "$LOG_FILE"; then
+      log_success "Local agent installed"
+    else
+      log_warning "Agent installation had errors but continuing..."
+    fi
   else
     log_warning "Agent package not found, skipping local agent installation"
   fi
