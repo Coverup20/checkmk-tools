@@ -51,7 +51,7 @@ deploy_notify_scripts() {
   # Create symlinks for main notification scripts
   for script_name in mail_realip telegram_realip ydea_realip; do
     if [[ -f "$dest/$script_name" ]]; then
-      ln -sf "$dest/$script_name" "/usr/local/bin/$script_name"
+      ln -sf "$dest/$script_name" "/usr/local/bin/$script_name" 2>/dev/null || true
       log_debug "Linked: $script_name"
     fi
   done
@@ -126,7 +126,7 @@ deploy_tool_scripts() {
   for tool in "${common_tools[@]}"; do
     if [[ -f "$dest/$tool" ]]; then
       local link_name=$(basename "$tool" .sh)
-      ln -sf "$dest/$tool" "/usr/local/bin/$link_name"
+      ln -sf "$dest/$tool" "/usr/local/bin/$link_name" 2>/dev/null || true
       log_debug "Linked: $link_name"
     fi
   done
@@ -234,7 +234,7 @@ echo ""
 echo "Update completed!"
 EOF
   
-  chmod +x /usr/local/bin/update-checkmk-scripts
+  chmod +x /usr/local/bin/update-checkmk-scripts 2>/dev/null || true
   
   log_success "Update script created: /usr/local/bin/update-checkmk-scripts"
 }
@@ -253,7 +253,7 @@ install_remote_launchers() {
     if [[ -f "$launcher" ]]; then
       local launcher_name=$(basename "$launcher")
       cp "$launcher" "/usr/local/bin/$launcher_name"
-      chmod +x "/usr/local/bin/$launcher_name"
+      chmod +x "/usr/local/bin/$launcher_name" 2>/dev/null || true
       ((count++))
       log_debug "Installed: $launcher_name"
     fi
