@@ -401,7 +401,7 @@ main() {
   
   log_module_end "$MODULE_NAME" "success"
   
-  display_site_info
+  display_installation_summary
 }
 
 # Run main function
