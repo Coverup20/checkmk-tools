@@ -75,19 +75,21 @@ fi
 # Uninstall CheckMK Server
 echo "[5/12] Uninstalling CheckMK Server..."
 if dpkg -l | grep -q check-mk-raw; then
-  # Remove corrupted dpkg metadata files (critical for clean state)
+  # Remove corrupted dpkg metadata files first (critical for clean state)
   echo "Removing dpkg metadata..."
+  sudo rm -rf /var/lib/dpkg/info/check-mk-agent.* 2>/dev/null || true
   sudo rm -f /var/lib/dpkg/info/check-mk-raw-* 2>/dev/null || true
-  sudo rm -f /var/lib/dpkg/info/check-mk-agent* 2>/dev/null || true
   
   # Force remove check-mk-agent if in broken state
+  echo "Force removing check-mk-agent..."
   sudo dpkg --remove --force-remove-reinstreq check-mk-agent 2>/dev/null || true
+  sudo dpkg --purge check-mk-agent 2>/dev/null || true
   
-  # Method 1: dpkg remove first
+  # Method 1: dpkg remove CheckMK server
   sudo dpkg --remove --force-remove-reinstreq check-mk-raw-2.4.0p16 2>/dev/null || true
   
   # Method 2: apt-get remove with wildcard
-  sudo apt-get remove --purge -y check-mk-raw-2.4.0p16 check-mk-agent 2>/dev/null || true
+  sudo apt-get remove --purge -y check-mk-raw-2.4.0p16 2>/dev/null || true
   
   # Method 3: autoremove dependencies
   sudo apt-get autoremove -y 2>/dev/null || true
