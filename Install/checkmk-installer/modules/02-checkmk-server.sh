@@ -131,6 +131,28 @@ install_checkmk_package() {
   # Fix any dependency issues
   log_command "apt-get install -f -y"
   
+  # Verify omd command is available
+  if ! command -v omd &> /dev/null; then
+    log_error "omd command not found after installation"
+    log_info "Attempting to fix symlinks..."
+    
+    # Recreate symlink if needed
+    if [[ -d /omd/versions ]]; then
+      local version
+      version=$(find /omd/versions/ -maxdepth 1 -type d ! -name "versions" ! -name "default" -printf "%f\n" | head -1)
+      if [[ -n "$version" ]]; then
+        log_debug "Found version: $version"
+        ln -sf "/omd/versions/$version/bin/omd" /usr/bin/omd
+      fi
+    fi
+    
+    # Check again
+    if ! command -v omd &> /dev/null; then
+      log_error "Failed to fix omd command"
+      return 1
+    fi
+  fi
+  
   log_success "CheckMK package installed"
 }
 
