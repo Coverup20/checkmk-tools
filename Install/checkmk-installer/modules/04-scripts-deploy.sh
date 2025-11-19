@@ -52,11 +52,10 @@ deploy_notify_scripts() {
   find "$dest" -type f -name "*.sh" -exec chmod +x {} \;
   find "$dest" -type f ! -name "*.md" ! -name "*.txt" ! -name "*.html" -exec chmod +x {} \;
   
-  # Create symlinks in /usr/local/bin
-  for script in "$dest"/mail_realip* "$dest"/telegram_realip "$dest"/ydea_realip; do
-    if [[ -f "$script" ]]; then
-      local script_name=$(basename "$script")
-      ln -sf "$script" "/usr/local/bin/$script_name"
+  # Create symlinks for main notification scripts
+  for script_name in mail_realip telegram_realip ydea_realip; do
+    if [[ -f "$dest/$script_name" ]]; then
+      ln -sf "$dest/$script_name" "/usr/local/bin/$script_name"
       log_debug "Linked: $script_name"
     fi
   done
