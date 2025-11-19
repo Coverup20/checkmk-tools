@@ -60,7 +60,9 @@ sudo umount /opt/omd/sites/monitoring/tmp 2>/dev/null || true
 # Uninstall CheckMK Server
 echo "[5/12] Uninstalling CheckMK Server..."
 if dpkg -l | grep -q check-mk-raw; then
+  sudo dpkg --purge --force-all check-mk-raw-* 2>/dev/null || true
   sudo apt-get purge -y check-mk-raw-* 2>/dev/null || true
+  sudo apt-get autoremove -y 2>/dev/null || true
 fi
 
 # Remove CheckMK Agent
