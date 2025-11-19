@@ -12,6 +12,7 @@ INSTALLER_ROOT="$(dirname "$SCRIPT_DIR")"
 source "${INSTALLER_ROOT}/utils/colors.sh"
 source "${INSTALLER_ROOT}/utils/logger.sh"
 source "${INSTALLER_ROOT}/utils/validate.sh"
+source "${INSTALLER_ROOT}/utils/menu.sh"
 
 # Load configuration
 if [[ -f "${INSTALLER_ROOT}/.env" ]]; then
