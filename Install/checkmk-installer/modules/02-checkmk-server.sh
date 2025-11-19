@@ -28,6 +28,30 @@ fi
 log_module_start "$MODULE_NAME"
 
 #############################################
+# Get latest CheckMK version URL
+#############################################
+get_latest_checkmk_url() {
+  log_info "Finding latest CheckMK RAW version..."
+  
+  local os_codename
+  os_codename=$(lsb_release -sc)
+  
+  # Try to get latest version from GitHub releases API
+  local latest_version
+  latest_version=$(curl -s https://api.github.com/repos/Checkmk/checkmk/releases/latest | grep '"tag_name"' | sed -E 's/.*"v?([^"]+)".*/\1/' || echo "")
+  
+  if [[ -z "$latest_version" ]]; then
+    log_warning "Could not determine latest version, using default 2.4.0p15"
+    latest_version="2.4.0p15"
+  fi
+  
+  local url="https://download.checkmk.com/checkmk/${latest_version}/check-mk-raw-${latest_version}_0.${os_codename}_amd64.deb"
+  
+  log_info "Latest version: $latest_version for $os_codename"
+  echo "$url"
+}
+
+#############################################
 # Download CheckMK
 #############################################
 download_checkmk() {
@@ -47,7 +71,6 @@ download_checkmk() {
   fi
   
   log_success "CheckMK downloaded to $dest"
-  echo "$dest"
 }
 
 #############################################
@@ -305,7 +328,8 @@ EOF
 display_site_info() {
   local site_name="${CHECKMK_SITE_NAME:-monitoring}"
   local http_port="${CHECKMK_HTTP_PORT:-5000}"
-  local server_ip=$(hostname -I | awk '{print $1}')
+  local server_ip
+  server_ip=$(hostname -I | awk '{print $1}')
   
   print_separator "="
   echo ""
@@ -332,10 +356,11 @@ display_site_info() {
 main() {
   log_info "Starting CheckMK server installation..."
   
-  # Check if URL is provided
-  if [[ -z "${CHECKMK_DEB_URL:-}" ]]; then
-    log_error "CHECKMK_DEB_URL not set in configuration"
-    exit 1
+  # Auto-detect latest version if URL not provided
+  local url="${CHECKMK_DEB_URL:-}"
+  if [[ -z "$url" ]]; then
+    log_info "No URL provided, auto-detecting latest version..."
+    url=$(get_latest_checkmk_url)
   fi
   
   if [[ -z "${CHECKMK_ADMIN_PASSWORD:-}" ]]; then
@@ -346,8 +371,8 @@ main() {
   # Execute installation steps
   install_checkmk_dependencies
   
-  local package=$(download_checkmk "$CHECKMK_DEB_URL")
-  install_checkmk_package "$package"
+  download_checkmk "$url"
+  install_checkmk_package "/tmp/check-mk-raw.deb"
   
   create_checkmk_site
   configure_checkmk_site
