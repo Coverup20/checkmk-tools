@@ -31,16 +31,14 @@ log_module_start "$MODULE_NAME"
 # Clean corrupted check-mk-agent package
 #############################################
 clean_corrupted_agent() {
-  log_info "Checking for corrupted check-mk-agent package..."
+  log_info "Cleaning any corrupted check-mk-agent package..."
   
-  # Remove corrupted dpkg metadata if exists
-  if dpkg -l | grep -q check-mk-agent 2>/dev/null; then
-    log_warning "Found check-mk-agent package, cleaning up..."
-    rm -rf /var/lib/dpkg/info/check-mk-agent.* 2>/dev/null || true
-    dpkg --remove --force-remove-reinstreq check-mk-agent 2>/dev/null || true
-    dpkg --purge check-mk-agent 2>/dev/null || true
-    log_success "Corrupted agent package cleaned"
-  fi
+  # Always attempt cleanup - corrupted packages may not show in dpkg -l
+  rm -rf /var/lib/dpkg/info/check-mk-agent.* 2>/dev/null || true
+  dpkg --remove --force-remove-reinstreq check-mk-agent 2>/dev/null || true
+  dpkg --purge check-mk-agent 2>/dev/null || true
+  
+  log_success "Agent package cleanup completed"
 }
 
 #############################################
