@@ -65,6 +65,13 @@ if grep -q "monitoring" /etc/fstab 2>/dev/null; then
   sudo systemctl daemon-reload
 fi
 
+# Remove site directories BEFORE uninstalling package
+echo "[4.6/12] Removing CheckMK site directories..."
+if [[ -d /omd/sites/monitoring ]]; then
+  echo "Removing /omd/sites/monitoring..."
+  sudo rm -rf /omd/sites/monitoring
+fi
+
 # Uninstall CheckMK Server
 echo "[5/12] Uninstalling CheckMK Server..."
 if dpkg -l | grep -q check-mk-raw; then
