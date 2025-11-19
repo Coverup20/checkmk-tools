@@ -39,17 +39,19 @@ sudo systemctl stop ydea-ticket-monitor.service 2>/dev/null || true
 echo "[2/12] Stopping CheckMK site..."
 if [ -d /omd/sites/monitoring ]; then
   sudo omd stop monitoring 2>/dev/null || true
+  sleep 2
 fi
 
-# Remove CheckMK site (force kill if needed)
+# Kill all CheckMK/OMD processes BEFORE attempting removal
+echo "[2.5/12] Force killing all CheckMK processes..."
+sudo pkill -9 -f "omd\|monitoring\|/omd/sites" 2>/dev/null || true
+sleep 2
+
+# Remove CheckMK site (now should be quick since processes are dead)
 echo "[3/12] Removing CheckMK site..."
 if command -v omd &> /dev/null; then
-  # Try with timeout, if fails kill everything
-  timeout 10 sudo omd rm --kill monitoring 2>/dev/null || {
-    echo "Timeout reached, force killing all processes..."
-    sudo pkill -9 -f "omd\|monitoring\|/omd/sites" 2>/dev/null || true
-    sleep 2
-  }
+  # Try with short timeout since we already killed everything
+  timeout 5 sudo omd rm monitoring 2>/dev/null || true
 fi
 
 # Unmount any locked directories
