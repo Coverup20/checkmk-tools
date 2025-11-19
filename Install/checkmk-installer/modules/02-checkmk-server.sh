@@ -166,7 +166,9 @@ configure_checkmk_site() {
   
   # Configure site settings
   log_debug "Configuring site settings"
-  omd config "$site_name" set APACHE_TCP_ADDR 0.0.0.0
+  local server_ip
+  server_ip=$(hostname -I | awk '{print $1}')
+  omd config "$site_name" set APACHE_TCP_ADDR "$server_ip"
   omd config "$site_name" set APACHE_TCP_PORT "${CHECKMK_HTTP_PORT:-5000}"
   
   # Enable livestatus
@@ -331,29 +333,31 @@ EOF
 #############################################
 # Display site information
 #############################################
-display_site_info() {
+display_installation_summary() {
   local site_name="${CHECKMK_SITE_NAME:-monitoring}"
   local http_port="${CHECKMK_HTTP_PORT:-5000}"
+  local admin_password="${CHECKMK_ADMIN_PASSWORD}"
   local server_ip
   server_ip=$(hostname -I | awk '{print $1}')
   
-  print_separator "="
   echo ""
-  display_box "CheckMK Installation Complete!" \
-    "" \
-    "Site Name: $site_name" \
-    "Web Interface: http://${server_ip}:${http_port}/${site_name}/" \
-    "Admin User: cmkadmin" \
-    "Admin Password: (as configured)" \
-    "" \
-    "Commands:" \
-    "  - omd status $site_name" \
-    "  - omd start/stop/restart $site_name" \
-    "  - omd config $site_name" \
-    "" \
-    "Backup: /usr/local/bin/backup-checkmk.sh"
+  echo "=========================================="
+  echo "CheckMK Installation Complete!"
+  echo "=========================================="
   echo ""
-  print_separator "="
+  echo "  Site Name: $site_name"
+  echo "  Web Interface: http://${server_ip}:${http_port}/${site_name}/"
+  echo "  Admin User: cmkadmin"
+  echo "  Admin Password: $admin_password"
+  echo ""
+  echo "  Commands:"
+  echo "    - omd status $site_name"
+  echo "    - omd start/stop/restart $site_name"
+  echo "    - omd config $site_name"
+  echo ""
+  echo "  Backup: /usr/local/bin/backup-checkmk.sh"
+  echo "=========================================="
+  echo ""
 }
 
 #############################################
