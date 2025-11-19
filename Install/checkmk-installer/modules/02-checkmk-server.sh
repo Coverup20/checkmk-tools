@@ -282,10 +282,17 @@ configure_checkmk_site() {
 }
 
 #############################################
-# Configure Apache
+# Configure Apache2 as Reverse Proxy
 #############################################
 configure_apache() {
-  log_info "Configuring Apache..."
+  log_info "Configuring Apache2 as reverse proxy..."
+  
+  # Install Apache2 if not present
+  if ! command -v apache2 &> /dev/null; then
+    log_info "Installing Apache2..."
+    log_command "apt-get update"
+    log_command "DEBIAN_FRONTEND=noninteractive apt-get install -y apache2"
+  fi
   
   # Enable required modules
   local modules=("proxy" "proxy_http" "rewrite" "headers" "ssl")
@@ -294,10 +301,54 @@ configure_apache() {
     log_command "a2enmod $mod"
   done
   
+  # Create CheckMK virtual host configuration
+  log_info "Creating Apache virtual host for CheckMK..."
+  
+  cat > /etc/apache2/sites-available/checkmk.conf <<'EOF'
+<VirtualHost *:80>
+    ServerName _default_
+    
+    # Redirect HTTP to HTTPS
+    RewriteEngine On
+    RewriteCond %{HTTPS} off
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}$1 [R=301,L]
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName _default_
+    
+    # SSL Configuration (using self-signed certificate)
+    SSLEngine on
+    SSLCertificateFile /etc/ssl/certs/ssl-cert-snakeoil.pem
+    SSLCertificateKeyFile /etc/ssl/private/ssl-cert-snakeoil.key
+    
+    # Proxy to CheckMK on port 5000
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:5000/
+    ProxyPassReverse / http://127.0.0.1:5000/
+    
+    # WebSocket support for CheckMK
+    RewriteEngine On
+    RewriteCond %{HTTP:Upgrade} websocket [NC]
+    RewriteCond %{HTTP:Connection} upgrade [NC]
+    RewriteRule ^/?(.*) "ws://127.0.0.1:5000/$1" [P,L]
+    
+    # Security headers
+    Header always set Strict-Transport-Security "max-age=31536000"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+</VirtualHost>
+EOF
+  
+  # Enable CheckMK site and disable default
+  log_command "a2ensite checkmk.conf"
+  log_command "a2dissite 000-default.conf" || true
+  
   # Restart Apache
   log_command "systemctl restart apache2"
+  log_command "systemctl enable apache2"
   
-  log_success "Apache configured"
+  log_success "Apache2 configured as reverse proxy (HTTP:80 -> HTTPS:443 -> CheckMK:5000)"
 }
 
 #############################################
@@ -324,8 +375,12 @@ configure_checkmk_firewall() {
   
   log_info "Configuring firewall for CheckMK..."
   
-  # Allow CheckMK HTTP
-  log_command "ufw allow $http_port/tcp comment 'CheckMK Web Interface'"
+  # Allow Apache HTTP and HTTPS (reverse proxy)
+  log_command "ufw allow 80/tcp comment 'HTTP (redirect to HTTPS)'"
+  log_command "ufw allow 443/tcp comment 'HTTPS CheckMK Web Interface'"
+  
+  # Allow CheckMK HTTP (internal only, accessed via Apache proxy)
+  log_command "ufw allow $http_port/tcp comment 'CheckMK Internal Port'"
   
   # Allow CheckMK agent
   log_command "ufw allow 6556/tcp comment 'CheckMK Agent'"
@@ -333,7 +388,7 @@ configure_checkmk_firewall() {
   # Allow Livestatus
   log_command "ufw allow 6557/tcp comment 'CheckMK Livestatus'"
   
-  log_success "Firewall configured"
+  log_success "Firewall configured (HTTP:80, HTTPS:443, CheckMK:$http_port, Agent:6556, Livestatus:6557)"
 }
 
 #############################################
@@ -452,7 +507,9 @@ display_installation_summary() {
   echo "=========================================="
   echo ""
   echo "  Site Name: $site_name"
-  echo "  Web Interface: http://${server_ip}:${http_port}/${site_name}/"
+  echo "  Web Interface (HTTPS): https://${server_ip}/${site_name}/"
+  echo "  Web Interface (HTTP):  http://${server_ip}/${site_name}/ (redirects to HTTPS)"
+  echo "  Internal Port:         http://${server_ip}:${http_port}/${site_name}/"
   echo "  Admin User: cmkadmin"
   
   if [[ "$admin_password" == "N/A" ]]; then
