@@ -78,6 +78,10 @@ if dpkg -l | grep -q check-mk-raw; then
   # Remove corrupted dpkg metadata files (critical for clean state)
   echo "Removing dpkg metadata..."
   sudo rm -f /var/lib/dpkg/info/check-mk-raw-* 2>/dev/null || true
+  sudo rm -f /var/lib/dpkg/info/check-mk-agent* 2>/dev/null || true
+  
+  # Force remove check-mk-agent if in broken state
+  sudo dpkg --remove --force-remove-reinstreq check-mk-agent 2>/dev/null || true
   
   # Method 1: dpkg remove first
   sudo dpkg --remove --force-remove-reinstreq check-mk-raw-2.4.0p16 2>/dev/null || true
