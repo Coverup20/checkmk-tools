@@ -125,7 +125,8 @@ deploy_tool_scripts() {
   
   for tool in "${common_tools[@]}"; do
     if [[ -f "$dest/$tool" ]]; then
-      local link_name=$(basename "$tool" .sh)
+      local link_name
+      link_name=$(basename "$tool" .sh)
       ln -sf "$dest/$tool" "/usr/local/bin/$link_name" 2>/dev/null || true
       log_debug "Linked: $link_name"
     fi
@@ -251,7 +252,8 @@ install_remote_launchers() {
   # Find all r* launcher scripts
   for launcher in "$launchers_src"/*/r*; do
     if [[ -f "$launcher" ]]; then
-      local launcher_name=$(basename "$launcher")
+      local launcher_name
+      launcher_name=$(basename "$launcher")
       cp "$launcher" "/usr/local/bin/$launcher_name"
       chmod +x "/usr/local/bin/$launcher_name" 2>/dev/null || true
       ((count++))
@@ -283,7 +285,8 @@ configure_checkmk_notifications() {
   # Link notification scripts
   for script in /opt/script-notify-checkmk/*; do
     if [[ -f "$script" ]] && [[ -x "$script" ]]; then
-      local script_name=$(basename "$script")
+      local script_name
+      script_name=$(basename "$script")
       su - "$site_name" -c "ln -sf '$script' '$notify_dir/$script_name'" 2>/dev/null || true
       log_debug "Linked notification: $script_name"
     fi
@@ -359,8 +362,10 @@ EOF
 # Display deployment summary
 #############################################
 display_deployment_summary() {
-  local total_scripts=$(find /opt/script-* -type f 2>/dev/null | wc -l)
-  local total_links=$(find /usr/local/bin -type l 2>/dev/null | wc -l)
+  local total_scripts
+  local total_links
+  total_scripts=$(find /opt/script-* -type f 2>/dev/null | wc -l)
+  total_links=$(find /usr/local/bin -type l 2>/dev/null | wc -l)
   
   print_separator "="
   echo ""
