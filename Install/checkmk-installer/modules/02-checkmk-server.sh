@@ -31,7 +31,7 @@ log_module_start "$MODULE_NAME"
 # Get latest CheckMK version URL
 #############################################
 get_latest_checkmk_url() {
-  log_info "Finding latest CheckMK RAW version..."
+  log_info "Finding latest CheckMK RAW version..." >&2
   
   local os_codename
   os_codename=$(lsb_release -sc)
@@ -41,19 +41,19 @@ get_latest_checkmk_url() {
   latest_version=$(curl -s https://checkmk.com/download | grep -oP 'Stable:.*?v\K[0-9]+\.[0-9]+\.[0-9]+p[0-9]+' | head -1 || echo "")
   
   if [[ -z "$latest_version" ]]; then
-    log_warning "Could not determine latest version from website, trying alternative method..."
+    log_warning "Could not determine latest version from website, trying alternative method..." >&2
     # Try to list versions from download server
     latest_version=$(curl -s https://download.checkmk.com/checkmk/ | grep -oP 'href="[0-9]+\.[0-9]+\.[0-9]+p[0-9]+/"' | grep -oP '[0-9]+\.[0-9]+\.[0-9]+p[0-9]+' | sort -V | tail -1 || echo "")
   fi
   
   if [[ -z "$latest_version" ]]; then
-    log_warning "Could not auto-detect version, using default 2.4.0p16"
+    log_warning "Could not auto-detect version, using default 2.4.0p16" >&2
     latest_version="2.4.0p16"
   fi
   
   local url="https://download.checkmk.com/checkmk/${latest_version}/check-mk-raw-${latest_version}_0.${os_codename}_amd64.deb"
   
-  log_info "Latest version: $latest_version for $os_codename"
+  log_info "Latest version: $latest_version for $os_codename" >&2
   echo "$url"
 }
 
