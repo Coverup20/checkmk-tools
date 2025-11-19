@@ -142,6 +142,13 @@ create_checkmk_site() {
   
   log_info "Creating CheckMK site: $site_name"
   
+  # Ensure /omd/sites directory exists
+  if [[ ! -d /omd/sites ]]; then
+    log_debug "Creating /omd/sites directory"
+    mkdir -p /omd/sites
+    chmod 755 /omd/sites
+  fi
+  
   # Check if site already exists
   if omd sites | grep -q "$site_name"; then
     log_warning "Site '$site_name' already exists"
