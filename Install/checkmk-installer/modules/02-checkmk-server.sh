@@ -153,6 +153,13 @@ install_checkmk_package() {
     fi
   fi
   
+  # Ensure /omd/apache directory exists (needed for site enable)
+  if [[ ! -d /omd/apache ]]; then
+    log_debug "Creating /omd/apache directory"
+    mkdir -p /omd/apache
+    chmod 755 /omd/apache
+  fi
+  
   log_success "CheckMK package installed"
 }
 
@@ -174,6 +181,13 @@ create_checkmk_site() {
   # Check if site already exists (safely handle empty directory)
   if [[ -d "/omd/sites/$site_name" ]]; then
     log_warning "Site '$site_name' already exists"
+    
+    # Enable site if disabled
+    if omd status "$site_name" 2>&1 | grep -q "This site is disabled"; then
+      log_info "Enabling existing site..."
+      omd enable "$site_name" || log_warning "Could not enable site"
+    fi
+    
     return 0
   fi
   
@@ -205,7 +219,14 @@ create_checkmk_site() {
     log_debug "Captured auto-generated password"
   fi
   
-  log_success "Site '$site_name' created"
+  # Enable the site (required before configuration)
+  log_info "Enabling site..."
+  if ! omd enable "$site_name" 2>&1; then
+    log_error "Failed to enable site"
+    return 1
+  fi
+  
+  log_success "Site '$site_name' created and enabled"
 }
 
 #############################################
