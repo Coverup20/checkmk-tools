@@ -48,9 +48,8 @@ deploy_notify_scripts() {
   cp -r "$src"/* "$dest/"
   log_write "INFO" "Copied notification scripts"
   
-  # Set permissions
-  find "$dest" -type f -name "*.sh" -exec chmod +x {} \;
-  find "$dest" -type f ! -name "*.md" ! -name "*.txt" ! -name "*.html" -exec chmod +x {} \;
+  # Set permissions on all executables
+  chmod -R +x "$dest"/*.sh "$dest"/mail* "$dest"/telegram* "$dest"/ydea* "$dest"/dump_env 2>/dev/null || true
   
   # Create symlinks for main notification scripts
   for script_name in mail_realip telegram_realip ydea_realip; do
@@ -87,9 +86,7 @@ deploy_check_scripts() {
   log_write "INFO" "Copied Proxmox scripts"
   
   # Set permissions
-  find "$dest" -type f -name "*.sh" -exec chmod +x {} \;
-  find "$dest" -type f -name "*.pl" -exec chmod +x {} \;
-  find "$dest" -type f -name "*.py" -exec chmod +x {} \;
+  chmod -R +x "$dest"/*.sh "$dest"/*.pl "$dest"/*.py 2>/dev/null || true
   
   # Install polling scripts to CheckMK agent
   if [[ -d "$dest/polling" ]]; then
@@ -123,10 +120,10 @@ deploy_tool_scripts() {
   
   # Copy scripts
   cp -r "$src"/* "$dest/"
-  log_write "INFO" "Copied NS8 check scripts"
+  log_write "INFO" "Copied tool scripts"
   
-  # Set permissions  
-  find "$dest" -type f -name "*.sh" -exec chmod +x {} \;  
+  # Set permissions
+  chmod -R +x "$dest"/*.sh 2>/dev/null || true  
   # Create symlinks for commonly used tools
   local common_tools=(
     "checkmk-tuning-interactive-v5.sh"
@@ -168,8 +165,7 @@ deploy_proxmox_scripts() {
   log_write "INFO" "Copied NS7 check scripts"
   
   # Set permissions
-  find "$dest" -type f -name "*.sh" -exec chmod +x {} \;
-  find "$dest" -type f ! -name "*.md" ! -name "*.txt" -exec chmod +x {} \;
+  chmod -R +x "$dest"/*.sh 2>/dev/null || true
   
   log_success "Proxmox scripts deployed to: $dest"
 }
@@ -192,10 +188,11 @@ deploy_fix_scripts() {
   mkdir -p "$dest"
   
   # Copy scripts
-  log_command "cp -r '$src'/* '$dest/'"
+  cp -r "$src"/* "$dest/"
+  log_write "INFO" "Copied fix scripts"
   
   # Set permissions
-  find "$dest" -type f \( -name "*.sh" -o -name "*.ps1" -o -name "*.bat" \) -exec chmod +x {} \;
+  chmod -R +x "$dest"/*.sh "$dest"/*.ps1 "$dest"/*.bat 2>/dev/null || true
   
   log_success "Fix scripts deployed to: $dest"
 }
