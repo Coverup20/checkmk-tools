@@ -211,6 +211,7 @@ show_main_menu() {
     "Update Scripts (from GitHub)"
     "Configuration Wizard"
     "Show Current Configuration"
+    "Complete Cleanup (Remove all installations)"
     "Exit"
   )
   

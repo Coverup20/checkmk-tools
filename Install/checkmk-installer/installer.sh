@@ -301,6 +301,52 @@ show_current_config() {
   press_any_key
 }
 
+run_complete_cleanup() {
+  log_info "Running complete cleanup..."
+  
+  print_header "Complete Cleanup"
+  
+  print_color "$RED" "
+╔════════════════════════════════════════════════════════════════╗
+║                         WARNING!                               ║
+║                                                                ║
+║  This will COMPLETELY REMOVE all installed components:        ║
+║    • CheckMK Server (site: monitoring)                        ║
+║    • CheckMK Agent                                            ║
+║    • FRPS/FRPC Server                                         ║
+║    • All monitoring scripts                                   ║
+║    • Ydea Toolkit                                             ║
+║    • Configuration files                                      ║
+║                                                                ║
+║  Firewall rules will be preserved.                            ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+"
+  
+  echo ""
+  if ! confirm "Are you ABSOLUTELY SURE you want to remove everything?" "n"; then
+    log_info "Cleanup cancelled by user"
+    return 0
+  fi
+  
+  echo ""
+  print_warning "Last chance to cancel!"
+  if ! confirm "Type YES to confirm complete removal" "n"; then
+    log_info "Cleanup cancelled by user"
+    return 0
+  fi
+  
+  if [[ -f "${INSTALLER_ROOT}/testing/cleanup-full.sh" ]]; then
+    bash "${INSTALLER_ROOT}/testing/cleanup-full.sh" || { log_error "Cleanup failed"; return 1; }
+  else
+    print_error "Cleanup script not found at ${INSTALLER_ROOT}/testing/cleanup-full.sh"
+    return 1
+  fi
+  
+  print_success "COMPLETE CLEANUP FINISHED!"
+  press_any_key
+}
+
 #############################################
 # Main menu loop
 #############################################
@@ -337,6 +383,9 @@ main_menu() {
         show_current_config
         ;;
       10)
+        run_complete_cleanup
+        ;;
+      11)
         log_info "Exiting installer"
         print_info "Goodbye!"
         exit 0
