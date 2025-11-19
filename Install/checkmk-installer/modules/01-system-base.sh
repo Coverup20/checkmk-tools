@@ -36,15 +36,13 @@ clean_corrupted_agent() {
   # Remove all check-mk-agent metadata files
   rm -rf /var/lib/dpkg/info/check-mk-agent.* 2>/dev/null || true
   
+  # Remove from dpkg status file directly (ALWAYS)
+  log_warning "Removing check-mk-agent from dpkg status database..."
+  sed -i '/^Package: check-mk-agent$/,/^$/d' /var/lib/dpkg/status 2>/dev/null || true
+  
   # Force remove from dpkg database
   dpkg --remove --force-remove-reinstreq check-mk-agent 2>/dev/null || true
   dpkg --purge --force-all check-mk-agent 2>/dev/null || true
-  
-  # Remove from dpkg status file directly if still present
-  if grep -q "Package: check-mk-agent" /var/lib/dpkg/status 2>/dev/null; then
-    log_warning "Removing check-mk-agent from dpkg status database..."
-    sed -i '/^Package: check-mk-agent$/,/^$/d' /var/lib/dpkg/status
-  fi
   
   log_success "Agent package cleanup completed"
 }
