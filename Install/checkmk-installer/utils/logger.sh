@@ -90,7 +90,10 @@ log_write() {
 # Log functions
 log_debug() {
   log_write "DEBUG" "$*"
-  [[ "${VERBOSE:-0}" == "1" ]] && print_color "$GRAY" "🔍 DEBUG: $*"
+  if [[ "${VERBOSE:-0}" == "1" ]]; then
+    print_color "$GRAY" "🔍 DEBUG: $*"
+  fi
+  return 0
 }
 
 log_info() {
