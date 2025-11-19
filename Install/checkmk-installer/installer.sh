@@ -64,7 +64,7 @@ install_full_server() {
   bash "${INSTALLER_ROOT}/modules/02-checkmk-server.sh" || { log_error "CheckMK server failed"; return 1; }
   bash "${INSTALLER_ROOT}/modules/04-scripts-deploy.sh" || { log_error "Scripts deployment failed"; return 1; }
   bash "${INSTALLER_ROOT}/modules/05-ydea-toolkit.sh" || { log_error "Ydea toolkit failed"; return 1; }
-  bash "${INSTALLER_ROOT}/modules/06-frpc-setup.sh" || { log_error "FRPC setup failed"; return 1; }
+  bash "${INSTALLER_ROOT}/modules/06-frps-setup.sh" || { log_error "FRPS setup failed"; return 1; }
   
   print_separator "="
   print_success "FULL SERVER INSTALLATION COMPLETED!"
@@ -93,7 +93,7 @@ install_client_agent() {
   bash "${INSTALLER_ROOT}/modules/01-system-base.sh" || { log_error "System base failed"; return 1; }
   bash "${INSTALLER_ROOT}/modules/03-checkmk-agent.sh" || { log_error "CheckMK agent failed"; return 1; }
   bash "${INSTALLER_ROOT}/modules/04-scripts-deploy.sh" || { log_error "Scripts deployment failed"; return 1; }
-  bash "${INSTALLER_ROOT}/modules/06-frpc-setup.sh" || { log_error "FRPC setup failed"; return 1; }
+  bash "${INSTALLER_ROOT}/modules/06-frpc-setup.sh" || { log_error "FRPC client setup failed"; return 1; }
   
   print_separator "="
   print_success "CLIENT AGENT INSTALLATION COMPLETED!"
@@ -151,7 +151,7 @@ install_custom() {
     "CheckMK Agent (Client)"
     "Monitoring Scripts"
     "Ydea Toolkit"
-    "FRPC Client"
+    "FRPS Server"
   )
   
   local selected=$(multi_select "Select modules to install" "${modules[@]}")
@@ -178,7 +178,7 @@ install_custom() {
       3) module_script="03-checkmk-agent.sh" ;;
       4) module_script="04-scripts-deploy.sh" ;;
       5) module_script="05-ydea-toolkit.sh" ;;
-      6) module_script="06-frpc-setup.sh" ;;
+      6) module_script="06-frps-setup.sh" ;;
     esac
     
     if [[ -n "$module_script" ]]; then
