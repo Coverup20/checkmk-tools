@@ -100,6 +100,11 @@ echo "[10/12] Removing OMD directories..."
 sudo rm -rf /omd
 sudo rm -rf /opt/omd
 
+# Remove users and groups
+echo "[10.5/12] Removing CheckMK users and groups..."
+sudo userdel monitoring 2>/dev/null || true
+sudo groupdel monitoring 2>/dev/null || true
+
 # Remove firewall rules (optional - commented out to preserve security)
 # echo "[11/12] Removing firewall rules..."
 # sudo ufw delete allow 5000/tcp 2>/dev/null || true
