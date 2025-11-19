@@ -30,10 +30,29 @@ YDEA_LOG_DIR="/var/log"
 YDEA_BIN="/usr/local/bin/ydea-toolkit"
 
 #############################################
+# Clean corrupted check-mk-agent package
+#############################################
+clean_corrupted_agent() {
+  log_info "Checking for corrupted check-mk-agent package..."
+  
+  # Remove corrupted dpkg metadata if exists
+  if dpkg -l | grep -q check-mk-agent 2>/dev/null; then
+    log_warning "Found check-mk-agent package, cleaning up..."
+    rm -rf /var/lib/dpkg/info/check-mk-agent.* 2>/dev/null || true
+    dpkg --remove --force-remove-reinstreq check-mk-agent 2>/dev/null || true
+    dpkg --purge check-mk-agent 2>/dev/null || true
+    log_success "Corrupted agent package cleaned"
+  fi
+}
+
+#############################################
 # Install dependencies
 #############################################
 install_dependencies() {
   log_info "Installing dependencies..."
+  
+  # Clean any corrupted packages first
+  clean_corrupted_agent
   
   local deps=("curl" "jq" "cron")
   
