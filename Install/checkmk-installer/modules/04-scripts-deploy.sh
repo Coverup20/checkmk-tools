@@ -24,8 +24,8 @@ fi
 # Module start
 log_module_start "$MODULE_NAME"
 
-# Script source directory
-SCRIPTS_SRC="${INSTALLER_ROOT}/scripts"
+# Script source directory (go up 2 levels to repo root)
+SCRIPTS_SRC="$(dirname "$(dirname "$INSTALLER_ROOT")")"
 
 #############################################
 # Deploy notification scripts
