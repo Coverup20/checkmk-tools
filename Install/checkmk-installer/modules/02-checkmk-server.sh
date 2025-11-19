@@ -148,10 +148,26 @@ create_checkmk_site() {
     return 0
   fi
   
-  # Create site
-  if ! log_command "omd create '$site_name'"; then
+  # Create site and capture the auto-generated password
+  local create_output
+  create_output=$(omd create "$site_name" 2>&1)
+  if [[ $? -ne 0 ]]; then
     log_error "Failed to create site"
     return 1
+  fi
+  
+  # Extract auto-generated password from output
+  # Output format: "Created new site monitoring with version 2.4.0p16.cre.
+  #                 The site can be started with omd start monitoring.
+  #                 The default GUI is available at http://...
+  #                 The admin user for the web applications is cmkadmin with password: <PASSWORD>"
+  CHECKMK_AUTO_PASSWORD=$(echo "$create_output" | grep -oP 'password: \K\S+' || echo "")
+  
+  if [[ -z "$CHECKMK_AUTO_PASSWORD" ]]; then
+    log_warning "Could not extract auto-generated password from output"
+    log_debug "omd create output: $create_output"
+  else
+    log_debug "Captured auto-generated password"
   fi
   
   log_success "Site '$site_name' created"
@@ -162,13 +178,11 @@ create_checkmk_site() {
 #############################################
 configure_checkmk_site() {
   local site_name="${CHECKMK_SITE_NAME:-monitoring}"
-  local admin_password="${CHECKMK_ADMIN_PASSWORD}"
   
   log_info "Configuring CheckMK site..."
   
-  # Set admin password
-  log_debug "Setting admin password"
-  su - "$site_name" -c "htpasswd -b ~/etc/htpasswd cmkadmin '$admin_password'" 2>/dev/null || true
+  # Keep auto-generated password - do not override with htpasswd
+  log_debug "Using auto-generated admin password from site creation"
   
   # Configure site settings
   log_debug "Configuring site settings"
@@ -342,7 +356,7 @@ EOF
 display_installation_summary() {
   local site_name="${CHECKMK_SITE_NAME:-monitoring}"
   local http_port="${CHECKMK_HTTP_PORT:-5000}"
-  local admin_password="${CHECKMK_ADMIN_PASSWORD}"
+  local admin_password="${CHECKMK_AUTO_PASSWORD:-N/A}"
   local server_ip
   server_ip=$(hostname -I | awk '{print $1}')
   
@@ -354,7 +368,7 @@ display_installation_summary() {
   echo "  Site Name: $site_name"
   echo "  Web Interface: http://${server_ip}:${http_port}/${site_name}/"
   echo "  Admin User: cmkadmin"
-  echo "  Admin Password: $admin_password"
+  echo "  Admin Password: $admin_password (AUTO-GENERATED)"
   echo ""
   echo "  Commands:"
   echo "    - omd status $site_name"
