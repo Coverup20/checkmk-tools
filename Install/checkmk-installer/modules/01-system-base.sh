@@ -288,8 +288,22 @@ configure_postfix() {
     log_debug "Configuring SMTP relay: ${SMTP_RELAY_HOST}"
     postconf -e "relayhost = [${SMTP_RELAY_HOST}]:587"
     
+    # Ask for credentials if not provided in .env
+    local smtp_user="${SMTP_RELAY_USER:-}"
+    local smtp_pass="${SMTP_RELAY_PASSWORD:-}"
+    
+    if [[ -z "$smtp_user" ]] || [[ -z "$smtp_pass" ]]; then
+      echo ""
+      echo "${YELLOW}SMTP relay configured: ${SMTP_RELAY_HOST}${NC}"
+      echo "Authentication credentials required:"
+      echo ""
+      read -p "SMTP username: " smtp_user
+      read -s -p "SMTP password: " smtp_pass
+      echo ""
+    fi
+    
     # Configure SMTP authentication if credentials provided
-    if [[ -n "${SMTP_RELAY_USER:-}" ]] && [[ -n "${SMTP_RELAY_PASSWORD:-}" ]]; then
+    if [[ -n "$smtp_user" ]] && [[ -n "$smtp_pass" ]]; then
       log_debug "Configuring SMTP authentication"
       
       # Enable SASL authentication
@@ -300,13 +314,15 @@ configure_postfix() {
       postconf -e "smtp_tls_security_level = encrypt"
       
       # Create password file
-      echo "[${SMTP_RELAY_HOST}]:587 ${SMTP_RELAY_USER}:${SMTP_RELAY_PASSWORD}" > /etc/postfix/sasl_passwd
+      echo "[${SMTP_RELAY_HOST}]:587 ${smtp_user}:${smtp_pass}" > /etc/postfix/sasl_passwd
       chmod 600 /etc/postfix/sasl_passwd
       
       # Generate hash map
       log_command "postmap /etc/postfix/sasl_passwd"
       
       log_success "SMTP authentication configured"
+    else
+      log_warn "SMTP credentials not provided - relay configured without authentication"
     fi
   fi
   
