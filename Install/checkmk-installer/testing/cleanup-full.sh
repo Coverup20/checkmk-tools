@@ -96,6 +96,15 @@ if dpkg -l | grep -q check-mk-raw; then
   sudo apt-get autoclean 2>/dev/null || true
 fi
 
+# Final cleanup of any remaining check-mk-agent corruption
+echo "Final check for check-mk-agent corruption..."
+if dpkg -l | grep -q check-mk-agent; then
+  echo "Forcing final removal of check-mk-agent..."
+  sudo rm -rf /var/lib/dpkg/info/check-mk-agent.* 2>/dev/null || true
+  sudo dpkg --remove --force-remove-reinstreq check-mk-agent 2>/dev/null || true
+  sudo dpkg --purge check-mk-agent 2>/dev/null || true
+fi
+
 # Remove files manually
 sudo rm -rf /omd /opt/omd /etc/alternatives/omd* /usr/bin/omd
 sudo rm -f /tmp/check-mk-raw.deb
