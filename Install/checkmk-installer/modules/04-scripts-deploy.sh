@@ -256,7 +256,7 @@ install_remote_launchers() {
       launcher_name=$(basename "$launcher")
       cp "$launcher" "/usr/local/bin/$launcher_name"
       chmod +x "/usr/local/bin/$launcher_name" 2>/dev/null || true
-      ((count++))
+      count=$((count + 1))
       log_debug "Installed: $launcher_name"
     fi
   done
