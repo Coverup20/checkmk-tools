@@ -44,9 +44,12 @@ fi
 # Remove CheckMK site (force kill if needed)
 echo "[3/12] Removing CheckMK site..."
 if command -v omd &> /dev/null; then
-  timeout 30 sudo omd rm --kill monitoring 2>/dev/null || true
-  # Force kill any remaining processes
-  sudo pkill -9 -f "monitoring" 2>/dev/null || true
+  # Try with timeout, if fails kill everything
+  timeout 10 sudo omd rm --kill monitoring 2>/dev/null || {
+    echo "Timeout reached, force killing all processes..."
+    sudo pkill -9 -f "omd\|monitoring\|/omd/sites" 2>/dev/null || true
+    sleep 2
+  }
 fi
 
 # Unmount any locked directories
