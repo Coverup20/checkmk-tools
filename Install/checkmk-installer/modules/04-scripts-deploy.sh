@@ -45,7 +45,8 @@ deploy_notify_scripts() {
   mkdir -p "$dest"
   
   # Copy scripts
-  log_command "cp -r '$src'/* '$dest/'"
+  cp -r "$src"/* "$dest/"
+  log_write "INFO" "Copied notification scripts"
   
   # Set permissions
   find "$dest" -type f -name "*.sh" -exec chmod +x {} \;
@@ -83,7 +84,8 @@ deploy_check_scripts() {
   mkdir -p "$dest"
   
   # Copy scripts
-  log_command "cp -r '$src'/* '$dest/'"
+  cp -r "$src"/* "$dest/"
+  log_write "INFO" "Copied Proxmox scripts"
   
   # Set permissions
   find "$dest" -type f -name "*.sh" -exec chmod +x {} \;
@@ -121,11 +123,11 @@ deploy_tool_scripts() {
   mkdir -p "$dest"
   
   # Copy scripts
-  log_command "cp -r '$src'/* '$dest/'"
+  cp -r "$src"/* "$dest/"
+  log_write "INFO" "Copied NS8 check scripts"
   
-  # Set permissions
-  find "$dest" -type f -name "*.sh" -exec chmod +x {} \;
-  
+  # Set permissions  
+  find "$dest" -type f -name "*.sh" -exec chmod +x {} \;  
   # Create symlinks for commonly used tools
   local common_tools=(
     "checkmk-tuning-interactive-v5.sh"
@@ -163,11 +165,12 @@ deploy_proxmox_scripts() {
   mkdir -p "$dest"
   
   # Copy scripts
-  log_command "cp -r '$src'/* '$dest/'"
+  cp -r "$src"/* "$dest/"
+  log_write "INFO" "Copied NS7 check scripts"
   
   # Set permissions
   find "$dest" -type f -name "*.sh" -exec chmod +x {} \;
-  find "$dest" -type f -name "*.pl" -exec chmod +x {} \;
+  find "$dest" -type f ! -name "*.md" ! -name "*.txt" -exec chmod +x {} \;
   
   log_success "Proxmox scripts deployed to: $dest"
 }
