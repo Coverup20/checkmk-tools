@@ -217,7 +217,19 @@ create_checkmk_site() {
     log_info "Full omd create output:"
     log_info "$create_output"
   else
-    log_info "Auto-generated password captured successfully"
+    # SHOW PASSWORD IMMEDIATELY
+    echo ""
+    echo "=========================================="
+    echo "  ⚠️  CHECKMK ADMIN PASSWORD"
+    echo "=========================================="
+    echo "  Username: cmkadmin"
+    echo "  Password: $CHECKMK_AUTO_PASSWORD"
+    echo "=========================================="
+    echo "  ⚠️  SAVE THIS PASSWORD NOW!"
+    echo "=========================================="
+    echo ""
+    
+    log_success "Auto-generated password captured successfully"
     
     # Save password to temporary file for summary display
     echo "$CHECKMK_AUTO_PASSWORD" > /tmp/checkmk_admin_password.txt
