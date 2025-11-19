@@ -158,6 +158,17 @@ if ($missingRemotes) {
 Write-Host "`n🌐 Backup su Share di Rete..." -ForegroundColor Cyan
 
 if ($NETWORK_SHARE_ENABLED) {
+    Write-Host "`n📦 Backup su share di rete" -ForegroundColor Cyan
+    Write-Host "   Share: $NETWORK_SHARE" -ForegroundColor Gray
+    
+    # Richiesta conferma
+    $confirmation = Read-Host "   Vuoi eseguire il backup su share di rete? (S/N) [S]"
+    if ([string]::IsNullOrWhiteSpace($confirmation)) { $confirmation = "S" }
+    
+    if ($confirmation -notmatch "^[Ss]") {
+        Write-Host "   ⏭️  Backup su share di rete SKIPPATO dall'utente" -ForegroundColor Yellow
+        $script:backupResults += "⏭️ Share di rete - SKIPPED by user"
+    } else {
     try {
         # Verifica accessibilità della share
         if (Test-Path $NETWORK_SHARE) {
@@ -255,6 +266,7 @@ if ($NETWORK_SHARE_ENABLED) {
         Write-Host "   ❌ Errore backup share di rete: $($_.Exception.Message)" -ForegroundColor Red
         $script:backupResults += "❌ Share di rete - Errore: $($_.Exception.Message)"
     }
+    } # Chiusura else della conferma
 } else {
     Write-Host "   ⏭️  Backup share di rete disabilitato" -ForegroundColor DarkGray
 }
