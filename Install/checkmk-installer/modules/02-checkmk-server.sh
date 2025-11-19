@@ -263,10 +263,14 @@ configure_checkmk_site() {
   
   # Configure site settings
   log_debug "Configuring site settings"
-  local server_ip
-  server_ip=$(hostname -I | awk '{print $1}')
-  omd config "$site_name" set APACHE_TCP_ADDR "$server_ip"
+  
+  # Set Apache to listen on localhost only (for reverse proxy)
+  omd config "$site_name" set APACHE_TCP_ADDR 127.0.0.1
   omd config "$site_name" set APACHE_TCP_PORT "${CHECKMK_HTTP_PORT:-5000}"
+  
+  # Update Apache config after changing bind address
+  log_info "Updating Apache configuration..."
+  omd update-apache-config "$site_name" || log_warning "Failed to update Apache config"
   
   # Enable livestatus
   omd config "$site_name" set LIVESTATUS_TCP on
