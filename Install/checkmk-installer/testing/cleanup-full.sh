@@ -60,13 +60,23 @@ sudo umount /opt/omd/sites/monitoring/tmp 2>/dev/null || true
 # Uninstall CheckMK Server
 echo "[5/12] Uninstalling CheckMK Server..."
 if dpkg -l | grep -q check-mk-raw; then
-  sudo apt-get remove --purge check-mk-raw-* -y
-  sudo dpkg --purge --force-all check-mk-raw-* 2>/dev/null || true
+  # Method 1: dpkg remove first
+  sudo dpkg --remove --force-remove-reinstreq check-mk-raw-2.4.0p16 2>/dev/null || true
+  
+  # Method 2: apt-get remove with wildcard
+  sudo apt-get remove --purge -y check-mk-raw-2.4.0p16 check-mk-agent 2>/dev/null || true
+  
+  # Method 3: autoremove dependencies
   sudo apt-get autoremove -y 2>/dev/null || true
+  sudo apt-get autoclean 2>/dev/null || true
 fi
 
-# Clean package cache
+# Remove files manually
+sudo rm -rf /omd /opt/omd /etc/alternatives/omd* /usr/bin/omd
 sudo rm -f /tmp/check-mk-raw.deb
+sudo rm -rf /var/lib/cmk-agent
+
+# Clean package cache
 sudo apt-get clean
 sudo apt-get update
 
