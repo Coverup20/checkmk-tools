@@ -118,23 +118,19 @@ log_critical() {
   print_error "CRITICAL: $*"
 }
 
-# Log command execution
+# Log command execution (fixed - no stdout redirection)
 log_command() {
   local cmd="$*"
-  log_debug "Executing: $cmd"
+  log_write "DEBUG" "Executing: $cmd"
   
-  if [[ "${VERBOSE:-0}" == "1" ]]; then
-    eval "$cmd" 2>&1 | tee -a "$LOG_FILE"
-    local ret=${PIPESTATUS[0]}
-  else
-    eval "$cmd" >> "$LOG_FILE" 2>&1
-    local ret=$?
-  fi
+  # Execute command normally without redirecting stdout
+  eval "$cmd"
+  local ret=$?
   
   if [[ $ret -eq 0 ]]; then
-    log_debug "Command succeeded: $cmd"
+    log_write "DEBUG" "Command succeeded: $cmd"
   else
-    log_error "Command failed (exit code $ret): $cmd"
+    log_write "ERROR" "Command failed (exit code $ret): $cmd"
   fi
   
   return $ret
@@ -174,7 +170,7 @@ log_errors() {
 # Clear log
 log_clear() {
   if [[ -f "$LOG_FILE" ]]; then
-    > "$LOG_FILE"
+    true > "$LOG_FILE"
     log_success "Log file cleared"
   fi
 }
