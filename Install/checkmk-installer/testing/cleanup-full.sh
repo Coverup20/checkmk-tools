@@ -47,12 +47,10 @@ echo "[2.5/12] Force killing all CheckMK processes..."
 sudo pkill -9 -f "omd\|monitoring\|/omd/sites" 2>/dev/null || true
 sleep 2
 
-# Remove CheckMK site (now should be quick since processes are dead)
-echo "[3/12] Removing CheckMK site..."
-if command -v omd &> /dev/null; then
-  # Try with short timeout since we already killed everything
-  timeout 5 sudo omd rm monitoring 2>/dev/null || true
-fi
+# Skip omd rm entirely - just clean up manually
+echo "[3/12] Removing CheckMK site (manual cleanup)..."
+# Don't use omd rm - it hangs. Just remove directories after killing processes
+echo "Skipping 'omd rm' command (unreliable), will clean directories manually"
 
 # Unmount any locked directories
 echo "[4/12] Unmounting locked directories..."
