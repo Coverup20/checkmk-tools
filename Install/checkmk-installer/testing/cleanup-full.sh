@@ -57,6 +57,14 @@ echo "[4/12] Unmounting locked directories..."
 sudo umount /omd/sites/monitoring/tmp 2>/dev/null || true
 sudo umount /opt/omd/sites/monitoring/tmp 2>/dev/null || true
 
+# Clean /etc/fstab from monitoring entries
+echo "[4.5/12] Cleaning /etc/fstab from monitoring entries..."
+if grep -q "monitoring" /etc/fstab 2>/dev/null; then
+  echo "Removing monitoring entries from /etc/fstab..."
+  sudo sed -i '/monitoring/d' /etc/fstab
+  sudo systemctl daemon-reload
+fi
+
 # Uninstall CheckMK Server
 echo "[5/12] Uninstalling CheckMK Server..."
 if dpkg -l | grep -q check-mk-raw; then
