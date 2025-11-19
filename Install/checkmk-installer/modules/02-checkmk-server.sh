@@ -218,6 +218,11 @@ create_checkmk_site() {
     log_info "$create_output"
   else
     log_info "Auto-generated password captured successfully"
+    
+    # Save password to temporary file for summary display
+    echo "$CHECKMK_AUTO_PASSWORD" > /tmp/checkmk_admin_password.txt
+    chmod 600 /tmp/checkmk_admin_password.txt
+    
     # Synchronize password with CheckMK internal database
     log_info "Synchronizing password with CheckMK database..."
     echo "$CHECKMK_AUTO_PASSWORD" | su - "$site_name" -c "cmk-passwd cmkadmin" 2>/dev/null || log_warning "Could not sync password with cmk-passwd"
@@ -420,9 +425,14 @@ EOF
 display_installation_summary() {
   local site_name="${CHECKMK_SITE_NAME:-monitoring}"
   local http_port="${CHECKMK_HTTP_PORT:-5000}"
-  local admin_password="${CHECKMK_AUTO_PASSWORD:-N/A}"
+  local admin_password="N/A"
   local server_ip
   server_ip=$(hostname -I | awk '{print $1}')
+  
+  # Try to read password from temporary file
+  if [[ -f /tmp/checkmk_admin_password.txt ]]; then
+    admin_password=$(cat /tmp/checkmk_admin_password.txt)
+  fi
   
   echo ""
   echo "=========================================="
@@ -439,6 +449,8 @@ display_installation_summary() {
     echo "    sudo su - $site_name -c 'cmk-passwd cmkadmin'"
   else
     echo "  Admin Password: $admin_password (AUTO-GENERATED)"
+    echo ""
+    echo "  ⚠️  IMPORTANT: Save this password! The temp file will be deleted."
   fi
   echo ""
   echo "  Commands:"
