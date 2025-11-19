@@ -66,7 +66,17 @@ configure_system_base() {
   echo ""
   OPEN_HTTP_HTTPS=$(select_from_list "Open HTTP/HTTPS ports in firewall?" "no" "yes")
   FAIL2BAN_EMAIL=$(input_email "Fail2Ban notification email" "root@localhost")
+  
+  echo ""
   SMTP_RELAY_HOST=$(input_text "SMTP relay host (optional)" "")
+  
+  if [[ -n "$SMTP_RELAY_HOST" ]]; then
+    SMTP_RELAY_USER=$(input_text "SMTP username" "")
+    SMTP_RELAY_PASSWORD=$(input_password "SMTP password" false)
+  else
+    SMTP_RELAY_USER=""
+    SMTP_RELAY_PASSWORD=""
+  fi
   
   echo ""
   DISABLE_IPV6=$(select_from_list "Disable IPv6?" "no" "yes")
@@ -231,6 +241,8 @@ NTP_SERVERS="${NTP_SERVERS:-0.pool.ntp.org 1.pool.ntp.org 2.pool.ntp.org 3.pool.
 OPEN_HTTP_HTTPS="${OPEN_HTTP_HTTPS:-no}"
 FAIL2BAN_EMAIL="${FAIL2BAN_EMAIL:-root@localhost}"
 SMTP_RELAY_HOST="${SMTP_RELAY_HOST:-}"
+SMTP_RELAY_USER="${SMTP_RELAY_USER:-}"
+SMTP_RELAY_PASSWORD="${SMTP_RELAY_PASSWORD:-}"
 
 DISABLE_IPV6="${DISABLE_IPV6:-no}"
 

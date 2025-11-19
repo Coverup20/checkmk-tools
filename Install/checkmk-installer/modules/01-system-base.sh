@@ -286,7 +286,28 @@ configure_postfix() {
   
   if [[ -n "${SMTP_RELAY_HOST:-}" ]]; then
     log_debug "Configuring SMTP relay: ${SMTP_RELAY_HOST}"
-    postconf -e "relayhost = ${SMTP_RELAY_HOST}"
+    postconf -e "relayhost = [${SMTP_RELAY_HOST}]:587"
+    
+    # Configure SMTP authentication if credentials provided
+    if [[ -n "${SMTP_RELAY_USER:-}" ]] && [[ -n "${SMTP_RELAY_PASSWORD:-}" ]]; then
+      log_debug "Configuring SMTP authentication"
+      
+      # Enable SASL authentication
+      postconf -e "smtp_sasl_auth_enable = yes"
+      postconf -e "smtp_sasl_security_options = noanonymous"
+      postconf -e "smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd"
+      postconf -e "smtp_use_tls = yes"
+      postconf -e "smtp_tls_security_level = encrypt"
+      
+      # Create password file
+      echo "[${SMTP_RELAY_HOST}]:587 ${SMTP_RELAY_USER}:${SMTP_RELAY_PASSWORD}" > /etc/postfix/sasl_passwd
+      chmod 600 /etc/postfix/sasl_passwd
+      
+      # Generate hash map
+      log_command "postmap /etc/postfix/sasl_passwd"
+      
+      log_success "SMTP authentication configured"
+    fi
   fi
   
   # Restart postfix
