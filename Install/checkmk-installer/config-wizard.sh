@@ -68,9 +68,12 @@ configure_system_base() {
   FAIL2BAN_EMAIL=$(input_email "Fail2Ban notification email" "root@localhost")
   
   echo ""
-  SMTP_RELAY_HOST=$(input_text "SMTP relay host (optional)" "")
+  SMTP_RELAY_HOST=$(input_text "SMTP relay host" "smtp-relay.nethesis.it")
   
   if [[ -n "$SMTP_RELAY_HOST" ]]; then
+    echo ""
+    echo "SMTP relay configured: $SMTP_RELAY_HOST"
+    echo "Please provide authentication credentials:"
     SMTP_RELAY_USER=$(input_text "SMTP username" "")
     SMTP_RELAY_PASSWORD=$(input_password "SMTP password" false)
   else
