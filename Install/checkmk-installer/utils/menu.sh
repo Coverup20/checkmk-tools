@@ -161,7 +161,7 @@ input_number() {
       return 0
     fi
     
-    echo "Enter a valid number"
+    echo "Enter a valid number" >&2
   done
 }
 
@@ -170,16 +170,16 @@ select_from_list() {
   shift
   local options=("$@")
   
-  echo ""
-  echo "$prompt"
-  echo ""
+  echo "" >&2
+  echo "$prompt" >&2
+  echo "" >&2
   
   for i in "${!options[@]}"; do
     local num=$((i + 1))
-    echo "  $num) ${options[$i]}"
+    echo "  $num) ${options[$i]}" >&2
   done
   
-  echo ""
+  echo "" >&2
   
   while true; do
     read -p "Select (1-${#options[@]}): " selection
@@ -191,7 +191,7 @@ select_from_list() {
       return 0
     fi
     
-    echo "Invalid selection"
+    echo "Invalid selection" >&2
   done
 }
 
