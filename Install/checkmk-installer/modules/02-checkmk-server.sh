@@ -214,9 +214,13 @@ create_checkmk_site() {
   
   if [[ -z "$CHECKMK_AUTO_PASSWORD" ]]; then
     log_warning "Could not extract auto-generated password from output"
-    log_debug "omd create output: $create_output"
+    log_info "Full omd create output:"
+    log_info "$create_output"
   else
-    log_debug "Captured auto-generated password"
+    log_info "Auto-generated password captured successfully"
+    # Synchronize password with CheckMK internal database
+    log_info "Synchronizing password with CheckMK database..."
+    echo "$CHECKMK_AUTO_PASSWORD" | su - "$site_name" -c "cmk-passwd cmkadmin" 2>/dev/null || log_warning "Could not sync password with cmk-passwd"
   fi
   
   # Enable the site (required before configuration)
@@ -428,7 +432,14 @@ display_installation_summary() {
   echo "  Site Name: $site_name"
   echo "  Web Interface: http://${server_ip}:${http_port}/${site_name}/"
   echo "  Admin User: cmkadmin"
-  echo "  Admin Password: $admin_password (AUTO-GENERATED)"
+  
+  if [[ "$admin_password" == "N/A" ]]; then
+    echo "  Admin Password: Could not capture auto-generated password"
+    echo "  To set password manually, run:"
+    echo "    sudo su - $site_name -c 'cmk-passwd cmkadmin'"
+  else
+    echo "  Admin Password: $admin_password (AUTO-GENERATED)"
+  fi
   echo ""
   echo "  Commands:"
   echo "    - omd status $site_name"
