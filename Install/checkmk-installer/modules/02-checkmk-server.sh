@@ -120,10 +120,16 @@ install_checkmk_package() {
   
   log_info "Installing CheckMK package..."
   
-  if ! log_command "DEBIAN_FRONTEND=noninteractive apt-get install -y '$package'"; then
+  # Install the package using dpkg directly to force reinstallation
+  if ! log_command "dpkg -i '$package'"; then
     log_error "Failed to install CheckMK package"
+    log_info "Attempting to fix dependencies..."
+    log_command "apt-get install -f -y"
     return 1
   fi
+  
+  # Fix any dependency issues
+  log_command "apt-get install -f -y"
   
   log_success "CheckMK package installed"
 }

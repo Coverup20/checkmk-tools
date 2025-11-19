@@ -60,6 +60,10 @@ sudo umount /opt/omd/sites/monitoring/tmp 2>/dev/null || true
 # Uninstall CheckMK Server
 echo "[5/12] Uninstalling CheckMK Server..."
 if dpkg -l | grep -q check-mk-raw; then
+  # Remove corrupted dpkg metadata files (critical for clean state)
+  echo "Removing dpkg metadata..."
+  sudo rm -f /var/lib/dpkg/info/check-mk-raw-* 2>/dev/null || true
+  
   # Method 1: dpkg remove first
   sudo dpkg --remove --force-remove-reinstreq check-mk-raw-2.4.0p16 2>/dev/null || true
   
