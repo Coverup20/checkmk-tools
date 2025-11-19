@@ -149,8 +149,8 @@ create_checkmk_site() {
     chmod 755 /omd/sites
   fi
   
-  # Check if site already exists
-  if omd sites | grep -q "$site_name"; then
+  # Check if site already exists (safely handle empty directory)
+  if [[ -d "/omd/sites/$site_name" ]]; then
     log_warning "Site '$site_name' already exists"
     return 0
   fi
@@ -158,8 +158,14 @@ create_checkmk_site() {
   # Create site and capture the auto-generated password
   local create_output
   create_output=$(omd create "$site_name" 2>&1)
-  if [[ $? -ne 0 ]]; then
+  local exit_code=$?
+  
+  # Always show the output for debugging
+  log_debug "omd create output: $create_output"
+  
+  if [[ $exit_code -ne 0 ]]; then
     log_error "Failed to create site"
+    log_error "Output: $create_output"
     return 1
   fi
   
