@@ -1,0 +1,36 @@
+# ISO files (too large for Git)
+*.iso
+**/*.iso
+
+# Build artifacts
+iso-output/
+**/iso-output/
+
+# Vagrant
+.vagrant/
+**/.vagrant/
+*.box
+
+# Logs
+*.log
+install.log
+
+# Environment files with secrets
+.env
+.env.bak.*
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# Python cache
+__pycache__/
+*.pyc
+
+# CheckMK packages (can be downloaded)
+*.deb
+*.rpm
+
+# Backup directory (local only)
+Backup/
