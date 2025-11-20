@@ -188,6 +188,9 @@ confirm_upgrade() {
 backup_site() {
     print_header "Backup Sito CheckMK"
     
+    # Crea directory backup se non esiste
+    mkdir -p "$BACKUP_DIR"
+    
     local backup_file="$BACKUP_DIR/${SITE_NAME}_pre-upgrade_$(date +%Y%m%d_%H%M%S).tar.gz"
     
     print_info "Creazione backup in: $backup_file"
