@@ -286,8 +286,6 @@ download_version() {
     fi
     
     print_success "File scaricato: $(du -h "$local_file" | cut -f1)"
-    
-    echo "$local_file"
 }
 
 # ==========================================================
@@ -433,7 +431,8 @@ main() {
     backup_site
     
     # 7. Download nuova versione
-    PACKAGE_FILE=$(download_version "$LATEST_VERSION")
+    download_version "$LATEST_VERSION"
+    PACKAGE_FILE="/tmp/cmk.deb"
     
     # 8. Installazione nuova versione
     install_version "$PACKAGE_FILE"
