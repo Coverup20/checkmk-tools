@@ -98,7 +98,6 @@ get_current_version() {
     fi
     
     print_info "Versione installata: ${GREEN}$CURRENT_VERSION${NC}"
-    echo "$CURRENT_VERSION"
 }
 
 # ==========================================================
@@ -122,7 +121,6 @@ get_latest_version() {
     fi
     
     print_info "Ultima versione disponibile: ${GREEN}$LATEST_VERSION${NC}"
-    echo "$LATEST_VERSION"
 }
 
 # ==========================================================
@@ -414,10 +412,10 @@ main() {
     check_prerequisites
     
     # 2. Ottieni versione corrente
-    CURRENT_VERSION=$(get_current_version)
+    get_current_version
     
     # 3. Ottieni ultima versione disponibile
-    LATEST_VERSION=$(get_latest_version)
+    get_latest_version
     
     # 4. Confronta versioni
     if compare_versions "$CURRENT_VERSION" "$LATEST_VERSION"; then
