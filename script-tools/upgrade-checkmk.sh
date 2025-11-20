@@ -259,7 +259,7 @@ download_version() {
     esac
     
     download_url="https://download.checkmk.com/checkmk/${version}/${package_name}"
-    local local_file="$DOWNLOAD_DIR/$package_name"
+    local local_file="/tmp/checkmk_${version}.deb"
     
     print_info "URL download: $download_url"
     print_info "File locale: $local_file"
