@@ -264,18 +264,28 @@ download_version() {
     print_info "URL download: $download_url"
     print_info "File locale: $local_file"
     
-    # Verifica se già scaricato
+    # Rimuovi file esistente per evitare problemi
     if [[ -f "$local_file" ]]; then
-        print_warning "File già presente, lo riutilizzo"
-    else
-        print_info "Download in corso..."
-        if wget -q --show-progress -O "$local_file" "$download_url"; then
-            print_success "Download completato"
-        else
-            print_error "Errore durante il download"
-            exit 1
-        fi
+        print_warning "Rimuovo file esistente..."
+        rm -f "$local_file"
     fi
+    
+    print_info "Download in corso..."
+    if wget --progress=bar:force -O "$local_file" "$download_url" 2>&1; then
+        print_success "Download completato"
+    else
+        print_error "Errore durante il download"
+        rm -f "$local_file"
+        exit 1
+    fi
+    
+    # Verifica che il file esista e abbia dimensione > 0
+    if [[ ! -f "$local_file" ]] || [[ ! -s "$local_file" ]]; then
+        print_error "File scaricato non valido"
+        exit 1
+    fi
+    
+    print_success "File scaricato: $(du -h "$local_file" | cut -f1)"
     
     echo "$local_file"
 }
