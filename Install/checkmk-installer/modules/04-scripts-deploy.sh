@@ -28,6 +28,51 @@ log_module_start "$MODULE_NAME"
 SCRIPTS_SRC="$(dirname "$(dirname "$INSTALLER_ROOT")")"
 
 #############################################
+# Detect OS Type
+#############################################
+detect_os_type() {
+  local check_type="$1"
+  
+  case "$check_type" in
+    "ns7")
+      # Check for NethServer 7
+      if [[ -f /etc/nethserver-release ]]; then
+        return 0
+      fi
+      ;;
+    "ns8")
+      # Check for NethServer 8 (has runagent command)
+      if command -v runagent &>/dev/null; then
+        return 0
+      fi
+      ;;
+    "ubuntu")
+      # Check for Ubuntu/Debian
+      if [[ -f /etc/os-release ]]; then
+        source /etc/os-release
+        if [[ "$ID" == "ubuntu" ]] || [[ "$ID" == "debian" ]]; then
+          return 0
+        fi
+      fi
+      ;;
+    "proxmox")
+      # Check for Proxmox VE
+      if [[ -f /etc/pve/.version ]]; then
+        return 0
+      fi
+      ;;
+    "windows")
+      # Windows detection (usually not run from bash)
+      if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
+        return 0
+      fi
+      ;;
+  esac
+  
+  return 1
+}
+
+#############################################
 # Deploy notification scripts
 #############################################
 deploy_notify_scripts() {
@@ -400,12 +445,30 @@ main() {
   
   # Deploy all script categories
   deploy_notify_scripts
-  deploy_check_scripts "ns7"
-  deploy_check_scripts "ns8"
-  deploy_check_scripts "ubuntu"
-  deploy_check_scripts "windows"
+  
+  # Deploy check scripts based on detected OS
+  if detect_os_type "ns7"; then
+    deploy_check_scripts "ns7"
+  fi
+  
+  if detect_os_type "ns8"; then
+    deploy_check_scripts "ns8"
+  fi
+  
+  if detect_os_type "ubuntu"; then
+    deploy_check_scripts "ubuntu"
+  fi
+  
+  if detect_os_type "windows"; then
+    deploy_check_scripts "windows"
+  fi
+  
   deploy_tool_scripts
-  deploy_proxmox_scripts
+  
+  if detect_os_type "proxmox"; then
+    deploy_proxmox_scripts
+  fi
+  
   deploy_fix_scripts
   
   # Install additional components
