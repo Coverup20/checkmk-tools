@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=root
-WorkingDirectory=/root
-ExecStart=/bin/bash /root/checkmk-tools/script-tools/auto-git-sync.sh
+User=marzio
+WorkingDirectory=/home/marzio
+ExecStart=/bin/bash /home/marzio/checkmk-tools/script-tools/auto-git-sync.sh
 Restart=always
 RestartSec=10
 StandardOutput=journal
