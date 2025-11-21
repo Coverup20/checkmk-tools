@@ -122,6 +122,13 @@ echo "✅ Systemd ricaricato"
 systemctl enable auto-git-sync.service
 echo "✅ Servizio abilitato all'avvio"
 
+# Riavvia il servizio se già attivo
+if systemctl is-active --quiet auto-git-sync.service; then
+    echo "ℹ️  Servizio già attivo, riavvio in corso..."
+    systemctl restart auto-git-sync.service
+    echo "✅ Servizio riavviato con nuova configurazione"
+fi
+
 # Mostra menu opzioni
 echo ""
 echo "========================================="
