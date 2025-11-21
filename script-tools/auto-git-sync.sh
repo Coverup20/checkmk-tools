@@ -6,6 +6,9 @@
 #  Autore: ChatGPT per Marzio Bordin
 # ==========================================================
 
+# Imposta PATH per systemd
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
 # Configurazione
 REPO_URL="https://github.com/Coverup20/checkmk-tools.git"
 TARGET_DIR="$HOME/checkmk-tools"
