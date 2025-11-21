@@ -1,0 +1,16 @@
+[Unit]
+Description=Auto Git Sync Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root
+ExecStart=/root/checkmk-tools/script-tools/auto-git-sync.sh
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
