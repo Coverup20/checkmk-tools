@@ -12,7 +12,7 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Configurazione
 REPO_URL="https://github.com/Coverup20/checkmk-tools.git"
 TARGET_DIR="$HOME/checkmk-tools"
-SYNC_INTERVAL=60  # secondi (60 = 1 minuto)
+SYNC_INTERVAL="${1:-60}"  # Primo parametro o default 60 secondi
 LOG_FILE="/var/log/auto-git-sync.log"
 
 # Colori per output

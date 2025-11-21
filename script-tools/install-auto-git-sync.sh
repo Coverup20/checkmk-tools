@@ -10,6 +10,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_FILE="auto-git-sync.service"
 SCRIPT_FILE="auto-git-sync.sh"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo "========================================="
 echo "  Installazione Auto Git Sync Service"
@@ -24,6 +25,51 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 echo "✅ Esecuzione come root"
+
+# Chiedi intervallo di sync
+echo ""
+echo "⏱️  Configurazione intervallo di sync"
+echo ""
+echo "Scegli ogni quanto eseguire il git pull:"
+echo "  1) Ogni 30 secondi"
+echo "  2) Ogni 1 minuto (consigliato)"
+echo "  3) Ogni 5 minuti"
+echo "  4) Ogni 10 minuti"
+echo "  5) Ogni 30 minuti"
+echo "  6) Personalizzato"
+echo ""
+read -p "Scelta [2]: " interval_choice
+
+case "$interval_choice" in
+    1) SYNC_INTERVAL=30 ;;
+    2|"") SYNC_INTERVAL=60 ;;
+    3) SYNC_INTERVAL=300 ;;
+    4) SYNC_INTERVAL=600 ;;
+    5) SYNC_INTERVAL=1800 ;;
+    6)
+        read -p "Inserisci intervallo in secondi: " SYNC_INTERVAL
+        if ! [[ "$SYNC_INTERVAL" =~ ^[0-9]+$ ]] || [ "$SYNC_INTERVAL" -lt 10 ]; then
+            echo "❌ Valore non valido, uso default 60 secondi"
+            SYNC_INTERVAL=60
+        fi
+        ;;
+    *)
+        echo "❌ Scelta non valida, uso default 60 secondi"
+        SYNC_INTERVAL=60
+        ;;
+esac
+
+echo "✅ Intervallo impostato: $SYNC_INTERVAL secondi"
+echo ""
+
+# Rileva l'utente proprietario del repository
+REPO_OWNER=$(stat -c '%U' "$REPO_DIR")
+REPO_OWNER_HOME=$(eval echo "~$REPO_OWNER")
+
+echo "ℹ️  Repository owner: $REPO_OWNER"
+echo "ℹ️  Repository path: $REPO_DIR"
+echo "ℹ️  Home directory: $REPO_OWNER_HOME"
+echo ""
 
 # Verifica esistenza file
 if [[ ! -f "$SCRIPT_DIR/$SCRIPT_FILE" ]]; then
@@ -42,9 +88,31 @@ echo "✅ File trovati"
 chmod +x "$SCRIPT_DIR/$SCRIPT_FILE"
 echo "✅ Permessi di esecuzione impostati"
 
+# Crea service file personalizzato
+echo "ℹ️  Creazione service file personalizzato..."
+cat > /tmp/auto-git-sync.service.tmp << EOF
+[Unit]
+Description=Auto Git Sync Service
+After=network.target
+
+[Service]
+Type=simple
+User=$REPO_OWNER
+WorkingDirectory=$REPO_OWNER_HOME
+ExecStart=/bin/bash $REPO_DIR/script-tools/auto-git-sync.sh $SYNC_INTERVAL
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 # Copia il service file in systemd
-cp "$SCRIPT_DIR/$SERVICE_FILE" /etc/systemd/system/
-echo "✅ Service file copiato in /etc/systemd/system/"
+cp /tmp/auto-git-sync.service.tmp /etc/systemd/system/auto-git-sync.service
+rm /tmp/auto-git-sync.service.tmp
+echo "✅ Service file creato e installato"
 
 # Ricarica systemd
 systemctl daemon-reload
@@ -59,6 +127,11 @@ echo ""
 echo "========================================="
 echo "  Installazione Completata!"
 echo "========================================="
+echo ""
+echo "📊 Configurazione:"
+echo "   • Utente: $REPO_OWNER"
+echo "   • Repository: $REPO_DIR"
+echo "   • Intervallo sync: $SYNC_INTERVAL secondi"
 echo ""
 echo "Comandi disponibili:"
 echo ""
