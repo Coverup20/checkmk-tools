@@ -142,6 +142,11 @@ do_git_pull() {
         if [[ "$old_commit" != "$new_commit" ]]; then
             print_success "Repository aggiornato: $old_commit → $new_commit"
             
+            # Rendi eseguibili tutti gli script .sh
+            print_info "Aggiornamento permessi script..."
+            find "$TARGET_DIR" -type f -name "*.sh" -exec chmod +x {} \; 2>/dev/null
+            print_success "Permessi aggiornati per file .sh"
+            
             # Mostra i file modificati
             print_info "File modificati:"
             git diff --name-status "$old_commit" "$new_commit" | while read -r status file; do
