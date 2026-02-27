@@ -29,6 +29,34 @@ is_openwrt() {
     [[ -f /etc/openwrt_release ]] && return 0 || return 1
 }
 
+# OpenWrt repo per download dinamico pacchetti
+REPO_PACKAGES="${REPO_PACKAGES:-https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/packages}"
+
+# Download dinamico pacchetto da repo OpenWrt (come install-checkmk-agent-persistent-nsec8.sh)
+download_openwrt_package() {
+    local package_name="$1"
+    local repo_url="$2"
+    local output_file="$3"
+    echo "i  Download dinamico: $package_name"
+    if ! wget -q -O /tmp/Packages.gz "${repo_url}/Packages.gz"; then
+        echo "WARN  Download Packages.gz fallito"
+        return 1
+    fi
+    local package_file
+    package_file=$(gunzip -c /tmp/Packages.gz | grep "^Filename:" | grep "${package_name}_" | head -1 | awk '{print $2}')
+    rm -f /tmp/Packages.gz
+    if [ -z "$package_file" ]; then
+        echo "WARN  $package_name non trovato nell'index OpenWrt"
+        return 1
+    fi
+    if wget -O "$output_file" "${repo_url}/${package_file}" 2>/dev/null; then
+        return 0
+    else
+        echo "WARN  Download fallito: ${repo_url}/${package_file}"
+        return 1
+    fi
+}
+
 pick_pkg_manager() {
     PKG_MGR=""
     if command -v apt-get >/dev/null 2>&1; then
@@ -67,8 +95,19 @@ pkg_install_git() {
             timeout 300 dnf install -y git
             ;;
         opkg)
-            opkg update || true
-            opkg install git git-http
+            if download_openwrt_package "git" "$REPO_PACKAGES" "/tmp/git.ipk"; then
+                if download_openwrt_package "git-http" "$REPO_PACKAGES" "/tmp/git-http.ipk"; then
+                    opkg install /tmp/git.ipk /tmp/git-http.ipk
+                    rm -f /tmp/git.ipk /tmp/git-http.ipk
+                else
+                    rm -f /tmp/git.ipk
+                    echo " Download git-http fallito"
+                    return 1
+                fi
+            else
+                echo " Download git fallito"
+                return 1
+            fi
             ;;
         *)
             echo " Package manager non supportato. Installa git manualmente."
