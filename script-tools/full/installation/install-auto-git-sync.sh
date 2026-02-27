@@ -4,7 +4,7 @@
 #  Installa e configura il servizio di sync automatico
 #  Autore: ChatGPT per Marzio Bordin
 # ==========================================================
-VERSION="1.0.5"   # Versione script (aggiornare ad ogni modifica)
+SCRIPT_VERSION="1.0.5"   # Versione script (aggiornare ad ogni modifica)
 
 set -e
 
@@ -250,7 +250,7 @@ echo "OK Repository clonato con successo"
 fi
 echo "========================================="
 echo "  Installazione Auto Git Sync Service"
-echo "  Version v${VERSION}"
+echo "  Version v${SCRIPT_VERSION}"
 echo "========================================="
 echo ""
 
