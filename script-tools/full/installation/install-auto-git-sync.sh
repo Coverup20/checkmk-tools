@@ -326,6 +326,44 @@ if touch /var/log/auto-git-sync.log 2>/dev/null; then
 else     echo "WARN  Impossibile creare log file, verra usato journalctl"
 fi
 
+# ===================================================================
+# OpenWrt / NethSecurity: usa cron invece di systemd
+# ===================================================================
+if is_openwrt || ! command -v systemctl &>/dev/null; then
+    CRON_FILE="/etc/crontabs/root"
+    SYNC_SCRIPT="/usr/local/bin/git-auto-sync.sh"
+
+    cat > "$SYNC_SCRIPT" <<'SYNCSCRIPT'
+#!/bin/sh
+REPO_DIR="/opt/checkmk-tools"
+LOG_FILE="/var/log/auto-git-sync.log"
+MAX_LOG_SIZE=1048576
+if [ -f "$LOG_FILE" ] && [ "$(stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)" -gt "$MAX_LOG_SIZE" ]; then
+    mv "$LOG_FILE" "$LOG_FILE.old" 2>/dev/null || true
+fi
+[ -d "$REPO_DIR/.git" ] || exit 1
+cd "$REPO_DIR" || exit 1
+if git pull origin main >> "$LOG_FILE" 2>&1; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Sync OK" >> "$LOG_FILE"
+else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Git pull failed" >> "$LOG_FILE"
+fi
+SYNCSCRIPT
+
+    chmod +x "$SYNC_SCRIPT"
+    # Rimuovi eventuale entry precedente
+    [ -f "$CRON_FILE" ] && sed -i '/git-auto-sync/d' "$CRON_FILE" 2>/dev/null || true
+    echo "* * * * * $SYNC_SCRIPT" >> "$CRON_FILE"
+    /etc/init.d/cron restart >/dev/null 2>&1 || true
+    echo "OK Auto Git Sync installato via cron (OpenWrt/NethSecurity)"
+    echo "   Script: $SYNC_SCRIPT"
+    echo "   Cron:   $CRON_FILE"
+    echo "   Log:    /var/log/auto-git-sync.log"
+    echo ""
+    echo "Verifica con: crontab -l"
+    exit 0
+fi
+
 # Crea service file personalizzato che esegue direttamente da GitHub
 echo "i  Creazione service file personalizzato..."
 cat > /etc/systemd/system/auto-git-sync.service << 'EOF'
@@ -365,44 +403,6 @@ sed -i "s|PLACEHOLDER_REPO|$REPO_DIR|g" /etc/systemd/system/auto-git-sync.servic
 sed -i "s|PLACEHOLDER_INTERVAL|$SYNC_INTERVAL|g" /etc/systemd/system/auto-git-sync.service
 
 echo "OK Service file creato e installato"
-
-# ===================================================================
-# OpenWrt / NethSecurity: usa cron invece di systemd
-# ===================================================================
-if is_openwrt || ! command -v systemctl &>/dev/null; then
-    CRON_FILE="/etc/crontabs/root"
-    SYNC_SCRIPT="/usr/local/bin/git-auto-sync.sh"
-
-    cat > "$SYNC_SCRIPT" <<'SYNCSCRIPT'
-#!/bin/sh
-REPO_DIR="/opt/checkmk-tools"
-LOG_FILE="/var/log/auto-git-sync.log"
-MAX_LOG_SIZE=1048576
-if [ -f "$LOG_FILE" ] && [ "$(stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)" -gt "$MAX_LOG_SIZE" ]; then
-    mv "$LOG_FILE" "$LOG_FILE.old" 2>/dev/null || true
-fi
-[ -d "$REPO_DIR/.git" ] || exit 1
-cd "$REPO_DIR" || exit 1
-if git pull origin main >> "$LOG_FILE" 2>&1; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Sync OK" >> "$LOG_FILE"
-else
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Git pull failed" >> "$LOG_FILE"
-fi
-SYNCSCRIPT
-
-    chmod +x "$SYNC_SCRIPT"
-    # Rimuovi eventuale entry precedente
-    [ -f "$CRON_FILE" ] && sed -i '/git-auto-sync/d' "$CRON_FILE" 2>/dev/null || true
-    echo "* * * * * $SYNC_SCRIPT" >> "$CRON_FILE"
-    /etc/init.d/cron restart >/dev/null 2>&1 || true
-    echo "OK Auto Git Sync installato via cron (OpenWrt/NethSecurity)"
-    echo "   Script: $SYNC_SCRIPT"
-    echo "   Cron:   $CRON_FILE"
-    echo "   Log:    /var/log/auto-git-sync.log"
-    echo ""
-    echo "Verifica con: crontab -l"
-    exit 0
-fi
 
 # Verifica che systemd sia disponibile
 if ! command -v systemctl &> /dev/null; then
