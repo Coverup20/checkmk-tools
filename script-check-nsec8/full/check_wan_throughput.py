@@ -23,7 +23,7 @@ import sys
 import time
 from typing import Optional, Tuple
 
-SCRIPT_VERSION = "1.0.2"
+SCRIPT_VERSION = "1.0.3"
 SERVICE = "WAN_Throughput"
 STATE_FILE = "/tmp/wan_throughput_state.json"
 PROC_NET_DEV = "/proc/net/dev"
@@ -180,7 +180,7 @@ def main() -> int:
     # Prima esecuzione o interfaccia cambiata: inizializza
     if state is None or state.get("iface") != iface:
         save_state(iface, rx_now, tx_now, now)
-        print(f"1 {SERVICE} - {iface}: Initializing, wait next check [v{SCRIPT_VERSION}] | rx_mbps=0;{80};{95};0 tx_mbps=0;{80};{95};0")
+        print(f"0 {SERVICE} - {iface}: Initializing, wait next check [v{SCRIPT_VERSION}] | rx_mbps=0;{80};{95};0 tx_mbps=0;{80};{95};0")
         return 0
 
     # 4. Calcola delta
@@ -188,7 +188,7 @@ def main() -> int:
     if delta_seconds < 1:
         # Esecuzioni troppo ravvicinate
         save_state(iface, rx_now, tx_now, now)
-        print(f"1 {SERVICE} - {iface}: Interval too short ({delta_seconds:.1f}s) [v{SCRIPT_VERSION}] | rx_mbps=0;{80};{95};0 tx_mbps=0;{80};{95};0")
+        print(f"0 {SERVICE} - {iface}: Interval too short ({delta_seconds:.1f}s) [v{SCRIPT_VERSION}] | rx_mbps=0;{80};{95};0 tx_mbps=0;{80};{95};0")
         return 0
 
     rx_prev = state["rx_bytes"]
