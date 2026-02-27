@@ -72,7 +72,7 @@ def ping(target: str) -> bool:
 def main() -> int:
     wan_ifaces = find_wan_interfaces()
     if not wan_ifaces:
-        print("0 WAN_Status status=ERROR No WAN interfaces found")
+        print(f"0 WAN_Status status=ERROR No WAN interfaces found [v{VERSION}]")
         return 0
 
     overall = 0
@@ -107,7 +107,7 @@ def main() -> int:
             overall = max(overall, 1)
 
     final_status = "OK" if overall == 0 else ("WARNING" if overall == 1 else "CRITICAL")
-    print(f"{overall} WAN_Status status={final_status} {' '.join(status_messages)} - {', '.join(details)}")
+    print(f"{overall} WAN_Status status={final_status} {' '.join(status_messages)} - {', '.join(details)} [v{VERSION}]")
 
     wan_count = len(wan_ifaces)
     wan_up = sum(1 for s in status_messages if s.endswith("=OK"))
