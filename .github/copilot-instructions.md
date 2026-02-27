@@ -1461,6 +1461,14 @@ wsl -- ssh <host> "rm /usr/lib/check_mk_agent/local/rssh_service_name_old 2>/dev
 - ✅ SSH Config: `~/.ssh/config` con alias host
 - ✅ SSH ControlMaster: Riutilizzo connessioni (passphrase 1 volta, poi 1 min attiva)
 
+**⚠️ REGOLA FORMATO COMANDI - Quando l'utente chiede "comandi da incollare":**
+
+- Passare il comando **nudo**, senza wrapper `wsl -- ssh ...`
+- L'utente lo incolla direttamente nel terminale remoto già aperto
+- SBAGLIATO: `wsl -- ssh -tt -o ControlMaster=no -J sos -p 2333 root@45.33.235.86 "apt-get install -y git"`
+- CORRETTO: `apt-get install -y git`
+- Usare il wrapper `wsl -- ssh ...` SOLO quando si esegue da VS Code terminal in modo autonomo
+
 **⚠️ REGOLA PRATICA - Password SSH (no “pausa continua”):**
 
 - ✅ Usa `ssh -tt` quando prevedi prompt (password/confirm)
@@ -1520,6 +1528,8 @@ laboratorio       # 10.155.100.1:2222 (root, NethSecurity 8)
 marziodemo        # 10.155.100.61:22 (root, Demo environment)
 ubntmarzio        # 10.155.100.108:22 (user: marzio)
 srv-monitoring    # 45.33.235.86:2333 (root, Monitoring)
+                  # ⚠️ USARE SEMPRE root@45.33.235.86 - MAI admin-nethesis o altri utenti!
+                  # ⚠️ NON usare sudo (connessione già come root - sudo non serve)
                   # Firewall pubblico 45.33.235.86 porta 2333 → DNAT → 127.0.0.1:2222 interno
                   # ⚠️ fail2ban attivo sul firewall - NON fare tentativi multipli di connessione
                   # ⚠️ Firewall whitelist solo IP 159.65.203.113 (alias sos) - OBBLIGATORIO jump via sos
@@ -1535,11 +1545,10 @@ srv-monitoring    # 45.33.235.86:2333 (root, Monitoring)
                   #       ControlMaster auto
                   #       ControlPath ~/.ssh/cm-%r@%h:%p
                   #       ControlPersist 5m
-                  # ✅ Workflow persistenza (password 1 sola volta per 5 min):
-                  #   1. wsl -- ssh srv-monitoring         → inserire password → sessione aperta
-                  #   2. wsl -- ssh srv-monitoring "cmd"   → no password (riusa ControlMaster)
-                  # → Accesso diretto senza config:
-                  #   wsl -- ssh -o ControlMaster=no -J sos -p 2333 root@45.33.235.86
+                  # ⚠️ NON usare ControlMaster per srv-monitoring - usare SEMPRE -o ControlMaster=no
+                  # ✅ Comando diretto (UNICO formato corretto):
+                  #   wsl -- ssh -tt -o ControlMaster=no -J sos -p 2333 root@45.33.235.86 "cmd"
+                  # ✅ Il terminale VS Code non supporta input password interattivo → aprire terminale esterno
 
 # Altri server
 fwlab             # 192.168.5.117:2222 (root)
