@@ -44,6 +44,9 @@ def run_step(cfg: InstallerConfig) -> None:
         encoding="utf-8",
     )
 
+    # Valida configurazione prima di riavviare — blocca se jail.local è corrotto
+    run_cmd(["fail2ban-client", "-t"])
+
     if command_exists("systemctl"):
         run_cmd(["systemctl", "enable", "fail2ban"], check=False)
         run_cmd(["systemctl", "restart", "fail2ban"], check=False)
