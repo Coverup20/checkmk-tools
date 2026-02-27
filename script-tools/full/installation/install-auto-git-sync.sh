@@ -4,7 +4,7 @@
 #  Installa e configura il servizio di sync automatico
 #  Autore: ChatGPT per Marzio Bordin
 # ==========================================================
-VERSION="1.0.4"   # Versione script (aggiornare ad ogni modifica)
+VERSION="1.0.5"   # Versione script (aggiornare ad ogni modifica)
 
 set -e
 
@@ -344,13 +344,18 @@ MAX_LOG_SIZE=1048576
 if [ -f "$LOG_FILE" ] && [ "$(stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)" -gt "$MAX_LOG_SIZE" ]; then
     mv "$LOG_FILE" "$LOG_FILE.old" 2>/dev/null || true
 fi
-[ -d "$REPO_DIR/.git" ] || exit 1
+[ -d "$REPO_DIR/.git" ] || { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $REPO_DIR non e un repo git" >> "$LOG_FILE"; exit 1; }
 cd "$REPO_DIR" || exit 1
-if git pull origin main >> "$LOG_FILE" 2>&1; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Sync OK" >> "$LOG_FILE"
-else
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Git pull failed" >> "$LOG_FILE"
+# Fetch aggiornamenti
+if ! git fetch origin main >> "$LOG_FILE" 2>&1; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARN: git fetch fallito (rete?)" >> "$LOG_FILE"
+    exit 0
 fi
+# Reset forzato: risolve branch divergenti, conflitti, modifiche locali
+git reset --hard origin/main >> "$LOG_FILE" 2>&1
+# Rimuovi file non tracciati che potrebbero causare conflitti futuri
+git clean -fd >> "$LOG_FILE" 2>&1
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Sync OK ($(git rev-parse --short HEAD 2>/dev/null))" >> "$LOG_FILE"
 SYNCSCRIPT
 
     chmod +x "$SYNC_SCRIPT"
