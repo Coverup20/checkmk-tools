@@ -13,7 +13,7 @@ Strategia lettura bytes (in ordine di priorità):
 Stato persistente salvato in /tmp/wan_throughput_state.json.
 Prima esecuzione: inizializza stato e output WARNING "Initializing".
 
-Version: 1.0.1
+Version: 1.0.4
 """
 
 import json
@@ -23,7 +23,7 @@ import sys
 import time
 from typing import Optional, Tuple
 
-SCRIPT_VERSION = "1.0.3"
+SCRIPT_VERSION = "1.0.4"
 SERVICE = "WAN_Throughput"
 STATE_FILE = "/tmp/wan_throughput_state.json"
 PROC_NET_DEV = "/proc/net/dev"
@@ -180,7 +180,7 @@ def main() -> int:
     # Prima esecuzione o interfaccia cambiata: inizializza
     if state is None or state.get("iface") != iface:
         save_state(iface, rx_now, tx_now, now)
-        print(f"0 {SERVICE} - {iface}: Initializing, wait next check [v{SCRIPT_VERSION}] | rx_mbps=0;{80};{95};0 tx_mbps=0;{80};{95};0")
+        print(f"0 {SERVICE} - {iface}: Initializing, wait next check [v{SCRIPT_VERSION}] | rx_mbps=0;800;950;0 tx_mbps=0;800;950;0")
         return 0
 
     # 4. Calcola delta
@@ -188,7 +188,7 @@ def main() -> int:
     if delta_seconds < 1:
         # Esecuzioni troppo ravvicinate
         save_state(iface, rx_now, tx_now, now)
-        print(f"0 {SERVICE} - {iface}: Interval too short ({delta_seconds:.1f}s) [v{SCRIPT_VERSION}] | rx_mbps=0;{80};{95};0 tx_mbps=0;{80};{95};0")
+        print(f"0 {SERVICE} - {iface}: Interval too short ({delta_seconds:.1f}s) [v{SCRIPT_VERSION}] | rx_mbps=0;800;950;0 tx_mbps=0;800;950;0")
         return 0
 
     rx_prev = state["rx_bytes"]
@@ -205,9 +205,9 @@ def main() -> int:
     save_state(iface, rx_now, tx_now, now)
 
     # 6. Output CheckMK
-    # Soglie: WARNING a 80 Mbps, CRITICAL a 95 Mbps (su 100 Mbps tipici)
-    warn_mbps = 80
-    crit_mbps = 95
+    # Soglie: WARNING a 800 Mbps, CRITICAL a 950 Mbps (su 1000 Mbps FTTH 1G)
+    warn_mbps = 800
+    crit_mbps = 950
 
     state_code = 0
     if rx_mbps >= crit_mbps or tx_mbps >= crit_mbps:
