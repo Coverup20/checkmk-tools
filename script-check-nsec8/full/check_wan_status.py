@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-"""check_wan_status.py - CheckMK local check WAN status (Python puro)."""
+"""check_wan_status.py - CheckMK local check WAN status (Python puro).
+
+Version: 1.1.0
+"""
 
 import json
 import subprocess
 import sys
+
+VERSION = "1.1.0"
 
 
 def run(cmd: list[str]) -> str:
@@ -12,8 +17,37 @@ def run(cmd: list[str]) -> str:
 
 
 def find_wan_interfaces() -> list[str]:
-    lines = run(["ubus", "list"]).splitlines()
-    return [line.replace("network.interface.", "") for line in lines if line.startswith("network.interface.") and line.replace("network.interface.", "").startswith(("wan", "wwan", "vwan"))]
+    """Rileva interfacce WAN cercando quelle con default route (target 0.0.0.0).
+    Fallback su nomi che iniziano con wan/wwan/vwan."""
+    wan_ifaces: list[str] = []
+
+    # Metodo 1: dump di tutte le interfacce, cerca quelle con default route
+    data = run(["ubus", "call", "network.interface", "dump"])
+    if data:
+        try:
+            parsed = json.loads(data)
+            for iface in parsed.get("interface", []):
+                name = iface.get("interface", "")
+                if not name or name in ("loopback",):
+                    continue
+                routes = iface.get("route", [])
+                for route in routes:
+                    if route.get("target") == "0.0.0.0":
+                        wan_ifaces.append(name)
+                        break
+        except Exception:
+            pass
+
+    # Fallback: nomi classici wan/wwan/vwan
+    if not wan_ifaces:
+        lines = run(["ubus", "list"]).splitlines()
+        for line in lines:
+            if line.startswith("network.interface."):
+                name = line.replace("network.interface.", "")
+                if name.lower().startswith(("wan", "wwan", "vwan")):
+                    wan_ifaces.append(name)
+
+    return wan_ifaces
 
 
 def iface_status(iface: str) -> tuple[str, str]:
