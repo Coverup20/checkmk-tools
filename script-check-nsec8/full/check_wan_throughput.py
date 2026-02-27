@@ -3,13 +3,17 @@
 check_wan_throughput.py - CheckMK Local Check per throughput WAN su NethSecurity 8
 
 Misura il throughput RX/TX sull'interfaccia WAN in Mbps.
-Usa ubus per rilevare l'interfaccia WAN (via default route 0.0.0.0)
-e leggere i contatori rx_bytes/tx_bytes da statistics.
+Usa ubus dump per rilevare l'interfaccia WAN (via default route 0.0.0.0)
+e leggere i contatori rx_bytes/tx_bytes.
+
+Strategia lettura bytes (in ordine di priorità):
+1. statistics nel dump ubus (rx_bytes/tx_bytes)
+2. /proc/net/dev via campo "device" nel dump (interfaccia fisica sottostante)
 
 Stato persistente salvato in /tmp/wan_throughput_state.json.
 Prima esecuzione: inizializza stato e output WARNING "Initializing".
 
-Version: 1.0.0
+Version: 1.0.1
 """
 
 import json
@@ -19,9 +23,10 @@ import sys
 import time
 from typing import Optional, Tuple
 
-SCRIPT_VERSION = "1.0.0"
+SCRIPT_VERSION = "1.0.1"
 SERVICE = "WAN_Throughput"
 STATE_FILE = "/tmp/wan_throughput_state.json"
+PROC_NET_DEV = "/proc/net/dev"
 
 
 def run_command(cmd: list) -> Tuple[int, str, str]:
@@ -43,10 +48,34 @@ def run_command(cmd: list) -> Tuple[int, str, str]:
         return 1, "", str(e)
 
 
-def get_wan_interface() -> Optional[str]:
+def get_proc_net_dev_bytes(device: str) -> Optional[Tuple[int, int]]:
     """
-    Rileva il nome dell'interfaccia WAN cercando la default route (0.0.0.0)
-    nel dump di ubus. Fallback su prefissi comuni wan/wwan/vwan.
+    Legge rx_bytes e tx_bytes da /proc/net/dev per il device fisico specificato.
+    Formato righe: Interface: rx_bytes rx_packets ... tx_bytes tx_packets ...
+    """
+    try:
+        with open(PROC_NET_DEV, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith(device + ":"):
+                    # Rimuovi "device:" e splitta
+                    parts = line.split(":", 1)[1].split()
+                    # Colonne: [0]=rx_bytes [1]=rx_packets ... [8]=tx_bytes ...
+                    if len(parts) >= 9:
+                        return int(parts[0]), int(parts[8])
+    except (IOError, ValueError, IndexError):
+        pass
+    return None
+
+
+def get_wan_info() -> Optional[Tuple[str, int, int]]:
+    """
+    Usa ubus dump per trovare interfaccia WAN e leggere i byte RX/TX.
+    Ritorna (iface_name, rx_bytes, tx_bytes) oppure None.
+
+    Strategia bytes:
+    1. statistics.rx_bytes / statistics.tx_bytes dal dump
+    2. /proc/net/dev via campo "device" (interfaccia fisica)
     """
     rc, out, err = run_command(["ubus", "call", "network.interface", "dump"])
     if rc != 0 or not out:
@@ -56,41 +85,46 @@ def get_wan_interface() -> Optional[str]:
         data = json.loads(out)
         interfaces = data.get("interface", [])
 
-        # Prima passata: cerca interfaccia con route target 0.0.0.0
+        wan_iface = None
+        wan_data = None
+
+        # Prima passata: cerca interfaccia con default route
         for iface in interfaces:
             routes = iface.get("route", [])
             for route in routes:
                 if route.get("target") == "0.0.0.0":
-                    return iface.get("interface")
+                    wan_iface = iface.get("interface", "")
+                    wan_data = iface
+                    break
+            if wan_iface:
+                break
 
-        # Fallback: cerca per prefissi comuni
-        for iface in interfaces:
-            name = iface.get("interface", "")
-            if name.lower().startswith(("wan", "wwan", "vwan")):
-                return name
+        # Fallback su prefissi comuni
+        if not wan_iface:
+            for iface in interfaces:
+                name = iface.get("interface", "")
+                if name.lower().startswith(("wan", "wwan", "vwan")):
+                    wan_iface = name
+                    wan_data = iface
+                    break
 
-    except (json.JSONDecodeError, KeyError):
-        pass
+        if not wan_iface or wan_data is None:
+            return None
 
-    return None
-
-
-def get_iface_bytes(iface_name: str) -> Optional[Tuple[int, int]]:
-    """
-    Legge rx_bytes e tx_bytes dall'interfaccia via ubus.
-    Ritorna (rx_bytes, tx_bytes) oppure None se non disponibile.
-    """
-    rc, out, err = run_command(["ubus", "call", f"network.interface.{iface_name}", "status"])
-    if rc != 0 or not out:
-        return None
-
-    try:
-        data = json.loads(out)
-        stats = data.get("statistics", {})
+        # Strategia 1: statistics nel dump
+        stats = wan_data.get("statistics", {})
         rx = stats.get("rx_bytes")
         tx = stats.get("tx_bytes")
         if rx is not None and tx is not None:
-            return int(rx), int(tx)
+            return wan_iface, int(rx), int(tx)
+
+        # Strategia 2: /proc/net/dev via device fisico
+        device = wan_data.get("device", "")
+        if device:
+            result = get_proc_net_dev_bytes(device)
+            if result is not None:
+                return wan_iface, result[0], result[1]
+
     except (json.JSONDecodeError, KeyError, ValueError):
         pass
 
@@ -131,20 +165,14 @@ def bytes_to_mbps(delta_bytes: int, delta_seconds: float) -> float:
 
 
 def main() -> int:
-    # 1. Trova interfaccia WAN
-    iface = get_wan_interface()
-    if not iface:
-        print(f"2 {SERVICE} rx_mbps=0 tx_mbps=0 - No WAN interface found [v{SCRIPT_VERSION}]")
-        return 0
-
-    # 2. Leggi contatori attuali
+    # 1. Trova interfaccia WAN e leggi contatori attuali
     now = time.time()
-    counters = get_iface_bytes(iface)
-    if counters is None:
-        print(f"3 {SERVICE} rx_mbps=0 tx_mbps=0 - Cannot read bytes for {iface} [v{SCRIPT_VERSION}]")
+    wan_info = get_wan_info()
+    if wan_info is None:
+        print(f"2 {SERVICE} rx_mbps=0 tx_mbps=0 - No WAN interface or bytes not available [v{SCRIPT_VERSION}]")
         return 0
 
-    rx_now, tx_now = counters
+    iface, rx_now, tx_now = wan_info
 
     # 3. Carica stato precedente
     state = load_state()
