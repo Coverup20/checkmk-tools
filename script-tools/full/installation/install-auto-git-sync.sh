@@ -333,6 +333,7 @@ if is_openwrt || ! command -v systemctl &>/dev/null; then
     CRON_FILE="/etc/crontabs/root"
     SYNC_SCRIPT="/usr/local/bin/git-auto-sync.sh"
 
+    mkdir -p /usr/local/bin
     cat > "$SYNC_SCRIPT" <<'SYNCSCRIPT'
 #!/bin/sh
 REPO_DIR="/opt/checkmk-tools"
