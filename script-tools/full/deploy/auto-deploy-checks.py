@@ -100,6 +100,15 @@ class HostDetector:
             self.script_category = "script-check-ns7"
             return
         
+        # NethSecurity 8 (OpenWrt based) - check PRIMA di NS8 perché /etc/nethserver può esistere anche su NethSecurity
+        if Path("/etc/openwrt_release").exists():
+            with open("/etc/openwrt_release", 'r') as f:
+                content = f.read()
+                if "NethSecurity" in content or "nethsecurity" in content.lower():
+                    self.host_type = "NethSecurity 8"
+                    self.script_category = "script-check-nsec8"
+                    return
+        
         # NethServer 8 (Rocky Linux based)
         ns8_indicators = [
             Path("/usr/bin/runagent"),
@@ -113,15 +122,6 @@ class HostDetector:
             self.host_type = "NethServer 8"
             self.script_category = "script-check-ns8"
             return
-        
-        # NethSecurity 8 (OpenWrt based)
-        if Path("/etc/openwrt_release").exists():
-            with open("/etc/openwrt_release", 'r') as f:
-                content = f.read()
-                if "NethSecurity" in content or "nethsecurity" in content.lower():
-                    self.host_type = "NethSecurity 8"
-                    self.script_category = "script-check-nsec8"
-                    return
         
         # CheckMK Server (OMD)
         if Path("/omd").exists() or Path("/opt/omd").exists():
