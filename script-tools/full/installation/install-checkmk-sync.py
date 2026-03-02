@@ -167,6 +167,21 @@ def update_repo(repo_path: Path) -> None:
 
 # ─── STEP 1: Auto Git Sync ────────────────────────────────────────────────────
 
+_GIT_SYNC_SCRIPT = "/usr/local/bin/checkmk-git-sync.sh"
+
+_GIT_SYNC_WRAPPER = """#!/bin/bash
+REPO_DIR="{repo_dir}"
+LOG_FILE="{log}"
+if ! git -C "$REPO_DIR" fetch origin main >> "$LOG_FILE" 2>&1; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARN: git fetch fallito" >> "$LOG_FILE"
+    exit 0
+fi
+git -C "$REPO_DIR" reset --hard origin/main >> "$LOG_FILE" 2>&1
+git -C "$REPO_DIR" clean -fd >> "$LOG_FILE" 2>&1
+SHA=$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Sync OK ($SHA)" >> "$LOG_FILE"
+"""
+
 _GIT_SYNC_SERVICE_TPL = """\
 [Unit]
 Description=Auto Git Sync - checkmk-tools
@@ -178,12 +193,7 @@ Wants=network-online.target
 Type=oneshot
 User={user}
 Group={user}
-ExecStart=/bin/bash -c '\
-    cd {repo_dir} && \
-    git fetch origin main >> {log} 2>&1 && \
-    git reset --hard origin/main >> {log} 2>&1 && \
-    git clean -fd >> {log} 2>&1 && \
-    echo "[$(date +%Y-%m-%d\\ %H:%M:%S)] Sync OK ($(git rev-parse --short HEAD))" >> {log}'
+ExecStart=/bin/bash {script}
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=auto-git-sync
@@ -212,21 +222,30 @@ def install_git_sync_systemd(repo_path: Path, interval: int, owner: str) -> None
     except Exception:
         pass
 
+    # Scrivi wrapper script bash (evita problemi ExecStart multi-riga in systemd)
+    wrapper_content = _GIT_SYNC_WRAPPER.format(repo_dir=str(repo_path), log=GIT_SYNC_LOG)
+    write_text(Path(_GIT_SYNC_SCRIPT), wrapper_content)
+    Path(_GIT_SYNC_SCRIPT).chmod(0o755)
+
     svc_path = SYSTEMD_DIR / GIT_SYNC_SERVICE_NAME
     timer_path = SYSTEMD_DIR / GIT_SYNC_TIMER_NAME
 
     write_text(svc_path, _GIT_SYNC_SERVICE_TPL.format(
         user=owner,
-        repo_dir=str(repo_path),
-        log=GIT_SYNC_LOG,
+        script=_GIT_SYNC_SCRIPT,
     ))
     write_text(timer_path, _GIT_SYNC_TIMER_TPL.format(interval=interval))
 
     run(["systemctl", "daemon-reload"])
-    run(["systemctl", "enable", "--now", GIT_SYNC_TIMER_NAME])
+    run(["systemctl", "enable", GIT_SYNC_TIMER_NAME])
+    run(["systemctl", "start", GIT_SYNC_TIMER_NAME])
 
-    # Forza un sync immediato
-    run_capture(["systemctl", "start", GIT_SYNC_SERVICE_NAME])
+    # Primo sync immediato (non fatale)
+    result = run_capture(["systemctl", "start", GIT_SYNC_SERVICE_NAME])
+    if result.returncode == 0:
+        print(f"[OK] Primo sync eseguito")
+    else:
+        print(f"[WARN] Primo sync fallito (il timer lo rieseguirà): {(result.stdout or '').strip()[-200:]}")
 
     print(f"[OK] auto-git-sync.timer attivo → sync ogni {interval}s")
     print(f"     Log:     tail -f {GIT_SYNC_LOG}")
