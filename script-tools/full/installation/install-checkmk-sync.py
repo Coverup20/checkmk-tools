@@ -14,7 +14,7 @@ Sostituisce:
   - install-auto-git-sync.sh
   - install-python-full-sync.py
 
-Version: 1.0.5
+Version: 1.0.6
 """
 
 import argparse
@@ -26,7 +26,7 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-VERSION = "1.0.5"
+VERSION = "1.0.6"
 
 # ─── Costanti ─────────────────────────────────────────────────────────────────
 
@@ -408,16 +408,20 @@ def install_python_sync_cron(repo_path: Path, target: str,
 def _ask(prompt: str) -> str:
     """
     Legge input da /dev/tty se stdin non è un tty (es. curl | python3 -).
+    Apre /dev/tty in r+w così prompt e risposta usano entrambi il terminale reale.
     Fallback a input() standard.
     """
     import sys
     if not sys.stdin.isatty():
         try:
-            with open("/dev/tty", "r") as tty:
-                sys.stdout.write(prompt)
-                sys.stdout.flush()
+            with open("/dev/tty", "r+") as tty:
+                tty.write(prompt)
+                tty.flush()
                 return tty.readline().rstrip("\n")
         except OSError:
+            # /dev/tty non disponibile: scrivi prompt su stderr e usa default
+            sys.stderr.write(prompt + " [auto-default]\n")
+            sys.stderr.flush()
             return ""
     return input(prompt)
 
