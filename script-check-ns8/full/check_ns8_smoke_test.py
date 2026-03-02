@@ -10,7 +10,7 @@ import sys
 import time
 
 VERSION = "1.0.0"
-SERVICE = "NS8_Smoke_Test"
+SERVICE = "NS8 Smoke Test"
 
 
 def main() -> int:

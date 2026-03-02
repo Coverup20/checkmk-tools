@@ -15,7 +15,7 @@ from typing import Tuple, Optional
 from pathlib import Path
 
 VERSION = "1.0.0"
-SERVICE = "SOS_session"
+SERVICE = "SOS Session"
 LOGFILE = Path("/var/log/messages")
 
 

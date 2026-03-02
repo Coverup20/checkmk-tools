@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 VERSION = "1.0.0"
-SERVICE = "Podman_Status"
+SERVICE = "Podman Status"
 LOGFILE = Path("/var/log/podman_events.log")
 TIME_WINDOW_MINUTES = 5
 
