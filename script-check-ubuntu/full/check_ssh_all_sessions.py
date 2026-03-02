@@ -13,7 +13,7 @@ import sys
 from typing import Tuple, List, Set
 
 VERSION = "1.0.0"
-SERVICE = "SSH_all_sessions"
+SERVICE = "SSH.All.Sessions"
 
 
 def run_command(cmd: List[str]) -> Tuple[int, str, str]:

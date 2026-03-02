@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import Tuple, Set, List
 
 VERSION = "1.0.0"
-SERVICE = "SSH_root_session"
+SERVICE = "SSH.Root.Session"
 
 # State file configuration
 STATE_DIR = Path("/var/lib/check_mk_agent")

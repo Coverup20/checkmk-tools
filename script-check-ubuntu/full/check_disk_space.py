@@ -14,7 +14,7 @@ import re
 from typing import Tuple, Optional
 
 VERSION = "1.0.0"
-SERVICE = "Disk_Space_Root"
+SERVICE = "Disk.Space.Root"
 
 # Configurable thresholds (percentage)
 THRESHOLD_WARNING = 80

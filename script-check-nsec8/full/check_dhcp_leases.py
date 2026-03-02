@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 VERSION = "1.1.0"
-SERVICE = "DHCP_Leases"
+SERVICE = "DHCP.Leases"
 LEASE_FILE = Path("/tmp/dhcp.leases")
 
 

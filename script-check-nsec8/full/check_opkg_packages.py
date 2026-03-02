@@ -7,7 +7,7 @@ import sys
 import time
 from pathlib import Path
 
-SERVICE = "OPKG_Packages"
+SERVICE = "OPKG.Packages"
 
 
 def run_lines(cmd: list[str], timeout: int = 15) -> list[str]:

@@ -4,7 +4,7 @@
 import sys
 from pathlib import Path
 
-SERVICE = "Firewall_Connections"
+SERVICE = "Firewall.Connections"
 
 
 def read_int(path: str) -> int:

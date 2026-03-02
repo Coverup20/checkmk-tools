@@ -5,7 +5,7 @@ import subprocess
 import sys
 import time
 
-SERVICE = "DNS_Resolution"
+SERVICE = "DNS.Resolution"
 TEST_DOMAINS = ["google.com", "cloudflare.com", "dns.google"]
 
 

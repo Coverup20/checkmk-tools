@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 VERSION = "1.1.0"
-SERVICE = "Firewall_Rules"
+SERVICE = "Firewall.Rules"
 
 
 def run(cmd: list[str]) -> str:

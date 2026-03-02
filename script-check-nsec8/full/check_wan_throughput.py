@@ -24,7 +24,7 @@ import time
 from typing import Optional, Tuple
 
 SCRIPT_VERSION = "1.0.4"
-SERVICE = "WAN_Throughput"
+SERVICE = "WAN.Throughput"
 STATE_FILE = "/tmp/wan_throughput_state.json"
 PROC_NET_DEV = "/proc/net/dev"
 

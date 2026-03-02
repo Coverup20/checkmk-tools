@@ -14,7 +14,7 @@ import re
 from typing import Tuple, List
 
 VERSION = "1.0.0"
-SERVICE = "SSH_sessions_count"
+SERVICE = "SSH.Sessions.Count"
 
 # Configurable thresholds
 THRESHOLD_WARNING = 1  # WARNING if >= 1 root session
