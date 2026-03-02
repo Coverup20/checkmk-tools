@@ -2,7 +2,7 @@
 """
 sync-python-full-checks.py - Sincronizza e deploya Python local checks
 
-Copia i launcher Python da script-check-*/remote/*.py
+Copia i check Python da script-check-*/full/*.py
 verso /usr/lib/check_mk_agent/local/ (senza estensione .py).
 
 Utilizzato da install-checkmk-sync.py come STEP 2.
@@ -13,11 +13,11 @@ Argomenti:
   --category       Categoria script-check-* specifica (default: auto-detect)
   --all-categories Sincronizza tutte le categorie script-check-*
   --scripts        Nomi script specifici da deployare, separati da virgola
-                   Es: rssh_fail2ban_status,rssh_disk_usage
+                   Es: check_fail2ban_status,check_disk_space
   --temp-dir       Deploy in directory temporanea invece di --target
                    (anteprima senza deploy reale)
 
-Version: 1.1.0
+Version: 1.2.0
 """
 
 import argparse
@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Set, Tuple
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 TEMP_DIR_DEFAULT = "/tmp/checkmk-sync-preview"
 
 REPO_DEFAULT = Path("/opt/checkmk-tools")
@@ -56,35 +56,35 @@ def get_categories(repo: Path, category: str, all_categories: bool) -> List[Path
             sys.exit(1)
         return [cat_path]
 
-    # Auto-detect: tutte le categorie con almeno un file in remote/
+    # Auto-detect: tutte le categorie con almeno un file in full/
     cats = sorted(repo.glob("script-check-*/"))
-    return [c for c in cats if c.is_dir() and (c / "remote").is_dir()]
+    return [c for c in cats if c.is_dir() and (c / "full").is_dir()]
 
 
 def find_launchers(category_dir: Path,
                    scripts_filter: Optional[Set[str]] = None) -> List[Path]:
     """
-    Trova launcher Python in category_dir/remote/*.py
+    Trova check Python in category_dir/full/*.py
 
-    Se scripts_filter è specificato, restituisce solo i launcher
+    Se scripts_filter è specificato, restituisce solo i check
     il cui stem (nome senza .py) è presente nel set.
     """
-    remote_dir = category_dir / "remote"
-    if not remote_dir.is_dir():
+    full_dir = category_dir / "full"
+    if not full_dir.is_dir():
         return []
-    launchers = sorted(remote_dir.glob("*.py"))
+    launchers = sorted(full_dir.glob("*.py"))
     if scripts_filter:
         launchers = [l for l in launchers if l.stem in scripts_filter]
     return launchers
 
 
 def list_all_launchers(repo: Path) -> List[Path]:
-    """Restituisce tutti i launcher disponibili nel repo (tutte le categorie)."""
+    """Restituisce tutti i check disponibili nel repo (tutte le categorie)."""
     result = []
     for cat in sorted(repo.glob("script-check-*/")):
-        remote = cat / "remote"
-        if remote.is_dir():
-            result.extend(sorted(remote.glob("*.py")))
+        full_dir = cat / "full"
+        if full_dir.is_dir():
+            result.extend(sorted(full_dir.glob("*.py")))
     return result
 
 

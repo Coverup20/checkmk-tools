@@ -14,7 +14,7 @@ Sostituisce:
   - install-auto-git-sync.sh
   - install-python-full-sync.py
 
-Version: 1.0.3
+Version: 1.0.4
 """
 
 import argparse
@@ -26,7 +26,7 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-VERSION = "1.0.3"
+VERSION = "1.0.4"
 
 # ─── Costanti ─────────────────────────────────────────────────────────────────
 
@@ -514,9 +514,9 @@ def ask_scripts(repo_path: Path) -> Tuple[str, bool, str]:
     selected_cats = [filter_cat] if filter_cat else categories
     all_launchers: List[Tuple[str, str]] = []  # (stem, categoria)
     for cat_name in selected_cats:
-        remote = repo_path / cat_name / "remote"
-        if remote.is_dir():
-            for launcher in sorted(remote.glob("*.py")):
+        full_dir = repo_path / cat_name / "full"
+        if full_dir.is_dir():
+            for launcher in sorted(full_dir.glob("*.py")):
                 all_launchers.append((launcher.stem, cat_name))
 
     if not all_launchers:
