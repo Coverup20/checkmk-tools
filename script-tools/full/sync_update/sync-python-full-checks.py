@@ -17,7 +17,7 @@ Argomenti:
   --temp-dir       Deploy in directory temporanea invece di --target
                    (anteprima senza deploy reale)
 
-Version: 1.2.0
+Version: 1.2.1
 """
 
 import argparse
@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Set, Tuple
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 TEMP_DIR_DEFAULT = "/tmp/checkmk-sync-preview"
 
 REPO_DEFAULT = Path("/opt/checkmk-tools")
@@ -72,7 +72,8 @@ def find_launchers(category_dir: Path,
     full_dir = category_dir / "full"
     if not full_dir.is_dir():
         return []
-    launchers = sorted(full_dir.glob("*.py"))
+    # Solo file che iniziano con "check" → esclude daemon, utility, etc.
+    launchers = sorted(f for f in full_dir.glob("*.py") if f.stem.startswith("check"))
     if scripts_filter:
         launchers = [l for l in launchers if l.stem in scripts_filter]
     return launchers
