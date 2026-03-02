@@ -1543,12 +1543,10 @@ srv-monitoring    # 45.33.235.86:2333 (root, Monitoring)
                   #       User root
                   #       ProxyJump sos
                   #       ControlMaster auto
-                  #       ControlPath ~/.ssh/cm-%r@%h:%p
-                  #       ControlPersist 5m
-                  # ⚠️ NON usare ControlMaster per srv-monitoring - usare SEMPRE -o ControlMaster=no
-                  # ✅ Comando diretto (UNICO formato corretto):
-                  #   wsl -- ssh -tt -o ControlMaster=no -J sos -p 2333 root@45.33.235.86 "cmd"
-                  # ✅ Il terminale VS Code non supporta input password interattivo → aprire terminale esterno
+                  #       ControlPath ~/.ssh/sockets/%r@%h:%p
+                  #       ControlPersist 60m
+                  # ✅ Comando corretto: wsl bash -c "ssh -tt srv-monitoring 'cmd'"
+                  # ✅ Prima connessione chiede password, poi socket attivo per 60 minuti
 
 # Altri server
 fwlab             # 192.168.5.117:2222 (root)
