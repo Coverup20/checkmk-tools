@@ -3,7 +3,7 @@
 # Notifica login/logout Cockpit leggendo /var/log/messages
 # e mostra quante sessioni sono attive
 
-SERVICE="Cockpit_sessions"
+SERVICE="NS7.Cockpit.Sessions"
 STATEFILE="/var/lib/check_mk_agent/cockpit_sessions.state"
 LOGFILE="/var/log/messages"
 NOW=$(date +"%Y-%m-%d %H:%M:%S")

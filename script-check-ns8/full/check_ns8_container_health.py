@@ -14,7 +14,7 @@ import sys
 from typing import List, Tuple
 
 VERSION = "1.0.0"
-SERVICE = "NS8_Containers"
+SERVICE = "NS8.Containers"
 
 
 def run_command(cmd: List[str], timeout: int = 30) -> Tuple[int, str, str]:

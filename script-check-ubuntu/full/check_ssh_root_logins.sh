@@ -5,7 +5,7 @@
 # Notifica se ci sono sessioni SSH aperte come root
 
 
-SERVICE="SSH_sessions_count"
+SERVICE="Ubuntu.SSH.Count"
 
 
 # Conta sessioni root correnti (utenti collegati con root via SSH)

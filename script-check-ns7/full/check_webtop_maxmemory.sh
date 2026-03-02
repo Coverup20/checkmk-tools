@@ -1,6 +1,6 @@
 #!/bin/bash
 # check_webtop_maxmemory.sh
-SERVICE="WebTop_maxmemory"
+SERVICE="NS7.WebTop.MaxMemory"
 MAXMEM=$(config show webtop 2>/dev/null | grep -i 'MaxMemory' | awk -
 F= '{print $2}')
 if [ -z "$MAXMEM" ]; then

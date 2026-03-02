@@ -5,7 +5,7 @@
 # Genera notifica per ogni login e logout SSH root
 
 
-SERVICE="SSH_root_session"
+SERVICE="Ubuntu.SSH.RootSession"
 
 STATEFILE="/var/lib/check_mk_agent/ssh_root_sessions.state"
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # check_webtop_https.sh
-SERVICE="WebTop_https"
+SERVICE="NS7.WebTop.HTTPS"
 URL="https://$(hostname -f)/webtop/"
 HTTP_CODE=$(curl -L -s -k -o /dev/null -w "%{http_code}" --max-time 5 "$URL")
 if [ "$HTTP_CODE" = "200" ]; then

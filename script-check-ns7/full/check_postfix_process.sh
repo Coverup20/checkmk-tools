@@ -1,6 +1,6 @@
 #!/bin/bash
 # check_postfix_processes.sh
-SERVICE="Postfix_processes"
+SERVICE="NS7.Postfix.Processes"
 PROCS=$(pgrep -c -f "postfix")
 if [ "$PROCS" -gt 0 ]; then
     echo "0 $SERVICE - $PROCS Postfix process(es) running"

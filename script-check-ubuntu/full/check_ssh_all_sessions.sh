@@ -5,7 +5,7 @@
 # Conta tutte le sessioni SSH attive (tutti gli utenti)
 
 
-SERVICE="SSH_all_sessions"
+SERVICE="Ubuntu.SSH.AllSessions"
 
 
 # Conta tutte le sessioni SSH attive
