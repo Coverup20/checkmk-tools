@@ -10,7 +10,7 @@ import sys
 from typing import List, Tuple
 
 VERSION = "1.0.0"
-SERVICE = "NS8_Container_Inventory"
+SERVICE = "NS8.Container.Inventory"
 
 
 def run_command(cmd: List[str], timeout: int = 30) -> Tuple[int, str, str]:

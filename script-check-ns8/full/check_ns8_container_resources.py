@@ -10,7 +10,7 @@ import sys
 from typing import List, Tuple
 
 VERSION = "1.1.0"
-SERVICE = "NS8_Container_Resources"
+SERVICE = "NS8.Container.Resources"
 CPU_WARN = 80.0
 CPU_CRIT = 95.0
 MEM_WARN = 80.0
