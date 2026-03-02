@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 from typing import List
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 SYSTEMD_DIR = Path("/etc/systemd/system")
 SERVICE_NAME = "checkmk-local-discovery-trigger.service"
 TIMER_NAME = "checkmk-local-discovery-trigger.timer"
@@ -228,9 +228,20 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def is_checkmk_server() -> bool:
+    """Verifica che questo sia un server CheckMK (omd + cmk presenti)."""
+    return shutil.which("omd") is not None and shutil.which("cmk") is not None
+
+
 def main() -> int:
     args = parse_args()
     require_root()
+
+    # Guardrail: questo script va eseguito SOLO su server CheckMK, non su host monitorati
+    if not is_checkmk_server():
+        print("[ERROR] Questo non è un server CheckMK (omd/cmk non trovati).", file=sys.stderr)
+        print("[ERROR] Il discovery trigger va installato SOLO sul server CheckMK, non sugli host monitorati.", file=sys.stderr)
+        return 1
 
     if args.quick and not args.site:
         args.site = detect_default_site()
