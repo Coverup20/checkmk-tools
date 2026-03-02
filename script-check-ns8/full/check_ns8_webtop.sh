@@ -10,7 +10,7 @@ FQDN=$(hostname -f)
 DOMAIN=$(echo "$FQDN" | cut -d. -f2-)
 
 if [[ -z "$DOMAIN" ]]; then
-    echo "2 Webtop5 - Nessun dominio rilevato da hostname -f"
+    echo "1 Webtop5 - Nessun dominio rilevato da hostname -f"
     exit 1
 fi
 
@@ -18,7 +18,7 @@ fi
 INSTANCES=$(runagent -l | grep -E '^webtop')
 
 if [[ -z "$INSTANCES" ]]; then
-    echo "2 Webtop5 - Nessuna istanza WebTop trovata"
+    echo "1 Webtop5 - Nessuna istanza WebTop trovata (modulo non installato)"
     exit 0
 fi
 

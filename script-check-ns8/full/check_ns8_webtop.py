@@ -5,7 +5,7 @@ check_ns8_webtop.py - CheckMK Local Check per WebTop NS8
 Monitora disponibilità WebTop su NethServer 8.
 Controlla presenza istanze WebTop e raggiungibilità interfaccia HTTP.
 
-Version: 1.0.0
+Version: 1.0.1
 """
 
 import subprocess
@@ -16,7 +16,7 @@ import urllib.error
 import ssl
 from typing import Tuple, Optional
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 SERVICE = "Webtop5"
 
 
@@ -133,12 +133,12 @@ def main() -> int:
     domain = get_domain_from_fqdn()
     
     if not domain:
-        print(f"2 {SERVICE} - Nessun dominio rilevato da hostname -f")
+        print(f"1 {SERVICE} - Nessun dominio rilevato da hostname -f")
         return 0
     
     # Check WebTop instances
     if not check_webtop_instances():
-        print(f"2 {SERVICE} - Nessuna istanza WebTop trovata")
+        print(f"1 {SERVICE} - Nessuna istanza WebTop trovata (modulo non installato)")
         return 0
     
     # Check HTTP availability
