@@ -62,7 +62,7 @@
     - ✅ Dopo OGNI comando lanciato in terminale, aggiungere una pausa breve per permettere di leggere l’output.
     - Default: **3 secondi**.
     - PowerShell (locale): aggiungere sempre `; Start-Sleep -Seconds 3`
-       - Esempio: `wsl -- ssh host "uptime"; Start-Sleep -Seconds 3`
+       - Esempio: `wsl -d kali-linux ssh host "uptime"; Start-Sleep -Seconds 3`
     - Bash (remoto / dentro SSH): aggiungere `; sleep 3`
        - Esempio: `ssh host "uptime; sleep 3"`
     - Obiettivo: evitare che l’output “sparisca” subito e ridurre errori/timeout percepiti.
@@ -253,9 +253,9 @@ wsl bash -n rocksolid-startup.sh       # ✅ Validazione 2
 wsl bash -n altro-script.sh            # ✅ Validazione 3
 
 # Test esecuzione TUTTI E 3 su host remoto
-wsl -- ssh nsec8-stable "curl -fsSL .../install-script.sh | bash"      # ✅ Test 1
-wsl -- ssh nsec8-stable "curl -fsSL .../rocksolid-startup.sh | bash"   # ✅ Test 2
-wsl -- ssh nsec8-stable "curl -fsSL .../altro-script.sh | bash"        # ✅ Test 3
+wsl -d kali-linux ssh nsec8-stable "curl -fsSL .../install-script.sh | bash"      # ✅ Test 1
+wsl -d kali-linux ssh nsec8-stable "curl -fsSL .../rocksolid-startup.sh | bash"   # ✅ Test 2
+wsl -d kali-linux ssh nsec8-stable "curl -fsSL .../altro-script.sh | bash"        # ✅ Test 3
 
 # SOLO ORA puoi dire "test completato"
 
@@ -267,7 +267,7 @@ wsl -- ssh nsec8-stable "curl -fsSL .../altro-script.sh | bash"        # ✅ Tes
 # Modificati: install-script.sh, rocksolid-startup.sh
 
 # Test solo rocksolid
-wsl -- ssh nsec8-stable "rocksolid-startup.sh"  # ✅ Test 1
+wsl -d kali-linux ssh nsec8-stable "rocksolid-startup.sh"  # ✅ Test 1
 # ❌ NON testato install-script.sh!
 
 # ❌ ERRORE: Dici "test completato" senza testare install-script.sh
@@ -362,7 +362,7 @@ Copy-Item "\\192.168.10.132\usbshare\CheckMK-Backups\2026-01-29_00-00-00\script-
 wsl bash -n script.sh  # EXIT CODE: 0 ✓
 
 # 3. Testa su host
-wsl -- ssh nsec8-stable "bash /opt/checkmk-tools/script.sh"
+wsl -d kali-linux ssh nsec8-stable "bash /opt/checkmk-tools/script.sh"
 # Output: ERROR line 45: comando non trovato
 
 # 4. Fix automatico (NON fermarsi!)
@@ -372,7 +372,7 @@ wsl -- ssh nsec8-stable "bash /opt/checkmk-tools/script.sh"
 wsl bash -n script.sh  # EXIT CODE: 0 ✓
 
 # 6. Ri-testa
-wsl -- ssh nsec8-stable "bash /opt/checkmk-tools/script.sh"
+wsl -d kali-linux ssh nsec8-stable "bash /opt/checkmk-tools/script.sh"
 # Output: SUCCESS ✓
 
 # 7. Solo ora committa
@@ -490,12 +490,12 @@ git push
 "Su quale host testo? [nsec8-stable]"
 
 # 6. Verifica e aggiorna repo locale
-wsl -- ssh nsec8-stable "[ -d /opt/checkmk-tools ] && echo 'EXISTS' || echo 'MISSING'"
+wsl -d kali-linux ssh nsec8-stable "[ -d /opt/checkmk-tools ] && echo 'EXISTS' || echo 'MISSING'"
 # Se MISSING → git clone https://github.com/Coverup20/checkmk-tools.git /opt/checkmk-tools
-# Se EXISTS → wsl -- ssh nsec8-stable "cd /opt/checkmk-tools && git pull"
+# Se EXISTS → wsl -d kali-linux ssh nsec8-stable "cd /opt/checkmk-tools && git pull"
 
 # 7. Test da REPO LOCALE (NON GitHub!)
-wsl -- ssh nsec8-stable "/opt/checkmk-tools/script-tools/full/install-script.sh"
+wsl -d kali-linux ssh nsec8-stable "/opt/checkmk-tools/script-tools/full/install-script.sh"
 # Output: ERRORE linea 45
 
 # ❌ ERRORE → TORNA A 1 (fix + ritest)
@@ -935,16 +935,16 @@ curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script
 
 ```bash
 # STEP 1: Verifica + crea/aggiorna repo locale
-wsl -- ssh <host> "[ -d /opt/checkmk-tools ] && echo 'REPO EXISTS' || echo 'REPO MISSING'"
+wsl -d kali-linux ssh <host> "[ -d /opt/checkmk-tools ] && echo 'REPO EXISTS' || echo 'REPO MISSING'"
 
 # Se REPO MISSING → clona
-wsl -- ssh <host> "git clone https://github.com/Coverup20/checkmk-tools.git /opt/checkmk-tools"
+wsl -d kali-linux ssh <host> "git clone https://github.com/Coverup20/checkmk-tools.git /opt/checkmk-tools"
 
 # Se REPO EXISTS → aggiorna
-wsl -- ssh <host> "cd /opt/checkmk-tools && git pull"
+wsl -d kali-linux ssh <host> "cd /opt/checkmk-tools && git pull"
 
 # STEP 2: Esegui test da repo LOCALE (NON da GitHub!)
-wsl -- ssh <host> "/opt/checkmk-tools/script-check-ns7/full/check-sos-ns7.py"
+wsl -d kali-linux ssh <host> "/opt/checkmk-tools/script-check-ns7/full/check-sos-ns7.py"
 
 # ✅ VANTAGGI:
 # - Nessun problema cache GitHub
@@ -956,10 +956,10 @@ wsl -- ssh <host> "/opt/checkmk-tools/script-check-ns7/full/check-sos-ns7.py"
 
 ```bash
 # Aggiorna repo
-wsl -- ssh <host> "cd /opt/checkmk-tools && git pull"
+wsl -d kali-linux ssh <host> "cd /opt/checkmk-tools && git pull"
 
 # Test launcher da repo locale
-wsl -- ssh <host> "/opt/checkmk-tools/script-check-ns7/remote/rcheck-sos-ns7.py"
+wsl -d kali-linux ssh <host> "/opt/checkmk-tools/script-check-ns7/remote/rcheck-sos-ns7.py"
 
 # ✅ Launcher scarica full/ da GitHub (comportamento normale)
 # ✅ Ma launcher stesso viene da repo locale aggiornato
@@ -1345,30 +1345,30 @@ git commit -m "feat(ubuntu): converti check_service_name in Python v1.0.0 + laun
 git push
 
 # 8. Deploy su host remoto
-wsl -- ssh <host> "cd /opt/checkmk-tools && git pull"
+wsl -d kali-linux ssh <host> "cd /opt/checkmk-tools && git pull"
 
 # 9. Test script completo
-wsl -- ssh <host> "/opt/checkmk-tools/script-check-ubuntu/full/check_service_name.py"
+wsl -d kali-linux ssh <host> "/opt/checkmk-tools/script-check-ubuntu/full/check_service_name.py"
 
 # 10. Test launcher remoto
-wsl -- ssh <host> "/opt/checkmk-tools/script-check-ubuntu/remote/rssh_service_name.py"
+wsl -d kali-linux ssh <host> "/opt/checkmk-tools/script-check-ubuntu/remote/rssh_service_name.py"
 
 # 11. ⚠️ VERIFICA presenza versione bash PRIMA del deploy
-wsl -- ssh <host> "ls -la /usr/lib/check_mk_agent/local/<nome_check_bash>"
+wsl -d kali-linux ssh <host> "ls -la /usr/lib/check_mk_agent/local/<nome_check_bash>"
 # Se NON esiste versione bash → SKIP deploy Python su questo host
 
 # 12. Deploy come local check (SOLO se bash esisteva)
-wsl -- ssh <host> "cp /opt/checkmk-tools/script-check-ubuntu/remote/rssh_service_name.py /usr/lib/check_mk_agent/local/rssh_service_name && chmod +x /usr/lib/check_mk_agent/local/rssh_service_name"
+wsl -d kali-linux ssh <host> "cp /opt/checkmk-tools/script-check-ubuntu/remote/rssh_service_name.py /usr/lib/check_mk_agent/local/rssh_service_name && chmod +x /usr/lib/check_mk_agent/local/rssh_service_name"
 
 # 13. Test local check deployato
-wsl -- ssh <host> "/usr/lib/check_mk_agent/local/rssh_service_name"
+wsl -d kali-linux ssh <host> "/usr/lib/check_mk_agent/local/rssh_service_name"
 
 # 14. Verifica output agent CheckMK
-wsl -- ssh <host> "check_mk_agent 2>/dev/null | grep ServiceName"
+wsl -d kali-linux ssh <host> "check_mk_agent 2>/dev/null | grep ServiceName"
 # Deve mostrare UNA SOLA riga con output check
 
 # 15. ✅ Se tutto OK → Rimuovi vecchio launcher bash (se esisteva)
-wsl -- ssh <host> "rm /usr/lib/check_mk_agent/local/rssh_service_name_old 2>/dev/null || true"
+wsl -d kali-linux ssh <host> "rm /usr/lib/check_mk_agent/local/rssh_service_name_old 2>/dev/null || true"
 ```
 
 ### 6. Naming Convention
@@ -1456,18 +1456,18 @@ wsl -- ssh <host> "rm /usr/lib/check_mk_agent/local/rssh_service_name_old 2>/dev
 ### Setup WSL SSH
 
 **Environment configurato:**
-- ✅ WSL: Ubuntu su Windows (`wsl -- bash -c "command"`)
+- ✅ WSL: **Kali Linux** su Windows (`wsl -d kali-linux bash -c "command"`)
 - ✅ SSH Keys: `~/.ssh/checkmk` (protetta da passphrase)
 - ✅ SSH Config: `~/.ssh/config` con alias host
 - ✅ SSH ControlMaster: Riutilizzo connessioni (passphrase 1 volta, poi 1 min attiva)
 
 **⚠️ REGOLA FORMATO COMANDI - Quando l'utente chiede "comandi da incollare":**
 
-- Passare il comando **nudo**, senza wrapper `wsl -- ssh ...`
+- Passare il comando **nudo**, senza wrapper `wsl -d kali-linux ssh ...`
 - L'utente lo incolla direttamente nel terminale remoto già aperto
-- SBAGLIATO: `wsl -- ssh -tt -o ControlMaster=no -J sos -p 2333 root@45.33.235.86 "apt-get install -y git"`
+- SBAGLIATO: `wsl -d kali-linux ssh -tt -o ControlMaster=no -J sos -p 2333 root@45.33.235.86 "apt-get install -y git"`
 - CORRETTO: `apt-get install -y git`
-- Usare il wrapper `wsl -- ssh ...` SOLO quando si esegue da VS Code terminal in modo autonomo
+- Usare il wrapper `wsl -d kali-linux ssh ...` SOLO quando si esegue da VS Code terminal in modo autonomo
 
 **⚠️ REGOLA PRATICA - Password SSH (no “pausa continua”):**
 
@@ -1535,7 +1535,7 @@ srv-monitoring    # 45.33.235.86:2333 (root, Monitoring)
                   # ⚠️ Firewall whitelist solo IP 159.65.203.113 (alias sos) - OBBLIGATORIO jump via sos
                   # ⚠️ Autenticazione PASSWORD (non chiave SSH) - NON installare chiavi SSH
                   # ✅ Comando accesso diretto (da WSL):
-                  #   wsl -- ssh srv-monitoring          (usa alias ~/.ssh/config in WSL)
+                  #   wsl -d kali-linux ssh srv-monitoring          (usa alias ~/.ssh/config in WSL)
                   # ✅ Config WSL ~/.ssh/config entry OBBLIGATORIA:
                   #   Host srv-monitoring
                   #       HostName 45.33.235.86
@@ -1545,8 +1545,8 @@ srv-monitoring    # 45.33.235.86:2333 (root, Monitoring)
                   #       ControlMaster auto
                   #       ControlPath ~/.ssh/sockets/%r@%h:%p
                   #       ControlPersist 60m
-                  # ✅ Comando corretto: wsl bash -c "ssh -tt srv-monitoring 'cmd'"
-                  # ✅ Prima connessione chiede password, poi socket attivo per 60 minuti
+                  # ✅ Comando corretto: wsl -d kali-linux bash -c "ssh -tt srv-monitoring 'cmd'"
+                  # ✅ Prima connessione chiede password, poi socket attivo per 15 minuti
 
 # Altri server
 fwlab             # 192.168.5.117:2222 (root)
@@ -1569,17 +1569,17 @@ redteam           # redteam.security.nethesis.it (root)
 
 ```powershell
 # Da PowerShell → esegui comando su VPS (con timeout generoso)
-wsl -- ssh checkmk-vps-01 "omd version"
+wsl -d kali-linux ssh checkmk-vps-01 "omd version"
 # timeout: 30000 (30 sec) - comando SSH normale
 
-wsl -- ssh checkmk-vps-02 "omd sites"
+wsl -d kali-linux ssh checkmk-vps-02 "omd sites"
 # timeout: 30000 (30 sec)
 
 # Comando complesso (check_mk_agent, git pull)
-wsl -- ssh ns-lab00 "check_mk_agent"
+wsl -d kali-linux ssh ns-lab00 "check_mk_agent"
 # timeout: 60000 (60 sec) - comando complesso, output lungo
 
-wsl -- ssh ns-lab00 "cd /opt/checkmk-tools && git pull"
+wsl -d kali-linux ssh ns-lab00 "cd /opt/checkmk-tools && git pull"
 # timeout: 60000 (60 sec) - operazione git remota
 ```
 
@@ -1587,10 +1587,10 @@ wsl -- ssh ns-lab00 "cd /opt/checkmk-tools && git pull"
 
 ```powershell
 # Download ed esecuzione diretta script dal repository
-wsl -- ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash"
+wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash"
 
 # Con parametri
-wsl -- ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/script.sh | bash -s -- arg1 arg2"
+wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/script.sh | bash -s -- arg1 arg2"
 
 ```text
 
@@ -1598,11 +1598,11 @@ wsl -- ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup2
 
 ```powershell
 # Check rapido su tutti i VPS
-wsl -- ssh checkmk-vps-01 "omd status"
-wsl -- ssh checkmk-vps-02 "omd status"
+wsl -d kali-linux ssh checkmk-vps-01 "omd status"
+wsl -d kali-linux ssh checkmk-vps-02 "omd status"
 
 # Verifica backup
-wsl -- ssh checkmk-vps-01 "ls -lh /opt/omd/sites/monitoring/var/check_mk/notify-backup/"
+wsl -d kali-linux ssh checkmk-vps-01 "ls -lh /opt/omd/sites/monitoring/var/check_mk/notify-backup/"
 
 ```text
 
@@ -1613,7 +1613,7 @@ wsl -- ssh checkmk-vps-01 "ls -lh /opt/omd/sites/monitoring/var/check_mk/notify-
 # ❌ SBAGLIATO: scp script.sh checkmk-vps-01:/usr/local/bin/
 # ✅ CORRETTO: esegui da GitHub con curl
 
-wsl -- ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash"
+wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash"
 
 ```text
 
@@ -1633,21 +1633,21 @@ wsl -- ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup2
 
 ```powershell
 # Esegui check-integrity su VPS
-wsl -- ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash -n"
+wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash -n"
 
 ```text
 
 **Verifica logs:**
 
 ```powershell
-wsl -- ssh checkmk-vps-01 "tail -100 /omd/sites/monitoring/var/log/notify.log"
+wsl -d kali-linux ssh checkmk-vps-01 "tail -100 /omd/sites/monitoring/var/log/notify.log"
 
 ```text
 
 **Raccolta info sistema:**
 
 ```powershell
-wsl -- ssh checkmk-vps-01 "df -h && free -h && uptime"
+wsl -d kali-linux ssh checkmk-vps-01 "df -h && free -h && uptime"
 
 ```text
 
