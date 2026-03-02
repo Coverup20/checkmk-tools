@@ -14,7 +14,7 @@ Sostituisce:
   - install-auto-git-sync.sh
   - install-python-full-sync.py
 
-Version: 1.0.1
+Version: 1.0.2
 """
 
 import argparse
@@ -26,7 +26,7 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 
 # ─── Costanti ─────────────────────────────────────────────────────────────────
 
@@ -154,13 +154,14 @@ def ensure_repo(repo_path: Path, repo_url: str) -> None:
 
 
 def update_repo(repo_path: Path) -> None:
-    result = run_capture(["git", "-C", str(repo_path), "fetch", "origin", "main"])
+    repo_str = str(repo_path)
+    result = run_capture(["git", "fetch", "origin", "main"], cwd=repo_str)
     if result.returncode != 0:
         print(f"[WARN] git fetch fallito: {(result.stdout or '').strip()}")
         return
-    run_capture(["git", "-C", str(repo_path), "reset", "--hard", "origin/main"])
-    run_capture(["git", "-C", str(repo_path), "clean", "-fd"])
-    head = run_capture(["git", "-C", str(repo_path), "rev-parse", "--short", "HEAD"])
+    run_capture(["git", "reset", "--hard", "origin/main"], cwd=repo_str)
+    run_capture(["git", "clean", "-fd"], cwd=repo_str)
+    head = run_capture(["git", "rev-parse", "--short", "HEAD"], cwd=repo_str)
     sha = (head.stdout or "").strip()
     print(f"[OK] Repository aggiornato → {sha or 'ok'}")
 
@@ -172,13 +173,14 @@ _GIT_SYNC_SCRIPT = "/usr/local/bin/checkmk-git-sync.sh"
 _GIT_SYNC_WRAPPER = """#!/bin/bash
 REPO_DIR="{repo_dir}"
 LOG_FILE="{log}"
-if ! git -C "$REPO_DIR" fetch origin main >> "$LOG_FILE" 2>&1; then
+cd "$REPO_DIR" || exit 0
+if ! git fetch origin main >> "$LOG_FILE" 2>&1; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARN: git fetch fallito" >> "$LOG_FILE"
     exit 0
 fi
-git -C "$REPO_DIR" reset --hard origin/main >> "$LOG_FILE" 2>&1
-git -C "$REPO_DIR" clean -fd >> "$LOG_FILE" 2>&1
-SHA=$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null)
+git reset --hard origin/main >> "$LOG_FILE" 2>&1
+git clean -fd >> "$LOG_FILE" 2>&1
+SHA=$(git rev-parse --short HEAD 2>/dev/null)
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Sync OK ($SHA)" >> "$LOG_FILE"
 """
 
@@ -403,6 +405,22 @@ def install_python_sync_cron(repo_path: Path, target: str,
 
 # ─── Prompt interattivi ───────────────────────────────────────────────────────
 
+def _ask(prompt: str) -> str:
+    """
+    Legge input da /dev/tty se stdin non è un tty (es. curl | python3 -).
+    Fallback a input() standard.
+    """
+    import sys
+    if not sys.stdin.isatty():
+        try:
+            with open("/dev/tty", "r") as tty:
+                sys.stdout.write(prompt)
+                sys.stdout.flush()
+                return tty.readline().rstrip("\n")
+        except OSError:
+            return ""
+    return input(prompt)
+
 def ask_interval() -> int:
     print()
     print("  Scegli intervallo git sync:")
@@ -411,7 +429,7 @@ def ask_interval() -> int:
     print("  3) Ogni 5 minuti")
     print("  4) Ogni 10 minuti")
     print("  5) Ogni 30 minuti")
-    choice = input("\n  Scelta [2]: ").strip().replace("\r", "") or "2"
+    choice = _ask("\n  Scelta [2]: ").strip().replace("\r", "") or "2"
     mapping = {"1": 30, "2": 60, "3": 300, "4": 600, "5": 1800}
     interval = mapping.get(choice, 60)
     print(f"[OK] Intervallo: {interval}s")
@@ -433,7 +451,7 @@ def ask_category(repo_path: Path) -> Tuple[str, bool]:
         print(f"  {i}) {cat}")
     print("  a) Auto-detect (consigliato)")
 
-    choice = input("\n  Scelta [a]: ").strip().lower().replace("\r", "") or "a"
+    choice = _ask("\n  Scelta [a]: ").strip().lower().replace("\r", "") or "a"
 
     if choice == "0":
         return "auto", True
@@ -484,7 +502,7 @@ def ask_scripts(repo_path: Path) -> Tuple[str, bool, str]:
     print("  - 0 o invio = tutti")
     print()
 
-    raw = input("  Scelta [0 = tutti]: ").strip().replace("\r", "") or "0"
+    raw = _ask("  Scelta [0 = tutti]: ").strip().replace("\r", "") or "0"
 
     selected_indices: List[int] = []
     if raw == "0" or raw == "":
@@ -525,7 +543,7 @@ def ask_scripts(repo_path: Path) -> Tuple[str, bool, str]:
     print("  Modalità deploy:")
     print("  1) Deploy reale → /usr/lib/check_mk_agent/local/ (default)")
     print(f"  2) Anteprima temp → /tmp/checkmk-sync-preview/ (nessun deploy reale)")
-    mode = input("\n  Scelta [1]: ").strip().replace("\r", "") or "1"
+    mode = _ask("\n  Scelta [1]: ").strip().replace("\r", "") or "1"
 
     temp_dir = ""
     if mode == "2":
