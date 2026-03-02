@@ -12,8 +12,12 @@ Argomenti:
   --target         Directory destinazione local checks (default: /usr/lib/check_mk_agent/local)
   --category       Categoria script-check-* specifica (default: auto-detect)
   --all-categories Sincronizza tutte le categorie script-check-*
+  --scripts        Nomi script specifici da deployare, separati da virgola
+                   Es: rssh_fail2ban_status,rssh_disk_usage
+  --temp-dir       Deploy in directory temporanea invece di --target
+                   (anteprima senza deploy reale)
 
-Version: 1.0.0
+Version: 1.1.0
 """
 
 import argparse
@@ -22,9 +26,10 @@ import shutil
 import stat
 import sys
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Set, Tuple
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
+TEMP_DIR_DEFAULT = "/tmp/checkmk-sync-preview"
 
 REPO_DEFAULT = Path("/opt/checkmk-tools")
 TARGET_DEFAULT = "/usr/lib/check_mk_agent/local"
@@ -56,12 +61,31 @@ def get_categories(repo: Path, category: str, all_categories: bool) -> List[Path
     return [c for c in cats if c.is_dir() and (c / "remote").is_dir()]
 
 
-def find_launchers(category_dir: Path) -> List[Path]:
-    """Trova tutti i launcher Python in category_dir/remote/*.py"""
+def find_launchers(category_dir: Path,
+                   scripts_filter: Optional[Set[str]] = None) -> List[Path]:
+    """
+    Trova launcher Python in category_dir/remote/*.py
+
+    Se scripts_filter è specificato, restituisce solo i launcher
+    il cui stem (nome senza .py) è presente nel set.
+    """
     remote_dir = category_dir / "remote"
     if not remote_dir.is_dir():
         return []
-    return sorted(remote_dir.glob("*.py"))
+    launchers = sorted(remote_dir.glob("*.py"))
+    if scripts_filter:
+        launchers = [l for l in launchers if l.stem in scripts_filter]
+    return launchers
+
+
+def list_all_launchers(repo: Path) -> List[Path]:
+    """Restituisce tutti i launcher disponibili nel repo (tutte le categorie)."""
+    result = []
+    for cat in sorted(repo.glob("script-check-*/")):
+        remote = cat / "remote"
+        if remote.is_dir():
+            result.extend(sorted(remote.glob("*.py")))
+    return result
 
 
 def deploy_name(launcher: Path) -> str:
@@ -72,14 +96,20 @@ def deploy_name(launcher: Path) -> str:
 
 # ─── Deploy ───────────────────────────────────────────────────────────────────
 
-def sync_category(category_dir: Path, target_dir: Path) -> Tuple[int, int, int]:
+def sync_category(category_dir: Path, target_dir: Path,
+                  scripts_filter: Optional[Set[str]] = None) -> Tuple[int, int, int]:
     """
     Sincronizza i launcher di una categoria.
+
+    Args:
+        category_dir:    Directory script-check-*
+        target_dir:      Destinazione deploy (reale o temp)
+        scripts_filter:  Se specificato, deploya solo gli script nel set
 
     Returns:
         (deployed, updated, skipped)
     """
-    launchers = find_launchers(category_dir)
+    launchers = find_launchers(category_dir, scripts_filter)
     if not launchers:
         return 0, 0, 0
 
@@ -133,26 +163,47 @@ def sync_category(category_dir: Path, target_dir: Path) -> Tuple[int, int, int]:
     return deployed, updated, skipped
 
 
-def run(repo: Path, target_dir: Path, category: str, all_categories: bool) -> int:
-    """Entry point principale."""
+def run(repo: Path, target_dir: Path, category: str, all_categories: bool,
+        scripts_filter: Optional[Set[str]] = None,
+        temp_dir: Optional[Path] = None) -> int:
+    """
+    Entry point principale.
+
+    Args:
+        scripts_filter: Se specificato, deploya solo gli script nel set
+        temp_dir:       Se specificato, deploya in questa dir (anteprima)
+    """
+    # Destinazione effettiva
+    effective_target = temp_dir if temp_dir is not None else target_dir
+    is_temp = temp_dir is not None
+
     print(f"=== sync-python-full-checks v{VERSION} ===")
     print(f"  Repo:   {repo}")
-    print(f"  Target: {target_dir}")
+    if is_temp:
+        print(f"  Target: {effective_target}  [ANTEPRIMA - non deploy reale]")
+    else:
+        print(f"  Target: {effective_target}")
+    if scripts_filter:
+        print(f"  Script: {', '.join(sorted(scripts_filter))}")
     print()
 
     if not repo.is_dir():
         print(f"[ERROR] Repository non trovato: {repo}", file=sys.stderr)
         return 1
 
-    if not target_dir.is_dir():
-        print(f"[WARN] Target directory non esiste, la creo: {target_dir}")
+    if not effective_target.is_dir():
+        print(f"[INFO] Creo directory: {effective_target}")
         try:
-            target_dir.mkdir(parents=True, exist_ok=True)
+            effective_target.mkdir(parents=True, exist_ok=True)
         except OSError as e:
             print(f"[ERROR] Impossibile creare target dir: {e}", file=sys.stderr)
             return 1
 
-    categories = get_categories(repo, category, all_categories)
+    # Se scripts_filter specificato → cerca in tutte le categorie ignorando --category
+    if scripts_filter:
+        categories = get_categories(repo, "auto", all_categories=True)
+    else:
+        categories = get_categories(repo, category, all_categories)
 
     if not categories:
         print("[WARN] Nessuna categoria trovata.")
@@ -164,16 +215,17 @@ def run(repo: Path, target_dir: Path, category: str, all_categories: bool) -> in
 
     for cat_dir in categories:
         cat_name = cat_dir.name
-        print(f"── {cat_name} ──")
-        d, u, s = sync_category(cat_dir, target_dir)
+        d, u, s = sync_category(cat_dir, effective_target, scripts_filter)
         total_deployed += d
         total_updated += u
         total_skipped += s
-        if d == 0 and u == 0 and s == 0:
-            print(f"  (nessun launcher trovato in remote/)")
-        print()
+        if d > 0 or u > 0:
+            print()  # separatore visivo tra categorie con output
 
     print("─" * 40)
+    if is_temp:
+        print(f"[OK] Anteprima in: {effective_target}")
+        print(f"     Per deployare davvero: cp {effective_target}/* {target_dir}/")
     print(f"[OK] Riepilogo: {total_deployed} deployati, {total_updated} aggiornati, {total_skipped} invariati")
     return 0
 
@@ -183,6 +235,21 @@ def run(repo: Path, target_dir: Path, category: str, all_categories: bool) -> in
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=f"sync-python-full-checks v{VERSION} - Deploy Python local checks",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Esempi:
+  # Deploy tutte le categorie
+  sync-python-full-checks.py --all-categories
+
+  # Deploy solo script specifici
+  sync-python-full-checks.py --scripts rssh_fail2ban_status,rssh_disk_usage
+
+  # Anteprima (temp dir) senza deploy reale
+  sync-python-full-checks.py --all-categories --temp-dir /tmp/preview
+
+  # Lista script disponibili
+  sync-python-full-checks.py --list
+        """,
     )
     p.add_argument("--repo", default=str(REPO_DEFAULT),
                    help=f"Path repository locale (default: {REPO_DEFAULT})")
@@ -192,6 +259,12 @@ def parse_args() -> argparse.Namespace:
                    help="Categoria script-check-* o 'auto'")
     p.add_argument("--all-categories", action="store_true",
                    help="Sincronizza tutte le categorie")
+    p.add_argument("--scripts",
+                   help="Script specifici da deployare (nomi separati da virgola, senza .py)")
+    p.add_argument("--temp-dir", default=None,
+                   help=f"Deploy in directory temp invece di --target (anteprima)")
+    p.add_argument("--list", action="store_true",
+                   help="Mostra tutti gli script disponibili nel repo ed esce")
     return p.parse_args()
 
 
@@ -199,7 +272,29 @@ def main() -> int:
     args = parse_args()
     repo = Path(args.repo)
     target = Path(args.target)
-    return run(repo, target, args.category, args.all_categories)
+
+    # --list: mostra script disponibili ed esce
+    if args.list:
+        launchers = list_all_launchers(repo)
+        if not launchers:
+            print("[WARN] Nessuno script trovato.")
+            return 0
+        print(f"Script disponibili ({len(launchers)}):\n")
+        for l in launchers:
+            cat = l.parent.parent.name
+            print(f"  {l.stem:<45} [{cat}]")
+        return 0
+
+    scripts_filter: Optional[Set[str]] = None
+    if args.scripts:
+        scripts_filter = {s.strip() for s in args.scripts.split(",") if s.strip()}
+
+    temp_dir: Optional[Path] = None
+    if args.temp_dir:
+        temp_dir = Path(args.temp_dir)
+
+    return run(repo, target, args.category, args.all_categories,
+               scripts_filter=scripts_filter, temp_dir=temp_dir)
 
 
 if __name__ == "__main__":

@@ -295,12 +295,17 @@ WantedBy=timers.target
 
 
 def _build_sync_cmd(py_bin: str, sync_script: Path, repo_path: Path,
-                    target: str, category: str, all_categories: bool) -> str:
+                    target: str, category: str, all_categories: bool,
+                    scripts: str = "", temp_dir: str = "") -> str:
     parts = [py_bin, str(sync_script), "--repo", str(repo_path), "--target", target]
-    if all_categories:
+    if scripts:
+        parts.extend(["--scripts", scripts])
+    elif all_categories:
         parts.append("--all-categories")
     else:
         parts.extend(["--category", category])
+    if temp_dir:
+        parts.extend(["--temp-dir", temp_dir])
     return " ".join(parts)
 
 
@@ -315,7 +320,8 @@ def _find_sync_script(repo_path: Path) -> Path:
 
 
 def install_python_sync_systemd(repo_path: Path, target: str,
-                                 category: str, all_categories: bool) -> None:
+                                 category: str, all_categories: bool,
+                                 scripts: str = "", temp_dir: str = "") -> None:
     """Installa checkmk-python-full-sync come systemd service + timer."""
     py_bin = shutil.which("python3")
     if not py_bin:
@@ -323,7 +329,21 @@ def install_python_sync_systemd(repo_path: Path, target: str,
         sys.exit(1)
 
     sync_script = _find_sync_script(repo_path)
-    cmd = _build_sync_cmd(py_bin, sync_script, repo_path, target, category, all_categories)
+    cmd = _build_sync_cmd(py_bin, sync_script, repo_path, target,
+                          category, all_categories, scripts, temp_dir)
+
+    # Modalità temp: esecuzione one-shot senza installare timer
+    if temp_dir:
+        print(f"[INFO] Modalità anteprima → esecuzione one-shot (nessun timer installato)")
+        result = run_capture([py_bin, str(sync_script),
+                              "--repo", str(repo_path),
+                              "--target", target,
+                              "--temp-dir", temp_dir]
+                             + (["--scripts", scripts] if scripts else ["--all-categories"])
+                             )
+        print(result.stdout or "")
+        print(f"[OK] Anteprima completata in: {temp_dir}")
+        return
 
     svc_path = SYSTEMD_DIR / PYTHON_SYNC_SERVICE_NAME
     timer_path = SYSTEMD_DIR / PYTHON_SYNC_TIMER_NAME
@@ -347,7 +367,8 @@ def install_python_sync_systemd(repo_path: Path, target: str,
 
 
 def install_python_sync_cron(repo_path: Path, target: str,
-                              category: str, all_categories: bool) -> None:
+                              category: str, all_categories: bool,
+                              scripts: str = "", temp_dir: str = "") -> None:
     """Installa python full sync via cron."""
     py_bin = shutil.which("python3")
     if not py_bin:
@@ -355,7 +376,24 @@ def install_python_sync_cron(repo_path: Path, target: str,
         sys.exit(1)
 
     sync_script = _find_sync_script(repo_path)
-    cmd = _build_sync_cmd(py_bin, sync_script, repo_path, target, category, all_categories)
+
+    # Modalità temp: esecuzione one-shot senza installare cron
+    if temp_dir:
+        print(f"[INFO] Modalità anteprima → esecuzione one-shot")
+        cmd_parts = [py_bin, str(sync_script),
+                     "--repo", str(repo_path), "--target", target,
+                     "--temp-dir", temp_dir]
+        if scripts:
+            cmd_parts += ["--scripts", scripts]
+        else:
+            cmd_parts.append("--all-categories")
+        result = run_capture(cmd_parts)
+        print(result.stdout or "")
+        print(f"[OK] Anteprima completata in: {temp_dir}")
+        return
+
+    cmd = _build_sync_cmd(py_bin, sync_script, repo_path, target,
+                          category, all_categories, scripts, temp_dir)
     cron_line = f"*/5 * * * * {cmd} >> {PYTHON_SYNC_LOG} 2>&1  # {PYTHON_SYNC_CRON_MARKER}"
 
     cron_update(PYTHON_SYNC_CRON_MARKER, cron_line, openwrt=is_openwrt())
@@ -410,6 +448,95 @@ def ask_category(repo_path: Path) -> Tuple[str, bool]:
     return "auto", False
 
 
+def ask_scripts(repo_path: Path) -> Tuple[str, bool, str]:
+    """
+    Selezione interattiva script e modalità deploy.
+
+    Returns:
+        (scripts_csv, all_categories, temp_dir)
+        scripts_csv:    stringa "nome1,nome2,..." oppure "" (tutte le categorie)
+        all_categories: True se l'utente ha scelto tutto
+        temp_dir:       path temp se anteprima, altrimenti ""
+    """
+    # Raccogli tutti i launcher disponibili
+    all_launchers: List[Tuple[str, str]] = []  # (stem, categoria)
+    for cat in sorted(repo_path.glob("script-check-*/")):
+        remote = cat / "remote"
+        if remote.is_dir():
+            for launcher in sorted(remote.glob("*.py")):
+                all_launchers.append((launcher.stem, cat.name))
+
+    if not all_launchers:
+        print("[WARN] Nessuno script trovato nel repository.")
+        return "", True, ""
+
+    print()
+    print("  Script disponibili:")
+    print("  ─" * 35)
+    print(f"  {'#':<4} {'Nome script':<45} Categoria")
+    print("  ─" * 35)
+    for i, (stem, cat) in enumerate(all_launchers, 1):
+        print(f"  {i:<4} {stem:<45} {cat}")
+    print()
+    print("  Seleziona script da deployare:")
+    print("  - Numeri separati da virgola/spazio: es. 1,3,5  oppure  1 3 5")
+    print("  - Intervalli: es. 1-5")
+    print("  - 0 o invio = tutti")
+    print()
+
+    raw = input("  Scelta [0 = tutti]: ").strip().replace("\r", "") or "0"
+
+    selected_indices: List[int] = []
+    if raw == "0" or raw == "":
+        selected_indices = list(range(len(all_launchers)))
+    else:
+        # Parsing: virgole, spazi, trattini per range
+        tokens = raw.replace(",", " ").split()
+        for token in tokens:
+            if "-" in token and not token.startswith("-"):
+                parts = token.split("-", 1)
+                try:
+                    start, end = int(parts[0]), int(parts[1])
+                    selected_indices.extend(range(start - 1, end))
+                except ValueError:
+                    pass
+            else:
+                try:
+                    selected_indices.append(int(token) - 1)
+                except ValueError:
+                    pass
+        # Dedup e ordine
+        selected_indices = sorted(set(
+            i for i in selected_indices if 0 <= i < len(all_launchers)
+        ))
+
+    scripts_csv = ""
+    all_cat = False
+    if not selected_indices or selected_indices == list(range(len(all_launchers))):
+        all_cat = True
+        print("  → Tutti gli script selezionati")
+    else:
+        chosen = [all_launchers[i][0] for i in selected_indices]
+        scripts_csv = ",".join(chosen)
+        print(f"  → Selezionati {len(chosen)} script: {scripts_csv}")
+
+    # Chiedi modalità deploy
+    print()
+    print("  Modalità deploy:")
+    print("  1) Deploy reale → /usr/lib/check_mk_agent/local/ (default)")
+    print(f"  2) Anteprima temp → /tmp/checkmk-sync-preview/ (nessun deploy reale)")
+    mode = input("\n  Scelta [1]: ").strip().replace("\r", "") or "1"
+
+    temp_dir = ""
+    if mode == "2":
+        temp_dir = "/tmp/checkmk-sync-preview"
+        print(f"  → Anteprima in: {temp_dir}")
+    else:
+        print("  → Deploy reale")
+
+    return scripts_csv, all_cat, temp_dir
+
+
 # ─── Argomenti CLI ────────────────────────────────────────────────────────────
 
 def parse_args() -> argparse.Namespace:
@@ -441,6 +568,10 @@ Esempi:
                    help="Categoria script-check-* o 'auto' (default: auto)")
     p.add_argument("--all-categories", action="store_true",
                    help="Sincronizza tutte le categorie script-check-*")
+    p.add_argument("--scripts", default="",
+                   help="Script specifici da deployare (nomi separati da virgola, senza .py)")
+    p.add_argument("--temp", action="store_true",
+                   help="Deploy in /tmp/checkmk-sync-preview/ invece di --target (anteprima)")
     p.add_argument("--git-interval", type=int, default=None,
                    help="Intervallo git pull in secondi (default: chiesto interattivamente)")
     p.add_argument("--quick", action="store_true",
@@ -496,21 +627,34 @@ def main() -> int:
     print()
     print("── STEP 2: Python Full Sync (deploy local checks) ────")
 
+    scripts = args.scripts
+    temp_dir = "/tmp/checkmk-sync-preview" if args.temp else ""
+
     if args.quick:
         category = args.category
         all_cat = args.all_categories
     else:
-        category = args.category
-        all_cat = args.all_categories
-        if category == "auto" and not all_cat:
-            category, all_cat = ask_category(repo_path)
+        # Modalità interattiva: selezione granulare
+        if not scripts and not args.all_categories:
+            scripts, all_cat, temp_dir = ask_scripts(repo_path)
+            category = args.category
+        else:
+            category = args.category
+            all_cat = args.all_categories
 
-    print(f"[INFO] Categoria: {'TUTTE' if all_cat else category}")
+    if scripts:
+        print(f"[INFO] Script selezionati: {scripts}")
+    else:
+        print(f"[INFO] Categoria: {'TUTTE' if all_cat else category}")
+    if temp_dir:
+        print(f"[INFO] Modalità: ANTEPRIMA → {temp_dir}")
 
     if use_systemd:
-        install_python_sync_systemd(repo_path, args.target, category, all_cat)
+        install_python_sync_systemd(repo_path, args.target, category, all_cat,
+                                    scripts=scripts, temp_dir=temp_dir)
     else:
-        install_python_sync_cron(repo_path, args.target, category, all_cat)
+        install_python_sync_cron(repo_path, args.target, category, all_cat,
+                                 scripts=scripts, temp_dir=temp_dir)
 
     # ── Riepilogo finale ──────────────────────────────────────────────────────
     print()
