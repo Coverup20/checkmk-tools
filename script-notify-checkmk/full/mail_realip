@@ -5,7 +5,7 @@ set -euo pipefail
 
 # === CONFIG ===
 CMK_URL="https://monitor.nethlab.it/monitoring"
-FROM_EMAIL="checkmk-vps@nethesis.it"
+FROM_EMAIL="no-reply@nethesis.it"
 TO_EMAIL="${NOTIFY_CONTACTEMAIL:-root@localhost}"
 # ==============
 
