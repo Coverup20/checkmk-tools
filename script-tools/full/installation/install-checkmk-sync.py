@@ -14,7 +14,7 @@ Sostituisce:
   - install-auto-git-sync.sh
   - install-python-full-sync.py
 
-Version: 1.0.2
+Version: 1.0.3
 """
 
 import argparse
@@ -26,7 +26,7 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
 # ─── Costanti ─────────────────────────────────────────────────────────────────
 
@@ -470,27 +470,61 @@ def ask_scripts(repo_path: Path) -> Tuple[str, bool, str]:
     """
     Selezione interattiva script e modalità deploy.
 
+    Passo 1 → scelta categoria (OS)
+    Passo 2 → scelta script dentro la categoria
+    Passo 3 → modalità deploy (reale / anteprima)
+
     Returns:
         (scripts_csv, all_categories, temp_dir)
         scripts_csv:    stringa "nome1,nome2,..." oppure "" (tutte le categorie)
-        all_categories: True se l'utente ha scelto tutto
+        all_categories: True se l'utente ha scelto tutto (nessun filtro)
         temp_dir:       path temp se anteprima, altrimenti ""
     """
-    # Raccogli tutti i launcher disponibili
-    all_launchers: List[Tuple[str, str]] = []  # (stem, categoria)
-    for cat in sorted(repo_path.glob("script-check-*/")):
-        remote = cat / "remote"
-        if remote.is_dir():
-            for launcher in sorted(remote.glob("*.py")):
-                all_launchers.append((launcher.stem, cat.name))
-
-    if not all_launchers:
-        print("[WARN] Nessuno script trovato nel repository.")
-        return "", True, ""
+    # ── Passo 1: Selezione categoria (OS) ────────────────────────────────────
+    categories = sorted([
+        d.name for d in repo_path.iterdir()
+        if d.is_dir() and d.name.startswith("script-check-")
+    ])
 
     print()
-    print("  Script disponibili:")
-    print("  ─" * 35)
+    print("  ── Passo 1: Categoria (sistema operativo) ─────────")
+    print(f"  {'#':<4} {'Categoria':<35} OS")
+    print("  ─" * 30)
+    print(f"  {'0':<4} {'(tutte le categorie)':35} -")
+    for i, cat in enumerate(categories, 1):
+        label = cat.replace("script-check-", "").upper()
+        print(f"  {i:<4} {cat:<35} {label}")
+    print()
+
+    cat_raw = _ask("  Categoria [0 = tutte]: ").strip().replace("\r", "") or "0"
+
+    filter_cat: Optional[str] = None
+    if cat_raw != "0" and cat_raw != "":
+        try:
+            idx = int(cat_raw) - 1
+            if 0 <= idx < len(categories):
+                filter_cat = categories[idx]
+                print(f"  → {filter_cat}")
+        except ValueError:
+            pass
+    if filter_cat is None:
+        print("  → Tutte le categorie")
+
+    # ── Passo 2: Raccolta launcher dalla categoria selezionata ───────────────
+    selected_cats = [filter_cat] if filter_cat else categories
+    all_launchers: List[Tuple[str, str]] = []  # (stem, categoria)
+    for cat_name in selected_cats:
+        remote = repo_path / cat_name / "remote"
+        if remote.is_dir():
+            for launcher in sorted(remote.glob("*.py")):
+                all_launchers.append((launcher.stem, cat_name))
+
+    if not all_launchers:
+        print("[WARN] Nessuno script trovato nella categoria selezionata.")
+        return "", (filter_cat is None), ""
+
+    print()
+    print("  ── Passo 2: Selezione script ───────────────────────")
     print(f"  {'#':<4} {'Nome script':<45} Categoria")
     print("  ─" * 35)
     for i, (stem, cat) in enumerate(all_launchers, 1):
@@ -499,7 +533,7 @@ def ask_scripts(repo_path: Path) -> Tuple[str, bool, str]:
     print("  Seleziona script da deployare:")
     print("  - Numeri separati da virgola/spazio: es. 1,3,5  oppure  1 3 5")
     print("  - Intervalli: es. 1-5")
-    print("  - 0 o invio = tutti")
+    print("  - 0 o invio = tutti quelli elencati sopra")
     print()
 
     raw = _ask("  Scelta [0 = tutti]: ").strip().replace("\r", "") or "0"
@@ -508,7 +542,6 @@ def ask_scripts(repo_path: Path) -> Tuple[str, bool, str]:
     if raw == "0" or raw == "":
         selected_indices = list(range(len(all_launchers)))
     else:
-        # Parsing: virgole, spazi, trattini per range
         tokens = raw.replace(",", " ").split()
         for token in tokens:
             if "-" in token and not token.startswith("-"):
@@ -523,7 +556,6 @@ def ask_scripts(repo_path: Path) -> Tuple[str, bool, str]:
                     selected_indices.append(int(token) - 1)
                 except ValueError:
                     pass
-        # Dedup e ordine
         selected_indices = sorted(set(
             i for i in selected_indices if 0 <= i < len(all_launchers)
         ))
@@ -531,18 +563,25 @@ def ask_scripts(repo_path: Path) -> Tuple[str, bool, str]:
     scripts_csv = ""
     all_cat = False
     if not selected_indices or selected_indices == list(range(len(all_launchers))):
-        all_cat = True
-        print("  → Tutti gli script selezionati")
+        if filter_cat is None:
+            # Nessun filtro OS E tutti gli script → all_categories=True
+            all_cat = True
+            print(f"  → Tutti gli script di tutte le categorie ({len(all_launchers)} script)")
+        else:
+            # Categoria specifica, tutti i suoi script → passa lista esplicita
+            chosen = [all_launchers[i][0] for i in range(len(all_launchers))]
+            scripts_csv = ",".join(chosen)
+            print(f"  → Tutti i {len(chosen)} script di {filter_cat}")
     else:
         chosen = [all_launchers[i][0] for i in selected_indices]
         scripts_csv = ",".join(chosen)
         print(f"  → Selezionati {len(chosen)} script: {scripts_csv}")
 
-    # Chiedi modalità deploy
+    # ── Passo 3: Modalità deploy ─────────────────────────────────────────────
     print()
-    print("  Modalità deploy:")
+    print("  ── Passo 3: Modalità deploy ────────────────────────")
     print("  1) Deploy reale → /usr/lib/check_mk_agent/local/ (default)")
-    print(f"  2) Anteprima temp → /tmp/checkmk-sync-preview/ (nessun deploy reale)")
+    print("  2) Anteprima temp → /tmp/checkmk-sync-preview/ (nessun deploy reale)")
     mode = _ask("\n  Scelta [1]: ").strip().replace("\r", "") or "1"
 
     temp_dir = ""
