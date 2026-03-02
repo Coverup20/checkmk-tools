@@ -14,7 +14,7 @@ Sostituisce:
   - install-auto-git-sync.sh
   - install-python-full-sync.py
 
-Version: 1.0.0
+Version: 1.0.1
 """
 
 import argparse
@@ -26,7 +26,7 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 # ─── Costanti ─────────────────────────────────────────────────────────────────
 
