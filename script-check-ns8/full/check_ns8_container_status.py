@@ -11,7 +11,7 @@ import time
 from typing import List, Tuple
 
 VERSION = "1.3.0"
-SERVICE = "NS8 Container Status"
+SERVICE = "NS8_Container_Status"
 SCRIPT_TIMEOUT_SECONDS = 10
 COMMAND_TIMEOUT_SECONDS = 4
 _SCRIPT_START = time.monotonic()
