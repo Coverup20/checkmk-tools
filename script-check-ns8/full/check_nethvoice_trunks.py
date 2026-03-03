@@ -33,7 +33,7 @@ import re
 import time
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 SERVICE_PREFIX = "NethVoice_Trunk"
 SERVICE_SUMMARY = "NethVoice_Trunks"
 
@@ -145,7 +145,7 @@ def find_asterisk_container() -> Optional[Tuple[str, str]]:
 
     Strategia:
       1. runagent -l  → lista moduli
-      2. Per ogni modulo → podman ps → cerca container con "asterisk" nel nome
+      2. Per ogni modulo → podman ps → cerca container con "freepbx" o "asterisk" nel nome
       3. Ritorna (module_name, container_name) alla prima occorrenza trovata
 
     Returns:
@@ -155,7 +155,7 @@ def find_asterisk_container() -> Optional[Tuple[str, str]]:
         if elapsed() >= SCRIPT_TIMEOUT:
             break
         for cname, cstatus in get_containers(module):
-            if "asterisk" in cname.lower():
+            if "freepbx" in cname.lower() or "asterisk" in cname.lower():
                 return (module, cname)
     return None
 
