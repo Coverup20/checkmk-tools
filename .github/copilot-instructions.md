@@ -1491,10 +1491,18 @@ wsl -d kali-linux ssh <host> "rm /usr/lib/check_mk_agent/local/rssh_service_name
 - ❌ **MAI** lanciare un nuovo comando SSH mentre il precedente è ancora in attesa di password o output
 - ❌ **MAI** usare `get_terminal_output` subito dopo e poi lanciare un secondo comando "perché il primo non ha risposto"
 - ✅ **SEMPRE** usare `terminal_last_command` per leggere l'output del comando in corso
-- ✅ **SEMPRE** aspettare con timeout generoso (60000+) su srv-monitoring (autenticazione password richiesta ogni volta)
-- ✅ srv-monitoring richiede **2 inserimenti password** (primo fallisce "Permission denied"), poi funziona
-- ⚠️ Il secondo inserimento password può richiedere fino a 30-60 secondi prima che l'output arrivi
 - ❌ **NON** lanciare un comando alternativo "più semplice" se il primo non risponde subito - ASPETTARE
+
+**🔴 REGOLA GENERALE - Host con autenticazione PASSWORD (checkmk-z1plus, ns-lab00, laboratorio, srv-monitoring, etc.):**
+- ❌ **MAI** tentare connessioni SSH autonome via `run_in_terminal` su host con password
+  → il tool non può inserire la password → fallisce sempre con `^C` o timeout
+- ✅ **SE il primo tentativo `run_in_terminal` su host-password fallisce** (output `^C` o vuoto):
+  → NON riprovare
+  → Dare IMMEDIATAMENTE i comandi da incollare nel terminale dell'utente
+- ✅ **ECCEZIONE**: checkmk-vps-01 e checkmk-vps-02 usano chiave SSH → run_in_terminal funziona
+- ✅ **Classificazione host per metodo auth**:
+  - 🔑 **CHIAVE SSH** (run_in_terminal OK): checkmk-vps-01, checkmk-vps-02
+  - 🔐 **PASSWORD** (dare comandi da incollare): tutti gli altri host
 
 **Host disponibili:**
 
@@ -1546,7 +1554,7 @@ srv-monitoring    # 45.33.235.86:2333 (root, Monitoring)
                   #       ControlPath ~/.ssh/sockets/%r@%h:%p
                   #       ControlPersist 60m
                   # ✅ Comando corretto: wsl -d kali-linux bash -c "ssh -tt srv-monitoring 'cmd'"
-                  # ✅ Prima connessione chiede password, poi socket attivo per 15 minuti
+                  # ✅ Prima connessione chiede password, poi socket attivo per 60 minuti (ControlPersist 60m)
                   #
                   # 🔴 REGOLA CRITICA - srv-monitoring richiede password interattiva:
                   # ❌ MAI tentare di eseguire comandi su srv-monitoring in autonomia tramite run_in_terminal
