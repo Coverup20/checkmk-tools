@@ -40,8 +40,9 @@ import sys
 import time
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 SERVICE_SUMMARY  = "NV8.Status.Extensions"
+SERVICE_EXT      = "NV8.Status.Extension"
 
 SCRIPT_TIMEOUT = 25       # secondi totali budget
 WARN_PCT       = 10       # % interni non registrati → WARNING
@@ -255,7 +256,12 @@ def main() -> int:
     unreg_count = len(unreg)
     unreg_pct   = (unreg_count / total * 100) if total > 0 else 0.0
 
-    # Determina stato sommario
+    # Una riga CRIT per ogni interno non registrato → servizio separato → notifica individuale
+    for ep in unreg:
+        svc = f"{SERVICE_EXT}.{sanitize_name(ep['name'])}"
+        print(f"2 {svc} - Unregistered | name={ep['name']} state={ep['state']} module={ep['module']}")
+
+    # Sommario sintetico (solo conteggi)
     if unreg_count == 0:
         overall = 0
         msg = f"OK: tutti {total} interni registrati"
@@ -268,13 +274,6 @@ def main() -> int:
     else:
         overall = 0
         msg = f"OK: {reg_count}/{total} registrati, {unreg_count} non registrati ({unreg_pct:.0f}%)"
-
-    # Lista interni non registrati nel messaggio (visibile nelle notifiche)
-    if unreg_count > 0:
-        names = ", ".join(
-            f"{e['name']}({e['module']})" for e in unreg
-        )
-        msg += f" | non registrati: {names}"
 
     perf = f"registered={reg_count};;;0;{total} unregistered={unreg_count};;;0;{total} total={total}"
     modules_str = ",".join(modules_checked)
