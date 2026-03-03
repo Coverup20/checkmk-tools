@@ -1,32 +1,40 @@
 #!/usr/bin/env python3
 """
-install-checkmk-sync.py - Installer unificato CheckMK auto-sync
+install-checkmk-sync.py - Installer unificato CheckMK
 
-Installa in sequenza:
-  STEP 1 → auto-git-sync        (git pull automatico ogni N secondi)
-  STEP 2 → checkmk-python-full-sync  (deploy check Python ogni 5 minuti)
+Esegue in sequenza:
+  STEP A → CheckMK Agent install    (download da server CMK, plain TCP 6556)
+             + FRPC opzionale       (tunnel verso server FRP)
+  STEP 1 → auto-git-sync            (git pull automatico ogni N secondi)
+  STEP 2 → checkmk-python-full-sync (deploy check Python ogni 5 minuti)
 
 Compatibilità:
-  - Linux con systemd   → service + timer (consigliato)
-  - OpenWrt / cron-only → cron jobs fallback
+  - Debian/Ubuntu                   → deb + systemd socket
+  - RHEL/Rocky/NethServer           → rpm + systemd socket
+  - OpenWrt / NethSecurity 8        → estrazione .deb manuale + socat/procd
+  - Sistemi cron-only               → cron jobs fallback per git-sync/py-sync
 
 Sostituisce:
+  - install-agent-interactive.sh / install-agent-interactive.py
   - install-auto-git-sync.sh
   - install-python-full-sync.py
 
-Version: 1.0.6
+Version: 2.0.0
 """
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
-VERSION = "1.0.6"
+VERSION = "2.0.0"
 
 # ─── Costanti ─────────────────────────────────────────────────────────────────
 
@@ -34,6 +42,17 @@ REPO_DEFAULT_PATH = Path("/opt/checkmk-tools")
 REPO_URL_DEFAULT = "https://github.com/Coverup20/checkmk-tools.git"
 SYSTEMD_DIR = Path("/etc/systemd/system")
 LOCAL_TARGET_DEFAULT = "/usr/lib/check_mk_agent/local"
+
+# CheckMK Agent
+CHECKMK_BASE_URL_DEFAULT = "https://monitoring.nethlab.it/monitoring/check_mk/agents"
+AGENT_PLAIN_SOCKET_NAME = "check-mk-agent-plain.socket"
+AGENT_PLAIN_SERVICE_NAME = "check-mk-agent-plain@.service"
+
+# FRPC
+FRP_VERSION_DEFAULT = "0.64.0"
+FRPC_BIN = "/usr/local/bin/frpc"
+FRPC_CONF_DIR = Path("/etc/frp")
+FRPC_CONF_FILE = FRPC_CONF_DIR / "frpc.toml"
 
 # auto-git-sync
 GIT_SYNC_SERVICE_NAME = "auto-git-sync.service"
@@ -127,9 +146,433 @@ def cron_update(lines_to_keep_filter: str, new_line: str, openwrt: bool = False)
         Path(tmp).unlink(missing_ok=True)
 
 
-# ─── Git prerequisiti ─────────────────────────────────────────────────────────
+# ─── STEP A: CheckMK Agent + FRPC ─────────────────────────────────────────────
 
-def ensure_git(pkg_mgr: str) -> None:
+# agente – rilevamento OS ─────────────────────────────────────────────────────
+
+def detect_os_info() -> Dict[str, str]:
+    """
+    Rileva OS e restituisce un dizionario con chiavi:
+      os_id, os_ver, pkg_type (deb|rpm|openwrt), pkg_manager (apt|dnf|yum|opkg)
+    """
+    info: Dict[str, str] = {
+        "os_id": "", "os_ver": "", "pkg_type": "", "pkg_manager": "",
+    }
+
+    # OpenWrt / NethSecurity 8
+    if (
+        Path("/etc/openwrt_release").exists()
+        or (
+            Path("/etc/os-release").exists()
+            and "openwrt" in Path("/etc/os-release").read_text(errors="ignore").lower()
+        )
+    ):
+        info["os_id"] = "openwrt"
+        if Path("/etc/openwrt_release").exists():
+            for line in Path("/etc/openwrt_release").read_text(errors="ignore").splitlines():
+                if line.startswith("DISTRIB_RELEASE="):
+                    info["os_ver"] = line.split("'")[1] if "'" in line else line.split("=", 1)[1].strip()
+                    break
+        info["pkg_type"] = "openwrt"
+        info["pkg_manager"] = "opkg"
+        print(f"[INFO] Sistema: openwrt {info['os_ver']}")
+        return info
+
+    # Linux standard (/etc/os-release)
+    if Path("/etc/os-release").exists():
+        for line in Path("/etc/os-release").read_text(errors="ignore").splitlines():
+            if line.startswith("ID="):
+                info["os_id"] = line.split("=", 1)[1].strip().strip('"')
+            elif line.startswith("VERSION_ID="):
+                info["os_ver"] = line.split("=", 1)[1].strip().strip('"')
+
+    if Path("/etc/nethserver-release").exists():
+        info["os_id"] = "nethserver"
+
+    if info["os_id"] in ("debian", "ubuntu"):
+        info["pkg_type"] = "deb"
+        info["pkg_manager"] = "apt"
+    elif info["os_id"] in ("rocky", "rhel", "centos", "almalinux", "fedora",
+                           "nethserver", "nethserver-enterprise"):
+        info["pkg_type"] = "rpm"
+        info["pkg_manager"] = "dnf" if shutil.which("dnf") else "yum"
+    else:
+        print(f"[WARN] OS non riconosciuto: '{info['os_id']}'. Tentativo con apt...", file=sys.stderr)
+        info["pkg_type"] = "deb"
+        info["pkg_manager"] = "apt"
+
+    print(f"[INFO] Sistema: {info['os_id']} {info['os_ver']} ({info['pkg_type']})")
+    return info
+
+
+# agente – download ───────────────────────────────────────────────────────────
+
+def fetch_text(url: str, timeout: int = 15) -> str:
+    """Scarica testo da URL (nessuna dipendenza esterna).
+
+    Raises: RuntimeError se fallisce.
+    """
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            return resp.read().decode("utf-8", errors="ignore")
+    except Exception as exc:
+        raise RuntimeError(f"fetch_text({url}): {exc}") from exc
+
+
+def download_file(url: str, outpath: str) -> None:
+    """Scarica file binario con curl o wget."""
+    if shutil.which("curl"):
+        run(["curl", "-fsSL", url, "-o", outpath])
+    elif shutil.which("wget"):
+        run(["wget", "-q", "-O", outpath, url])
+    else:
+        raise RuntimeError("né curl né wget trovati per il download")
+
+
+def latest_agent_filename(base_url: str, pkg_type: str) -> str:
+    """Ottiene il nome file dell'ultima versione agente dal listing HTML."""
+    try:
+        html = fetch_text(base_url + "/")
+    except RuntimeError as exc:
+        raise RuntimeError(f"Impossibile leggere listing agenti: {exc}") from exc
+
+    if pkg_type in ("deb", "openwrt"):
+        pattern = r'check-mk-agent_[\d.]+p[\d]+-[\d]+_all\.deb'
+    else:
+        pattern = r'check-mk-agent-[\d.]+p[\d]+-[\d]+\.noarch\.rpm'
+
+    matches = sorted(re.findall(pattern, html))
+    if not matches:
+        raise RuntimeError(f"Nessun pacchetto trovato in: {base_url}/")
+    return matches[-1]
+
+
+# agente – installazione Linux ────────────────────────────────────────────────
+
+def _pkg_install(pkg_mgr: str, *packages: str) -> None:
+    """Installa pacchetti con il package manager specificato."""
+    if pkg_mgr == "apt":
+        run(["apt-get", "install", "-y", *packages])
+    elif pkg_mgr == "dnf":
+        run(["dnf", "install", "-y", *packages])
+    elif pkg_mgr == "yum":
+        run(["yum", "install", "-y", *packages])
+    elif pkg_mgr == "opkg":
+        run(["opkg", "install", *packages])
+    else:
+        raise RuntimeError(f"Package manager non supportato: {pkg_mgr}")
+
+
+def install_agent_linux(base_url: str, pkg_type: str, pkg_mgr: str) -> None:
+    """Installa agente CheckMK su Debian/Ubuntu/RHEL tramite deb o rpm."""
+    fname = latest_agent_filename(base_url, pkg_type)
+    url = f"{base_url}/{fname}"
+    tmp = f"/tmp/{fname}"
+    print(f"[INFO] Download agente: {url}")
+    download_file(url, tmp)
+    print(f"[INFO] Installazione: {fname}")
+    if pkg_type == "deb":
+        result = run_capture(["dpkg", "-i", tmp])
+        if result.returncode != 0:
+            # fix dipendenze rotte (comune su Ubuntu)
+            run_capture([pkg_mgr == "apt" and "apt-get" or "apt-get",
+                         "install", "-f", "-y"])
+    else:
+        if not shutil.which("rpm"):
+            raise RuntimeError("rpm non trovato")
+        run(["rpm", "-Uvh", "--replacepkgs", tmp])
+    Path(tmp).unlink(missing_ok=True)
+
+
+def install_agent_openwrt(base_url: str) -> None:
+    """Installa agente CheckMK su OpenWrt: estrae il binario dal .deb manualmente."""
+    # installa dipendenze necessarie per estrarre .deb
+    run_capture(["opkg", "update"])
+    for pkg in ("ca-certificates", "wget", "tar", "gzip", "socat", "binutils"):
+        run_capture(["opkg", "install", pkg])
+
+    if not shutil.which("ar") or not shutil.which("tar"):
+        raise RuntimeError("ar e tar obbligatori per estrarre il .deb su OpenWrt")
+
+    fname = latest_agent_filename(base_url, "openwrt")
+    url = f"{base_url}/{fname}"
+    tmpdir = tempfile.mkdtemp()
+    deb = f"{tmpdir}/{fname}"
+
+    print(f"[INFO] Download agente (deb): {url}")
+    download_file(url, deb)
+
+    run(["ar", "x", deb], cwd=tmpdir)
+    data_tars = list(Path(tmpdir).glob("data.tar.*"))
+    if not data_tars:
+        raise RuntimeError("data.tar.* non trovato nel .deb")
+    run(["tar", "-xf", str(data_tars[0]), "-C", tmpdir])
+
+    for candidate in (
+        f"{tmpdir}/usr/bin/check_mk_agent",
+        f"{tmpdir}/usr/bin/check-mk-agent",
+    ):
+        if Path(candidate).exists():
+            run(["install", "-m", "0755", candidate, "/usr/bin/check_mk_agent"])
+            break
+    else:
+        raise RuntimeError("Binario agente non trovato nel .deb")
+
+    shutil.rmtree(tmpdir, ignore_errors=True)
+    print("[OK] check_mk_agent installato in /usr/bin/check_mk_agent")
+
+
+def install_agent(base_url: str, os_info: Dict[str, str]) -> None:
+    """Dispatcher installazione agente in base all'OS."""
+    if os_info["pkg_type"] == "openwrt":
+        install_agent_openwrt(base_url)
+    else:
+        # assicura curl/wget disponibili
+        run_capture([
+            os_info["pkg_manager"] if os_info["pkg_manager"] in ("apt", "dnf", "yum")
+            else "apt-get",
+            "install", "-y", "ca-certificates", "curl", "wget",
+        ])
+        # update cache prima dell'install
+        if os_info["pkg_manager"] == "apt":
+            run_capture(["apt-get", "update", "-y"])
+        install_agent_linux(base_url, os_info["pkg_type"], os_info["pkg_manager"])
+
+
+# agente – configurazione socket ──────────────────────────────────────────────
+
+_AGENT_SOCKET_UNIT = """\
+[Unit]
+Description=Checkmk Agent (TCP 6556 plain)
+Documentation=https://docs.checkmk.com/
+
+[Socket]
+ListenStream=6556
+Accept=yes
+
+[Install]
+WantedBy=sockets.target
+"""
+
+_AGENT_SERVICE_UNIT = """\
+[Unit]
+Description=Checkmk Agent (TCP 6556 plain) connection
+
+[Service]
+ExecStart=-/usr/bin/check_mk_agent
+StandardInput=socket
+"""
+
+_AGENT_OPENWRT_INITD = """\
+#!/bin/sh /etc/rc.common
+START=98
+STOP=10
+USE_PROCD=1
+
+PROG=/usr/bin/check_mk_agent
+
+start_service() {
+    procd_open_instance
+    procd_set_param command socat TCP-LISTEN:6556,reuseaddr,fork,keepalive EXEC:$PROG
+    procd_set_param respawn
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_close_instance
+}
+
+stop_service() {
+    killall socat >/dev/null 2>&1 || true
+}
+"""
+
+
+def configure_agent_systemd() -> None:
+    """Configura socket plain TCP 6556 via systemd (disabilita ctl-daemon)."""
+    for unit in ("check-mk-agent.socket", "cmk-agent-ctl-daemon.service"):
+        run_capture(["systemctl", "stop", unit])
+        run_capture(["systemctl", "disable", unit])
+
+    write_text(SYSTEMD_DIR / AGENT_PLAIN_SOCKET_NAME, _AGENT_SOCKET_UNIT)
+    write_text(SYSTEMD_DIR / AGENT_PLAIN_SERVICE_NAME, _AGENT_SERVICE_UNIT)
+
+    run(["systemctl", "daemon-reload"])
+    run(["systemctl", "enable", "--now", AGENT_PLAIN_SOCKET_NAME])
+    print(f"[OK] Socket check-mk-agent-plain.socket attivo (porta 6556)")
+
+
+def configure_agent_openwrt() -> None:
+    """Configura agente via procd + socat su OpenWrt."""
+    initd = Path("/etc/init.d/check_mk_agent")
+    write_text(initd, _AGENT_OPENWRT_INITD)
+    initd.chmod(0o755)
+    run_capture([str(initd), "enable"])
+    run_capture([str(initd), "restart"])
+    print("[OK] Agente avviato via procd + socat (porta 6556)")
+
+
+def configure_agent(os_info: Dict[str, str]) -> None:
+    if os_info["pkg_type"] == "openwrt":
+        configure_agent_openwrt()
+    else:
+        configure_agent_systemd()
+
+
+# agente – uninstall ──────────────────────────────────────────────────────────
+
+def uninstall_agent(os_info: Dict[str, str]) -> None:
+    """Rimuove agente CheckMK e sua configurazione socket."""
+    print("[INFO] Rimozione agente CheckMK...")
+    if os_info["pkg_type"] == "openwrt":
+        initd = Path("/etc/init.d/check_mk_agent")
+        run_capture([str(initd), "stop"])
+        run_capture([str(initd), "disable"])
+        initd.unlink(missing_ok=True)
+        Path("/usr/bin/check_mk_agent").unlink(missing_ok=True)
+        shutil.rmtree("/etc/check_mk", ignore_errors=True)
+    else:
+        run_capture(["systemctl", "stop", AGENT_PLAIN_SOCKET_NAME])
+        run_capture(["systemctl", "disable", AGENT_PLAIN_SOCKET_NAME])
+        (SYSTEMD_DIR / AGENT_PLAIN_SOCKET_NAME).unlink(missing_ok=True)
+        (SYSTEMD_DIR / AGENT_PLAIN_SERVICE_NAME).unlink(missing_ok=True)
+        run_capture(["systemctl", "daemon-reload"])
+        if os_info["pkg_type"] == "deb":
+            run_capture(["dpkg", "-r", "check-mk-agent"])
+        elif os_info["pkg_type"] == "rpm":
+            run_capture(["rpm", "-e", "check-mk-agent"])
+        Path("/usr/bin/check_mk_agent").unlink(missing_ok=True)
+        shutil.rmtree("/etc/check_mk", ignore_errors=True)
+    print("[OK] Agente rimosso")
+
+
+# FRPC – installazione ────────────────────────────────────────────────────────
+
+def install_frpc(frp_version: str) -> None:
+    """Scarica e installa il binario frpc."""
+    import platform
+    machine = platform.machine().lower()
+    arch = "amd64"
+    if "aarch64" in machine or "arm64" in machine:
+        arch = "arm64"
+    elif "arm" in machine:
+        arch = "arm"
+
+    url = (
+        f"https://github.com/fatedier/frp/releases/download"
+        f"/v{frp_version}/frp_{frp_version}_linux_{arch}.tar.gz"
+    )
+    tmpdir = tempfile.mkdtemp()
+    tgz = f"{tmpdir}/frp.tgz"
+    print(f"[INFO] Download FRPC v{frp_version} ({arch}): {url}")
+    download_file(url, tgz)
+    run(["tar", "-xzf", tgz, "-C", tmpdir])
+    frpc_bin = next(Path(tmpdir).rglob("frpc"), None)
+    if frpc_bin is None:
+        raise RuntimeError("frpc non trovato nell'archivio")
+    run(["install", "-m", "0755", str(frpc_bin), FRPC_BIN])
+    shutil.rmtree(tmpdir, ignore_errors=True)
+    print(f"[OK] FRPC installato: {FRPC_BIN}")
+
+
+_FRPC_CONF_TPL = """\
+[common]
+server_addr = "{server}"
+server_port = 7000
+auth.method = "token"
+auth.token  = "{token}"
+tls.enable  = true
+log.to      = "/var/log/frpc.log"
+log.level   = "debug"
+
+[{hostname}]
+type        = "tcp"
+local_ip    = "127.0.0.1"
+local_port  = 6556
+remote_port = {remote_port}
+"""
+
+_FRPC_INITD_OPENWRT = """\
+#!/bin/sh /etc/rc.common
+START=99
+STOP=10
+USE_PROCD=1
+
+start_service() {
+    procd_open_instance
+    procd_set_param command /usr/local/bin/frpc -c /etc/frp/frpc.toml
+    procd_set_param respawn
+    procd_close_instance
+}
+
+stop_service() {
+    killall frpc >/dev/null 2>&1 || true
+}
+"""
+
+_FRPC_SYSTEMD_SERVICE = """\
+[Unit]
+Description=FRP Client Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/frpc -c /etc/frp/frpc.toml
+Restart=on-failure
+RestartSec=5s
+User=root
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+
+def configure_frpc(hostname: str, server: str, remote_port: int,
+                   auth_token: str, os_info: Dict[str, str]) -> None:
+    """Scrive frpc.toml e installa il servizio/init.d."""
+    FRPC_CONF_DIR.mkdir(parents=True, exist_ok=True)
+    write_text(FRPC_CONF_FILE, _FRPC_CONF_TPL.format(
+        server=server,
+        token=auth_token,
+        hostname=hostname,
+        remote_port=remote_port,
+    ))
+    FRPC_CONF_FILE.chmod(0o600)
+
+    if os_info["pkg_type"] == "openwrt":
+        initd = Path("/etc/init.d/frpc")
+        write_text(initd, _FRPC_INITD_OPENWRT)
+        initd.chmod(0o755)
+        run_capture([str(initd), "enable"])
+        run_capture([str(initd), "restart"])
+    else:
+        write_text(SYSTEMD_DIR / "frpc.service", _FRPC_SYSTEMD_SERVICE)
+        run(["systemctl", "daemon-reload"])
+        run(["systemctl", "enable", "--now", "frpc.service"])
+
+    print(f"[OK] FRPC configurato: {server}:7000 → localhost:6556 (porta remota {remote_port})")
+
+
+# FRPC – uninstall ────────────────────────────────────────────────────────────
+
+def uninstall_frpc(os_info: Dict[str, str]) -> None:
+    """Rimuove FRPC e sua configurazione."""
+    print("[INFO] Rimozione FRPC...")
+    if os_info["pkg_type"] == "openwrt":
+        initd = Path("/etc/init.d/frpc")
+        run_capture([str(initd), "stop"])
+        run_capture([str(initd), "disable"])
+        initd.unlink(missing_ok=True)
+    else:
+        run_capture(["systemctl", "stop", "frpc"])
+        run_capture(["systemctl", "disable", "frpc"])
+        (SYSTEMD_DIR / "frpc.service").unlink(missing_ok=True)
+        run_capture(["systemctl", "daemon-reload"])
+    Path(FRPC_BIN).unlink(missing_ok=True)
+    shutil.rmtree(str(FRPC_CONF_DIR), ignore_errors=True)
+    print("[OK] FRPC rimosso")
+
+
+# ─── Git prerequisiti ─────────────────────────────────────────────────────────
     if shutil.which("git"):
         return
     print("[INFO] git non trovato, installazione in corso...")
@@ -425,6 +868,52 @@ def _ask(prompt: str) -> str:
             return ""
     return input(prompt)
 
+def ask_agent_install() -> bool:
+    """Chiede se installare l'agente CheckMK."""
+    print()
+    print("  STEP A – Installazione CheckMK Agent + FRPC")
+    print("  ─────────────────────────────────────────────")
+    ans = _ask("  Installare CheckMK Agent (plain TCP 6556)? [S/n]: ").strip().lower().replace("\r", "") or "s"
+    return ans in ("s", "y", "")
+
+
+def ask_frpc_install() -> bool:
+    """Chiede se installare FRPC."""
+    ans = _ask("  Installare FRPC (tunnel verso server CheckMK)? [s/N]: ").strip().lower().replace("\r", "") or "n"
+    return ans in ("s", "y")
+
+
+def ask_frpc_config() -> Tuple[str, str, int, str]:
+    """
+    Raccoglie i parametri FRPC in modo interattivo.
+
+    Returns:
+        (hostname, frp_server, remote_port, auth_token)
+    """
+    import socket as _socket
+    default_hostname = _socket.gethostname()
+
+    print()
+    print("  Configurazione FRPC:")
+    hostname = _ask(f"  Nome host [{default_hostname}]: ").strip().replace("\r", "") or default_hostname
+    server = _ask("  Server FRP remoto [monitor.nethlab.it]: ").strip().replace("\r", "") or "monitor.nethlab.it"
+
+    while True:
+        port_raw = _ask("  Porta remota (es: 20001): ").strip().replace("\r", "")
+        if port_raw.isdigit():
+            remote_port = int(port_raw)
+            break
+        print("  [ERR] Porta non valida. Inserire un numero.")
+
+    while True:
+        token = _ask("  Token FRP (obbligatorio): ").strip().replace("\r", "")
+        if token:
+            break
+        print("  [ERR] Token obbligatorio.")
+
+    return hostname, server, remote_port, token
+
+
 def ask_interval() -> int:
     print()
     print("  Scegli intervallo git sync:")
@@ -602,29 +1091,38 @@ def ask_scripts(repo_path: Path) -> Tuple[str, bool, str]:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description=f"install-checkmk-sync.py v{VERSION} - Installer unificato git-sync + deploy check Python",
+        description=f"install-checkmk-sync.py v{VERSION} - Installer unificato Agent + git-sync + deploy check Python",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Esempi:
-  # Installazione interattiva (consigliato)
+  # Installazione interattiva completa (consigliato)
   python3 install-checkmk-sync.py
 
-  # Modalità rapida (tutti i default)
+  # Modalità rapida (tutti i default, installa anche agent)
   python3 install-checkmk-sync.py --quick
+
+  # Solo sync (salta installazione agent)
+  python3 install-checkmk-sync.py --skip-agent
+
+  # Disinstalla tutto
+  python3 install-checkmk-sync.py --uninstall
+
+  # Disinstalla solo FRPC
+  python3 install-checkmk-sync.py --uninstall-frpc
 
   # Con categoria specifica e intervallo git custom
   python3 install-checkmk-sync.py --category script-check-ubuntu --git-interval 60
-
-  # Deploy tutte le categorie, non interattivo
-  python3 install-checkmk-sync.py --all-categories --quick
         """,
     )
+    # Repository e target
     p.add_argument("--repo", default=str(REPO_DEFAULT_PATH),
                    help=f"Path repository locale (default: {REPO_DEFAULT_PATH})")
     p.add_argument("--repo-url", default=REPO_URL_DEFAULT,
                    help="URL repository git (usato solo se repo non esiste)")
     p.add_argument("--target", default=LOCAL_TARGET_DEFAULT,
                    help=f"Path local checks target (default: {LOCAL_TARGET_DEFAULT})")
+
+    # Sync check Python
     p.add_argument("--category", default="auto",
                    help="Categoria script-check-* o 'auto' (default: auto)")
     p.add_argument("--all-categories", action="store_true",
@@ -637,6 +1135,35 @@ Esempi:
                    help="Intervallo git pull in secondi (default: chiesto interattivamente)")
     p.add_argument("--quick", action="store_true",
                    help="Modalità non-interattiva: usa tutti i default senza domande")
+
+    # Agent CheckMK
+    p.add_argument("--skip-agent", action="store_true",
+                   help="Salta l'installazione dell'agente CheckMK (STEP A)")
+    p.add_argument("--checkmk-url", default=CHECKMK_BASE_URL_DEFAULT,
+                   help=f"URL base agenti CheckMK (default: {CHECKMK_BASE_URL_DEFAULT})")
+
+    # FRPC
+    p.add_argument("--install-frpc", action="store_true",
+                   help="Forza installazione FRPC (default: chiesto interattivamente)")
+    p.add_argument("--frp-version", default=FRP_VERSION_DEFAULT,
+                   help=f"Versione FRPC da scaricare (default: {FRP_VERSION_DEFAULT})")
+    p.add_argument("--frpc-server", default="",
+                   help="Hostname server FRP (default: chiesto interattivamente)")
+    p.add_argument("--frpc-port", type=int, default=0,
+                   help="Porta remota FRP (default: chiesta interattivamente)")
+    p.add_argument("--frpc-token", default="",
+                   help="Token autenticazione FRP (default: chiesto interattivamente)")
+    p.add_argument("--frpc-hostname", default="",
+                   help="Nome host nel tunnel FRP (default: hostname locale)")
+
+    # Uninstall
+    p.add_argument("--uninstall-frpc", action="store_true",
+                   help="Disinstalla solo FRPC ed esce")
+    p.add_argument("--uninstall-agent", action="store_true",
+                   help="Disinstalla solo agente CheckMK ed esce")
+    p.add_argument("--uninstall", action="store_true",
+                   help="Disinstalla agente + FRPC ed esce")
+
     return p.parse_args()
 
 
@@ -651,15 +1178,25 @@ def main() -> int:
     use_systemd = has_systemd() and not openwrt
 
     # ── Header ───────────────────────────────────────────────────────────────
-    print("=" * 52)
+    print("=" * 60)
     print(f"  install-checkmk-sync.py v{VERSION}")
-    print("  Installer unificato CheckMK auto-sync")
-    print("=" * 52)
+    print("  Installer unificato CheckMK (Agent + Auto-Sync + Deploy)")
+    print("=" * 60)
     print()
     print(f"  Sistema:    {'systemd' if use_systemd else 'cron (OpenWrt/non-systemd)'}")
     print(f"  Repository: {repo_path}")
     print(f"  Target:     {args.target}")
     print()
+
+    # ── Uninstall shortcuts ───────────────────────────────────────────────────
+    if args.uninstall or args.uninstall_agent or args.uninstall_frpc:
+        os_info = detect_os_info()
+        if args.uninstall or args.uninstall_frpc:
+            uninstall_frpc(os_info)
+        if args.uninstall or args.uninstall_agent:
+            uninstall_agent(os_info)
+        print("[OK] Disinstallazione completata")
+        return 0
 
     # ── STEP 0: Prerequisiti ─────────────────────────────────────────────────
     print("── STEP 0: Prerequisiti ──────────────────────────────")
@@ -669,6 +1206,59 @@ def main() -> int:
     update_repo(repo_path)
     owner = get_repo_owner(repo_path)
     print(f"[OK] Owner repository: {owner}")
+
+    # ── STEP A: CheckMK Agent + FRPC ─────────────────────────────────────────
+    print()
+    print("── STEP A: CheckMK Agent + FRPC ──────────────────────")
+
+    agent_installed = False
+    frpc_installed = False
+
+    skip_agent = args.skip_agent
+    if not skip_agent and not args.quick:
+        skip_agent = not ask_agent_install()
+
+    if not skip_agent:
+        os_info = detect_os_info()
+        try:
+            install_agent(args.checkmk_url, os_info)
+            configure_agent(os_info)
+            agent_installed = True
+            print("[OK] CheckMK Agent installato (porta 6556)")
+        except Exception as exc:
+            print(f"[ERR] Installazione agente fallita: {exc}", file=sys.stderr)
+            print("[WARN] Continuando con STEP 1 e STEP 2...", file=sys.stderr)
+    else:
+        os_info = detect_os_info()
+        print("[INFO] STEP A saltato (--skip-agent)")
+
+    # FRPC (solo se agente installato o forzato da flag)
+    do_frpc = args.install_frpc
+    if not skip_agent and not do_frpc and not args.quick:
+        do_frpc = ask_frpc_install()
+
+    if do_frpc:
+        try:
+            install_frpc(args.frp_version)
+            # Raccoglie parametri FRPC
+            if args.frpc_server and args.frpc_port and args.frpc_token:
+                import socket as _socket
+                hostname = args.frpc_hostname or _socket.gethostname()
+                server = args.frpc_server
+                remote_port = args.frpc_port
+                auth_token = args.frpc_token
+            elif args.quick:
+                print("[WARN] FRPC richiede --frpc-server, --frpc-port, --frpc-token in modalità --quick. Saltato.")
+                do_frpc = False
+            else:
+                hostname, server, remote_port, auth_token = ask_frpc_config()
+
+            if do_frpc:
+                configure_frpc(hostname, server, remote_port, auth_token, os_info)
+                frpc_installed = True
+        except Exception as exc:
+            print(f"[ERR] Installazione FRPC fallita: {exc}", file=sys.stderr)
+            print("[WARN] Continuando con STEP 1 e STEP 2...", file=sys.stderr)
 
     # ── STEP 1: Auto Git Sync ─────────────────────────────────────────────────
     print()
@@ -719,22 +1309,30 @@ def main() -> int:
 
     # ── Riepilogo finale ──────────────────────────────────────────────────────
     print()
-    print("=" * 52)
+    print("=" * 60)
     print("  Installazione Completata!")
-    print("=" * 52)
+    print("=" * 60)
     print()
+
+    if agent_installed:
+        print(f"  ✓ CheckMK Agent         (porta 6556, plain TCP)")
+    if frpc_installed:
+        print(f"  ✓ FRPC                  (tunnel verso server FRP)")
+
     if use_systemd:
-        print("  Servizi installati:")
         print(f"  ✓ auto-git-sync.timer          (git pull ogni {interval}s)")
         print(f"  ✓ checkmk-python-full-sync.timer (deploy ogni 5min)")
         print()
         print("  Comandi utili:")
+        if agent_installed:
+            print(f"  systemctl status {AGENT_PLAIN_SOCKET_NAME}")
+        if frpc_installed:
+            print("  systemctl status frpc")
         print(f"  systemctl status {GIT_SYNC_TIMER_NAME}")
         print(f"  systemctl status {PYTHON_SYNC_TIMER_NAME}")
         print(f"  journalctl -u auto-git-sync -f")
         print(f"  journalctl -u checkmk-python-full-sync -f")
     else:
-        print("  Cron jobs installati:")
         print(f"  ✓ git-auto-sync      (ogni minuto)")
         print(f"  ✓ python-full-sync   (ogni 5 minuti)")
         print()
