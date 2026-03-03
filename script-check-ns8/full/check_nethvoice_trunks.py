@@ -33,7 +33,7 @@ import re
 import time
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 SERVICE_PREFIX = "NethVoice_Trunk"
 SERVICE_SUMMARY = "NethVoice_Trunks"
 
@@ -52,9 +52,10 @@ STATE_MAP: Dict[str, int] = {
     "Unregistered":   2,  # deregistrato manualmente
 }
 
-# Regex per rilevare lo stato PJSIP in fondo a ogni riga
+# Regex per rilevare lo stato PJSIP nella riga (non necessariamente a fine riga)
+# es: "trunk/sip:host:5060   auth   Rejected          (exp. 28s)"
 STATUS_RE = re.compile(
-    r"(Not\s+Registered|No\s+Auth|Registered|Trying|Rejected|Failed|Stopped|Unregistered)\s*$",
+    r"\b(Not\s+Registered|No\s+Auth|Registered|Trying|Rejected|Failed|Stopped|Unregistered)\b",
     re.IGNORECASE,
 )
 
@@ -139,25 +140,22 @@ def get_containers(module: str) -> List[Tuple[str, str]]:
     return result
 
 
-def find_asterisk_container() -> Optional[Tuple[str, str]]:
+def find_nethvoice_containers() -> List[Tuple[str, str]]:
     """
-    Cerca in tutti i moduli NS8 il container Asterisk attivo.
-
-    Strategia:
-      1. runagent -l  → lista moduli
-      2. Per ogni modulo → podman ps → cerca container con "freepbx" o "asterisk" nel nome
-      3. Ritorna (module_name, container_name) alla prima occorrenza trovata
-
-    Returns:
-        (module_name, container_name) oppure None se non trovato.
+    Trova TUTTI i container FreePBX/Asterisk in tutti i moduli nethvoice.
+    Ritorna lista di (module_name, container_name).
     """
+    results = []
     for module in get_modules():
         if elapsed() >= SCRIPT_TIMEOUT:
             break
-        for cname, cstatus in get_containers(module):
+        # Ottimizzazione: salta moduli che non sono nethvoice/asterisk/pbx
+        if not any(kw in module.lower() for kw in ("nethvoice", "asterisk", "freepbx", "pbx")):
+            continue
+        for cname, _ in get_containers(module):
             if "freepbx" in cname.lower() or "asterisk" in cname.lower():
-                return (module, cname)
-    return None
+                results.append((module, cname))
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -180,6 +178,7 @@ def run_asterisk_cmd(module: str, container: str, asterisk_cmd: str) -> Optional
     # consideriamo errore solo timeout (124) o comando non trovato (127)
     if code in (124, 127):
         return None
+    # "No objects found." è output valido (nessun trunk configurato)
     return out
 
 
@@ -265,48 +264,44 @@ def main() -> int:
         print(f"3 {SERVICE_SUMMARY} - UNKNOWN: runagent non trovato, questo script richiede NS8")
         return 0
 
-    # --- 2. Cerca container Asterisk ---
-    found = find_asterisk_container()
-    if found is None:
+    # --- 2. Cerca TUTTI i container FreePBX/Asterisk ---
+    containers = find_nethvoice_containers()
+    if not containers:
         print(
-            f"2 {SERVICE_SUMMARY} - CRITICAL: container Asterisk non trovato "
+            f"2 {SERVICE_SUMMARY} - CRITICAL: container Asterisk/FreePBX non trovato "
             f"(NethVoice installato? container running?)"
         )
         return 0
 
-    module, container = found
+    # --- 3. Raccoglie registrazioni da TUTTI i moduli nethvoice ---
+    all_trunks: List[Dict[str, str]] = []
+    modules_checked: List[str] = []
 
-    # --- 3. Recupera registrazioni PJSIP ---
-    raw = run_asterisk_cmd(module, container, "pjsip show registrations")
-    if raw is None:
+    for module, container in containers:
+        raw = run_asterisk_cmd(module, container, "pjsip show registrations outbound")
+        if raw is None:
+            continue
+        trunks = parse_pjsip_registrations(raw)
+        for t in trunks:
+            t["module"] = module  # aggiungi info modulo per debug
+        all_trunks.extend(trunks)
+        modules_checked.append(module)
+
+    modules_str = ",".join(modules_checked) if modules_checked else "none"
+
+    # --- 4. Nessun trunk trovato ---
+    if not all_trunks:
         print(
-            f"2 {SERVICE_SUMMARY} - CRITICAL: impossibile eseguire pjsip show registrations "
-            f"(module={module} container={container})"
+            f"1 {SERVICE_SUMMARY} - WARNING: nessun trunk PJSIP outbound configurato "
+            f"| modules={modules_str}"
         )
-        return 0
-
-    # --- 4. Parsa output ---
-    trunks = parse_pjsip_registrations(raw)
-
-    if not trunks:
-        # Nessun trunk registrant configurato (o tutti IP-based senza registrazione)
-        if "no registrations" in raw.lower():
-            print(
-                f"1 {SERVICE_SUMMARY} - WARNING: nessun trunk PJSIP con registrazione trovato "
-                f"| module={module} container={container}"
-            )
-        else:
-            print(
-                f"3 {SERVICE_SUMMARY} - UNKNOWN: output pjsip show registrations non riconosciuto "
-                f"| module={module} container={container}"
-            )
         return 0
 
     # --- 5. Output una riga per trunk ---
     overall_state = 0
     registered_count = 0
 
-    for trunk in trunks:
+    for trunk in all_trunks:
         state = get_state(trunk["status"])
         overall_state = max(overall_state, state)
 
@@ -321,10 +316,11 @@ def main() -> int:
         server_clean = server_clean.split("@")[-1]              # solo host (senza utente)
         server_clean = server_clean.split(";")[0].strip()       # rimuovi parametri SIP
 
-        print(f"{state} {svc_name} - {trunk['status']} | server={server_clean}")
+        mod = trunk.get("module", "")
+        print(f"{state} {svc_name} - {trunk['status']} | server={server_clean} module={mod}")
 
     # --- 6. Riga sommario ---
-    total = len(trunks)
+    total = len(all_trunks)
     not_ok = total - registered_count
 
     if overall_state == 0:
@@ -336,7 +332,7 @@ def main() -> int:
 
     print(
         f"{overall_state} {SERVICE_SUMMARY} - {summary_msg} "
-        f"| module={module} container={container}"
+        f"| modules={modules_str}"
     )
 
     return 0
