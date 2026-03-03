@@ -1283,46 +1283,38 @@ if __name__ == "__main__":
 
 - SEMPRE `0` per local checks (CheckMK ignora exit code, legge solo primo campo output)
 
-### 4. Launcher Remoti Python Puri
+### 4. Deploy Diretto da Repo Locale (NO Launcher)
 
-⚠️ **IMPORTANTE: Preferire launcher Python puri (no bash wrapper!)**
+❌ **LAUNCHER DEPRECATI** - Non creare più script `remote/rssh_*.py`
 
-**Template launcher remoto Python (`remote/rssh_service_name.py`):**
+✅ **POLICY ATTUALE: Deploy diretto dello script `full/` da `/opt/checkmk-tools/`**
 
-```python
-#!/usr/bin/env python3
-"""
-Remote launcher per check_service_name.py
-Scarica e esegue la versione Python completa da repository
-"""
+**Motivazione:**
+- Il repo `/opt/checkmk-tools/` è già presente su tutti gli host (git pull automatico ogni minuto)
+- Deploy diretto = nessun download HTTP in runtime, funziona offline
+- Meno file da mantenere, meno complessità
+- Nessun doppio step (launcher → download → exec)
 
-import urllib.request
-import sys
+**Metodo deploy:**
 
-REPO_URL = "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-<categoria>/full/check_service_name.py"
+```bash
+# Aggiorna repo locale
+cd /opt/checkmk-tools && git pull
 
-try:
-    # Download ed esegui lo script remoto
-    with urllib.request.urlopen(REPO_URL, timeout=10) as response:
-        script_code = response.read().decode('utf-8')
-    
-    # Esegui nel namespace globale (come se fosse lo script principale)
-    exec(script_code, {'__name__': '__main__'})
-    
-except Exception as e:
-    print(f"3 ServiceName - Failed to download/execute remote script: {e}")
-    sys.exit(0)
+# Copia script full/ nella directory local checks (SENZA estensione)
+cp script-check-<categoria>/full/check_service_name.py /usr/lib/check_mk_agent/local/check_service_name
+chmod +x /usr/lib/check_mk_agent/local/check_service_name
+
+# Test immediato
+/usr/lib/check_mk_agent/local/check_service_name
 ```
 
-**Vantaggi launcher Python vs Bash:**
+**Nome file deployato:**
+- SENZA estensione `.py` (CheckMK esegue tutti i file eseguibili)
+- Usa direttamente il nome del check: `check_nethvoice_trunks`, `check_fail2ban_status`, etc.
+- ❌ Niente più prefisso `rssh_`
 
-- ✅ Coerenza: tutto Python, no dipendenza da bash/curl
-- ✅ Error handling: try/except invece di exit codes
-- ✅ Timeout integrato: urllib.request.urlopen(timeout=10)
-- ✅ Output fallback: messaggio CheckMK-compliant in caso errore
-- ✅ Portabilità: funziona ovunque ci sia Python3
-
-### 5. Workflow Completo Conversione
+### 5. Workflow Completo Conversione/Nuovo Script
 
 **Step OBBLIGATORI (seguire SEMPRE):**
 
@@ -1335,82 +1327,62 @@ vim script-check-ubuntu/full/check_service_name.py
 python -m py_compile script-check-ubuntu/full/check_service_name.py
 # EXIT CODE deve essere 0
 
-# 3. Crea launcher remoto Python (remote/)
-vim script-check-ubuntu/remote/rssh_service_name.py
-# Usa template launcher sopra
-
-# 4. Valida sintassi launcher
-python -m py_compile script-check-ubuntu/remote/rssh_service_name.py
-# EXIT CODE deve essere 0
-
-# 5. Rendi eseguibili entrambi
+# 3. Rendi eseguibile e aggiungi a git
 git add script-check-ubuntu/full/check_service_name.py
-git add script-check-ubuntu/remote/rssh_service_name.py
 git update-index --chmod=+x script-check-ubuntu/full/check_service_name.py
-git update-index --chmod=+x script-check-ubuntu/remote/rssh_service_name.py
 
-# 6. Verifica permessi (devono mostrare 100755)
+# 4. Verifica permessi (devono mostrare 100755)
 git ls-files -s script-check-ubuntu/full/check_service_name.py
-git ls-files -s script-check-ubuntu/remote/rssh_service_name.py
 
-# 7. Commit & Push
-git commit -m "feat(ubuntu): converti check_service_name in Python v1.0.0 + launcher remoto"
+# 5. Commit & Push
+git commit -m "feat(ubuntu): check_service_name v1.0.0 - descrizione"
 git push
 
-# 8. Deploy su host remoto
-wsl -d kali-linux ssh <host> "cd /opt/checkmk-tools && git pull"
+# 6. Deploy su host remoto (aggiorna repo + copia direttamente)
+# HOST CON CHIAVE SSH (vps-01, vps-02):
+wsl -d kali-linux ssh <host> "cd /opt/checkmk-tools && git pull && cp script-check-ubuntu/full/check_service_name.py /usr/lib/check_mk_agent/local/check_service_name && chmod +x /usr/lib/check_mk_agent/local/check_service_name"
 
-# 9. Test script completo
-wsl -d kali-linux ssh <host> "/opt/checkmk-tools/script-check-ubuntu/full/check_service_name.py"
+# HOST CON PASSWORD (tutti gli altri): dare i comandi da incollare:
+# cd /opt/checkmk-tools && git pull
+# cp script-check-ubuntu/full/check_service_name.py /usr/lib/check_mk_agent/local/check_service_name
+# chmod +x /usr/lib/check_mk_agent/local/check_service_name
 
-# 10. Test launcher remoto
-wsl -d kali-linux ssh <host> "/opt/checkmk-tools/script-check-ubuntu/remote/rssh_service_name.py"
+# 7. Test local check
+wsl -d kali-linux ssh <host> "/usr/lib/check_mk_agent/local/check_service_name"
 
-# 11. ⚠️ VERIFICA presenza versione bash PRIMA del deploy
-wsl -d kali-linux ssh <host> "ls -la /usr/lib/check_mk_agent/local/<nome_check_bash>"
-# Se NON esiste versione bash → SKIP deploy Python su questo host
-
-# 12. Deploy come local check (SOLO se bash esisteva)
-wsl -d kali-linux ssh <host> "cp /opt/checkmk-tools/script-check-ubuntu/remote/rssh_service_name.py /usr/lib/check_mk_agent/local/rssh_service_name && chmod +x /usr/lib/check_mk_agent/local/rssh_service_name"
-
-# 13. Test local check deployato
-wsl -d kali-linux ssh <host> "/usr/lib/check_mk_agent/local/rssh_service_name"
-
-# 14. Verifica output agent CheckMK
+# 8. Verifica output agent CheckMK
 wsl -d kali-linux ssh <host> "check_mk_agent 2>/dev/null | grep ServiceName"
 # Deve mostrare UNA SOLA riga con output check
-
-# 15. ✅ Se tutto OK → Rimuovi vecchio launcher bash (se esisteva)
-wsl -d kali-linux ssh <host> "rm /usr/lib/check_mk_agent/local/rssh_service_name_old 2>/dev/null || true"
 ```
+
+❌ **NON creare cartella `remote/` né file `rssh_*.py`** - non servono più.
 
 ### 6. Naming Convention
 
 **File nel repository:**
 
-- `script-check-<categoria>/full/check_service_name.py` → Script completo Python
-- `script-check-<categoria>/full/check_service_name.sh` → Script bash OLD (deprecato)
-- `script-check-<categoria>/remote/rssh_service_name.py` → Launcher remoto Python
-- `script-check-<categoria>/remote/rssh_service_name.sh` → Launcher bash OLD (deprecato)
+- `script-check-<categoria>/full/check_service_name.py` → Script completo Python (unico file da creare)
+- `script-check-<categoria>/full/check_service_name.sh` → Script bash OLD (deprecato, non creare nuovi)
+- ❌ `script-check-<categoria>/remote/` → NON creare più questa cartella/file
 
 **File deployati su host (local checks):**
 
-- `/usr/lib/check_mk_agent/local/rssh_service_name` → Launcher deployato (SENZA estensione)
-- Convenzione: mantenere nome `rssh_` per identificare launcher remoti
-- NON usare `.py` in nome file deployato (CheckMK esegue tutti i file eseguibili)
+- `/usr/lib/check_mk_agent/local/check_service_name` → Script deployato SENZA estensione `.py`
+- Nome uguale al file `full/` senza `.py` (es: `check_nethvoice_trunks`)
+- CheckMK esegue tutti i file eseguibili nella directory
 
 ### 7. Migrazione Graduale
 
 **Quando converti uno script bash esistente:**
 
-1. ✅ Mantieni versione bash originale (`.sh`) nel repository
-2. ✅ Crea nuova versione Python (`.py`)
-3. ✅ Crea launcher remoto Python
-4. ✅ Testa launcher Python su host pilota
-5. ✅ Se tutto OK → sostituisci launcher bash deployato con Python
-6. ✅ OPZIONALE: Rimuovi `.sh` dal repository dopo periodo transizione
+1. ✅ Mantieni versione bash originale (`.sh`) nel repository durante transizione
+2. ✅ Crea nuova versione Python (`.py`) in `full/`
+3. ✅ Testa script Python direttamente su host pilota
+4. ✅ Se tutto OK → sostituisci il file deployato in `/usr/lib/check_mk_agent/local/` con la versione Python
+5. ✅ OPZIONALE: Rimuovi `.sh` dal repository dopo periodo transizione
 
 **NON eliminare mai script bash senza test completo Python!**
+❌ **NON creare launcher `remote/rssh_*`** - deploy diretto da repo locale.
 
 ### 8. Testing Obbligatorio
 
@@ -1418,18 +1390,10 @@ wsl -d kali-linux ssh <host> "rm /usr/lib/check_mk_agent/local/rssh_service_name
 
 - ✅ Validazione sintassi Python (py_compile)
 - ✅ Esecuzione script completo su host remoto
-- ✅ Esecuzione launcher remoto su host remoto
 - ✅ Output compatibile CheckMK format (`<STATE> <SERVICE> - <msg>`)
 - ✅ Check appare in `check_mk_agent` output
 - ✅ NO duplicati (solo 1 istanza del check nell'output agent)
 - ✅ Comportamento identico a versione bash (stessi state codes, stessi messaggi)
-
-**⚠️ REGOLA DEPLOY CONDIZIONALE:**
-
-- ❌ **NON deployare** lo script Python se sulla macchina remota **NON esiste** la versione bash
-- ✅ Deploy solo se il check bash è già presente su quel host
-- ✅ Verificare presenza: `ls -la /usr/lib/check_mk_agent/local/<nome_check_bash>`
-- ⚠️ Se bash non trovato → skip deploy Python su quell'host
 
 **⚠️ BACKUP A FINE CATEGORIA:**
 
