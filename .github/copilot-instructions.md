@@ -1547,6 +1547,14 @@ srv-monitoring    # 45.33.235.86:2333 (root, Monitoring)
                   #       ControlPersist 60m
                   # ✅ Comando corretto: wsl -d kali-linux bash -c "ssh -tt srv-monitoring 'cmd'"
                   # ✅ Prima connessione chiede password, poi socket attivo per 15 minuti
+                  #
+                  # 🔴 REGOLA CRITICA - srv-monitoring richiede password interattiva:
+                  # ❌ MAI tentare di eseguire comandi su srv-monitoring in autonomia tramite run_in_terminal
+                  #    → il socket ControlMaster scade rapidamente nella sessione VSCode
+                  #    → ogni tentativo autonomo fallisce con ^C o timeout
+                  # ✅ SEMPRE dare i comandi da incollare direttamente nel terminale già aperto su srv-monitoring
+                  # ✅ Se l'utente è già connesso → dare UN SOLO blocco di comandi, compatto, da incollare
+                  # ✅ Non usare più di un blocco per operazione (evitare back-and-forth inutile)
 
 # Altri server
 fwlab             # 192.168.5.117:2222 (root)
