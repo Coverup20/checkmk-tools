@@ -33,9 +33,9 @@ import re
 import time
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "1.2.0"
-SERVICE_PREFIX = "NethVoice_Trunk"
-SERVICE_SUMMARY = "NethVoice_Trunks"
+VERSION = "1.3.0"
+SERVICE_PREFIX = "NethVoice.Trunk"
+SERVICE_SUMMARY = "NethVoice.Trunks"
 
 SCRIPT_TIMEOUT = 20  # secondi totali a disposizione dello script
 _START = time.monotonic()
@@ -308,7 +308,7 @@ def main() -> int:
         if state == 0:
             registered_count += 1
 
-        svc_name = f"{SERVICE_PREFIX}_{sanitize_name(trunk['name'])}"
+        svc_name = f"{SERVICE_PREFIX}.{sanitize_name(trunk['name'])}"
 
         # Server URI abbreviato: domain[:porta] senza sip:/sips:
         server = trunk["server"]
