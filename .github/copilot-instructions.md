@@ -1477,9 +1477,12 @@ wsl -d kali-linux ssh <host> "check_mk_agent 2>/dev/null | grep ServiceName"
   → NON riprovare
   → Dare IMMEDIATAMENTE i comandi da incollare nel terminale dell'utente
 - ✅ **ECCEZIONE**: checkmk-vps-01 e checkmk-vps-02 usano chiave SSH → run_in_terminal funziona
+- ⚠️ **NOTA CRITICA**: avere l'alias host in `~/.ssh/config` NON significa accesso senza password!
+  → La config WSL definisce parametri di connessione, NON autentica automaticamente
+  → Se l'host usa password, il tool va in `^C` indipendentemente dall'alias configurato
 - ✅ **Classificazione host per metodo auth**:
   - 🔑 **CHIAVE SSH** (run_in_terminal OK): checkmk-vps-01, checkmk-vps-02
-  - 🔐 **PASSWORD** (dare comandi da incollare): tutti gli altri host
+  - 🔐 **PASSWORD** (dare comandi da incollare): checkmk-z1plus, checkmk-testfrp, nodo-proxmox, ns-lab00, box-lab00, rl94ns8, rl94ns81, nsec8-stable, laboratorio, marziodemo, ubntmarzio, srv-monitoring, fwlab, redteam
 
 **Host disponibili:**
 
