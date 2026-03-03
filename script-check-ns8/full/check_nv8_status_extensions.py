@@ -40,8 +40,7 @@ import sys
 import time
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "1.0.1"
-SERVICE_PREFIX   = "NV8.Status.Extension"
+VERSION = "1.0.2"
 SERVICE_SUMMARY  = "NV8.Status.Extensions"
 
 SCRIPT_TIMEOUT = 25       # secondi totali budget
@@ -249,20 +248,12 @@ def main() -> int:
         )
         return 0
 
-    total      = len(all_endpoints)
-    registered = [e for e in all_endpoints if e["registered"]]
-    unreg      = [e for e in all_endpoints if not e["registered"]]
-    reg_count  = len(registered)
+    total       = len(all_endpoints)
+    registered  = [e for e in all_endpoints if e["registered"]]
+    unreg       = [e for e in all_endpoints if not e["registered"]]
+    reg_count   = len(registered)
     unreg_count = len(unreg)
-    unreg_pct  = (unreg_count / total * 100) if total > 0 else 0.0
-
-    # Riga per ogni interno NON registrato (visibile come servizio separato in CheckMK)
-    for ep in unreg:
-        svc = f"{SERVICE_PREFIX}.{sanitize_name(ep['name'])}"
-        print(
-            f"2 {svc} - Unregistered | "
-            f"name={ep['name']} state={ep['state']} module={ep['module']}"
-        )
+    unreg_pct   = (unreg_count / total * 100) if total > 0 else 0.0
 
     # Determina stato sommario
     if unreg_count == 0:
@@ -278,10 +269,12 @@ def main() -> int:
         overall = 0
         msg = f"OK: {reg_count}/{total} registrati, {unreg_count} non registrati ({unreg_pct:.0f}%)"
 
-    # Aggiungi lista interni non registrati se pochi (max 10 in riga)
-    if 0 < unreg_count <= 10:
-        names = ", ".join(e["name"] for e in unreg)
-        msg += f" [{names}]"
+    # Lista interni non registrati nel messaggio (visibile nelle notifiche)
+    if unreg_count > 0:
+        names = ", ".join(
+            f"{e['name']}({e['module']})" for e in unreg
+        )
+        msg += f" | non registrati: {names}"
 
     perf = f"registered={reg_count};;;0;{total} unregistered={unreg_count};;;0;{total} total={total}"
     modules_str = ",".join(modules_checked)
