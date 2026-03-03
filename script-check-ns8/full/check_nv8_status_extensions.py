@@ -40,7 +40,7 @@ import sys
 import time
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 SERVICE_PREFIX   = "NV8.Status.Extension"
 SERVICE_SUMMARY  = "NV8.Status.Extensions"
 
@@ -188,10 +188,9 @@ def parse_endpoints(output: str) -> List[Dict[str, str]]:
         raw_state = m.group(2).strip()
         state_lc  = raw_state.lower()
 
-        # Salta endpoint che sembrano trunk (contengono "trunk", "reg-", oppure
-        # contengono "/" con parte sip: che indica AOR trunk)
+        # Salta endpoint che sembrano trunk o endpoint di sistema
         base_name = raw_name.split("/")[0]
-        if any(kw in base_name.lower() for kw in ("trunk", "reg-", "reg_", "sip:")):
+        if any(kw in base_name.lower() for kw in ("trunk", "reg-", "reg_", "sip:", "anonymous")):
             continue
 
         # Salta entry non-endpoint (header, separatori, conteggi)
