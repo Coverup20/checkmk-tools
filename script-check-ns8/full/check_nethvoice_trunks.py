@@ -33,7 +33,7 @@ import re
 import time
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 SERVICE_PREFIX = "NethVoice.Trunk"
 SERVICE_SUMMARY = "NethVoice.Trunks"
 
@@ -97,11 +97,12 @@ def sanitize_name(name: str) -> str:
     """
     Converte il nome di un trunk in un service name valido per CheckMK.
     - Rimuove prefisso reg- / reg_
-    - Sostituisce caratteri non alfanumerici con underscore
+    - Sostituisce caratteri non alfanumerici (incluso _ e -) con punto
     """
     name = re.sub(r"^reg[-_]", "", name, flags=re.IGNORECASE)
-    name = re.sub(r"[^a-zA-Z0-9_]", "_", name)
-    return name.strip("_") or "trunk"
+    name = re.sub(r"[^a-zA-Z0-9]", ".", name)
+    name = re.sub(r"\.{2,}", ".", name)  # collassa punti multipli
+    return name.strip(".") or "trunk"
 
 
 # ---------------------------------------------------------------------------
