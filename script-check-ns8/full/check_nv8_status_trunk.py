@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-check_nethvoice_trunks.py - CheckMK Local Check per stato trunk NethVoice
+check_nv8_status_trunk.py - CheckMK Local Check per stato trunk NethVoice NS8
 
 Monitora la registrazione dei trunk PJSIP su NethVoice NS8.
 Usa runagent + podman exec per eseguire `asterisk -rx "pjsip show registrations"`
@@ -33,9 +33,9 @@ import re
 import time
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "1.3.1"
-SERVICE_PREFIX = "NethVoice.Trunk"
-SERVICE_SUMMARY = "NethVoice.Trunks"
+VERSION = "1.4.0"
+SERVICE_PREFIX = "NV8.Status.Trunk"
+SERVICE_SUMMARY = "NV8.Status.Trunks"
 
 SCRIPT_TIMEOUT = 20  # secondi totali a disposizione dello script
 _START = time.monotonic()
