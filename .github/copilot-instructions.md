@@ -12,7 +12,7 @@
 
 **File correlati:**
 - `.copilot-preferences.md` → Sommario/quick reference (220 righe)
-- `.github/copilot-instructions.md` → **QUESTO FILE** - Regole complete (2105 righe)
+- `.github/copilot-instructions.md` → **QUESTO FILE** - Regole complete (~2250 righe, aggiornato automaticamente)
 
 ---
 
@@ -53,10 +53,12 @@
 
 **SEMPRE rispettare queste regole:**
 
-1. **Un comando alla volta**
-   - ❌ NON eseguire comandi multipli senza conferma
-   - ✅ Eseguire un comando, attendere conferma utente
-   - ⚠️ SPECIALMENTE per operazioni distruttive (rm, delete, drop, truncate)
+1. **Un comando alla volta** _(vale per operazioni DISTRUTTIVE o su sistemi remoti)_
+   - ❌ NON eseguire comandi distruttivi multipli senza conferma
+   - ✅ Eseguire un comando distruttivo, attendere conferma utente
+   - ⚠️ SPECIALMENTE per: cancellazioni, modifiche file, deploy, comandi SSH
+   - ✅ **ECCEZIONE**: tool read-only in parallelo sono OK (grep, read_file, file_search, etc.)
+   - ✅ **ECCEZIONE**: `multi_replace_string_in_file` è OK per edit batch sullo stesso file/progetto
 
     **Regola aggiuntiva (OBBLIGATORIA): pausa a fine comando**
     - ✅ Dopo OGNI comando lanciato in terminale, aggiungere una pausa breve per permettere di leggere l’output.
@@ -468,6 +470,8 @@ git commit -m "fix: risolto errore comando"
 - ✅ **SEMPRE** seguire TUTTI gli step 1-7 del workflow
 - 🔄 **LOOP infinito** finché non funziona o utente ferma
 - ⏱️ **NESSUNA FRETTA** - Prendere tutto il tempo necessario per fare bene
+- ⚠️ **STEP 7 SU HOST PASSWORD**: se l'host target richiede password (es. ns-lab00, laboratorio)
+  → NON eseguire il test in autonomia → dare i comandi da incollare all'utente
 
 **Esempio completo:**
 
@@ -550,7 +554,7 @@ git commit -m "feat: nuovo script"
 ```
 
 18. **📌 VERSIONING SCRIPT OBBLIGATORIO**
-   - ✅ **SEMPRE aggiungere variabile VERSION** all'inizio di ogni script bash/PowerShell
+   - ✅ **SEMPRE aggiungere variabile VERSION** all'inizio di ogni script bash/PowerShell/Python
    - ✅ Rendere **versione visibile nell'output/header** dello script
    - ✅ **Aggiornare versione ad OGNI modifica** committata
    - ⚠️ Permette identificazione immediata versione in esecuzione su host remoti
@@ -560,6 +564,15 @@ git commit -m "feat: nuovo script"
    - MAJOR: cambio architettura/breaking changes
    - MINOR: nuove funzionalità backwards-compatible
    - PATCH: bugfix/miglioramenti minori
+   
+   **Template Python (PREFERITO - policy Python-first):**
+   ```python
+   #!/usr/bin/env python3
+   VERSION = "1.0.0"   # Versione script (aggiornare ad ogni modifica)
+   
+   # Mostra versione in output/help
+   print(f"Script Name - Version v{VERSION}")
+   ```
    
    **Template Bash:**
    ```bash
@@ -1538,6 +1551,11 @@ ubntmarzio        # 10.155.100.108:22 (user: marzio)
 srv-monitoring    # 45.33.235.86:2333 (root, Monitoring)
                   # ⚠️ USARE SEMPRE root@45.33.235.86 - MAI admin-nethesis o altri utenti!
                   # ⚠️ NON usare sudo (connessione già come root - sudo non serve)
+                  # ✅ OMD installato: sito 'monitoring' in /omd/sites/monitoring/
+                  # ✅ rclone configurato: /opt/omd/sites/monitoring/.config/rclone/rclone.conf (remote 'do', bucket 'testmonbck')
+                  # ✅ Backup locali in: /var/backups/checkmk/
+                  # ✅ Cloud push: checkmk-cloud-backup-push@monitoring.timer (ogni minuto)
+                  # ✅ Comandi OMD come root: su - monitoring -c "comando"
                   # Firewall pubblico 45.33.235.86 porta 2333 → DNAT → 127.0.0.1:2222 interno
                   # ⚠️ fail2ban attivo sul firewall - NON fare tentativi multipli di connessione
                   # ⚠️ Firewall whitelist solo IP 159.65.203.113 (alias sos) - OBBLIGATORIO jump via sos
