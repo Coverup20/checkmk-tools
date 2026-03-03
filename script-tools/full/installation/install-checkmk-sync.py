@@ -573,6 +573,8 @@ def uninstall_frpc(os_info: Dict[str, str]) -> None:
 
 
 # ─── Git prerequisiti ─────────────────────────────────────────────────────────
+
+def ensure_git(pkg_mgr: str) -> None:
     if shutil.which("git"):
         return
     print("[INFO] git non trovato, installazione in corso...")
