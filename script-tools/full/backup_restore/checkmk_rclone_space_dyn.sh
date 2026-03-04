@@ -2,6 +2,7 @@
 set -euo pipefail
 
 # checkmk_cloud_backup_push.sh
+VERSION="1.0.1"   # Versione script (aggiornare ad ogni modifica)
 # Usage:
 #   checkmk_cloud_backup_push.sh setup
 #   checkmk_cloud_backup_push.sh run <site>
@@ -355,8 +356,14 @@ if [[ "$RETENTION_DAYS_REMOTE" -gt 0 ]]; then
   if [[ ${#all_backups[@]} -eq 0 ]]; then
     log "No remote backups found (this might be the first upload)."
   else
-    # Sort by name (newest first - ISO date format sorts correctly)
-    mapfile -t sorted_backups < <(printf '%s\n' "${all_backups[@]}" | sort -r)
+    # Sort by date extracted from filename (newest first)
+    # Note: sort -r on full name is wrong when job01 < job00 alphabetically but job00 is newer by date
+    mapfile -t sorted_backups < <(
+      printf '%s\n' "${all_backups[@]}" | \
+        sed 's/.*\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-[0-9]\{2\}h[0-9]\{2\}\).*/\1 &/' | \
+        sort -r | \
+        cut -d' ' -f2-
+    )
     
     # Keep only N most recent
     kept=0
