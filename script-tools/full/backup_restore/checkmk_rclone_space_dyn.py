@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from typing import List
 
-VERSION = "1.0.2"  # Versione script (aggiornare ad ogni modifica)
+VERSION = "1.0.3"  # Versione script (aggiornare ad ogni modifica)
 SCRIPT_NAME = Path(__file__).name
 SITES_BASE = Path("/opt/omd/sites")
 SYSTEMD_DIR = Path("/etc/systemd/system")
@@ -404,14 +404,14 @@ WantedBy=timers.target
     (SYSTEMD_DIR / "checkmk-cloud-backup-push@.timer").write_text(timer_unit, encoding="utf-8")
 
 
-def write_defaults_file(site: str, remote: str = "do:testmonbck", retention_local: str = "2", retention_remote: str = "1") -> None:
+def write_defaults_file(site: str, remote: str = "do:testmonbck", retention_local: str = "2", retention_remote: str = "1", remote_prefix: str = "checkmk-backups") -> None:
     defaults = Path(f"/etc/default/checkmk-cloud-backup-push-{site}")
     if defaults.exists():
         log(f"Defaults file already exists: {defaults} (not overwriting)")
         return
 
     text = f"""REMOTE={remote}
-REMOTE_PREFIX=checkmk-backups
+REMOTE_PREFIX={remote_prefix}
 BACKUP_DIR=/var/backups/checkmk
 RCLONE_CONF=/opt/omd/sites/{site}/.config/rclone/rclone.conf
 RETRIES=3
@@ -514,9 +514,10 @@ def setup() -> None:
 
     retention_local = prompt_default("Local retention (number of backups)", "2")
     retention_remote = prompt_default("Remote retention (number of backups)", "1")
+    remote_prefix = prompt_default("Remote folder name (cartella nel bucket)", "checkmk-backups")
 
     for site in sites:
-        write_defaults_file(site, f"{configured_remote_name}:{configured_bucket}", retention_local, retention_remote)
+        write_defaults_file(site, f"{configured_remote_name}:{configured_bucket}", retention_local, retention_remote, remote_prefix)
         run(["chown", "-R", f"{site}:{site}", str(backup_dir)], check=False)
         run(["systemctl", "enable", "--now", f"checkmk-cloud-backup-push@{site}.timer"], check=False)
         log(f"  ✓ {site} - monitoring /var/backups/checkmk")

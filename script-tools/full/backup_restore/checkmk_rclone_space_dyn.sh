@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # checkmk_cloud_backup_push.sh
-VERSION="1.0.1"   # Versione script (aggiornare ad ogni modifica)
+VERSION="1.0.2"   # Versione script (aggiornare ad ogni modifica)
 # Usage:
 #   checkmk_cloud_backup_push.sh setup
 #   checkmk_cloud_backup_push.sh run <site>
@@ -470,6 +470,7 @@ write_defaults_file() {
   local remote="${2:-do:testmonbck}"
   local retention_local="${3:-30}"
   local retention_remote="${4:-90}"
+  local remote_prefix="${5:-checkmk-backups}"
   local defaults="/etc/default/checkmk-cloud-backup-push-${site}"
   if [[ -f "$defaults" ]]; then
     log "Defaults file already exists: $defaults (not overwriting)"
@@ -480,7 +481,7 @@ write_defaults_file() {
 # Overrides for site ${site}
 # Example:
 # REMOTE=do:testmonbck
-# REMOTE_PREFIX=checkmk-backups
+# REMOTE_PREFIX=checkmk-backups  # Cartella nel bucket (scelta in fase di installazione)
 # BACKUP_DIR=/var/backups/checkmk
 # RCLONE_CONF=/opt/omd/sites/${site}/.config/rclone/rclone.conf
 # RETRIES=3
@@ -489,7 +490,7 @@ write_defaults_file() {
 # RETENTION_DAYS_REMOTE=1   # Number of backups to keep on cloud (single backup)
 
 REMOTE=${remote}
-REMOTE_PREFIX=checkmk-backups
+REMOTE_PREFIX=${remote_prefix}
 BACKUP_DIR=/var/backups/checkmk
 RCLONE_CONF=/opt/omd/sites/${site}/.config/rclone/rclone.conf
 RETRIES=3
@@ -686,6 +687,8 @@ setup() {
   local retention_local retention_remote
   retention_local="$(prompt_default "Local retention (number of backups, recommended: 2 for dual-slot)" "2")"
   retention_remote="$(prompt_default "Remote retention (number of backups, recommended: 1 for single full)" "1")"
+  local remote_prefix
+  remote_prefix="$(prompt_default "Remote folder name (cartella nel bucket)" "checkmk-backups")"
   log "Local retention: ${retention_local} backup(s)"
   log "Remote retention: ${retention_remote} backup(s)"
   log ""
@@ -697,7 +700,7 @@ setup() {
   if [[ "${#sites[@]}" -gt 0 ]]; then
     log "Auto-enabling backup monitoring for discovered sites:"
     for site in "${sites[@]}"; do
-      write_defaults_file "$site" "${CONFIGURED_REMOTE:-do:testmonbck}" "$retention_local" "$retention_remote"
+      write_defaults_file "$site" "${CONFIGURED_REMOTE:-do:testmonbck}" "$retention_local" "$retention_remote" "$remote_prefix"
       
       # Set correct ownership for the site user
       if id "$site" &>/dev/null; then
