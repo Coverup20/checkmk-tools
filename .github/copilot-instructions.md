@@ -1481,6 +1481,13 @@ wsl -d kali-linux ssh <host> "check_mk_agent 2>/dev/null | grep ServiceName"
 - ✅ **SEMPRE** usare `terminal_last_command` per leggere l'output del comando in corso
 - ❌ **NON** lanciare un comando alternativo "più semplice" se il primo non risponde subito - ASPETTARE
 
+**🔴 REGOLA CRITICA - Leggere SEMPRE l'output prima di parlare:**
+- ✅ **PRIMA di dire qualsiasi cosa** dopo un comando → controlla exit code nel context
+- ✅ **Se exit code = 0** → chiama `terminal_last_command` immediatamente e leggi l'output
+- ✅ **Solo se exit code = unknown / comando ancora in esecuzione** → aspetta o chiedi
+- ❌ **MAI** dire "inserisci la password" o "aspetta il completamento" se exit code è già 0
+- ❌ **MAI** rilanciate un comando se il precedente ha già exit code 0 — l'output è già disponibile
+
 **🔴 REGOLA GENERALE - Host con autenticazione PASSWORD (checkmk-z1plus, ns-lab00, laboratorio, srv-monitoring, etc.):**
 - ❌ **MAI** tentare connessioni SSH autonome via `run_in_terminal` su host con password
   → il tool non può inserire la password → fallisce sempre con `^C` o timeout
