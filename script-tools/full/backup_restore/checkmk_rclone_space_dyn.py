@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from typing import List
 
-VERSION = "1.0.1"  # Versione script (aggiornare ad ogni modifica)
+VERSION = "1.0.2"  # Versione script (aggiornare ad ogni modifica)
 SCRIPT_NAME = Path(__file__).name
 SITES_BASE = Path("/opt/omd/sites")
 SYSTEMD_DIR = Path("/etc/systemd/system")
@@ -319,9 +319,9 @@ if [[ "$RETENTION_DAYS_REMOTE" -gt 0 ]]; then
     # Sort by date extracted from filename (newest first)
     # Note: sort -r on full name is wrong when job01 < job00 alphabetically but job00 is newer by date
     mapfile -t sorted_backups < <(
-      printf '%s\\n' "${all_remote_backups[@]}" | \\
-        sed 's/.*\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}-[0-9]\\{2\\}h[0-9]\\{2\\}\\).*/\\1 &/' | \\
-        sort -r | \\
+      printf '%s\n' "${all_remote_backups[@]}" | \
+        sed 's/.*\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-[0-9]\{2\}h[0-9]\{2\}\).*/\1 &/' | \
+        sort -r | \
         cut -d' ' -f2-
     )
     kept=0
