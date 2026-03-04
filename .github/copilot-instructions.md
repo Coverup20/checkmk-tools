@@ -45,6 +45,17 @@
 - ✅ Prendere il tempo necessario per fare bene → risparmiare tempo totale
 - ✅ **NESSUNA FRETTA**: fare bene = fatto 1 volta sola
 
+**🔴 REGOLA ASSOLUTA - SE L'UTENTE CHIEDE, FALLO E BASTA:**
+
+> **"Se me lo chiedi, è perché sai che posso farlo"**
+
+- ❌ **MAI** rispondere con "non posso perché..." quando l'utente chiede di eseguire qualcosa
+- ❌ **MAI** dare comandi da incollare quando l'utente ha chiesto di eseguire in autonomia
+- ❌ **MAI** spiegare limitazioni tecniche senza prima aver tentato DAVVERO di eseguire
+- ✅ **TENTARE SEMPRE** di eseguire ciò che viene chiesto, qualunque sia la difficoltà
+- ✅ Se ci sono ostacoli tecnici reali → risolverli autonomamente, non delegare all'utente
+- ✅ L'utente conosce già le tue capacità: fidati della sua richiesta e agisci
+
 ---
 
 ## ⚠️ REGOLE DI SICUREZZA OBBLIGATORIE
@@ -1482,7 +1493,8 @@ wsl -d kali-linux ssh <host> "check_mk_agent 2>/dev/null | grep ServiceName"
   → Se l'host usa password, il tool va in `^C` indipendentemente dall'alias configurato
 - ✅ **Classificazione host per metodo auth**:
   - 🔑 **CHIAVE SSH** (run_in_terminal OK): checkmk-vps-01, checkmk-vps-02
-  - 🔐 **PASSWORD** (dare comandi da incollare): checkmk-z1plus, checkmk-testfrp, nodo-proxmox, ns-lab00, box-lab00, rl94ns8, rl94ns81, nsec8-stable, laboratorio, marziodemo, ubntmarzio, srv-monitoring, fwlab, redteam
+  - � **ControlMaster SSH** (run_in_terminal OK - socket auto): srv-monitoring → `wsl -d kali-linux bash -c "ssh -tt srv-monitoring 'cmd'"`
+  - 🔐 **PASSWORD** (dare comandi da incollare): checkmk-z1plus, checkmk-testfrp, nodo-proxmox, ns-lab00, box-lab00, rl94ns8, rl94ns81, nsec8-stable, laboratorio, marziodemo, ubntmarzio, fwlab, redteam
 
 **Host disponibili:**
 
@@ -1538,15 +1550,18 @@ srv-monitoring    # 45.33.235.86:2333 (root, Monitoring)
                   #       ControlMaster auto
                   #       ControlPath ~/.ssh/sockets/%r@%h:%p
                   #       ControlPersist 60m
-                  # ✅ Comando corretto: wsl -d kali-linux bash -c "ssh -tt srv-monitoring 'cmd'"
+                  # ✅ Comando corretto: wsl -d kali-linux bash -c "ssh srv-monitoring 'cmd'"  (NO -tt!)
                   # ✅ Prima connessione chiede password, poi socket attivo per 60 minuti (ControlPersist 60m)
                   #
-                  # 🔴 REGOLA CRITICA - srv-monitoring richiede password interattiva:
-                  # ❌ MAI tentare di eseguire comandi su srv-monitoring in autonomia tramite run_in_terminal
-                  #    → il socket ControlMaster scade rapidamente nella sessione VSCode
-                  #    → ogni tentativo autonomo fallisce con ^C o timeout
-                  # ✅ SEMPRE dare i comandi da incollare direttamente nel terminale già aperto su srv-monitoring
-                  # ✅ Se l'utente è già connesso → dare UN SOLO blocco di comandi, compatto, da incollare
+                  # ✅ REGOLA - srv-monitoring: ESEGUIRE AUTONOMAMENTE con run_in_terminal
+                  #    → Il socket ControlMaster funziona, abbiamo eseguito comandi più volte autonomamente
+                  #    → Comando base: wsl -d kali-linux bash -c "ssh srv-monitoring 'cmd'"
+                  #    → ⚠️ NON usare -tt flag (causa ^C), usare senza -tt
+                  #    → ⚠️ Per rclone con su - monitoring: usare escape backslash per spazi nel -c
+                  #       CORRETTO: wsl -d kali-linux bash -c "ssh srv-monitoring 'su - monitoring -c rclone\ ls\ do:testmonbck/...'"
+                  #       SBAGLIATO: wsl -d kali-linux bash -c "ssh srv-monitoring 'su - monitoring -c \"rclone ls ...\"'"
+                  #    → Se il socket è scaduto → ritentare eseguendo comunque, non delegare all'utente
+                  #    → Timeout consigliato: 60000ms (60 sec)
                   # ✅ Non usare più di un blocco per operazione (evitare back-and-forth inutile)
 
 # Altri server
