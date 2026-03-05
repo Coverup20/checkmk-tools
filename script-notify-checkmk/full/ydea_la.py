@@ -6,7 +6,7 @@ Bulk: no
 CheckMK notification script - integrates with Ydea ticketing system.
 Features: smart detection, flapping protection, host aggregation, cache management.
 
-Version: 1.0.1
+Version: 1.0.2
 """
 
 import os
@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -700,8 +700,8 @@ def main():
             log(f"Ticket #{ticket_id} not found (404), removing from cache")
             remove_ticket_from_cache(ticket_key)
             
-            # Create new ticket if still critical
-            if state in ["CRITICAL", "CRIT", "DOWN", "WARNING", "WARN"]:
+            # Create new ticket only if CRITICAL/DOWN (not WARNING)
+            if state in ["CRITICAL", "CRIT", "DOWN"]:
                 log("Creating new ticket after 404")
                 
                 alert_type = detect_alert_type(output, last_state, state)
@@ -723,8 +723,8 @@ def main():
                     save_ticket_cache(ticket_key, new_ticket_id, state)
                     log_ticket_event("CREATO", new_ticket_id, f"After 404 on #{ticket_id}")
     
-    elif state in ["CRITICAL", "CRIT", "DOWN", "WARNING", "WARN"]:
-        # Create new ticket
+    elif state in ["CRITICAL", "CRIT", "DOWN"]:
+        # Create new ticket (only CRITICAL/DOWN, WARNING only adds notes to existing tickets)
         log(f"Creating new ticket for {hostname}/{service}")
         
         alert_type = detect_alert_type(output, last_state, state)
