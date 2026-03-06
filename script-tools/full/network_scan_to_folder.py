@@ -203,11 +203,14 @@ def apply_checkmk(dry_run: bool = False):
         print("[DRY RUN] Salterebbe: cmk -R")
         return
     print("\nApplicazione CheckMK (cmk -R)...")
-    r = subprocess.run(["cmk", "-R"], capture_output=True, text=True)
-    if r.returncode == 0:
-        print("cmk -R: OK")
-    else:
-        print(f"cmk -R WARNING:\n{r.stderr[:500]}")
+    try:
+        r = subprocess.run(["cmk", "-R"], capture_output=True, text=True)
+        if r.returncode == 0:
+            print("cmk -R: OK")
+        else:
+            print(f"cmk -R WARNING:\n{r.stderr[:500]}")
+    except FileNotFoundError:
+        print("cmk non trovato — skip (host non è un server CheckMK)")
 
 
 # ---------------------------------------------------------------------------
