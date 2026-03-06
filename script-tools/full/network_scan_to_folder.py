@@ -24,7 +24,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Optional
 
-VERSION = "1.1.3"
+VERSION = "1.1.4"
 
 WATO_BASE = "/omd/sites/monitoring/etc/check_mk/conf.d/wato"
 
@@ -270,12 +270,48 @@ def apply_checkmk(dry_run: bool = False):
 # Main
 # ---------------------------------------------------------------------------
 
+def _prompt_subnet() -> list:
+    """Chiede le subnet interattivamente fino a riga vuota."""
+    print("Inserisci le subnet da scansionare (una per riga, INVIO vuoto per terminare):")
+    subnets = []
+    while True:
+        val = input(f"  subnet{len(subnets)+1}: ").strip()
+        if not val:
+            if not subnets:
+                print("  Devi inserire almeno una subnet.")
+                continue
+            break
+        # Validazione minimale formato CIDR
+        try:
+            import ipaddress
+            ipaddress.ip_network(val, strict=False)
+            subnets.append(val)
+        except ValueError:
+            print(f"  '{val}' non è un CIDR valido (es: 192.168.1.0/24). Riprova.")
+    return subnets
+
+
+def _prompt_folder() -> str:
+    """Chiede il nome della folder WATO interattivamente."""
+    while True:
+        val = input("Nome folder WATO [scansione]: ").strip()
+        if not val:
+            return "scansione"
+        # Solo caratteri sicuri per nome directory
+        if re.match(r'^[\w\-]+$', val):
+            return val
+        print("  Usa solo lettere, numeri, underscore e trattino.")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=f"Network scan → CheckMK folder v{VERSION}",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Esempi:
+  # Modalità interattiva (chiede subnet e folder)
+  python3 network_scan_to_folder.py
+
   # Preview senza scrivere
   python3 network_scan_to_folder.py --subnet 192.168.32.0/23 --dry-run
 
@@ -285,11 +321,11 @@ Esempi:
   # Più subnet, nome folder custom
   python3 network_scan_to_folder.py --subnet 192.168.32.0/24 --subnet 192.168.33.0/24 --folder scansione_lab
 """)
-    parser.add_argument("--subnet", action="append", required=True,
+    parser.add_argument("--subnet", action="append", default=None,
                         metavar="CIDR",
                         help="Subnet da scansionare (ripetibile: --subnet A --subnet B)")
-    parser.add_argument("--folder", default="scansione",
-                        help="Nome folder WATO (default: scansione)")
+    parser.add_argument("--folder", default=None,
+                        help="Nome folder WATO (default: chiede interattivamente)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Preview senza scrivere nulla")
     parser.add_argument("--workers", type=int, default=50,
@@ -297,7 +333,15 @@ Esempi:
     args = parser.parse_args()
 
     print(f"Network Scan → CheckMK Folder v{VERSION}")
-    print(f"Subnet:  {', '.join(args.subnet)}")
+    print("=" * 60)
+
+    # Input interattivo se non passato da CLI
+    if not args.subnet:
+        args.subnet = _prompt_subnet()
+    if args.folder is None:
+        args.folder = _prompt_folder()
+
+    print(f"\nSubnet:  {', '.join(args.subnet)}")
     print(f"Folder:  {args.folder}")
     print(f"Dry-run: {args.dry_run}")
     print("=" * 60)
