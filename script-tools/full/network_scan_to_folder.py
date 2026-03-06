@@ -198,19 +198,37 @@ ipaddresses.update({repr(ip_dict)})
     print(f"  hosts.mk: {len(all_hosts_entries)} host scritti")
 
 
+def get_omd_site() -> str:
+    """Rileva il nome del sito OMD dal WATO_BASE."""
+    # /omd/sites/SITE/etc/check_mk/... → estrae SITE
+    m = re.match(r'/omd/sites/([^/]+)/', WATO_BASE)
+    return m.group(1) if m else "monitoring"
+
+
 def apply_checkmk(dry_run: bool = False):
     if dry_run:
         print("[DRY RUN] Salterebbe: cmk -R")
         return
     print("\nApplicazione CheckMK (cmk -R)...")
+    # Prova direttamente (siamo già nel contesto OMD)
     try:
         r = subprocess.run(["cmk", "-R"], capture_output=True, text=True)
         if r.returncode == 0:
             print("cmk -R: OK")
+            return
+    except FileNotFoundError:
+        pass
+    # Fallback: su - SITE -c "cmk -R"
+    site = get_omd_site()
+    try:
+        r = subprocess.run(["su", "-", site, "-c", "cmk -R"],
+                           capture_output=True, text=True)
+        if r.returncode == 0:
+            print(f"cmk -R: OK (via su - {site})")
         else:
             print(f"cmk -R WARNING:\n{r.stderr[:500]}")
-    except FileNotFoundError:
-        print("cmk non trovato — skip (host non è un server CheckMK)")
+    except Exception as e:
+        print(f"cmk -R: impossibile eseguire ({e})")
 
 
 # ---------------------------------------------------------------------------
