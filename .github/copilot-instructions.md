@@ -1500,9 +1500,9 @@ wsl -d kali-linux ssh <host> "check_mk_agent 2>/dev/null | grep ServiceName"
   → La config WSL definisce parametri di connessione, NON autentica automaticamente
   → Se l'host usa password, il tool va in `^C` indipendentemente dall'alias configurato
 - ✅ **Classificazione host per metodo auth**:
-  - 🔑 **CHIAVE SSH** (run_in_terminal OK): checkmk-vps-01, checkmk-vps-02
+  - 🔑 **CHIAVE SSH** (run_in_terminal OK): checkmk-vps-01, checkmk-vps-02, ubntmarzio
   - � **ControlMaster SSH** (run_in_terminal OK - socket auto): srv-monitoring → `wsl -d kali-linux bash -c "ssh -tt srv-monitoring 'cmd'"`
-  - 🔐 **PASSWORD** (dare comandi da incollare): checkmk-z1plus, checkmk-testfrp, nodo-proxmox, ns-lab00, box-lab00, rl94ns8, rl94ns81, nsec8-stable, laboratorio, marziodemo, ubntmarzio, fwlab, redteam
+  - 🔐 **PASSWORD** (dare comandi da incollare): checkmk-z1plus, checkmk-testfrp, nodo-proxmox, ns-lab00, box-lab00, rl94ns8, rl94ns81, nsec8-stable, laboratorio, marziodemo, fwlab, redteam
 
 **Host disponibili:**
 
@@ -1534,7 +1534,7 @@ nsec8-stable      # 10.155.100.100:22 (root, NethSecurity 8)
 laboratorio       # 10.155.100.1:2222 (root, NethSecurity 8)
                   # ROCKSOLID Mode validato - resistente major upgrade
 marziodemo        # 10.155.100.61:22 (root, Demo environment)
-ubntmarzio        # 10.155.100.108:22 (user: marzio)
+ubntmarzio        # 10.155.100.108:22 (user: marzio) - 🔑 CHIAVE SSH (accesso autonomo OK, NO sudo senza password)
 srv-monitoring    # 45.33.235.86:2333 (root, Monitoring)
                   # ⚠️ USARE SEMPRE root@45.33.235.86 - MAI admin-nethesis o altri utenti!
                   # ⚠️ NON usare sudo (connessione già come root - sudo non serve)
