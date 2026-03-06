@@ -24,7 +24,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Optional
 
-VERSION = "1.1.2"
+VERSION = "1.1.3"
 
 WATO_BASE = "/omd/sites/monitoring/etc/check_mk/conf.d/wato"
 
@@ -137,6 +137,15 @@ def create_wato_folder(folder_name: str, hosts: list, subnets: list, dry_run: bo
         try:
             os.rename(hosts_file, backup)
             print(f"  Backup hosts.mk esistente → {backup}")
+        except Exception:
+            pass
+        # Pulisce backup vecchi: mantieni solo gli ultimi 3
+        try:
+            import glob
+            old_backups = sorted(glob.glob(f"{hosts_file}.backup_*"))
+            for old in old_backups[:-3]:
+                os.remove(old)
+                print(f"  Rimosso backup vecchio: {os.path.basename(old)}")
         except Exception:
             pass
 
