@@ -39,7 +39,10 @@ def ping(ip: str) -> bool:
 
 
 def reverse_dns(ip: str) -> Optional[str]:
-    """Reverse DNS via resolvectl (usa systemd-resolved, funziona con AD)."""
+    """Reverse DNS via resolvectl (usa systemd-resolved, funziona con AD).
+    
+    Formato output resolvectl: "IP: HOSTNAME.domain  -- link: iface"
+    """
     try:
         r = subprocess.run(
             ["resolvectl", "query", ip],
@@ -47,15 +50,11 @@ def reverse_dns(ip: str) -> Optional[str]:
         )
         if r.returncode == 0:
             for line in r.stdout.splitlines():
-                # Formato tipico: "192.168.x.x -- link#N: HOSTNAME.domain."
-                m = re.search(r'--\s+\S+\s+(\S+)', line)
+                # Formato: "10.x.x.x: HOSTNAME.domain.  -- link: iface"
+                m = re.match(r'\s*[\d\.]+:\s+(\S+)', line)
                 if m:
                     name = m.group(1).rstrip('.')
                     return name.split('.')[0].upper()
-            # Fallback
-            m = re.search(r'\d+\.\d+\.\d+\.\d+\s+(\S+)', r.stdout)
-            if m:
-                return m.group(1).split('.')[0].upper()
     except Exception:
         pass
     return None
