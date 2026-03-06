@@ -24,7 +24,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Optional
 
-VERSION = "1.1.0"
+VERSION = "1.1.2"
 
 WATO_BASE = "/omd/sites/monitoring/etc/check_mk/conf.d/wato"
 
@@ -211,6 +211,20 @@ def create_wato_folder(folder_name: str, hosts: list, subnets: list, dry_run: bo
         f.write(wato_content)
     with open(hosts_file, "w") as f:
         f.write(hosts_mk)
+
+    # Fix ownership: CheckMK deve girare come utente OMD, non root
+    site = get_site_name()
+    try:
+        import pwd
+        pw = pwd.getpwnam(site)
+        uid, gid = pw.pw_uid, pw.pw_gid
+        for dirpath, dirnames, filenames in os.walk(WATO_BASE):
+            os.chown(dirpath, uid, gid)
+            for fname in filenames:
+                os.chown(os.path.join(dirpath, fname), uid, gid)
+        print(f"  Permessi: chown -R {site}:{site} {WATO_BASE}")
+    except Exception as e:
+        print(f"  Permessi: skip ({e})")
 
     print(f"  Folder:   {folder_path}")
     print(f"  .wato:    OK")
