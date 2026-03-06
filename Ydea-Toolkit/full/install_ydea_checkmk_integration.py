@@ -13,10 +13,10 @@ Requirements:
     - CheckMK installato
     - Directory Ydea Toolkit
 
-Version: 1.0.3 (auto-check dipendenze Python)
+Version: 1.1.0 (fix cache path, OMD python3 deps, chown monitoring, cron per monitoring user)
 """
 
-VERSION = "1.0.3"
+VERSION = "1.1.0"
 
 import sys
 import os
@@ -108,48 +108,58 @@ def check_ydea_toolkit():
 
 
 def ensure_python_dependencies():
-    """Verifica/installa dipendenze Python necessarie al monitor Ydea"""
+    """Verifica/installa dipendenze Python per sistema e per OMD python3"""
     info("Verifica dipendenze Python (requests, python-dotenv)...")
 
+    # 1. OMD python3 (priorità - è quello usato da monitoring user)
+    omd_python = Path(f"/omd/sites/{CHECKMK_SITE}/bin/python3")
+    if omd_python.exists():
+        info(f"Verifica dipendenze per OMD python3: {omd_python}")
+        for pkg in ["requests", "dotenv"]:
+            result = subprocess.run(
+                [str(omd_python), "-c", f"import {pkg}"],
+                capture_output=True
+            )
+            if result.returncode != 0:
+                warn(f"Modulo '{pkg}' mancante in OMD python3, installo via pip...")
+                pip_pkg = "python-dotenv" if pkg == "dotenv" else pkg
+                try:
+                    subprocess.run(
+                        [str(omd_python), "-m", "pip", "install", "--quiet", pip_pkg],
+                        check=True
+                    )
+                    success(f"'{pip_pkg}' installato in OMD python3")
+                except subprocess.CalledProcessError as exc:
+                    warn(f"pip install {pip_pkg} fallito: {exc}")
+            else:
+                success(f"'{pkg}' già presente in OMD python3")
+    else:
+        warn(f"OMD python3 non trovato in {omd_python}, skip")
+
+    # 2. Python di sistema (fallback via apt)
     module_to_package = {
         "requests": "python3-requests",
         "dotenv": "python3-dotenv",
     }
-    missing_modules = [
-        module_name for module_name in module_to_package
-        if importlib.util.find_spec(module_name) is None
+    missing_system = [
+        m for m in module_to_package
+        if importlib.util.find_spec(m) is None
     ]
 
-    if not missing_modules:
-        success("Dipendenze Python già presenti")
-        return
-
-    warn(f"Dipendenze mancanti rilevate: {', '.join(missing_modules)}")
-
-    apt_get = shutil.which("apt-get")
-    if not apt_get:
-        warn("apt-get non disponibile: installa manualmente python3-requests e python3-dotenv")
-        return
-
-    packages_to_install = sorted({module_to_package[module] for module in missing_modules})
-    info(f"Installazione pacchetti: {' '.join(packages_to_install)}")
-
-    try:
-        subprocess.run([apt_get, "update", "-qq"], check=True)
-        subprocess.run([apt_get, "install", "-y", *packages_to_install], check=True)
-    except subprocess.CalledProcessError as exc:
-        warn(f"Installazione dipendenze fallita: {exc}")
-        warn("Procedi manualmente con apt install python3-requests python3-dotenv")
-        return
-
-    still_missing = [
-        module_name for module_name in module_to_package
-        if importlib.util.find_spec(module_name) is None
-    ]
-    if still_missing:
-        warn(f"Dipendenze ancora mancanti dopo install: {', '.join(still_missing)}")
+    if missing_system:
+        apt_get = shutil.which("apt-get")
+        if apt_get:
+            packages = sorted({module_to_package[m] for m in missing_system})
+            info(f"Installazione pacchetti sistema: {' '.join(packages)}")
+            try:
+                subprocess.run([apt_get, "install", "-y", *packages], check=True, capture_output=True)
+                success("Dipendenze sistema installate")
+            except subprocess.CalledProcessError as exc:
+                warn(f"Installazione sistema fallita: {exc}")
+        else:
+            warn(f"apt-get non disponibile, installa manualmente: {', '.join(missing_system)}")
     else:
-        success("Dipendenze Python installate correttamente")
+        success("Dipendenze Python sistema già presenti")
 
 
 # ===== INSTALLAZIONE =====
@@ -298,6 +308,29 @@ def install_scripts():
         shutil.copy(source, destination)
         destination.chmod(0o755)
         success(f"{dependency_name} installato")
+
+    # Chown di tutti i file in YDEA_TOOLKIT_DIR a monitoring
+    monitoring_user = CHECKMK_SITE
+    try:
+        subprocess.run(
+            ["chown", "-R", f"{monitoring_user}:{monitoring_user}", str(YDEA_TOOLKIT_DIR)],
+            check=True
+        )
+        success(f"Ownership {YDEA_TOOLKIT_DIR} impostata a {monitoring_user}")
+    except Exception as exc:
+        warn(f"chown {YDEA_TOOLKIT_DIR} fallito: {exc}")
+
+    # Chown script di notifica a monitoring
+    try:
+        for notifier in CHECKMK_NOTIFY_DIR.iterdir():
+            if notifier.name.startswith("ydea"):
+                subprocess.run(
+                    ["chown", f"{monitoring_user}:{monitoring_user}", str(notifier)],
+                    check=True
+                )
+        success(f"Ownership notifier impostata a {monitoring_user}")
+    except Exception as exc:
+        warn(f"chown notifier fallito: {exc}")
 
 
 def read_env_exports(env_file: Path) -> dict:
@@ -522,126 +555,135 @@ def setup_env():
 
 
 def test_connection():
-    """Test connessione Ydea API"""
-    info("Test connessione Ydea API...")
-    
-    # Cerca ydea-toolkit (supporta sia .sh che .py)
-    toolkit_script = None
-    possible_toolkits = [
-        YDEA_TOOLKIT_DIR / "ydea-toolkit.py",
-        YDEA_TOOLKIT_DIR / "ydea-toolkit.sh"
-    ]
-    
-    for toolkit in possible_toolkits:
-        if toolkit.exists():
-            toolkit_script = toolkit
-            break
-    
-    if not toolkit_script:
-        warn("ydea-toolkit non trovato, skip test")
+    """Test connessione Ydea API come utente monitoring"""
+    info("Test connessione Ydea API (utente monitoring)...")
+
+    omd_python = Path(f"/omd/sites/{CHECKMK_SITE}/bin/python3")
+    toolkit_script = YDEA_TOOLKIT_DIR / "ydea-toolkit.py"
+
+    if not toolkit_script.exists():
+        warn("ydea-toolkit.py non trovato, skip test")
         return
-    
+
+    python_cmd = str(omd_python) if omd_python.exists() else "python3"
+
     try:
-        # Test login
         result = subprocess.run(
-            [str(toolkit_script), "login"],
-            cwd=str(YDEA_TOOLKIT_DIR),
+            ["su", "-", CHECKMK_SITE, "-c",
+             f"cd {YDEA_TOOLKIT_DIR} && {python_cmd} ydea-toolkit.py login"],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=15
         )
-        
+
         if "Login effettuato" in result.stdout or result.returncode == 0:
             success("Connessione Ydea OK")
         else:
             warn("Test connessione fallito - verifica credenziali in .env")
+            if result.stderr:
+                print(f"  stderr: {result.stderr.strip()}")
     except Exception as e:
         warn(f"Test connessione fallito: {e}")
 
 
 def setup_cron():
-    """Configura cron job per health monitor e cache validator"""
-    info("Configurazione cron job per health monitor e cache validator...")
-    
-    # Determina quale health monitor usare
-    health_monitor = None
-    if (YDEA_TOOLKIT_DIR / "ydea_health_monitor.py").exists():
-        health_monitor = YDEA_TOOLKIT_DIR / "ydea_health_monitor.py"
-    elif (YDEA_TOOLKIT_DIR / "ydea-health-monitor.sh").exists():
-        health_monitor = YDEA_TOOLKIT_DIR / "ydea-health-monitor.sh"
+    """Configura cron job per health monitor e cache validator (utente monitoring)"""
+    info("Configurazione cron job per health monitor (utente monitoring)...")
+
+    # Determina quale health monitor usare e il python corretto
+    omd_python = Path(f"/omd/sites/{CHECKMK_SITE}/bin/python3")
+    health_monitor_path = YDEA_TOOLKIT_DIR / "ydea_health_monitor.py"
+    health_monitor_sh = YDEA_TOOLKIT_DIR / "ydea-health-monitor.sh"
+
+    if health_monitor_path.exists() and omd_python.exists():
+        health_cmd = f"{omd_python} {health_monitor_path}"
+    elif health_monitor_sh.exists():
+        health_cmd = str(health_monitor_sh)
     else:
         warn("Health monitor non trovato, skip cron setup")
         return
-    
-    health_cron_line = f"*/15 * * * * {health_monitor} >> /var/log/ydea_health.log 2>&1"
+
+    health_cron_line = f"*/15 * * * * {health_cmd} >> /var/log/ydea_health.log 2>&1"
     validator_path = NOTIFY_BIN_DIR / CACHE_VALIDATOR_NAME
-    validator_cron_line = f"* * * * * {validator_path} >> /var/log/ydea_cache_validator.log 2>&1"
-    
+
+    if validator_path.exists() and omd_python.exists():
+        validator_cmd = f"{omd_python} {validator_path}"
+    elif validator_path.exists():
+        validator_cmd = str(validator_path)
+    else:
+        validator_cmd = None
+
     try:
-        # Controlla se già esiste
+        # Leggi crontab attuale dell'utente monitoring
         result = subprocess.run(
-            ["crontab", "-l"],
+            ["su", "-", CHECKMK_SITE, "-c", "crontab -l"],
             capture_output=True,
             text=True
         )
-        
         current_crontab = result.stdout if result.returncode == 0 else ""
         new_crontab = current_crontab
 
-        if "ydea-health-monitor" in current_crontab or "ydea_health_monitor" in current_crontab:
-            warn("Cron job health monitor già configurato")
+        if "ydea_health_monitor" in current_crontab or "ydea-health-monitor" in current_crontab:
+            warn("Cron job health monitor già configurato per utente monitoring")
         else:
             new_crontab += f"\n# Ydea Health Monitor - ogni 15 minuti\n{health_cron_line}\n"
             success("Cron job health monitor configurato (ogni 15 minuti)")
 
-        if validator_path.exists():
+        if validator_cmd:
+            validator_cron_line = f"* * * * * {validator_cmd} >> /var/log/ydea_cache_validator.log 2>&1"
             if "ydea_cache_validator" in current_crontab:
                 warn("Cron job cache validator già configurato")
             else:
-                new_crontab += (
-                    f"\n# Ydea Cache Validator - ogni 1 minuto\n"
-                    f"{validator_cron_line}\n"
-                )
+                new_crontab += f"\n# Ydea Cache Validator - ogni 1 minuto\n{validator_cron_line}\n"
                 success("Cron job cache validator configurato (ogni 1 minuto)")
-        else:
-            warn(f"Cache validator non trovato in {validator_path}, skip cron dedicato")
 
         if new_crontab != current_crontab:
             subprocess.run(
-                ["crontab", "-"],
+                ["su", "-", CHECKMK_SITE, "-c", "crontab -"],
                 input=new_crontab,
                 text=True,
                 check=True
             )
     except Exception as e:
         warn(f"Errore configurazione cron: {e}")
-    
-    # Crea file log
-    log_file = Path("/var/log/ydea_health.log")
-    log_file.touch(exist_ok=True)
-    log_file.chmod(0o666)
-    success("Log file creato: /var/log/ydea_health.log")
 
-    validator_log_file = Path("/var/log/ydea_cache_validator.log")
-    validator_log_file.touch(exist_ok=True)
-    validator_log_file.chmod(0o666)
-    success("Log file creato: /var/log/ydea_cache_validator.log")
+    # Crea file log con permessi aperti
+    for log_path in [Path("/var/log/ydea_health.log"), Path("/var/log/ydea_cache_validator.log")]:
+        log_path.touch(exist_ok=True)
+        log_path.chmod(0o666)
+        success(f"Log file creato: {log_path}")
 
 
 def create_cache_files():
-    """Inizializza file cache"""
-    info("Inizializzazione file cache...")
-    
+    """Inizializza directory e file cache in /opt/ydea-toolkit/cache/"""
+    info("Inizializzazione directory e file cache...")
+
+    cache_dir = YDEA_TOOLKIT_DIR / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_dir.chmod(0o777)
+
     cache_files = [
-        Path("/tmp/ydea_checkmk_tickets.json"),
-        Path("/tmp/ydea_checkmk_flapping.json")
+        cache_dir / "ydea_checkmk_tickets.json",
+        cache_dir / "ydea_checkmk_flapping.json",
+        cache_dir / "ydea_cache.lock",
     ]
-    
+
     for cache_file in cache_files:
-        cache_file.write_text("{}")
+        if not cache_file.exists():
+            if cache_file.suffix == ".json":
+                cache_file.write_text("{}")
+            else:
+                cache_file.write_text("")
         cache_file.chmod(0o666)
-    
-    success("File cache inizializzati")
+
+    # Chown cache dir e file a monitoring
+    monitoring_user = CHECKMK_SITE
+    try:
+        subprocess.run(["chown", "-R", f"{monitoring_user}:{monitoring_user}", str(cache_dir)], check=True)
+    except Exception:
+        pass  # Non critico se il chown fallisce
+
+    success(f"Cache inizializzata in {cache_dir}")
 
 
 def backup_and_remove(path: Path, label: str):
