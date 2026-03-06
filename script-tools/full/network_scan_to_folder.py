@@ -231,7 +231,7 @@ def apply_checkmk(dry_run: bool = False):
     except FileNotFoundError:
         pass
     # Fallback: su - SITE -c "cmk -R"
-    site = get_omd_site()
+    site = get_site_name()
     try:
         r = subprocess.run(["su", "-", site, "-c", "cmk -R"],
                            capture_output=True, text=True)
