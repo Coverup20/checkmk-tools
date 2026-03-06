@@ -34,7 +34,7 @@ import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 
 # ─── Costanti ─────────────────────────────────────────────────────────────────
 
@@ -848,6 +848,119 @@ def install_python_sync_cron(repo_path: Path, target: str,
     print(f"     Log:     tail -f {PYTHON_SYNC_LOG}")
 
 
+# ─── Add scripts to existing sync ───────────────────────────────────────────────
+
+def add_scripts_to_sync(new_scripts_arg: str, use_systemd: bool) -> int:
+    """
+    Aggiunge script alla lista del timer/cron senza reinstallare.
+    Legge la configurazione attuale, fa il merge, riscrive e riavvia.
+    """
+    new_set = {s.strip() for s in new_scripts_arg.split(",") if s.strip()}
+    if not new_set:
+        print("[ERROR] --add-scripts: nessuno script specificato", file=sys.stderr)
+        return 1
+
+    if use_systemd:
+        svc_path = SYSTEMD_DIR / PYTHON_SYNC_SERVICE_NAME
+        if not svc_path.exists():
+            print(f"[ERROR] Service non trovato: {svc_path}", file=sys.stderr)
+            print("[INFO] Eseguire prima install-checkmk-sync.py senza --add-scripts", file=sys.stderr)
+            return 1
+
+        content = svc_path.read_text(encoding="utf-8")
+
+        if "--all-categories" in content:
+            print("[INFO] Servizio gia' in modalita' --all-categories.")
+            print(f"[INFO] Gli script {sorted(new_set)} verranno deployati automaticamente al prossimo ciclo.")
+            return 0
+
+        m = re.search(r'--scripts\s+(\S+)', content)
+        if m:
+            current = {s.strip() for s in m.group(1).split(",") if s.strip()}
+            added = sorted(new_set - current)
+            if not added:
+                print(f"[INFO] Tutti gli script sono gia' presenti nella lista: {sorted(current)}")
+                return 0
+            merged = sorted(current | new_set)
+            new_scripts_str = ",".join(merged)
+            new_content = re.sub(r'--scripts\s+\S+', f'--scripts {new_scripts_str}', content)
+            print(f"[INFO] Aggiunti: {added}")
+            print(f"[INFO] Lista completa: {merged}")
+        else:
+            # ExecStart esiste ma senza --scripts (usa --category o --all-categories)
+            # Aggiunge --scripts in coda alla riga ExecStart
+            new_scripts_str = ",".join(sorted(new_set))
+            new_content = re.sub(
+                r'(ExecStart=.+)',
+                lambda mm: mm.group(1) + f' --scripts {new_scripts_str}',
+                content
+            )
+            print(f"[INFO] Aggiunto --scripts: {new_scripts_str}")
+
+        svc_path.write_text(new_content, encoding="utf-8")
+        run_capture(["systemctl", "daemon-reload"])
+        run_capture(["systemctl", "restart", PYTHON_SYNC_TIMER_NAME])
+        # Deploy immediato
+        result = run_capture(["systemctl", "start", PYTHON_SYNC_SERVICE_NAME])
+        if result.returncode == 0:
+            print("[OK] Deploy immediato completato.")
+        else:
+            print("[WARN] Deploy immediato: controlla 'journalctl -u checkmk-python-full-sync -f'")
+        print(f"[OK] --add-scripts completato. Timer aggiornato.")
+
+    else:
+        # cron (OpenWrt / sistemi senza systemd)
+        cron_result = run_capture(["crontab", "-l"] if not is_openwrt() else ["cat", str(OPENWRT_CRONTAB)])
+        cron_lines = (cron_result.stdout or "").splitlines()
+        updated = False
+        for i, line in enumerate(cron_lines):
+            if PYTHON_SYNC_CRON_MARKER not in line:
+                continue
+            if "--all-categories" in line:
+                print("[INFO] Cron gia' in modalita' --all-categories. Script verranno deployati automaticamente.")
+                return 0
+            m = re.search(r'--scripts\s+(\S+)', line)
+            if m:
+                current = {s.strip() for s in m.group(1).split(",") if s.strip()}
+                added = sorted(new_set - current)
+                if not added:
+                    print(f"[INFO] Script gia' presenti: {sorted(current)}")
+                    return 0
+                merged = sorted(current | new_set)
+                new_scripts_str = ",".join(merged)
+                cron_lines[i] = re.sub(r'--scripts\s+\S+', f'--scripts {new_scripts_str}', line)
+                print(f"[INFO] Aggiunti: {added}")
+                print(f"[INFO] Lista completa: {merged}")
+            else:
+                new_scripts_str = ",".join(sorted(new_set))
+                cron_lines[i] = re.sub(
+                    r'(--target\s+\S+)',
+                    f'\\1 --scripts {new_scripts_str}',
+                    line
+                )
+                print(f"[INFO] Aggiunto --scripts: {new_scripts_str}")
+            updated = True
+            break
+
+        if not updated:
+            print(f"[ERROR] Marker '{PYTHON_SYNC_CRON_MARKER}' non trovato nel crontab.", file=sys.stderr)
+            print("[INFO] Eseguire prima install-checkmk-sync.py senza --add-scripts", file=sys.stderr)
+            return 1
+
+        if is_openwrt():
+            OPENWRT_CRONTAB.write_text("\n".join(cron_lines) + "\n", encoding="utf-8")
+            run_capture(["sh", "-c", "/etc/init.d/cron restart 2>/dev/null || true"])
+        else:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".cron", delete=False) as f:
+                f.write("\n".join(cron_lines) + "\n")
+                tmp = f.name
+            run(["crontab", tmp])
+            Path(tmp).unlink(missing_ok=True)
+        print("[OK] --add-scripts completato. Cron aggiornato.")
+
+    return 0
+
+
 # ─── Prompt interattivi ───────────────────────────────────────────────────────
 
 def _ask(prompt: str) -> str:
@@ -1166,6 +1279,10 @@ Esempi:
     p.add_argument("--uninstall", action="store_true",
                    help="Disinstalla agente + FRPC ed esce")
 
+    # Aggiunta script post-installazione
+    p.add_argument("--add-scripts", default="", metavar="SCRIPT1,SCRIPT2",
+                   help="Aggiunge script al timer/cron senza reinstallare (es: check_arp_watch,check_disk_space)")
+
     return p.parse_args()
 
 
@@ -1199,6 +1316,10 @@ def main() -> int:
             uninstall_agent(os_info)
         print("[OK] Disinstallazione completata")
         return 0
+
+    # ── Add scripts shortcut ──────────────────────────────────────────────────
+    if args.add_scripts:
+        return add_scripts_to_sync(args.add_scripts, use_systemd)
 
     # ── STEP 0: Prerequisiti ─────────────────────────────────────────────────
     print("── STEP 0: Prerequisiti ──────────────────────────────")
