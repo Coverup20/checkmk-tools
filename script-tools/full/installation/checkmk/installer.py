@@ -3,7 +3,7 @@
 
 Re-implements the workflow in script-tools/full/installation/install-cmk8/install-cmk/scripts/*.sh in Python.
 
-Version: 1.0.29
+Version: 1.0.30
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from steps import (
     config_backup_minimal,
     config_backup_ultra_minimal,
     deploy_checks,
+    dns_refresh,
     fail2ban,
     firewall,
     log_optimizer,
@@ -61,6 +62,7 @@ def bootstrap(env_file: Path, interactive: bool) -> None:
     firewall.run(cfg)
     fail2ban.run(cfg)
     checkmk.run(cfg)
+    dns_refresh.run(cfg)
     deploy_checks.run(cfg)
     auto_git_sync.run(cfg)
     apache.run(cfg)
