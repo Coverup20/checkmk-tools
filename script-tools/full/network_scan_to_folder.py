@@ -24,7 +24,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Optional
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 WATO_BASE = "/omd/sites/monitoring/etc/check_mk/conf.d/wato"
 
@@ -119,26 +119,20 @@ def sanitize(name: str) -> str:
     return re.sub(r'[^a-zA-Z0-9._-]', '-', name)
 
 
-def read_wato_format() -> str:
-    """Legge un .wato esistente per capire il formato (Python dict o JSON)."""
-    for root, dirs, files in os.walk(WATO_BASE):
-        if ".wato" in files:
-            try:
-                with open(os.path.join(root, ".wato")) as f:
-                    return f.read().strip()
-            except Exception:
-                pass
-    return ""
+def get_site_name() -> str:
+    """Rileva il nome del sito OMD dal WATO_BASE."""
+    m = re.match(r'/omd/sites/([^/]+)/', WATO_BASE)
+    return m.group(1) if m else "monitoring"
 
 
 def create_wato_folder(folder_name: str, hosts: list, subnets: list, dry_run: bool = False):
-    """Crea directory + .wato + hosts.mk."""
+    """Crea directory + .wato + hosts.mk in formato CheckMK 2.x."""
     folder_path = os.path.join(WATO_BASE, folder_name)
     wato_file  = os.path.join(folder_path, ".wato")
     hosts_file = os.path.join(folder_path, "hosts.mk")
 
     # Controlla se folder esiste già
-    if os.path.exists(folder_path) and not dry_run:
+    if os.path.exists(hosts_file) and not dry_run:
         backup = f"{hosts_file}.backup_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
         try:
             os.rename(hosts_file, backup)
@@ -146,40 +140,65 @@ def create_wato_folder(folder_name: str, hosts: list, subnets: list, dry_run: bo
         except Exception:
             pass
 
-    # Determina formato .wato dal resto del sito
-    sample = read_wato_format()
-    if sample.startswith("{"):
-        # Python dict format (comune in CMK 2.x)
-        wato_content = f"{{'title': u'Scansione Rete', 'attributes': {{}}, 'num_hosts': {len(hosts)}, 'lock': False}}\n"
-    else:
-        wato_content = f"{{'title': u'Scansione Rete', 'attributes': {{}}, 'num_hosts': {len(hosts)}, 'lock': False}}\n"
+    wato_content = (
+        "{'title': u'Scansione Rete', 'attributes': {}, "
+        f"'num_hosts': {len(hosts)}, 'lock': False}}\n"
+    )
 
-    # Costruisce all_hosts e ipaddresses
-    folder_tag = f"/wato/{folder_name}/"
-    all_hosts_entries = []
-    ip_dict = {}
+    site = get_site_name()
+    now_ts = datetime.now().timestamp()
+
+    # Costruisce righe hosts.mk formato CMK 2.x
+    all_hosts_lines = []
+    host_tags_lines = []
+    host_labels_lines = []
+    host_attrs_lines  = []
 
     for h in hosts:
         name = sanitize(h["name"])
-        # Tag: ping-only, no agent, wato-managed
-        entry = f"{name}|ping|no-agent|wato|{folder_tag}"
-        all_hosts_entries.append(entry)
-        ip_dict[name] = h["ip"]
+        ip   = h["ip"]
+
+        all_hosts_lines.append(f'"{name}"')
+
+        tags = {
+            "site": site,
+            "address_family": "ip-v4-only",
+            "ip-v4": "ip-v4",
+            "agent": "no-agent",
+            "piggyback": "auto-piggyback",
+            "snmp_ds": "no-snmp",
+            "criticality": "prod",
+            "networking": "lan",
+            "ping": "ping",
+        }
+        host_tags_lines.append(f'"{name}": {repr(tags)}')
+        host_labels_lines.append(f'"{name}": {{}}')
+        host_attrs_lines.append(
+            f'"{name}": {{"ipaddress": "{ip}", '
+            f'"meta_data": {{"created_at": {now_ts:.1f}, '
+            f'"created_by": "network_scan", "updated_at": {now_ts:.1f}}}}}'
+        )
 
     subnet_comment = ", ".join(subnets)
-    hosts_mk = f"""# Generato da network_scan_to_folder.py v{VERSION}
-# Data: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-# Subnet scansionate: {subnet_comment}
-# Host totali: {len(hosts)} ({sum(1 for h in hosts if h['src'] == 'DNS')} con DNS, {sum(1 for h in hosts if h['src'] == 'IP ')} IP-only)
-
-all_hosts += {repr(all_hosts_entries)}
-
-ipaddresses.update({repr(ip_dict)})
-"""
+    hosts_mk = (
+        f"# Generato da network_scan_to_folder.py v{VERSION}\n"
+        f"# Data: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"# Subnet scansionate: {subnet_comment}\n"
+        f"# Host totali: {len(hosts)} "
+        f"({sum(1 for h in hosts if h['src'] == 'DNS')} con DNS, "
+        f"{sum(1 for h in hosts if h['src'] == 'IP ')} IP-only)\n"
+        f"# Created by HostStorage\n\n"
+        f"all_hosts += [{', '.join(all_hosts_lines)}]\n\n"
+        f"host_tags.update({{{', '.join(host_tags_lines)}}})\n\n"
+        f"host_labels.update({{{', '.join(host_labels_lines)}}})\n\n"
+        f"# Host attributes (needed for WATO)\n"
+        f"host_attributes.update({{{', '.join(host_attrs_lines)}}})\n\n"
+        f"folder_attributes.update({{}})\n"
+    )
 
     if dry_run:
         print(f"\n[DRY RUN] Folder: {folder_path}")
-        print(f"[DRY RUN] {len(all_hosts_entries)} host")
+        print(f"[DRY RUN] {len(all_hosts_lines)} host")
         print(f"\n--- hosts.mk preview ---")
         for line in hosts_mk.splitlines()[:30]:
             print(f"  {line}")
@@ -195,14 +214,7 @@ ipaddresses.update({repr(ip_dict)})
 
     print(f"  Folder:   {folder_path}")
     print(f"  .wato:    OK")
-    print(f"  hosts.mk: {len(all_hosts_entries)} host scritti")
-
-
-def get_omd_site() -> str:
-    """Rileva il nome del sito OMD dal WATO_BASE."""
-    # /omd/sites/SITE/etc/check_mk/... → estrae SITE
-    m = re.match(r'/omd/sites/([^/]+)/', WATO_BASE)
-    return m.group(1) if m else "monitoring"
+    print(f"  hosts.mk: {len(all_hosts_lines)} host scritti")
 
 
 def apply_checkmk(dry_run: bool = False):
