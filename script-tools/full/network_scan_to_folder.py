@@ -24,7 +24,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Optional
 
-VERSION = "1.1.4"
+VERSION = "1.1.5"
 
 WATO_BASE = "/omd/sites/monitoring/etc/check_mk/conf.d/wato"
 
@@ -150,7 +150,7 @@ def create_wato_folder(folder_name: str, hosts: list, subnets: list, dry_run: bo
             pass
 
     wato_content = (
-        "{'title': u'Scansione Rete', 'attributes': {}, "
+        f"{{'title': u'{folder_name}', 'attributes': {{}}, "
         f"'num_hosts': {len(hosts)}, 'lock': False}}\n"
     )
 
