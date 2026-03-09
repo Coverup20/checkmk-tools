@@ -23,6 +23,7 @@ BACKUP-CORRUPTED-*
 # Temporary reports
 integrity-report*.txt
 
+
 # Ydea credentials (NEVER commit!)
 Ydea-Toolkit/config/credentials.sh
 Ydea-Toolkit/config/.ydea-cookies
