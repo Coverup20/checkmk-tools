@@ -7,9 +7,10 @@ from lib.config import InstallerConfig
 
 _CRON_FILE_NAME = "dns-refresh"
 _CRON_CONTENT = """\
-# Refresh DNS cache and reload CheckMK config every 5 minutes.
+# Refresh DNS cache and reload CheckMK config every 30 seconds.
 # Needed for DHCP hosts that can change IP address.
-*/5 * * * * cmk --update-dns-cache > /dev/null 2>&1 ; cmk -R > /dev/null 2>&1
+* * * * * cmk --update-dns-cache > /dev/null 2>&1 ; cmk -R > /dev/null 2>&1
+* * * * * sleep 30 && cmk --update-dns-cache > /dev/null 2>&1 ; sleep 30 && cmk -R > /dev/null 2>&1
 """
 
 
