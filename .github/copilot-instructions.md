@@ -1501,7 +1501,10 @@ wsl -d kali-linux ssh <host> "check_mk_agent 2>/dev/null | grep ServiceName"
   → Se l'host usa password, il tool va in `^C` indipendentemente dall'alias configurato
 - ✅ **Classificazione host per metodo auth**:
   - 🔑 **CHIAVE SSH** (run_in_terminal OK): checkmk-vps-01, checkmk-vps-02, ubntmarzio
-  - � **ControlMaster SSH** (run_in_terminal OK - socket auto): srv-monitoring → `wsl -d kali-linux bash -c "ssh -tt srv-monitoring 'cmd'"`
+  - 🔑 **CHIAVE SSH** (run_in_terminal OK): srv-monitoring
+    → Chiave: ~/.ssh/copilot_srv_monitoring (ed25519, installata 2026-03-10)
+    → Comando: `wsl -d kali-linux bash -c "ssh srv-monitoring 'cmd'"` (NO -tt!)
+    → Accesso completamente autonomo, zero password
   - 🔐 **PASSWORD** (dare comandi da incollare): checkmk-z1plus, checkmk-testfrp, nodo-proxmox, ns-lab00, box-lab00, rl94ns8, rl94ns81, nsec8-stable, laboratorio, marziodemo, fwlab, redteam
 
 **Host disponibili:**
