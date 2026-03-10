@@ -29,7 +29,7 @@ except ImportError:
     print("   pip3 install requests python-dotenv")
     sys.exit(127)
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 # ===== CONFIGURAZIONE GLOBALE =====
 
@@ -1219,13 +1219,15 @@ def main():
         
         elif args.command == 'create':
             if not args.args:
-                logger.error("Uso: create <title> [description] [priority] [sla_id]")
+                logger.error("Uso: create <title> [description] [priority] [sla_id] [tipo] [creatoda]")
                 sys.exit(1)
             title = args.args[0]
             description = args.args[1] if len(args.args) > 1 else ""
             priority = args.args[2] if len(args.args) > 2 else "normal"
             sla_id = int(args.args[3]) if len(args.args) > 3 else None
-            response = tickets.create_ticket(title, description, priority, sla_id)
+            tipo = args.args[4] if len(args.args) > 4 else None
+            creatoda = int(args.args[5]) if len(args.args) > 5 else None
+            response = tickets.create_ticket(title, description, priority, sla_id, tipo, creatoda)
             print(json.dumps(response, indent=2, ensure_ascii=False))
         
         elif args.command == 'update':
