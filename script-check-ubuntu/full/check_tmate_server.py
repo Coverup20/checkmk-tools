@@ -27,7 +27,8 @@ import glob
 import re
 import time
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
+EXCLUDE_IPS = {"127.0.0.1", "::1"}  # esclude il server stesso
 SERVICE = "Tmate.Clients"
 TOKENS_DIR = "/opt/tmate-tokens"
 TOKEN_MAX_AGE = 600  # 10 minuti - token piu' vecchi considerati stale
@@ -51,6 +52,8 @@ def get_active_sessions() -> dict:
             m = re.search(r'^\s*(\d+)\s+tmate-ssh-server \[(\w+)\.\.\.\] \(daemon\) (\S+)', line)
             if m:
                 pid, prefix, ip = m.group(1), m.group(2), m.group(3)
+                if ip in EXCLUDE_IPS:
+                    continue  # salta il server stesso (127.0.0.1)
                 sessions[prefix] = {'pid': pid, 'ip': ip, 'nodename': None, 'viewers': 0}
     except Exception:
         pass
