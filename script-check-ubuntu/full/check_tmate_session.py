@@ -2,10 +2,10 @@
 """
 check_tmate_session.py - CheckMK Local Check per sessioni tmate attive
 
-Mostra tutti i token SSH delle sessioni tmate in esecuzione,
-interrogando direttamente ogni socket tmate trovato nei processi attivi.
+Mostra tutti i token SSH delle sessioni tmate in esecuzione e i client
+attualmente collegati (con IP/TTY), per identificare chi è connesso.
 
-Version: 1.2.0
+Version: 1.3.0
 """
 
 import sys
@@ -13,8 +13,9 @@ import os
 import socket
 import subprocess
 import glob
+import re
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 SERVICE = "Tmate.Session"
 TOKEN_FILE = "/run/tmate-ssh.txt"
 
@@ -70,6 +71,30 @@ def get_token_from_socket(sock: str) -> str:
     return ""
 
 
+def get_clients_from_socket(sock: str) -> list:
+    """
+    Restituisce lista di client collegati al socket tmate.
+    Output di list-clients: /dev/pts/0: 0 [80x24 xterm-256color] (utf8)
+    Per client remoti tmate mostra l'IP nella parte iniziale.
+    """
+    clients = []
+    try:
+        result = subprocess.run(
+            ["tmate", "-S", sock, "list-clients", "-F",
+             "#{client_name} #{client_width}x#{client_height} #{client_termname}"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, timeout=5
+        )
+        if result.returncode == 0:
+            for line in result.stdout.strip().splitlines():
+                line = line.strip()
+                if line:
+                    clients.append(line)
+    except Exception:
+        pass
+    return clients
+
+
 def main() -> int:
     hostname = get_hostname()
 
@@ -88,31 +113,37 @@ def main() -> int:
     # Cerca tutti i socket attivi
     sockets = get_tmate_sockets()
 
-    tokens = []
+    sessions = []
     for sock in sockets:
         token = get_token_from_socket(sock)
-        if token:
-            tokens.append(token)
+        if not token:
+            continue
+        clients = get_clients_from_socket(sock)
+        sessions.append((token, clients))
 
     # Fallback al file token se non trovato via socket
-    if not tokens and os.path.exists(TOKEN_FILE):
+    if not sessions and os.path.exists(TOKEN_FILE):
         try:
             token = open(TOKEN_FILE).read().strip()
             if token:
-                tokens.append(token)
+                sessions.append((token, []))
         except Exception:
             pass
 
-    if not tokens:
+    if not sessions:
         print(f"1 {SERVICE} - WARNING: [{hostname}] tmate in esecuzione ma nessun token disponibile")
         return 0
 
-    if len(tokens) == 1:
-        print(f"0 {SERVICE} - OK: [{hostname}] {tokens[0]}")
-    else:
-        token_list = " | ".join(tokens)
-        print(f"0 {SERVICE} - OK: [{hostname}] {len(tokens)} sessioni: {token_list}")
+    parts = []
+    for token, clients in sessions:
+        if clients:
+            client_str = "clients: " + ", ".join(clients)
+            parts.append(f"{token} [{client_str}]")
+        else:
+            parts.append(f"{token} [nessun client]")
 
+    msg = " | ".join(parts)
+    print(f"0 {SERVICE} - OK: [{hostname}] {msg}")
     return 0
 
 
