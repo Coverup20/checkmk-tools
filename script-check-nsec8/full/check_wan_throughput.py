@@ -13,7 +13,7 @@ Strategia lettura bytes (in ordine di priorità):
 Stato persistente salvato in /tmp/wan_throughput_state.json.
 Prima esecuzione: inizializza stato e output WARNING "Initializing".
 
-Version: 1.0.5
+Version: 1.1.0
 """
 
 import json
@@ -23,7 +23,7 @@ import sys
 import time
 from typing import Optional, Tuple
 
-SCRIPT_VERSION = "1.0.5"
+SCRIPT_VERSION = "1.1.0"
 SERVICE = "WAN.Throughput"
 STATE_FILE = "/tmp/wan_throughput_state.json"
 PROC_NET_DEV = "/proc/net/dev"
@@ -68,10 +68,10 @@ def get_proc_net_dev_bytes(device: str) -> Optional[Tuple[int, int]]:
     return None
 
 
-def get_wan_info() -> Optional[Tuple[str, int, int]]:
+def get_wan_info() -> Optional[Tuple[str, str, int, int]]:
     """
     Usa ubus dump per trovare interfaccia WAN e leggere i byte RX/TX.
-    Ritorna (iface_name, rx_bytes, tx_bytes) oppure None.
+    Ritorna (iface_name, device_name, rx_bytes, tx_bytes) oppure None.
 
     Strategia bytes:
     1. statistics.rx_bytes / statistics.tx_bytes dal dump
@@ -111,19 +111,21 @@ def get_wan_info() -> Optional[Tuple[str, int, int]]:
         if not wan_iface or wan_data is None:
             return None
 
+        # Leggi device fisico
+        device = wan_data.get("device", "")
+
         # Strategia 1: statistics nel dump
         stats = wan_data.get("statistics", {})
         rx = stats.get("rx_bytes")
         tx = stats.get("tx_bytes")
         if rx is not None and tx is not None:
-            return wan_iface, int(rx), int(tx)
+            return wan_iface, device, int(rx), int(tx)
 
         # Strategia 2: /proc/net/dev via device fisico
-        device = wan_data.get("device", "")
         if device:
             result = get_proc_net_dev_bytes(device)
             if result is not None:
-                return wan_iface, result[0], result[1]
+                return wan_iface, device, result[0], result[1]
 
     except (json.JSONDecodeError, KeyError, ValueError):
         pass
@@ -157,11 +159,33 @@ def save_state(iface: str, rx_bytes: int, tx_bytes: int, timestamp: float) -> No
         pass
 
 
-def bytes_to_mbps(delta_bytes: int, delta_seconds: float) -> float:
-    """Converti delta bytes in Mbps."""
+def bytes_to_bps(delta_bytes: int, delta_seconds: float) -> float:
+    """Converti delta bytes in bytes/s."""
     if delta_seconds <= 0:
         return 0.0
-    return (delta_bytes * 8) / (delta_seconds * 1_000_000)
+    return delta_bytes / delta_seconds
+
+
+def fmt_bps(bps: float) -> str:
+    """Formatta bytes/s in formato human-readable (B/s, KiB/s, MiB/s, GiB/s)."""
+    if bps < 1024:
+        return f"{bps:.1f} B/s"
+    elif bps < 1024 ** 2:
+        return f"{bps / 1024:.1f} KiB/s"
+    elif bps < 1024 ** 3:
+        return f"{bps / 1024 ** 2:.2f} MiB/s"
+    else:
+        return f"{bps / 1024 ** 3:.2f} GiB/s"
+
+
+def get_device_speed_mbps(device: str) -> int:
+    """Legge velocità interfaccia in Mbps da sysfs. Fallback: 1000 Mbps."""
+    try:
+        with open(f"/sys/class/net/{device}/speed") as f:
+            speed = int(f.read().strip())
+            return speed if speed > 0 else 1000
+    except Exception:
+        return 1000
 
 
 def main() -> int:
@@ -169,10 +193,10 @@ def main() -> int:
     now = time.time()
     wan_info = get_wan_info()
     if wan_info is None:
-        print(f"2 {SERVICE} - No WAN interface or bytes not available [v{SCRIPT_VERSION}] | in_mbps=0 out_mbps=0")
+        print(f"2 {SERVICE} - No WAN interface or bytes not available [v{SCRIPT_VERSION}] | in_traffic=0 out_traffic=0")
         return 0
 
-    iface, rx_now, tx_now = wan_info
+    iface, device, rx_now, tx_now = wan_info
 
     # 3. Carica stato precedente
     state = load_state()
@@ -180,47 +204,57 @@ def main() -> int:
     # Prima esecuzione o interfaccia cambiata: inizializza
     if state is None or state.get("iface") != iface:
         save_state(iface, rx_now, tx_now, now)
-        print(f"0 {SERVICE} - {iface}: Initializing, wait next check [v{SCRIPT_VERSION}] | in_mbps=0;800;950;0 out_mbps=0;800;950;0")
+        print(f"0 {SERVICE} - [{iface}], (up), Initializing, wait next check [v{SCRIPT_VERSION}] | in_traffic=0 out_traffic=0")
         return 0
 
     # 4. Calcola delta
     delta_seconds = now - state["timestamp"]
     if delta_seconds < 1:
-        # Esecuzioni troppo ravvicinate
         save_state(iface, rx_now, tx_now, now)
-        print(f"0 {SERVICE} - {iface}: Interval too short ({delta_seconds:.1f}s) [v{SCRIPT_VERSION}] | in_mbps=0;800;950;0 out_mbps=0;800;950;0")
+        print(f"0 {SERVICE} - [{iface}], (up), Interval too short ({delta_seconds:.1f}s) | in_traffic=0 out_traffic=0")
         return 0
 
     rx_prev = state["rx_bytes"]
     tx_prev = state["tx_bytes"]
 
-    # Gestisci counter wrap (32-bit: max ~4GB, 64-bit: molto maggiore)
+    # Gestisci counter wrap
     delta_rx = rx_now - rx_prev if rx_now >= rx_prev else rx_now
     delta_tx = tx_now - tx_prev if tx_now >= tx_prev else tx_now
 
-    rx_mbps = bytes_to_mbps(delta_rx, delta_seconds)
-    tx_mbps = bytes_to_mbps(delta_tx, delta_seconds)
+    rx_bps = bytes_to_bps(delta_rx, delta_seconds)
+    tx_bps = bytes_to_bps(delta_tx, delta_seconds)
 
     # 5. Salva nuovo stato
     save_state(iface, rx_now, tx_now, now)
 
-    # 6. Output CheckMK
-    # Soglie: WARNING a 800 Mbps, CRITICAL a 950 Mbps (su 1000 Mbps FTTH 1G)
-    warn_mbps = 800
-    crit_mbps = 950
+    # 6. Velocità interfaccia e percentuale utilizzo
+    speed_mbps = get_device_speed_mbps(device or iface)
+    speed_bps = speed_mbps * 125_000  # Mbps → bytes/s
+    if speed_mbps >= 1000:
+        speed_str = f"{speed_mbps // 1000} GBit/s"
+    else:
+        speed_str = f"{speed_mbps} MBit/s"
+
+    rx_pct = (rx_bps / speed_bps * 100) if speed_bps > 0 else 0.0
+    tx_pct = (tx_bps / speed_bps * 100) if speed_bps > 0 else 0.0
+
+    # Soglie in bytes/s (WARNING 80%, CRITICAL 95% della velocità linea)
+    warn_bps = speed_bps * 0.80
+    crit_bps = speed_bps * 0.95
 
     state_code = 0
-    if rx_mbps >= crit_mbps or tx_mbps >= crit_mbps:
+    if rx_bps >= crit_bps or tx_bps >= crit_bps:
         state_code = 2
-    elif rx_mbps >= warn_mbps or tx_mbps >= warn_mbps:
+    elif rx_bps >= warn_bps or tx_bps >= warn_bps:
         state_code = 1
 
     print(
         f"{state_code} {SERVICE} - "
-        f"{iface}: IN={rx_mbps:.2f} Mbps OUT={tx_mbps:.2f} Mbps "
-        f"(interval {delta_seconds:.0f}s) [v{SCRIPT_VERSION}]"
-        f" | in_mbps={rx_mbps:.2f};{warn_mbps};{crit_mbps};0 "
-        f"out_mbps={tx_mbps:.2f};{warn_mbps};{crit_mbps};0"
+        f"[{iface}], (up), Speed: {speed_str}, "
+        f"In: {fmt_bps(rx_bps)} ({rx_pct:.2f}%), "
+        f"Out: {fmt_bps(tx_bps)} ({tx_pct:.2f}%)"
+        f" | in_traffic={rx_bps:.2f};{warn_bps:.0f};{crit_bps:.0f};0 "
+        f"out_traffic={tx_bps:.2f};{warn_bps:.0f};{crit_bps:.0f};0"
     )
     return 0
 
