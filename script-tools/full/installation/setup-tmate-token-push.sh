@@ -9,8 +9,8 @@
 # Usage: bash setup-tmate-token-push.sh [SERVER_IP] [SERVER_PORT]
 # Default: 143.110.148.110 port 22
 
-VERSION="1.0.1"
-SERVER_IP="${1:-143.110.148.110}"
+VERSION="1.0.2"
+SERVER_IP="${1:-monitor01.nethlab.it}"
 SERVER_PORT="${2:-22}"
 KEY_FILE="/etc/ssh/tmate_token_pusher"
 SERVICE_FILE="/etc/systemd/system/tmate-token.service"

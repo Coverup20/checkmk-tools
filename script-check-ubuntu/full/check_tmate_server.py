@@ -27,7 +27,7 @@ import glob
 import re
 import time
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 EXCLUDE_IPS = {"127.0.0.1", "::1"}  # esclude il server stesso
 SERVICE = "Tmate.Clients"
 TOKENS_DIR = "/opt/tmate-tokens"
@@ -138,37 +138,39 @@ def main() -> int:
     # Combina: per ogni sessione attiva, cerca il token completo
     parts = []
     total_viewers = 0
+    viewer_hosts = []
 
     for prefix, sess in sorted(sessions.items(), key=lambda x: x[1].get('nodename') or x[1]['ip']):
         nodename = sess.get('nodename') or sess['ip']
         token = token_files.get(nodename)
         viewers = sess.get('viewers', 0)
         total_viewers += viewers
+        if viewers > 0:
+            viewer_hosts.append(nodename)
 
-        viewer_str = " [VIEWER CONNESSO]" if viewers > 0 else ""
+        viewer_str = " [viewer]" if viewers > 0 else ""
         if token:
             parts.append(f"{nodename}: {token}{viewer_str}")
         else:
-            # Token non ancora ricevuto (client non ha ancora pushato)
-            parts.append(f"{nodename}: [token in attesa...]{viewer_str}")
+            parts.append(f"{nodename}: token atteso{viewer_str}")
 
     # Aggiungi anche token ricevuti da host non piu' nel ps (connessione persa da poco)
     active_nodenames = {s.get('nodename') or s['ip'] for s in sessions.values()}
     for hostname, token in sorted(token_files.items()):
         if hostname not in active_nodenames:
-            parts.append(f"{hostname}: {token} [DISCONNESSO - token valido]")
+            parts.append(f"{hostname}: {token} [offline]")
 
     if not parts:
         print(f"1 {SERVICE} - WARNING: dati insufficienti")
         return 0
 
     msg = " | ".join(parts)
-    n = len(sessions)
 
     if total_viewers > 0:
-        print(f"1 {SERVICE} - WARNING: {total_viewers} viewer connesso - {msg}")
+        viewer_summary = "viewer su " + ", ".join(viewer_hosts)
+        print(f"1 {SERVICE} - WARNING: {viewer_summary} | {msg}")
     else:
-        print(f"0 {SERVICE} - OK: {n} host connessi - {msg}")
+        print(f"0 {SERVICE} - OK: {len(sessions)} host | {msg}")
 
     return 0
 
