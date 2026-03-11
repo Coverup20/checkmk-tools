@@ -28,7 +28,7 @@ import re
 import time
 from typing import Optional
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 EXCLUDE_IPS = {"127.0.0.1", "::1"}  # esclude il server stesso
 SERVICE = "Tmate.Clients"
 TOKENS_DIR = "/opt/tmate-tokens"
@@ -202,7 +202,9 @@ def main() -> int:
     ).stdout.strip() or "localhost"
     svc = f"Tmate.{local_hostname}"
     if local_token:
-        print(f"0 {svc} - OK: {local_token}")
+        # Sostituisce IP con FQDN nel token
+        local_token_display = re.sub(r'@[\d.]+', '@monitor01.nethlab.it', local_token)
+        print(f"0 {svc} - OK: {local_token_display}")
     else:
         print(f"1 {svc} - WARNING: sessione locale non attiva")
 
