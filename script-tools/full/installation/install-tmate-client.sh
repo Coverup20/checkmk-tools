@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # install-tmate-client.sh
 # Installa e configura tmate client per connettersi al server self-hosted
-# su monitor01.redteam.nethesis.it:10022
 #
 # Uso: bash install-tmate-client.sh
 # Compatibile: Ubuntu/Debian
@@ -11,9 +10,8 @@
 
 set -euo pipefail
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 
-TMATE_SERVER_HOST="127.0.0.1"
 TMATE_SERVER_PORT="10022"
 TMATE_SERVER_RSA_FP="SHA256:J71q24ldCtHKvDsVrShV3WAIWVy/73KdgbcqcUo0T80"
 TMATE_SERVER_ED25519_FP="SHA256:sfN9/q+YFgewu0TCSJZZAKFjSXSRwhMADw6P1wHpQjo"
@@ -21,6 +19,14 @@ TMATE_SERVER_ED25519_FP="SHA256:sfN9/q+YFgewu0TCSJZZAKFjSXSRwhMADw6P1wHpQjo"
 log() { echo "[$(date '+%F %T')] $*"; }
 
 log "=== install-tmate-client.sh v${VERSION} ==="
+
+# Chiedi IP o FQDN del server tmate interattivamente
+while true; do
+    read -rp "Inserisci IP o FQDN del server tmate (es: 143.110.148.110): " TMATE_SERVER_HOST
+    [[ -n "$TMATE_SERVER_HOST" ]] && break
+    echo "ERRORE: valore non può essere vuoto."
+done
+log "Server tmate: ${TMATE_SERVER_HOST}:${TMATE_SERVER_PORT}"
 
 # 1. Installa tmate
 if ! command -v tmate &>/dev/null; then
