@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """check_martian_packets.py - CheckMK local check martian packets (Python puro)."""
 
-# Version: 1.1.0
+# Version: 1.1.1
 
 import re
 import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 WARN_THRESHOLD = 10
 CRIT_THRESHOLD = 50
 LOG_FILE = Path("/var/log/messages")
@@ -54,7 +54,7 @@ def main() -> int:
         status, status_text = 0, "OK - Nessun martian packet"
 
     print(
-        f"{status} Martian_Packets count={martian_count};{WARN_THRESHOLD};{CRIT_THRESHOLD};0 unique_ips={unique_ips} "
+        f"{status} Martian.Packets count={martian_count};{WARN_THRESHOLD};{CRIT_THRESHOLD};0 unique_ips={unique_ips} "
         f"- {status_text} | martian_count={martian_count} unique_ips={unique_ips}"
     )
 

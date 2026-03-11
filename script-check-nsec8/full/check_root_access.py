@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """check_root_access.py - CheckMK local check root access (Python puro)."""
 
+VERSION = "1.1.0"
+
 import re
 import subprocess
 import sys
@@ -41,11 +43,11 @@ def main() -> int:
         status, status_text = 0, "OK - Nessun accesso recente"
 
     print(
-        f"{status} Root_Access sessions={active_sessions};2;3;0 logins={successful_logins} failed={failed_logins};5;10;0 - {status_text} "
+        f"{status} Root.Access sessions={active_sessions};2;3;0 logins={successful_logins} failed={failed_logins};5;10;0 - {status_text} "
         f"| active_sessions={active_sessions} successful_logins={successful_logins} failed_logins={failed_logins} unique_ips={unique_ips}"
     )
     if recent_ips:
-        print(f"0 Root_Access_IPs - Recent IPs: {' '.join(sorted(set(recent_ips))[:5])}")
+        print(f"0 Root.AccessIPs - Recent IPs: {' '.join(sorted(set(recent_ips))[:5])}")
     return 0
 
 

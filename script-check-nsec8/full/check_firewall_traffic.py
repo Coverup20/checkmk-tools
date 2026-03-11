@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """check_firewall_traffic.py - CheckMK local check firewall traffic (Python puro)."""
 
+VERSION = "1.1.0"
+
 import json
 import subprocess
 import sys
@@ -53,7 +55,7 @@ def emit_for_iface(iface: str) -> None:
 
     status = 1 if (rx_errors > 100 or tx_errors > 100) else 0
     print(
-        f"{status} {iface}_traffic - RX: {rx_bytes} bytes, TX: {tx_bytes} bytes "
+        f"{status} {iface}.Traffic - RX: {rx_bytes} bytes, TX: {tx_bytes} bytes "
         f"| rx_bytes={rx_bytes} tx_bytes={tx_bytes} rx_packets={rx_packets} tx_packets={tx_packets} rx_errors={rx_errors} tx_errors={tx_errors}"
     )
 

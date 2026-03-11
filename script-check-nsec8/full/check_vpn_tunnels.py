@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """check_vpn_tunnels.py - CheckMK local check VPN tunnels (Python puro)."""
 
+VERSION = "1.1.0"
+
 import shutil
 import subprocess
 import sys
@@ -48,12 +50,12 @@ def main() -> int:
         status, status_text = 0, "OK - All VPN active"
 
     print(
-        f"{status} VPN_Tunnels active={active_tunnels};0;0;0;{total_tunnels} "
+        f"{status} VPN.Tunnels active={active_tunnels};0;0;0;{total_tunnels} "
         f"Total:{total_tunnels} Active:{active_tunnels} - {status_text} "
         f"| total={total_tunnels} active={active_tunnels} inactive={inactive_tunnels}"
     )
     if details:
-        print(f"0 VPN_Details - {', '.join(details)}")
+        print(f"0 VPN.Details - {', '.join(details)}")
     return 0
 
 

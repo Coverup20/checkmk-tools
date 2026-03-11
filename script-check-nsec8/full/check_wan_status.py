@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """check_wan_status.py - CheckMK local check WAN status (Python puro).
 
-Version: 1.1.0
+Version: 1.1.1
 """
 
 import json
 import subprocess
 import sys
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 
 
 def run(cmd: list[str]) -> str:
@@ -72,7 +72,7 @@ def ping(target: str) -> bool:
 def main() -> int:
     wan_ifaces = find_wan_interfaces()
     if not wan_ifaces:
-        print(f"0 WAN_Status status=ERROR No WAN interfaces found [v{VERSION}]")
+        print(f"0 WAN.Status status=ERROR No WAN interfaces found [v{VERSION}]")
         return 0
 
     overall = 0
@@ -107,14 +107,14 @@ def main() -> int:
             overall = max(overall, 1)
 
     final_status = "OK" if overall == 0 else ("WARNING" if overall == 1 else "CRITICAL")
-    print(f"{overall} WAN_Status status={final_status} {' '.join(status_messages)} - {', '.join(details)} [v{VERSION}]")
+    print(f"{overall} WAN.Status status={final_status} {' '.join(status_messages)} - {', '.join(details)} [v{VERSION}]")
 
     wan_count = len(wan_ifaces)
     wan_up = sum(1 for s in status_messages if s.endswith("=OK"))
     wan_down = sum(1 for s in status_messages if s.endswith("=DOWN"))
     wan_degraded = sum(1 for s in status_messages if s.endswith("=DEGRADED"))
     print(
-        f"0 WAN_Metrics - Total={wan_count} Up={wan_up} Down={wan_down} Degraded={wan_degraded} "
+        f"0 WAN.Metrics - Total={wan_count} Up={wan_up} Down={wan_down} Degraded={wan_degraded} "
         f"| total={wan_count} up={wan_up} down={wan_down} degraded={wan_degraded}"
     )
     return 0

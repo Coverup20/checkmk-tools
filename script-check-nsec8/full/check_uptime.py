@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """check_uptime.py - CheckMK local check uptime/load (Python puro)."""
 
+VERSION = "1.1.0"
+
 import os
 import sys
 from pathlib import Path
@@ -35,7 +37,7 @@ def main() -> int:
         status, status_text = 0, "OK"
 
     print(
-        f"{status} Firewall_Uptime - Uptime: {days}d {hours}h {minutes}m, Load: {load1:.2f} {load5:.2f} {load15:.2f} ({cpu_count} CPU) - {status_text} "
+        f"{status} Firewall.Uptime - Uptime: {days}d {hours}h {minutes}m, Load: {load1:.2f} {load5:.2f} {load15:.2f} ({cpu_count} CPU) - {status_text} "
         f"| uptime_seconds={uptime_seconds} load1={load1:.2f} load5={load5:.2f} load15={load15:.2f} cpu_count={cpu_count}"
     )
     return 0
