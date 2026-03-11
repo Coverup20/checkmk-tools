@@ -13,7 +13,7 @@ Strategia lettura bytes (in ordine di priorità):
 Stato persistente salvato in /tmp/wan_throughput_state.json.
 Prima esecuzione: inizializza stato e output WARNING "Initializing".
 
-Version: 1.0.4
+Version: 1.0.5
 """
 
 import json
@@ -23,7 +23,7 @@ import sys
 import time
 from typing import Optional, Tuple
 
-SCRIPT_VERSION = "1.0.4"
+SCRIPT_VERSION = "1.0.5"
 SERVICE = "WAN.Throughput"
 STATE_FILE = "/tmp/wan_throughput_state.json"
 PROC_NET_DEV = "/proc/net/dev"
@@ -169,7 +169,7 @@ def main() -> int:
     now = time.time()
     wan_info = get_wan_info()
     if wan_info is None:
-        print(f"2 {SERVICE} - No WAN interface or bytes not available [v{SCRIPT_VERSION}] | rx_mbps=0 tx_mbps=0")
+        print(f"2 {SERVICE} - No WAN interface or bytes not available [v{SCRIPT_VERSION}] | in_mbps=0 out_mbps=0")
         return 0
 
     iface, rx_now, tx_now = wan_info
@@ -180,7 +180,7 @@ def main() -> int:
     # Prima esecuzione o interfaccia cambiata: inizializza
     if state is None or state.get("iface") != iface:
         save_state(iface, rx_now, tx_now, now)
-        print(f"0 {SERVICE} - {iface}: Initializing, wait next check [v{SCRIPT_VERSION}] | rx_mbps=0;800;950;0 tx_mbps=0;800;950;0")
+        print(f"0 {SERVICE} - {iface}: Initializing, wait next check [v{SCRIPT_VERSION}] | in_mbps=0;800;950;0 out_mbps=0;800;950;0")
         return 0
 
     # 4. Calcola delta
@@ -188,7 +188,7 @@ def main() -> int:
     if delta_seconds < 1:
         # Esecuzioni troppo ravvicinate
         save_state(iface, rx_now, tx_now, now)
-        print(f"0 {SERVICE} - {iface}: Interval too short ({delta_seconds:.1f}s) [v{SCRIPT_VERSION}] | rx_mbps=0;800;950;0 tx_mbps=0;800;950;0")
+        print(f"0 {SERVICE} - {iface}: Interval too short ({delta_seconds:.1f}s) [v{SCRIPT_VERSION}] | in_mbps=0;800;950;0 out_mbps=0;800;950;0")
         return 0
 
     rx_prev = state["rx_bytes"]
@@ -217,10 +217,10 @@ def main() -> int:
 
     print(
         f"{state_code} {SERVICE} - "
-        f"{iface}: RX={rx_mbps:.2f} Mbps TX={tx_mbps:.2f} Mbps "
+        f"{iface}: IN={rx_mbps:.2f} Mbps OUT={tx_mbps:.2f} Mbps "
         f"(interval {delta_seconds:.0f}s) [v{SCRIPT_VERSION}]"
-        f" | rx_mbps={rx_mbps:.2f};{warn_mbps};{crit_mbps};0 "
-        f"tx_mbps={tx_mbps:.2f};{warn_mbps};{crit_mbps};0"
+        f" | in_mbps={rx_mbps:.2f};{warn_mbps};{crit_mbps};0 "
+        f"out_mbps={tx_mbps:.2f};{warn_mbps};{crit_mbps};0"
     )
     return 0
 
