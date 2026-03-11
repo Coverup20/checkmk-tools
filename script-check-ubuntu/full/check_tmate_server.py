@@ -27,7 +27,7 @@ import glob
 import re
 import time
 
-VERSION = "1.0.9"
+VERSION = "1.1.0"
 EXCLUDE_IPS = {"127.0.0.1", "::1"}  # esclude il server stesso
 SERVICE = "Tmate.Clients"
 TOKENS_DIR = "/opt/tmate-tokens"
@@ -125,6 +125,23 @@ def read_token_files(active_ips: set = None) -> dict:
     return tokens
 
 
+def get_local_token() -> Optional[str]:
+    """Legge il token della sessione tmate locale (il server stesso)."""
+    sock = "/run/tmate/tmate.sock"
+    if not os.path.exists(sock):
+        return None
+    try:
+        result = subprocess.run(
+            ["tmate", "-S", sock, "display", "-p", "#{tmate_ssh}"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, timeout=5
+        )
+        token = result.stdout.strip()
+        return token if token.startswith("ssh ") else None
+    except Exception:
+        return None
+
+
 def main() -> int:
     sessions = get_active_sessions()
     active_ips = {sess['ip'] for sess in sessions.values() if sess.get('ip')}
@@ -176,6 +193,17 @@ def main() -> int:
         if hostname not in active_nodenames:
             svc = f"Tmate.{hostname}"
             print(f"1 {svc} - WARNING: [offline] {token}")
+
+    # Sessione locale del server stesso
+    local_token = get_local_token()
+    local_hostname = subprocess.run(
+        ["hostname", "-s"], stdout=subprocess.PIPE, text=True
+    ).stdout.strip() or "localhost"
+    svc = f"Tmate.{local_hostname}"
+    if local_token:
+        print(f"0 {svc} - OK: {local_token}")
+    else:
+        print(f"1 {svc} - WARNING: sessione locale non attiva")
 
     return 0
 
