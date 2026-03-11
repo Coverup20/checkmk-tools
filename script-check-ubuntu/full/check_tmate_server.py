@@ -27,7 +27,7 @@ import glob
 import re
 import time
 
-VERSION = "1.0.3"
+VERSION = "1.0.4"
 EXCLUDE_IPS = {"127.0.0.1", "::1"}  # esclude il server stesso
 SERVICE = "Tmate.Clients"
 TOKENS_DIR = "/opt/tmate-tokens"
@@ -149,6 +149,16 @@ def main() -> int:
             viewer_hosts.append(nodename)
 
         viewer_str = " [viewer]" if viewers > 0 else ""
+        if not token:
+            # Fallback: cerca per IP
+            token = token_files.get(sess['ip'])
+        if not token:
+            # Fallback: cerca per prefix (prime 4 lettere del token nel contenuto dei file)
+            for _, t in token_files.items():
+                m = re.search(r'ssh -p\d+ (\w+)@', t)
+                if m and m.group(1).startswith(prefix):
+                    token = t
+                    break
         if token:
             parts.append(f"{nodename}: {token}{viewer_str}")
         else:
