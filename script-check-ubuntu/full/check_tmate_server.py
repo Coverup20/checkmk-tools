@@ -26,6 +26,7 @@ import subprocess
 import glob
 import re
 import time
+from typing import Optional
 
 VERSION = "1.1.0"
 EXCLUDE_IPS = {"127.0.0.1", "::1"}  # esclude il server stesso
