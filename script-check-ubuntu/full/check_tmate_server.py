@@ -27,7 +27,7 @@ import glob
 import re
 import time
 
-VERSION = "1.0.8"
+VERSION = "1.0.9"
 EXCLUDE_IPS = {"127.0.0.1", "::1"}  # esclude il server stesso
 SERVICE = "Tmate.Clients"
 TOKENS_DIR = "/opt/tmate-tokens"
@@ -145,79 +145,37 @@ def main() -> int:
         print(f"2 {SERVICE} - CRITICAL: nessun host connesso al server tmate")
         return 0
 
-    # Combina: per ogni sessione attiva, cerca il token completo
-    parts = []
-    total_viewers = 0
-    viewer_hosts = []
-
+    # Una riga per host attivo
+    active_nodenames = set()
     for prefix, sess in sorted(sessions.items(), key=lambda x: x[1].get('nodename') or x[1]['ip']):
         nodename = sess.get('nodename') or sess['ip']
-        token = token_files.get(nodename)
-        viewers = sess.get('viewers', 0)
-        total_viewers += viewers
-        if viewers > 0:
-            viewer_hosts.append(nodename)
+        active_nodenames.add(nodename)
+        svc = f"Tmate.{nodename}"
+        token = token_files.get(nodename) or token_files.get(sess['ip'])
 
-        viewer_str = " [viewer]" if viewers > 0 else ""
+        # Fallback: cerca per prefix nel contenuto dei file
         if not token:
-            # Fallback: cerca per IP
-            token = token_files.get(sess['ip'])
-        if not token:
-            # Fallback: cerca per prefix (prime 4 lettere del token nel contenuto dei file)
             for _, t in token_files.items():
                 m = re.search(r'ssh -p\d+ (\w+)@', t)
                 if m and m.group(1).startswith(prefix):
                     token = t
                     break
-        if token:
-            parts.append(f"{nodename}: {token}{viewer_str}")
-        else:
-            parts.append(f"{nodename}: token atteso{viewer_str}")
 
-    # Aggiungi anche token ricevuti da host non piu' nel ps (connessione persa da poco)
-    active_nodenames = {s.get('nodename') or s['ip'] for s in sessions.values()}
+        viewers = sess.get('viewers', 0)
+
+        if viewers > 0:
+            msg = f"{token} [VIEWER CONNESSO]" if token else "token atteso [VIEWER CONNESSO]"
+            print(f"1 {svc} - WARNING: {msg}")
+        elif not token:
+            print(f"1 {svc} - WARNING: token atteso")
+        else:
+            print(f"0 {svc} - OK: {token}")
+
+    # Host offline (token salvato ma non piu' in ps)
     for hostname, token in sorted(token_files.items()):
         if hostname not in active_nodenames:
-            parts.append(f"{hostname}: {token} [offline]")
-
-    if not parts:
-        print(f"1 {SERVICE} - WARNING: dati insufficienti")
-        return 0
-
-    # Conta offline
-    offline_hosts = [h for h, t in token_files.items()
-                     if h not in {s.get('nodename') or s['ip'] for s in sessions.values()}]
-    no_token_hosts = [p.split(":")[0] for p in parts if "token atteso" in p]
-
-    # --- Summary (1a riga): conciso ---
-    summary_parts = [f"{len(sessions)} host connessi"]
-    if viewer_hosts:
-        summary_parts.append(f"viewer: {', '.join(viewer_hosts)}")
-    if no_token_hosts:
-        summary_parts.append(f"no token: {', '.join(no_token_hosts)}")
-    if offline_hosts:
-        summary_parts.append(f"offline: {', '.join(offline_hosts)}")
-    summary = " | ".join(summary_parts)
-
-    # --- Dettaglio (righe successive): una per host ---
-    detail_lines = []
-    for part in parts:
-        # Evidenzia visivamente viewer e no-token
-        if "[viewer]" in part:
-            detail_lines.append(f"  *** {part}")
-        elif "token atteso" in part:
-            detail_lines.append(f"  !!! {part}")
-        elif "[offline]" in part:
-            detail_lines.append(f"  --- {part}")
-        else:
-            detail_lines.append(f"      {part}")
-
-    detail = "\n".join(detail_lines)
-
-    if total_viewers > 0:
-        print(f"1 {SERVICE} - WARNING: {summary}\n{detail}")
-    else:
-        print(f"0 {SERVICE} - OK: {summary}\n{detail}")
+            svc = f"Tmate.{hostname}"
+            print(f"1 {svc} - WARNING: [offline] {token}")
 
     return 0
 
