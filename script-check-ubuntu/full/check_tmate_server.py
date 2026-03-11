@@ -27,7 +27,7 @@ import glob
 import re
 import time
 
-VERSION = "1.0.6"
+VERSION = "1.0.7"
 EXCLUDE_IPS = {"127.0.0.1", "::1"}  # esclude il server stesso
 SERVICE = "Tmate.Clients"
 TOKENS_DIR = "/opt/tmate-tokens"
@@ -64,24 +64,29 @@ def get_active_sessions() -> dict:
     # Dal journal: ottieni nodename e conteggio viewer per ogni sessione attiva
     try:
         result = subprocess.run(
-            ["journalctl", "-u", "tmate-ssh-server", "--no-pager", "-n", "500"],
+            ["journalctl", "-u", "tmate-ssh-server", "--no-pager", "-n", "2000"],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, timeout=10
         )
-        # Track viewer state per prefix
+        # Track viewer state per prefix - conta solo DOPO "Spawning daemon" della sessione corrente
         viewer_state = {p: 0 for p in sessions}
+        spawn_seen = {p: False for p in sessions}
         for line in result.stdout.splitlines():
-            # Spawning daemon: prende nodename
+            # Spawning daemon: marca inizio sessione corrente e prende nodename
             m = re.search(r'\[(\w+)\.\.\.\].*nodename=(\S+)', line)
             if m and m.group(1) in sessions:
                 sessions[m.group(1)]['nodename'] = m.group(2)
-            # Client joined
+                # Reset contatore al momento dello spawn (ignora eventi di sessioni precedenti)
+                spawn_seen[m.group(1)] = True
+                viewer_state[m.group(1)] = 0
+                continue
+            # Client joined - solo se la sessione corrente e' gia' stata vista
             m = re.search(r'\[(\w+)\.\.\.\] Client joined', line)
-            if m and m.group(1) in viewer_state:
+            if m and m.group(1) in viewer_state and spawn_seen.get(m.group(1)):
                 viewer_state[m.group(1)] += 1
-            # Client left
+            # Client left - solo se la sessione corrente e' gia' stata vista
             m = re.search(r'\[(\w+)\.\.\.\] Client left', line)
-            if m and m.group(1) in viewer_state:
+            if m and m.group(1) in viewer_state and spawn_seen.get(m.group(1)):
                 viewer_state[m.group(1)] = max(0, viewer_state[m.group(1)] - 1)
         for prefix in sessions:
             sessions[prefix]['viewers'] = viewer_state.get(prefix, 0)
