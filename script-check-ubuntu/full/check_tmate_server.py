@@ -27,7 +27,7 @@ import glob
 import re
 import time
 
-VERSION = "1.0.5"
+VERSION = "1.0.6"
 EXCLUDE_IPS = {"127.0.0.1", "::1"}  # esclude il server stesso
 SERVICE = "Tmate.Clients"
 TOKENS_DIR = "/opt/tmate-tokens"
@@ -91,23 +91,27 @@ def get_active_sessions() -> dict:
     return sessions
 
 
-def read_token_files() -> dict:
+def read_token_files(active_ips: set = None) -> dict:
     """
     Legge /opt/tmate-tokens/<hostname>.txt scritti dai client.
-    Ignora file piu' vecchi di TOKEN_MAX_AGE secondi.
+    Per file il cui nome corrisponde a un IP attivo (in active_ips) ignora TOKEN_MAX_AGE.
+    Per gli altri (host offline da poco) applica il limite di eta'.
     Returna { hostname -> token_ssh_string }
     """
     tokens = {}
     now = time.time()
+    if active_ips is None:
+        active_ips = set()
     for path in glob.glob(os.path.join(TOKENS_DIR, "*.txt")):
         # Salta chiavi SSH (receiver_key.pub etc.)
         if "receiver_key" in path:
             continue
         try:
-            mtime = os.path.getmtime(path)
-            if now - mtime > TOKEN_MAX_AGE:
-                continue
             hostname = os.path.basename(path).replace('.txt', '')
+            mtime = os.path.getmtime(path)
+            # Se l'host e' attivo in ps, ignora l'eta' del file
+            if hostname not in active_ips and now - mtime > TOKEN_MAX_AGE:
+                continue
             token = open(path).read().strip()
             if token and token.startswith("ssh "):
                 tokens[hostname] = token
@@ -118,7 +122,8 @@ def read_token_files() -> dict:
 
 def main() -> int:
     sessions = get_active_sessions()
-    token_files = read_token_files()
+    active_ips = {sess['ip'] for sess in sessions.values() if sess.get('ip')}
+    token_files = read_token_files(active_ips)
 
     # Normalizza: risolve chiavi IP -> hostname usando i dati di sessione
     ip_to_hostname = {
