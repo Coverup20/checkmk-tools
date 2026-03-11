@@ -27,7 +27,7 @@ import glob
 import re
 import time
 
-VERSION = "1.0.7"
+VERSION = "1.0.8"
 EXCLUDE_IPS = {"127.0.0.1", "::1"}  # esclude il server stesso
 SERVICE = "Tmate.Clients"
 TOKENS_DIR = "/opt/tmate-tokens"
@@ -184,13 +184,40 @@ def main() -> int:
         print(f"1 {SERVICE} - WARNING: dati insufficienti")
         return 0
 
-    msg = " | ".join(parts)
+    # Conta offline
+    offline_hosts = [h for h, t in token_files.items()
+                     if h not in {s.get('nodename') or s['ip'] for s in sessions.values()}]
+    no_token_hosts = [p.split(":")[0] for p in parts if "token atteso" in p]
+
+    # --- Summary (1a riga): conciso ---
+    summary_parts = [f"{len(sessions)} host connessi"]
+    if viewer_hosts:
+        summary_parts.append(f"viewer: {', '.join(viewer_hosts)}")
+    if no_token_hosts:
+        summary_parts.append(f"no token: {', '.join(no_token_hosts)}")
+    if offline_hosts:
+        summary_parts.append(f"offline: {', '.join(offline_hosts)}")
+    summary = " | ".join(summary_parts)
+
+    # --- Dettaglio (righe successive): una per host ---
+    detail_lines = []
+    for part in parts:
+        # Evidenzia visivamente viewer e no-token
+        if "[viewer]" in part:
+            detail_lines.append(f"  *** {part}")
+        elif "token atteso" in part:
+            detail_lines.append(f"  !!! {part}")
+        elif "[offline]" in part:
+            detail_lines.append(f"  --- {part}")
+        else:
+            detail_lines.append(f"      {part}")
+
+    detail = "\n".join(detail_lines)
 
     if total_viewers > 0:
-        viewer_summary = "viewer su " + ", ".join(viewer_hosts)
-        print(f"1 {SERVICE} - WARNING: {viewer_summary} | {msg}")
+        print(f"1 {SERVICE} - WARNING: {summary}\n{detail}")
     else:
-        print(f"0 {SERVICE} - OK: {len(sessions)} host | {msg}")
+        print(f"0 {SERVICE} - OK: {summary}\n{detail}")
 
     return 0
 
