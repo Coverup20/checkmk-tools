@@ -27,7 +27,7 @@ import glob
 import re
 import time
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 SERVICE = "Tmate.Clients"
 TOKENS_DIR = "/opt/tmate-tokens"
 TOKEN_MAX_AGE = 600  # 10 minuti - token piu' vecchi considerati stale
@@ -116,6 +116,17 @@ def read_token_files() -> dict:
 def main() -> int:
     sessions = get_active_sessions()
     token_files = read_token_files()
+
+    # Normalizza: risolve chiavi IP -> hostname usando i dati di sessione
+    ip_to_hostname = {
+        sess['ip']: (sess.get('nodename') or sess['ip'])
+        for sess in sessions.values() if sess.get('ip')
+    }
+    normalized_tokens = {}
+    for key, token in token_files.items():
+        resolved = ip_to_hostname.get(key, key)
+        normalized_tokens[resolved] = token
+    token_files = normalized_tokens
 
     if not sessions and not token_files:
         print(f"2 {SERVICE} - CRITICAL: nessun host connesso al server tmate")
