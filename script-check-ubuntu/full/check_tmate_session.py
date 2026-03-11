@@ -2,29 +2,22 @@
 """
 check_tmate_session.py - CheckMK Local Check per sessioni tmate attive
 
-Mostra tutti i token SSH delle sessioni tmate in esecuzione e i client
-attualmente collegati (con IP/TTY), per identificare chi è connesso.
+Output:
+  OK      = sessione attiva, nessun viewer connesso
+  WARNING = qualcuno e' connesso come viewer (mostra il suo IP)
 
-Version: 1.3.0
+Version: 1.4.0
 """
 
 import sys
 import os
-import socket
 import subprocess
 import glob
 import re
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 SERVICE = "Tmate.Session"
 TOKEN_FILE = "/run/tmate-ssh.txt"
-
-
-def get_hostname() -> str:
-    try:
-        return socket.gethostname()
-    except Exception:
-        return "unknown"
 
 
 def get_tmate_sockets() -> list:
@@ -47,7 +40,6 @@ def get_tmate_sockets() -> list:
     except Exception:
         pass
 
-    # Fallback: cerca socket in posizioni standard
     if not sockets:
         for pattern in ["/run/tmate/*.sock", "/tmp/tmate-*.sock"]:
             sockets.extend(glob.glob(pattern))
@@ -56,7 +48,6 @@ def get_tmate_sockets() -> list:
 
 
 def get_token_from_socket(sock: str) -> str:
-    """Legge il token SSH da un socket tmate."""
     try:
         result = subprocess.run(
             ["tmate", "-S", sock, "display", "-p", "#{tmate_ssh}"],
@@ -71,17 +62,12 @@ def get_token_from_socket(sock: str) -> str:
     return ""
 
 
-def get_clients_from_socket(sock: str) -> list:
-    """
-    Restituisce lista di client collegati al socket tmate.
-    Output di list-clients: /dev/pts/0: 0 [80x24 xterm-256color] (utf8)
-    Per client remoti tmate mostra l'IP nella parte iniziale.
-    """
-    clients = []
+def get_client_ttys_from_socket(sock: str) -> list:
+    """Restituisce lista di TTY dei viewer connessi (es. /dev/pts/1)."""
+    ttys = []
     try:
         result = subprocess.run(
-            ["tmate", "-S", sock, "list-clients", "-F",
-             "#{client_name} #{client_width}x#{client_height} #{client_termname}"],
+            ["tmate", "-S", sock, "list-clients", "-F", "#{client_name}"],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, timeout=5
         )
@@ -89,15 +75,31 @@ def get_clients_from_socket(sock: str) -> list:
             for line in result.stdout.strip().splitlines():
                 line = line.strip()
                 if line:
-                    clients.append(line)
+                    ttys.append(line)
     except Exception:
         pass
-    return clients
+    return ttys
+
+
+def get_viewer_ip(tty: str) -> str:
+    """Ricava l'IP del viewer da 'who' usando la TTY (es. /dev/pts/1 -> pts/1)."""
+    pts = tty.replace("/dev/", "")  # /dev/pts/1 -> pts/1
+    try:
+        result = subprocess.run(
+            ["who"], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, timeout=5
+        )
+        for line in result.stdout.splitlines():
+            if pts in line:
+                m = re.search(r'\(([^)]+)\)', line)
+                if m:
+                    return m.group(1)
+    except Exception:
+        pass
+    return tty  # fallback: mostra la TTY grezza
 
 
 def main() -> int:
-    hostname = get_hostname()
-
     # Verifica che tmate sia in esecuzione
     try:
         result = subprocess.run(["pgrep", "-x", "tmate"],
@@ -107,10 +109,9 @@ def main() -> int:
         tmate_running = False
 
     if not tmate_running:
-        print(f"2 {SERVICE} - CRITICAL: [{hostname}] tmate non in esecuzione")
+        print(f"2 {SERVICE} - CRITICAL: tmate non in esecuzione")
         return 0
 
-    # Cerca tutti i socket attivi
     sockets = get_tmate_sockets()
 
     sessions = []
@@ -118,10 +119,11 @@ def main() -> int:
         token = get_token_from_socket(sock)
         if not token:
             continue
-        clients = get_clients_from_socket(sock)
-        sessions.append((token, clients))
+        ttys = get_client_ttys_from_socket(sock)
+        viewer_ips = [get_viewer_ip(tty) for tty in ttys]
+        sessions.append((token, viewer_ips))
 
-    # Fallback al file token se non trovato via socket
+    # Fallback al file token
     if not sessions and os.path.exists(TOKEN_FILE):
         try:
             token = open(TOKEN_FILE).read().strip()
@@ -131,19 +133,25 @@ def main() -> int:
             pass
 
     if not sessions:
-        print(f"1 {SERVICE} - WARNING: [{hostname}] tmate in esecuzione ma nessun token disponibile")
+        print(f"1 {SERVICE} - WARNING: tmate attivo ma nessun token disponibile")
         return 0
 
+    all_viewers = [ip for _, viewers in sessions for ip in viewers]
+
     parts = []
-    for token, clients in sessions:
-        if clients:
-            client_str = "clients: " + ", ".join(clients)
-            parts.append(f"{token} [{client_str}]")
+    for token, viewers in sessions:
+        if viewers:
+            parts.append(f"{token} [viewer: {', '.join(viewers)}]")
         else:
-            parts.append(f"{token} [nessun client]")
+            parts.append(token)
 
     msg = " | ".join(parts)
-    print(f"0 {SERVICE} - OK: [{hostname}] {msg}")
+
+    if all_viewers:
+        print(f"1 {SERVICE} - WARNING: connesso da {', '.join(all_viewers)} - {msg}")
+    else:
+        print(f"0 {SERVICE} - OK: {msg}")
+
     return 0
 
 
