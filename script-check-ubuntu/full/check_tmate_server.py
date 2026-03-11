@@ -27,7 +27,7 @@ import glob
 import re
 import time
 
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 EXCLUDE_IPS = {"127.0.0.1", "::1"}  # esclude il server stesso
 SERVICE = "Tmate.Clients"
 TOKENS_DIR = "/opt/tmate-tokens"
@@ -164,13 +164,14 @@ def main() -> int:
         print(f"1 {SERVICE} - WARNING: dati insufficienti")
         return 0
 
-    msg = "\n".join(parts)
+    # CheckMK multiline: usare \n letterale (non newline reale), tutto su una riga
+    msg = "\\n".join(parts)
 
     if total_viewers > 0:
         viewer_summary = "viewer su " + ", ".join(viewer_hosts)
-        print(f"1 {SERVICE} - WARNING: {viewer_summary}\n{msg}")
+        print(f"1 {SERVICE} - WARNING: {viewer_summary}\\n{msg}")
     else:
-        print(f"0 {SERVICE} - OK: {len(sessions)} host\n{msg}")
+        print(f"0 {SERVICE} - OK: {len(sessions)} host\\n{msg}")
 
     return 0
 
