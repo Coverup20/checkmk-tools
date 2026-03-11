@@ -9,7 +9,7 @@
 # Usage: bash setup-tmate-token-push.sh [SERVER_IP] [SERVER_PORT]
 # Default: 143.110.148.110 port 22
 
-VERSION="1.0.2"
+VERSION="1.0.3"
 SERVER_IP="${1:-monitor01.nethlab.it}"
 SERVER_PORT="${2:-22}"
 KEY_FILE="/etc/ssh/tmate_token_pusher"
@@ -54,7 +54,7 @@ Requires=tmate.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c 'TOKEN=\$(tmate -S /run/tmate/tmate.sock display -p "#{tmate_ssh}" 2>/dev/null); if [ -n "\$TOKEN" ]; then echo "\$TOKEN" > /run/tmate-ssh.txt; echo "\$TOKEN" | ssh -i ${KEY_FILE} -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes -p ${SERVER_PORT} root@${SERVER_IP} token-push 2>/dev/null || true; fi'
+ExecStart=/bin/bash -c 'TOKEN=\$(tmate -S /run/tmate/tmate.sock display -p "#{tmate_ssh}" 2>/dev/null); if [ -n "\$TOKEN" ]; then echo "\$TOKEN" > /run/tmate-ssh.txt; echo "\$TOKEN" | ssh -i ${KEY_FILE} -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes -p ${SERVER_PORT} root@${SERVER_IP} "\$(hostname -s)" 2>/dev/null || true; fi'
 SVCEOF
 
     systemctl daemon-reload
@@ -66,7 +66,7 @@ SVCEOF
     if [ -z "$TOKEN" ]; then
         echo "[WARN] tmate non attivo, push non eseguito ora. Partira' automaticamente al prossimo timer."
     else
-        echo "$TOKEN" | ssh -i "$KEY_FILE" -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes -p "$SERVER_PORT" "root@${SERVER_IP}" token-push 2>/dev/null && \
+        echo "$TOKEN" | ssh -i "$KEY_FILE" -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes -p "$SERVER_PORT" "root@${SERVER_IP}" "$(hostname -s)" 2>/dev/null && \
             echo "[OK] Token pushato: $TOKEN" || \
             echo "[WARN] Push fallito (verificare connettivita' a ${SERVER_IP}:${SERVER_PORT})"
     fi
@@ -88,7 +88,7 @@ Requires=tmate.service
 [Service]
 Type=oneshot
 ExecStartPre=/bin/sleep 3
-ExecStart=/bin/bash -c 'TOK_FILE=/run/tmate/token.txt; if [ -f "\$TOK_FILE" ]; then TOKEN=\$(grep "^RW=" "\$TOK_FILE" | cut -d= -f2-); else TOKEN=\$(tmate -S /run/tmate/tmate.sock display -p "#{tmate_ssh}" 2>/dev/null); fi; if [ -n "\$TOKEN" ]; then echo "\$TOKEN" | ssh -i ${KEY_FILE} -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes -p ${SERVER_PORT} root@${SERVER_IP} token-push 2>/dev/null && echo "Token pushato: \$TOKEN" || echo "Push fallito"; fi'
+ExecStart=/bin/bash -c 'TOK_FILE=/run/tmate/token.txt; if [ -f "\$TOK_FILE" ]; then TOKEN=\$(grep "^RW=" "\$TOK_FILE" | cut -d= -f2-); else TOKEN=\$(tmate -S /run/tmate/tmate.sock display -p "#{tmate_ssh}" 2>/dev/null); fi; if [ -n "\$TOKEN" ]; then echo "\$TOKEN" | ssh -i ${KEY_FILE} -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes -p ${SERVER_PORT} root@${SERVER_IP} "\$(hostname -s)" 2>/dev/null && echo "Token pushato: \$TOKEN" || echo "Push fallito"; fi'
 
 [Install]
 WantedBy=multi-user.target
@@ -111,7 +111,7 @@ SVCEOF
     if [ -z "$TOKEN" ]; then
         echo "[WARN] Token non disponibile ora. Partira' automaticamente all'avvio di tmate."
     else
-        echo "$TOKEN" | ssh -i "$KEY_FILE" -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes -p "$SERVER_PORT" "root@${SERVER_IP}" token-push 2>/dev/null && \
+        echo "$TOKEN" | ssh -i "$KEY_FILE" -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes -p "$SERVER_PORT" "root@${SERVER_IP}" "$(hostname -s)" 2>/dev/null && \
             echo "[OK] Token pushato: $TOKEN" || \
             echo "[WARN] Push fallito (verificare connettivita' a ${SERVER_IP}:${SERVER_PORT})"
     fi
