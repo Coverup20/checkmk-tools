@@ -28,7 +28,7 @@ import re
 import time
 from typing import Optional
 
-VERSION = "1.1.1"
+VERSION = "1.1.2"
 EXCLUDE_IPS = {"127.0.0.1", "::1"}  # esclude il server stesso
 SERVICE = "Tmate.Clients"
 TOKENS_DIR = "/opt/tmate-tokens"
@@ -97,17 +97,18 @@ def get_active_sessions() -> dict:
     return sessions
 
 
-def read_token_files(active_ips: set = None) -> dict:
+def read_token_files(active_hosts: set = None) -> dict:
     """
     Legge /opt/tmate-tokens/<hostname>.txt scritti dai client.
-    Per file il cui nome corrisponde a un IP attivo (in active_ips) ignora TOKEN_MAX_AGE.
+    Per file il cui nome o IP corrisponde a un host attivo (in active_hosts) ignora TOKEN_MAX_AGE.
+    active_hosts puo' contenere sia IP che nodename/hostname.
     Per gli altri (host offline da poco) applica il limite di eta'.
     Returna { hostname -> token_ssh_string }
     """
     tokens = {}
     now = time.time()
-    if active_ips is None:
-        active_ips = set()
+    if active_hosts is None:
+        active_hosts = set()
     for path in glob.glob(os.path.join(TOKENS_DIR, "*.txt")):
         # Salta chiavi SSH (receiver_key.pub etc.)
         if "receiver_key" in path:
@@ -115,8 +116,8 @@ def read_token_files(active_ips: set = None) -> dict:
         try:
             hostname = os.path.basename(path).replace('.txt', '')
             mtime = os.path.getmtime(path)
-            # Se l'host e' attivo in ps, ignora l'eta' del file
-            if hostname not in active_ips and now - mtime > TOKEN_MAX_AGE:
+            # Se l'host e' attivo in ps (per IP o per nodename), ignora l'eta' del file
+            if hostname not in active_hosts and now - mtime > TOKEN_MAX_AGE:
                 continue
             token = open(path).read().strip()
             if token and token.startswith("ssh "):
@@ -146,7 +147,10 @@ def get_local_token() -> Optional[str]:
 def main() -> int:
     sessions = get_active_sessions()
     active_ips = {sess['ip'] for sess in sessions.values() if sess.get('ip')}
-    token_files = read_token_files(active_ips)
+    active_nodenames = {sess['nodename'] for sess in sessions.values() if sess.get('nodename')}
+    # Passa sia IPs che nodename: evita di scartare token file per host attivi
+    # il cui file e' nominato con hostname invece che IP
+    token_files = read_token_files(active_ips | active_nodenames)
 
     # Normalizza: risolve chiavi IP -> hostname usando i dati di sessione
     ip_to_hostname = {
@@ -181,11 +185,20 @@ def main() -> int:
 
         viewers = sess.get('viewers', 0)
 
+        # Verifica se il token salvato corrisponde alla sessione corrente
+        token_stale = False
+        if token:
+            m = re.search(r'ssh -p\d+ (\w{4})', token)
+            if m and not m.group(1) == prefix:
+                token_stale = True
+
         if viewers > 0:
             msg = f"{token} [VIEWER CONNESSO]" if token else "token atteso [VIEWER CONNESSO]"
             print(f"1 {svc} - WARNING: {msg}")
         elif not token:
-            print(f"1 {svc} - WARNING: token atteso")
+            print(f"1 {svc} - WARNING: token atteso (systemctl restart tmate-token-push.service)")
+        elif token_stale:
+            print(f"1 {svc} - WARNING: token obsoleto sessione precedente - {token} (restart tmate-token-push.service)")
         else:
             print(f"0 {svc} - OK: {token}")
 
