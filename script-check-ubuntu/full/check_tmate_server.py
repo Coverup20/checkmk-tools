@@ -198,7 +198,7 @@ def main() -> int:
         elif not token:
             print(f"1 {svc} - WARNING: token atteso (systemctl restart tmate-token-push.service)")
         elif token_stale:
-            print(f"1 {svc} - WARNING: token obsoleto sessione precedente - {token} (restart tmate-token-push.service)")
+            print(f"1 {svc} - WARNING: {token} (restart push service)")
         else:
             print(f"0 {svc} - OK: {token}")
 
