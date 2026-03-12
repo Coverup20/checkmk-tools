@@ -7,11 +7,11 @@
 #   2. Modifica tmate-token.service per pushare il token al server
 #
 # Usage: bash setup-tmate-token-push.sh [SERVER_IP] [SERVER_PORT]
-# Default: 143.110.148.110 port 22
+# Default: monitor01.nethlab.it port 10022
 
-VERSION="1.0.3"
+VERSION="1.0.4"
 SERVER_IP="${1:-monitor01.nethlab.it}"
-SERVER_PORT="${2:-22}"
+SERVER_PORT="${2:-10022}"
 KEY_FILE="/etc/ssh/tmate_token_pusher"
 SERVICE_FILE="/etc/systemd/system/tmate-token.service"
 PUSH_SERVICE="/etc/systemd/system/tmate-token-push.service"
