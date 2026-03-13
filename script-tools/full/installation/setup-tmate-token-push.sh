@@ -134,12 +134,10 @@ TIMEREOF
 
     # Test immediato
     echo "[INFO] Test push immediato..."
-    TOKEN=""
-    if [ -f "/run/tmate/token.txt" ]; then
+    # Priorita': socket (sempre live) > token.txt (scritto solo all'avvio del servizio)
+    TOKEN=$(tmate -S /run/tmate/tmate.sock display -p "#{tmate_ssh}" 2>/dev/null)
+    if [ -z "$TOKEN" ] && [ -f "/run/tmate/token.txt" ]; then
         TOKEN=$(grep "^RW=" /run/tmate/token.txt 2>/dev/null | cut -d= -f2-)
-    fi
-    if [ -z "$TOKEN" ]; then
-        TOKEN=$(tmate -S /run/tmate/tmate.sock display -p "#{tmate_ssh}" 2>/dev/null)
     fi
 
     if [ -z "$TOKEN" ]; then
