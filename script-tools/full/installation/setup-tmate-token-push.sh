@@ -9,7 +9,7 @@
 # Usage: bash setup-tmate-token-push.sh [SERVER_IP] [SERVER_PORT]
 # Default: monitor01.nethlab.it port 22 (SSH normale per push token)
 
-VERSION="1.0.4"
+VERSION="1.1.0"
 SERVER_IP="${1:-monitor01.nethlab.it}"
 SERVER_PORT="${2:-22}"
 KEY_FILE="/etc/ssh/tmate_token_pusher"
@@ -71,7 +71,24 @@ SVCEOF
             echo "[WARN] Push fallito (verificare connettivita' a ${SERVER_IP}:${SERVER_PORT})"
     fi
 
-    systemctl start tmate-token.timer 2>/dev/null || true
+    # Crea timer periodico ogni 5 minuti (aggiorna token se tmate riconoette)
+    cat > /etc/systemd/system/tmate-token.timer << TIMEREOF
+[Unit]
+Description=Periodic push of tmate token to receiver server
+After=tmate.service
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=5min
+Unit=tmate-token.service
+
+[Install]
+WantedBy=timers.target
+TIMEREOF
+
+    systemctl daemon-reload
+    systemctl enable --now tmate-token.timer 2>/dev/null || true
+    echo "[OK] tmate-token.timer creato e avviato (ogni 5 min)"
     systemctl start tmate-token.service 2>/dev/null || true
 
 elif [ -f "/run/tmate/token.txt" ] || systemctl is-active --quiet tmate.service 2>/dev/null; then
@@ -94,9 +111,26 @@ ExecStart=/bin/bash -c 'TOK_FILE=/run/tmate/token.txt; if [ -f "\$TOK_FILE" ]; t
 WantedBy=multi-user.target
 SVCEOF
 
+    # Crea timer periodico ogni 5 minuti (aggiorna token se tmate riconoette)
+    cat > /etc/systemd/system/tmate-token-push.timer << TIMEREOF
+[Unit]
+Description=Periodic push of tmate token to receiver server
+After=tmate.service
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=5min
+Unit=tmate-token-push.service
+
+[Install]
+WantedBy=timers.target
+TIMEREOF
+
     systemctl daemon-reload
     systemctl enable tmate-token-push.service 2>/dev/null || true
+    systemctl enable --now tmate-token-push.timer 2>/dev/null || true
     echo "[OK] tmate-token-push.service creato e abilitato"
+    echo "[OK] tmate-token-push.timer creato e avviato (ogni 5 min)"
 
     # Test immediato
     echo "[INFO] Test push immediato..."
