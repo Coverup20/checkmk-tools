@@ -6,32 +6,44 @@
 #   1. Installa la chiave privata per SSH al server (tmate-token-receiver)
 #   2. Modifica tmate-token.service per pushare il token al server
 #
-# Usage: bash setup-tmate-token-push.sh [SERVER_IP] [SERVER_PORT]
+# Usage: bash setup-tmate-token-push.sh [SERVER_IP] [SERVER_PORT] [KEY_SOURCE]
 # Default: monitor01.nethlab.it port 22 (SSH normale per push token)
+#
+# Prerequisito: la chiave privata deve essere disponibile in UNO di questi modi (in ordine di priorita'):
+#   1. File /tmp/tmate_token_pusher.key (scp da vps-02:/opt/tmate-tokens/receiver_key)
+#   2. Variabile d'ambiente TMATE_PUSHER_KEY (export TMATE_PUSHER_KEY='...')
+#   3. Chiave gia' presente in /etc/ssh/tmate_token_pusher (reinstallazione)
 
-VERSION="1.1.1"
+VERSION="1.2.0"
 SERVER_IP="${1:-monitor01.nethlab.it}"
 SERVER_PORT="${2:-22}"
 KEY_FILE="/etc/ssh/tmate_token_pusher"
 SERVICE_FILE="/etc/systemd/system/tmate-token.service"
 PUSH_SERVICE="/etc/systemd/system/tmate-token-push.service"
 
-# Chiave privata del receiver (generata dal server)
-PRIVATE_KEY='-----BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACCKv7wISky+KX1KI3gFduMwUWq9A6JTsxCZs39UCj+cuwAAAJhvIgyDbyIM
-gwAAAAtzc2gtZWQyNTUxOQAAACCKv7wISky+KX1KI3gFduMwUWq9A6JTsxCZs39UCj+cuw
-AAAEDLVTIKBkFbJ9pFbQaXADuLQQToWYDjDSr3Y/leb9BIsoq/vAhKTL4pfUojeAV24zBR
-ar0DolOzEJmzf1QKP5y7AAAAFHRtYXRlLXRva2VuLXJlY2VpdmVyAQ==
------END OPENSSH PRIVATE KEY-----'
-
 echo "=== setup-tmate-token-push.sh v${VERSION} ==="
 echo "Server: ${SERVER_IP}:${SERVER_PORT}"
 
 # 1. Installa chiave privata
-echo "$PRIVATE_KEY" > "$KEY_FILE"
-chmod 600 "$KEY_FILE"
-echo "[OK] Chiave installata in $KEY_FILE"
+# Priorita': file temporaneo > variabile env > chiave gia' presente
+if [ -f "/tmp/tmate_token_pusher.key" ]; then
+    cp /tmp/tmate_token_pusher.key "$KEY_FILE"
+    chmod 600 "$KEY_FILE"
+    rm -f /tmp/tmate_token_pusher.key
+    echo "[OK] Chiave installata da /tmp/tmate_token_pusher.key"
+elif [ -n "${TMATE_PUSHER_KEY:-}" ]; then
+    echo "${TMATE_PUSHER_KEY}" > "$KEY_FILE"
+    chmod 600 "$KEY_FILE"
+    echo "[OK] Chiave installata da variabile TMATE_PUSHER_KEY"
+elif [ -f "$KEY_FILE" ]; then
+    echo "[OK] Chiave gia' presente in $KEY_FILE (reinstallazione)"
+else
+    echo "[ERRORE] Chiave privata non trovata."
+    echo "Eseguire prima:"
+    echo "  scp checkmk-vps-02:/opt/tmate-tokens/receiver_key /tmp/tmate_token_pusher.key"
+    echo "  scp /tmp/tmate_token_pusher.key TARGET:/tmp/tmate_token_pusher.key"
+    exit 1
+fi
 
 # 2. Aggiorna tmate-token.service oppure crea tmate-token-push.service
 if [ -f "$SERVICE_FILE" ]; then
