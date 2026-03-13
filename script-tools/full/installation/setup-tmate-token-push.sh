@@ -9,7 +9,7 @@
 # Usage: bash setup-tmate-token-push.sh [SERVER_IP] [SERVER_PORT]
 # Default: monitor01.nethlab.it port 22 (SSH normale per push token)
 
-VERSION="1.1.0"
+VERSION="1.1.1"
 SERVER_IP="${1:-monitor01.nethlab.it}"
 SERVER_PORT="${2:-22}"
 KEY_FILE="/etc/ssh/tmate_token_pusher"
@@ -105,7 +105,7 @@ Requires=tmate.service
 [Service]
 Type=oneshot
 ExecStartPre=/bin/sleep 3
-ExecStart=/bin/bash -c 'TOK_FILE=/run/tmate/token.txt; if [ -f "\$TOK_FILE" ]; then TOKEN=\$(grep "^RW=" "\$TOK_FILE" | cut -d= -f2-); else TOKEN=\$(tmate -S /run/tmate/tmate.sock display -p "#{tmate_ssh}" 2>/dev/null); fi; if [ -n "\$TOKEN" ]; then echo "\$TOKEN" | ssh -i ${KEY_FILE} -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes -p ${SERVER_PORT} root@${SERVER_IP} "\$(hostname -s)" 2>/dev/null && echo "Token pushato: \$TOKEN" || echo "Push fallito"; fi'
+ExecStart=/bin/bash -c 'TOKEN=\$(tmate -S /run/tmate/tmate.sock display -p "#{tmate_ssh}" 2>/dev/null); if [ -z "\$TOKEN" ] && [ -f "/run/tmate/token.txt" ]; then TOKEN=\$(grep "^RW=" "/run/tmate/token.txt" | cut -d= -f2-); fi; if [ -n "\$TOKEN" ]; then echo "\$TOKEN" | ssh -i ${KEY_FILE} -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes -p ${SERVER_PORT} root@${SERVER_IP} "\$(hostname -s)" 2>/dev/null && echo "Token pushato: \$TOKEN" || echo "Push fallito"; fi'
 
 [Install]
 WantedBy=multi-user.target
