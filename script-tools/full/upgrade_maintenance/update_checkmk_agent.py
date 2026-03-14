@@ -37,7 +37,7 @@ import urllib.error
 from pathlib import Path
 from typing import Optional, Tuple
 
-VERSION = "0.7.0"
+VERSION = "0.7.1"
 
 # ─── OS Detection ─────────────────────────────────────────────────────────────
 
@@ -153,6 +153,14 @@ def detect_local_server_url() -> Optional[str]:
         hostname = socket.gethostname()
 
     return f"https://{hostname}/{site}"
+
+
+def normalize_server_url(url: str) -> str:
+    """Garantisce che l'URL abbia schema https:// e sia ben formato."""
+    url = url.strip()
+    if url and not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    return url.rstrip("/")
 
 
 def parse_server_url(server_url: str) -> Tuple[str, str]:
@@ -397,9 +405,9 @@ def main() -> int:
         print("[ERROR] Richiesto root", file=sys.stderr)
         return 1
 
-    # Risolvi server URL: se passato via CLI usalo direttamente,
+    # Risolvi server URL: se passato via CLI usalo direttamente (normalizzato),
     # altrimenti chiedi SEMPRE all'utente (auto-detect come suggerimento)
-    server_url = args.server_url
+    server_url = normalize_server_url(args.server_url) if args.server_url else None
     if not server_url:
         if sys.stdin.isatty():
             detected = detect_local_server_url()
@@ -414,7 +422,7 @@ def main() -> int:
             except (EOFError, KeyboardInterrupt):
                 print("\n[ERROR] Input interrotto.", file=sys.stderr)
                 return 1
-            server_url = answer if answer else detected
+            server_url = normalize_server_url(answer) if answer else detected
             if not server_url:
                 print("[ERROR] URL non fornito.", file=sys.stderr)
                 return 1
