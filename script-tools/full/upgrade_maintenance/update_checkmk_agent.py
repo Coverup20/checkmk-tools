@@ -21,11 +21,13 @@ Version: 0.3.0
 """
 
 import argparse
+import json
 import os
 import platform
 import re
 import shutil
 import socket
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -185,8 +187,11 @@ def get_server_agent_version(server_url: str, pkg_type: str) -> Optional[str]:
     """
     Interroga il server CheckMK per ottenere la versione dell'agent disponibile.
 
-    Usa l'endpoint REST API /api/1.0/version per leggere la versione del server,
-    che coincide con la versione dell'agent distribuito.
+    Strategie in ordine:
+      1. Lettura diretta symlink /omd/sites/{site}/version (solo se OMD locale,
+         zero HTTP, zero autenticazione — metodo più affidabile)
+      2. REST API /check_mk/api/1.0/version (richiede server raggiungibile, no auth)
+      3. Scraping pagina /check_mk/agents/ (fallback finale)
 
     Args:
         server_url: URL base del sito CheckMK (es. https://monitor.nethlab.it/monitoring)
@@ -195,28 +200,41 @@ def get_server_agent_version(server_url: str, pkg_type: str) -> Optional[str]:
     Returns:
         Stringa versione es. '2.4.0p23' oppure None se non raggiungibile.
     """
-    # Prova prima via REST API (non richiede autenticazione per /version)
+    import json, ssl
+
+    # Strategia 1: lettura locale symlink OMD (quando lo script gira sul server stesso)
+    # /omd/sites/{site}/version -> ../../versions/2.4.0p23.cre
+    _, site = parse_server_url(server_url)
+    if site:
+        version_link = Path(f"/omd/sites/{site}/version")
+        if version_link.is_symlink():
+            target = version_link.resolve().name  # es. "2.4.0p23.cre"
+            m = re.match(r"(\d+\.\d+\.\d+(?:p\d+)?)", target)
+            if m:
+                return m.group(1)
+
+    # Strategia 2: REST API (non richiede autenticazione per /version su server esterni)
+    # Usa SSLContext che accetta self-signed per localhost
     api_url = f"{server_url.rstrip('/')}/check_mk/api/1.0/version"
+    ssl_ctx = ssl.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = ssl.CERT_NONE
     try:
         req = urllib.request.Request(api_url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            import json
+        with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as resp:
             data = json.loads(resp.read().decode())
-            # Campo: {"site": "...", "group": "...", "edition": "cre", "version": "2.4.0p23"}
             ver = data.get("version", "")
             if ver:
-                return ver
+                m = re.match(r"(\d+\.\d+\.\d+(?:p\d+)?)", ver)
+                return m.group(1) if m else ver
     except Exception:
         pass
 
-    # Fallback: leggi il filename del pacchetto dalla pagina degli agenti
-    # Il nome file contiene la versione: check-mk-agent_2.4.0p23-1_all.deb
+    # Strategia 3: scraping pagina agents (fallback)
     agents_url = f"{server_url.rstrip('/')}/check_mk/agents/"
-    ext = {"deb": ".deb", "rpm": ".rpm", "openwrt": ".deb"}.get(pkg_type, ".deb")
     try:
-        with urllib.request.urlopen(agents_url, timeout=10) as resp:
+        with urllib.request.urlopen(agents_url, timeout=10, context=ssl_ctx) as resp:
             html = resp.read().decode(errors="replace")
-        # Cerca nomi file tipo check-mk-agent_2.4.0p23-1_all.deb
         pattern = r'check-mk-agent[_-](\d+\.\d+\.\d+p\d+)'
         m = re.search(pattern, html)
         if m:
