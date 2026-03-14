@@ -29,7 +29,7 @@ import urllib.error
 from pathlib import Path
 from typing import Optional, Tuple
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 # ─── OS Detection ─────────────────────────────────────────────────────────────
 
@@ -150,45 +150,47 @@ def get_server_agent_version(server_url: str, pkg_type: str) -> Optional[str]:
 
 # ─── Download Agent ───────────────────────────────────────────────────────────
 
-def download_agent(server_url: str, pkg_type: str, dest_dir: Path) -> Optional[Path]:
+def build_download_url(server_url: str, server_ver: str, pkg_type: str) -> Tuple[str, str]:
+    """
+    Costruisce URL di download e filename del pacchetto agent in modo dinamico,
+    a partire dalla versione già ottenuta tramite REST API.
+
+    Non esegue nessuna chiamata HTTP: URL e filename sono deterministici.
+
+    Args:
+        server_url: URL base sito CheckMK
+        server_ver: Versione agent sul server (es. '2.4.0p23')
+        pkg_type:   Tipo pacchetto ('deb', 'rpm', 'openwrt')
+
+    Returns:
+        Tupla (url_completo, filename)
+    """
+    agents_base = f"{server_url.rstrip('/')}/check_mk/agents/"
+    if pkg_type in ("deb", "openwrt"):
+        filename = f"check-mk-agent_{server_ver}-1_all.deb"
+    elif pkg_type == "rpm":
+        filename = f"check-mk-agent-{server_ver}-1.noarch.rpm"
+    else:
+        raise ValueError(f"Tipo pacchetto non supportato: {pkg_type}")
+    return f"{agents_base}{filename}", filename
+
+
+def download_agent(server_url: str, server_ver: str, pkg_type: str, dest_dir: Path) -> Optional[Path]:
     """
     Scarica il pacchetto agent dal server CheckMK.
+
+    L'URL viene costruito dinamicamente dalla versione già nota (nessuno scraping HTML).
+
+    Args:
+        server_url: URL base sito CheckMK
+        server_ver: Versione agent sul server (già ottenuta via REST API)
+        pkg_type:   Tipo pacchetto
+        dest_dir:   Directory temporanea dove salvare il file
 
     Returns:
         Path al file scaricato oppure None in caso di errore.
     """
-    agents_url = f"{server_url.rstrip('/')}/check_mk/agents/"
-
-    # Costruisce URL diretto per tipo pacchetto
-    direct_urls = {
-        "deb": f"{agents_url}check-mk-agent_",  # cercheremo il nome esatto
-        "rpm": f"{agents_url}check-mk-agent-",
-    }
-
-    try:
-        with urllib.request.urlopen(agents_url, timeout=10) as resp:
-            html = resp.read().decode(errors="replace")
-    except Exception as e:
-        print(f"[ERROR] Impossibile accedere a {agents_url}: {e}", file=sys.stderr)
-        return None
-
-    if pkg_type == "deb":
-        # cerca check-mk-agent_X.Y.Zpnn-1_all.deb
-        m = re.search(r'(check-mk-agent_[\d.p]+-\d+_all\.deb)', html)
-    elif pkg_type == "rpm":
-        m = re.search(r'(check-mk-agent-[\d.p]+-\d+\.noarch\.rpm)', html)
-    elif pkg_type == "openwrt":
-        # stessa .deb, viene estratta manualmente
-        m = re.search(r'(check-mk-agent_[\d.p]+-\d+_all\.deb)', html)
-    else:
-        m = None
-
-    if not m:
-        print(f"[ERROR] Filename agent non trovato nella pagina {agents_url}", file=sys.stderr)
-        return None
-
-    filename = m.group(1)
-    url = f"{agents_url}{filename}"
+    url, filename = build_download_url(server_url, server_ver, pkg_type)
     dest = dest_dir / filename
 
     print(f"[INFO] Download: {url}")
@@ -357,7 +359,7 @@ def main() -> int:
     # 5. Download
     tmpdir = Path(tempfile.mkdtemp(prefix="cmk-agent-update-"))
     try:
-        pkg_path = download_agent(args.server_url, pkg_type, tmpdir)
+        pkg_path = download_agent(args.server_url, server_ver, pkg_type, tmpdir)
         if not pkg_path:
             return 1
 
