@@ -9,11 +9,15 @@ Se il server non è ancora aggiornato → skip (versione disponibile == versione
 Questo garantisce che l'agent non venga mai aggiornato prima del server.
 
 Usage:
+    # Auto-rileva server da installazione OMD locale
+    python3 update_checkmk_agent.py
+
+    # Specifica server manualmente (override o host senza OMD locale)
     python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring
     python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring --dry-run
     python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring --force
 
-Version: 0.1.0
+Version: 0.3.0
 """
 
 import argparse
@@ -21,15 +25,17 @@ import os
 import platform
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 import urllib.request
 import urllib.error
 from pathlib import Path
 from typing import Optional, Tuple
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 # ─── OS Detection ─────────────────────────────────────────────────────────────
 
@@ -99,6 +105,55 @@ def get_local_agent_version(pkg_type: str) -> Optional[str]:
 
     return None
 
+# ─── Auto-detection Server URL ───────────────────────────────────────────────────────────
+
+def detect_local_server_url() -> Optional[str]:
+    """
+    Auto-rileva URL del server CheckMK dall'installazione OMD locale.
+
+    Legge hostname della macchina e il primo sito trovato in /omd/sites/.
+    Restituisce 'https://{hostname}/{site}' oppure None se OMD non è installato.
+    """
+    # Metodo 1: directory /omd/sites/ (presente su qualsiasi installazione OMD)
+    omd_sites_dir = Path("/omd/sites")
+    if omd_sites_dir.exists():
+        sites = sorted(d.name for d in omd_sites_dir.iterdir() if d.is_dir())
+        if sites:
+            hostname = socket.getfqdn()
+            site = sites[0]
+            return f"https://{hostname}/{site}"
+
+    # Metodo 2: comando omd (se in PATH)
+    try:
+        result = subprocess.run(
+            ["omd", "sites", "--bare"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            sites = [s.strip() for s in result.stdout.splitlines() if s.strip()]
+            if sites:
+                hostname = socket.getfqdn()
+                return f"https://{hostname}/{sites[0]}"
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    return None
+
+
+def parse_server_url(server_url: str) -> Tuple[str, str]:
+    """
+    Estrae hostname e site name dall'URL del server.
+
+    Args:
+        server_url: es. 'https://monitor.nethlab.it/monitoring'
+
+    Returns:
+        Tupla (hostname, site) es. ('monitor.nethlab.it', 'monitoring')
+    """
+    parsed = urllib.parse.urlparse(server_url)
+    hostname = parsed.netloc
+    site = parsed.path.strip('/').split('/')[0] if parsed.path.strip('/') else ''
+    return hostname, site
 
 # ─── Versione Agent sul Server ────────────────────────────────────────────────
 
@@ -282,18 +337,19 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Esempi:
-  # Controlla e aggiorna se necessario
+  # Auto-rileva server da installazione OMD locale (macchina con CheckMK server)
+  python3 update_checkmk_agent.py
+  python3 update_checkmk_agent.py --dry-run
+
+  # Specifica server manualmente (host monitorati senza OMD locale)
   python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring
-
-  # Solo mostra cosa farebbe (nessuna modifica)
   python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring --dry-run
-
-  # Forza reinstallazione anche se già aggiornato
   python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring --force
         """,
     )
-    p.add_argument("--server-url", required=True,
-                   help="URL base sito CheckMK (es. https://monitor.nethlab.it/monitoring)")
+    p.add_argument("--server-url", required=False, default=None,
+                   help="URL sito CheckMK es. https://hostname/site. "
+                        "Se omesso, auto-rilevato dall'installazione OMD locale.")
     p.add_argument("--dry-run", action="store_true",
                    help="Mostra cosa farebbe senza eseguire modifiche")
     p.add_argument("--force", action="store_true",
@@ -308,9 +364,24 @@ def main() -> int:
         print("[ERROR] Richiesto root", file=sys.stderr)
         return 1
 
+    # Risolvi server URL: da CLI oppure auto-detect da OMD locale
+    server_url = args.server_url
+    if not server_url:
+        server_url = detect_local_server_url()
+        if not server_url:
+            print("[ERROR] --server-url non fornito e nessuna installazione OMD locale rilevata.",
+                  file=sys.stderr)
+            print("[ERROR] Fornire: --server-url https://hostname/site", file=sys.stderr)
+            return 1
+        print(f"[INFO] Server URL auto-rilevato: {server_url}")
+
+    # Parsing hostname e site per output leggibile
+    server_hostname, server_site = parse_server_url(server_url)
+
     print(f"{'='*55}")
     print(f"  update_checkmk_agent.py v{VERSION}")
-    print(f"  Server: {args.server_url}")
+    print(f"  Hostname: {server_hostname}")
+    print(f"  Site:     {server_site}")
     print(f"{'='*55}")
 
     # 1. Detect OS
@@ -325,8 +396,8 @@ def main() -> int:
         print("[INFO] Agent locale:   non installato")
 
     # 3. Versione disponibile sul server
-    print(f"[INFO] Query server...")
-    server_ver = get_server_agent_version(args.server_url, pkg_type)
+    print(f"[INFO] Query server ({server_hostname}/{server_site})...")
+    server_ver = get_server_agent_version(server_url, pkg_type)
     if not server_ver:
         print("[ERROR] Impossibile ottenere versione dal server. "
               "Server non raggiungibile o non ancora aggiornato.", file=sys.stderr)
@@ -359,7 +430,7 @@ def main() -> int:
     # 5. Download
     tmpdir = Path(tempfile.mkdtemp(prefix="cmk-agent-update-"))
     try:
-        pkg_path = download_agent(args.server_url, server_ver, pkg_type, tmpdir)
+        pkg_path = download_agent(server_url, server_ver, pkg_type, tmpdir)
         if not pkg_path:
             return 1
 
