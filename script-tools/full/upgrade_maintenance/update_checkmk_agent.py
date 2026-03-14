@@ -37,7 +37,7 @@ import urllib.error
 from pathlib import Path
 from typing import Optional, Tuple
 
-VERSION = "0.7.1"
+VERSION = "0.7.2"
 
 # ─── OS Detection ─────────────────────────────────────────────────────────────
 
@@ -411,21 +411,38 @@ def main() -> int:
     if not server_url:
         if sys.stdin.isatty():
             detected = detect_local_server_url()
+            det_host, det_site = parse_server_url(detected) if detected else ("", "")
             if detected:
                 print(f"[INFO] Server rilevato localmente: {detected}")
-                prompt = f"[INPUT] URL server CheckMK [{detected}]: "
-            else:
-                prompt = "[INPUT] URL server CheckMK (es. https://monitor.nethlab.it/monitoring): "
-                detected = None
+
+            # Chiedi hostname
+            h_prompt = f"[INPUT] Hostname server CheckMK [{det_host}]: " if det_host \
+                       else "[INPUT] Hostname server CheckMK (es. monitor.nethlab.it): "
             try:
-                answer = input(prompt).strip()
+                h_answer = input(h_prompt).strip()
             except (EOFError, KeyboardInterrupt):
                 print("\n[ERROR] Input interrotto.", file=sys.stderr)
                 return 1
-            server_url = normalize_server_url(answer) if answer else detected
-            if not server_url:
-                print("[ERROR] URL non fornito.", file=sys.stderr)
+            server_hostname_input = h_answer if h_answer else det_host
+            if not server_hostname_input:
+                print("[ERROR] Hostname non fornito.", file=sys.stderr)
                 return 1
+
+            # Chiedi site
+            s_prompt = f"[INPUT] Site name [{det_site}]: " if det_site \
+                       else "[INPUT] Site name (es. monitoring): "
+            try:
+                s_answer = input(s_prompt).strip()
+            except (EOFError, KeyboardInterrupt):
+                print("\n[ERROR] Input interrotto.", file=sys.stderr)
+                return 1
+            server_site_input = s_answer if s_answer else det_site
+            if not server_site_input:
+                print("[ERROR] Site name non fornito.", file=sys.stderr)
+                return 1
+
+            server_url = f"https://{server_hostname_input}/{server_site_input}"
+            print(f"[INFO] URL costruito: {server_url}")
         else:
             print("[ERROR] --server-url non fornito e sessione non interattiva.", file=sys.stderr)
             print("[ERROR] Fornire: --server-url https://hostname/site", file=sys.stderr)
