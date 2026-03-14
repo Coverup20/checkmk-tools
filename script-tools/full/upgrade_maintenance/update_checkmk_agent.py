@@ -111,33 +111,57 @@ def detect_local_server_url() -> Optional[str]:
     """
     Auto-rileva URL del server CheckMK dall'installazione OMD locale.
 
-    Legge hostname della macchina e il primo sito trovato in /omd/sites/.
-    Restituisce 'https://{hostname}/{site}' oppure None se OMD non è installato.
+    Cerca il nome del sito OMD, poi prova a raggiungere la REST API su:
+      1. http://localhost/{site}
+      2. https://localhost/{site}
+      3. https://{fqdn}/{site}
+    Restituisce il primo URL che risponde oppure None se OMD non è installato.
     """
-    # Metodo 1: directory /omd/sites/ (presente su qualsiasi installazione OMD)
+    # Trova sito OMD
+    site: Optional[str] = None
+
     omd_sites_dir = Path("/omd/sites")
     if omd_sites_dir.exists():
         sites = sorted(d.name for d in omd_sites_dir.iterdir() if d.is_dir())
         if sites:
-            hostname = socket.getfqdn()
             site = sites[0]
-            return f"https://{hostname}/{site}"
 
-    # Metodo 2: comando omd (se in PATH)
-    try:
-        result = subprocess.run(
-            ["omd", "sites", "--bare"],
-            capture_output=True, text=True, timeout=5
-        )
-        if result.returncode == 0:
-            sites = [s.strip() for s in result.stdout.splitlines() if s.strip()]
-            if sites:
-                hostname = socket.getfqdn()
-                return f"https://{hostname}/{sites[0]}"
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
+    if not site:
+        try:
+            result = subprocess.run(
+                ["omd", "sites", "--bare"],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                found = [s.strip() for s in result.stdout.splitlines() if s.strip()]
+                if found:
+                    site = found[0]
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
 
-    return None
+    if not site:
+        return None
+
+    # Prova i candidati URL in ordine di preferenza
+    fqdn = socket.getfqdn()
+    candidates = [
+        f"http://localhost/{site}",
+        f"https://localhost/{site}",
+        f"https://{fqdn}/{site}",
+    ]
+    for url in candidates:
+        try:
+            api = f"{url}/check_mk/api/1.0/version"
+            req = urllib.request.Request(api, headers={"Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                if resp.status == 200:
+                    return url
+        except Exception:
+            continue
+
+    # Nessun candidato raggiungibile: restituisce il primo comunque
+    # (la verifica di raggiungibilità viene fatta dopo da get_server_agent_version)
+    return candidates[0]
 
 
 def parse_server_url(server_url: str) -> Tuple[str, str]:
