@@ -144,26 +144,15 @@ def detect_local_server_url() -> Optional[str]:
     if not site:
         return None
 
-    # Prova i candidati URL in ordine di preferenza
-    fqdn = socket.getfqdn()
-    candidates = [
-        f"http://localhost/{site}",
-        f"https://localhost/{site}",
-        f"https://{fqdn}/{site}",
-    ]
-    for url in candidates:
-        try:
-            api = f"{url}/check_mk/api/1.0/version"
-            req = urllib.request.Request(api, headers={"Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                if resp.status == 200:
-                    return url
-        except Exception:
-            continue
+    # Usa hostname -f per ottenere il FQDN della macchina corrente
+    try:
+        hostname = subprocess.check_output(
+            ["hostname", "-f"], text=True, timeout=5
+        ).strip()
+    except Exception:
+        hostname = socket.gethostname()
 
-    # Nessun candidato raggiungibile: restituisce il primo comunque
-    # (la verifica di raggiungibilità viene fatta dopo da get_server_agent_version)
-    return candidates[0]
+    return f"https://{hostname}/{site}"
 
 
 def parse_server_url(server_url: str) -> Tuple[str, str]:
