@@ -30,7 +30,7 @@ SCRIPT_URL = (
     "script-tools/full/backup_restore/cleanup-checkmk-retention.py"
 )
 LOG_FILE = "/var/log/cleanup-checkmk-retention.log"
-CRON_PATTERN = "cleanup-checkmk-retention.sh"
+CRON_PATTERN = "cleanup-checkmk-retention"
 DEFAULT_CRON_TIME = "0 3 * * *"
 
 
