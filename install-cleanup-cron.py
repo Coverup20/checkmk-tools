@@ -27,7 +27,7 @@ VERSION = "1.0.0"
 
 SCRIPT_URL = (
     "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/"
-    "script-tools/full/backup_restore/cleanup-checkmk-retention.sh"
+    "script-tools/full/backup_restore/cleanup-checkmk-retention.py"
 )
 LOG_FILE = "/var/log/cleanup-checkmk-retention.log"
 CRON_PATTERN = "cleanup-checkmk-retention.sh"
@@ -237,10 +237,11 @@ def ask_email(auto_yes: bool, email: str) -> str:
 def build_cron_cmd(cron_time: str, email: str) -> str:
     import shutil
     downloader = "curl -fsSL" if shutil.which("curl") else "wget -qO-"
+    py3 = shutil.which("python3") or "python3"
     if email:
-        cmd = f"{cron_time} {downloader} {SCRIPT_URL} | bash -s -- --email {email} >> {LOG_FILE} 2>&1"
+        cmd = f"{cron_time} {downloader} {SCRIPT_URL} | {py3} - --email {email} >> {LOG_FILE} 2>&1"
     else:
-        cmd = f"{cron_time} {downloader} {SCRIPT_URL} | bash >> {LOG_FILE} 2>&1"
+        cmd = f"{cron_time} {downloader} {SCRIPT_URL} | {py3} - >> {LOG_FILE} 2>&1"
     return cmd
 
 
@@ -291,8 +292,10 @@ def run_dry_run(auto_yes: bool) -> None:
 
     info("Esecuzione cleanup in modalità dry-run...")
     print("─" * 60)
+    import shutil
+    py3 = shutil.which("python3") or "python3"
     subprocess.run(
-        f"curl -fsSL {SCRIPT_URL} | bash -s -- --dry-run",
+        f"curl -fsSL {SCRIPT_URL} | {py3} - --dry-run",
         shell=True,
         check=False,
     )
@@ -302,8 +305,10 @@ def run_dry_run(auto_yes: bool) -> None:
     ans2 = ask("Eseguire cleanup REALE ora (non dry-run)? [y/N]: ", default="n").lower()
     if ans2 in ("y", "s"):
         info("Esecuzione cleanup reale...")
+        import shutil
+        py3 = shutil.which("python3") or "python3"
         subprocess.run(
-            f"curl -fsSL {SCRIPT_URL} | bash",
+            f"curl -fsSL {SCRIPT_URL} | {py3} -",
             shell=True,
             check=False,
         )
