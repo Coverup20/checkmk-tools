@@ -37,7 +37,7 @@ import urllib.error
 from pathlib import Path
 from typing import Optional, Tuple
 
-VERSION = "0.5.0"
+VERSION = "0.6.0"
 
 # ─── OS Detection ─────────────────────────────────────────────────────────────
 
@@ -395,25 +395,29 @@ def main() -> int:
         print("[ERROR] Richiesto root", file=sys.stderr)
         return 1
 
-    # Risolvi server URL: CLI → auto-detect OMD → prompt interattivo
+    # Risolvi server URL: se passato via CLI usalo direttamente,
+    # altrimenti chiedi SEMPRE all'utente (auto-detect come suggerimento)
     server_url = args.server_url
     if not server_url:
-        server_url = detect_local_server_url()
-    if not server_url:
         if sys.stdin.isatty():
-            print("[INFO] Nessuna installazione OMD rilevata localmente.")
-            print("[INPUT] Inserire URL server CheckMK (es. https://monitor.nethlab.it/monitoring):")
+            detected = detect_local_server_url()
+            if detected:
+                print(f"[INFO] Server rilevato localmente: {detected}")
+                prompt = f"[INPUT] URL server CheckMK [{detected}]: "
+            else:
+                prompt = "[INPUT] URL server CheckMK (es. https://monitor.nethlab.it/monitoring): "
+                detected = None
             try:
-                server_url = input("> ").strip()
+                answer = input(prompt).strip()
             except (EOFError, KeyboardInterrupt):
                 print("\n[ERROR] Input interrotto.", file=sys.stderr)
                 return 1
+            server_url = answer if answer else detected
             if not server_url:
                 print("[ERROR] URL non fornito.", file=sys.stderr)
                 return 1
         else:
-            print("[ERROR] --server-url non fornito, nessuna installazione OMD locale rilevata "
-                  "e sessione non interattiva.", file=sys.stderr)
+            print("[ERROR] --server-url non fornito e sessione non interattiva.", file=sys.stderr)
             print("[ERROR] Fornire: --server-url https://hostname/site", file=sys.stderr)
             return 1
 
