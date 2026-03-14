@@ -37,7 +37,7 @@ import urllib.error
 from pathlib import Path
 from typing import Optional, Tuple
 
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 
 # ─── OS Detection ─────────────────────────────────────────────────────────────
 
@@ -385,6 +385,8 @@ Esempi:
                    help="Mostra cosa farebbe senza eseguire modifiche")
     p.add_argument("--force", action="store_true",
                    help="Forza reinstallazione anche se versione già aggiornata")
+    p.add_argument("--install-cron", action="store_true",
+                   help="Installa un cron job per aggiornamento automatico periodico")
     return p.parse_args()
 
 
@@ -438,6 +440,10 @@ def main() -> int:
     print(f"  Questo host: {local_hostname}")
     print(f"  Server:      {server_hostname}/{server_site}")
     print(f"{'='*55}")
+
+    # Modalità install-cron: configura cron job e termina
+    if args.install_cron:
+        return install_cron_job(server_url)
 
     # 1. Detect OS
     pkg_type = detect_pkg_type()
@@ -508,6 +514,73 @@ def main() -> int:
             return 1
     finally:
         shutil.rmtree(str(tmpdir), ignore_errors=True)
+
+
+def install_cron_job(server_url: str) -> int:
+    """Installa un cron job per aggiornamento automatico periodico."""
+    script_path = os.path.abspath(__file__)
+    log_file = "/var/log/update_checkmk_agent.log"
+
+    print("\n[CRON] Configurazione aggiornamento automatico")
+    print("  1) Ogni giorno  (alle 03:00)")
+    print("  2) Ogni settimana (domenica alle 03:00)")
+    print("  3) Personalizzato (espressione cron manuale)")
+    print("  0) Annulla")
+    try:
+        choice = input("[INPUT] Scegli frequenza [1]: ").strip() or "1"
+    except (EOFError, KeyboardInterrupt):
+        print("\n[ERROR] Input interrotto.", file=sys.stderr)
+        return 1
+
+    if choice == "0":
+        print("[INFO] Installazione cron annullata.")
+        return 0
+    elif choice == "1":
+        schedule = "0 3 * * *"
+        desc = "ogni giorno alle 03:00"
+    elif choice == "2":
+        schedule = "0 3 * * 0"
+        desc = "ogni domenica alle 03:00"
+    elif choice == "3":
+        try:
+            schedule = input("[INPUT] Espressione cron (es. '0 3 * * *'): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n[ERROR] Input interrotto.", file=sys.stderr)
+            return 1
+        if not schedule:
+            print("[ERROR] Espressione cron non fornita.", file=sys.stderr)
+            return 1
+        desc = schedule
+    else:
+        print("[ERROR] Scelta non valida.", file=sys.stderr)
+        return 1
+
+    cron_line = (f"{schedule} root python3 {script_path} "
+                 f"--server-url {server_url} >> {log_file} 2>&1")
+    cron_file = "/etc/cron.d/update-checkmk-agent"
+
+    print(f"\n[INFO] Cron job che verrà installato:")
+    print(f"  File:      {cron_file}")
+    print(f"  Frequenza: {desc}")
+    print(f"  Comando:   {cron_line}")
+    print(f"  Log:       {log_file}")
+    try:
+        confirm = input("[INPUT] Confermi installazione? [S/n]: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print("\n[ERROR] Input interrotto.", file=sys.stderr)
+        return 1
+    if confirm in ("n", "no"):
+        print("[INFO] Installazione annullata.")
+        return 0
+
+    with open(cron_file, "w") as f:
+        f.write("# CheckMK Agent auto-update\n")
+        f.write(f"# Installato da update_checkmk_agent.py v{VERSION}\n")
+        f.write(f"{cron_line}\n")
+    os.chmod(cron_file, 0o644)
+    print(f"[OK] Cron job installato in {cron_file}")
+    print(f"[OK] Log in {log_file}")
+    return 0
 
 
 if __name__ == "__main__":
