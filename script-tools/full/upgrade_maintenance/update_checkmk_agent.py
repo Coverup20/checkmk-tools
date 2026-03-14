@@ -37,7 +37,7 @@ import urllib.error
 from pathlib import Path
 from typing import Optional, Tuple
 
-VERSION = "0.3.0"
+VERSION = "0.5.0"
 
 # ─── OS Detection ─────────────────────────────────────────────────────────────
 
@@ -395,24 +395,44 @@ def main() -> int:
         print("[ERROR] Richiesto root", file=sys.stderr)
         return 1
 
-    # Risolvi server URL: da CLI oppure auto-detect da OMD locale
+    # Risolvi server URL: CLI → auto-detect OMD → prompt interattivo
     server_url = args.server_url
     if not server_url:
         server_url = detect_local_server_url()
-        if not server_url:
-            print("[ERROR] --server-url non fornito e nessuna installazione OMD locale rilevata.",
-                  file=sys.stderr)
+    if not server_url:
+        if sys.stdin.isatty():
+            print("[INFO] Nessuna installazione OMD rilevata localmente.")
+            print("[INPUT] Inserire URL server CheckMK (es. https://monitor.nethlab.it/monitoring):")
+            try:
+                server_url = input("> ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print("\n[ERROR] Input interrotto.", file=sys.stderr)
+                return 1
+            if not server_url:
+                print("[ERROR] URL non fornito.", file=sys.stderr)
+                return 1
+        else:
+            print("[ERROR] --server-url non fornito, nessuna installazione OMD locale rilevata "
+                  "e sessione non interattiva.", file=sys.stderr)
             print("[ERROR] Fornire: --server-url https://hostname/site", file=sys.stderr)
             return 1
-        print(f"[INFO] Server URL auto-rilevato: {server_url}")
 
-    # Parsing hostname e site per output leggibile
+    # Hostname della macchina locale (quella che stiamo aggiornando)
+    try:
+        local_hostname = subprocess.check_output(
+            ["hostname", "-f"], text=True, timeout=5
+        ).strip()
+    except Exception:
+        local_hostname = socket.gethostname()
+
+    # Dal server_url estraiamo solo le info per display; l'URL rimane invariato
+    # per le operazioni di rete (query versione + download)
     server_hostname, server_site = parse_server_url(server_url)
 
     print(f"{'='*55}")
     print(f"  update_checkmk_agent.py v{VERSION}")
-    print(f"  Hostname: {server_hostname}")
-    print(f"  Site:     {server_site}")
+    print(f"  Questo host: {local_hostname}")
+    print(f"  Server:      {server_hostname}/{server_site}")
     print(f"{'='*55}")
 
     # 1. Detect OS
