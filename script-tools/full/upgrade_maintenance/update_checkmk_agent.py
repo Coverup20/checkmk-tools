@@ -20,6 +20,29 @@ Usage:
 Version: 0.3.0
 """
 
+# Python 3.6 compatibility: 'text' alias for 'universal_newlines'
+import sys as _sys
+if _sys.version_info < (3, 7):
+    import subprocess as _subprocess
+    _orig_check_output = _subprocess.check_output
+    def _compat_check_output(*args, **kwargs):
+        if 'text' in kwargs:
+            kwargs['universal_newlines'] = kwargs.pop('text')
+        return _orig_check_output(*args, **kwargs)
+    _subprocess.check_output = _compat_check_output
+
+    _orig_run = _subprocess.run
+    def _compat_run(*args, **kwargs):
+        if 'text' in kwargs:
+            kwargs['universal_newlines'] = kwargs.pop('text')
+        if 'capture_output' in kwargs:
+            capture = kwargs.pop('capture_output')
+            if capture:
+                kwargs['stdout'] = _subprocess.PIPE
+                kwargs['stderr'] = _subprocess.PIPE
+        return _orig_run(*args, **kwargs)
+    _subprocess.run = _compat_run
+
 import argparse
 import json
 import os
@@ -37,7 +60,7 @@ import urllib.error
 from pathlib import Path
 from typing import Optional, Tuple
 
-VERSION = "0.7.2"
+VERSION = "0.7.3"
 
 # ─── OS Detection ─────────────────────────────────────────────────────────────
 
