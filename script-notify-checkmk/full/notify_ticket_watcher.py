@@ -4,7 +4,7 @@ notify_ticket_watcher.py - Watcher log CheckMK per notifiche Telegram ticket
 Legge notify.log, intercetta [TICKET-EVENT] [CREATO] e manda messaggio Telegram.
 Completamente indipendente dal sistema di notifica CheckMK.
 
-Version: 1.1.0
+Version: 1.2.0
 """
 
 import os
@@ -14,12 +14,12 @@ import urllib.request
 import urllib.parse
 import sys
 
-VERSION = "1.0.0"
+VERSION = "1.2.0"
 
 LOG_FILE   = "/omd/sites/monitoring/var/log/notify.log"
 STATE_FILE = "/omd/sites/monitoring/var/log/notify_ticket_watcher.json"
 
-TOKEN    = "8704169230:AAGvH16EAxYgESIPPHj8HjONSIXA6E89go8"
+TOKEN    = os.environ.get("TELEGRAM_TOKEN", "")
 CHAT_ID  = "-1003770828164"
 CMK_URL  = "https://monitor.nethlab.it/monitoring"
 
