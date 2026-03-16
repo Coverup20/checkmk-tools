@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.1.1"
+VERSION = "1.1.2"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -834,7 +834,7 @@ def main():
                     title += f" - {service}"
                 
                 description = generate_smart_description(alert_type, hostname, real_ip, 
-                                                        output_short, service, state, last_state)
+                                                        output, service, state, last_state)
                 description += f"\n\nTicket precedente #{ticket_id} chiuso da operatore.\n\nMarcatore: {build_cmk_marker(hostname, real_ip)}"
                 
                 new_ticket_id = create_ydea_ticket(title, description, "low", 
@@ -857,7 +857,7 @@ def main():
             title += f" - {service}"
         
         description = generate_smart_description(alert_type, hostname, real_ip, 
-                                                output_short, service, state, last_state)
+                                                output, service, state, last_state)
         
         ticket_id = create_ydea_ticket(title, description, "low", 
                                       YDEA_CATEGORY_ID, hostname, service, output)
