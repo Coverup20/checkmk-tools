@@ -6,7 +6,7 @@ set -euo pipefail
 # === CONFIG ===
 TOKEN="${TELEGRAM_TOKEN:-}"
 # CHAT_ID per canale self-monitoring
-CHAT_ID="-1003454341374"
+CHAT_ID="-1003851005606"
 
 CMK_URL="https://monitor.nethlab.it/monitoring"
 SITE="monitoring"
