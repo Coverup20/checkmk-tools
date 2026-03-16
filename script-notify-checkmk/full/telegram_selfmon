@@ -5,9 +5,8 @@ set -euo pipefail
 
 # === CONFIG ===
 TOKEN="${TELEGRAM_TOKEN:-}"
-# CHAT_ID per canale self-monitoring
-# TODO: aggiornare con nuovo chat ID canale SIM aziendale
-CHAT_ID="-1003454341374"
+# CHAT_ID da variabile d'ambiente TELEGRAM_SELFMON_CHAT_ID (configurare per server in OMD environment)
+CHAT_ID="${TELEGRAM_SELFMON_CHAT_ID:-}"
 
 CMK_URL="https://monitor.nethlab.it/monitoring"
 SITE="monitoring"

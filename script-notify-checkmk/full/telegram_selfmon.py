@@ -6,7 +6,7 @@ Bulk: no
 CheckMK notification script - dedicated for "monitor" host self-monitoring alerts.
 Sends Telegram message with hardcoded CHAT_ID for self-monitoring channel.
 
-Version: 1.0.0
+Version: 1.1.0
 """
 
 import os
@@ -16,13 +16,12 @@ import urllib.request
 import urllib.parse
 from urllib.error import URLError
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 # === CONFIG ===
 TOKEN = os.getenv("TELEGRAM_TOKEN", "")
-# CHAT_ID dedicato canale self-monitoring
-# TODO: aggiornare con nuovo chat ID canale SIM aziendale
-CHAT_ID = "-1003454341374"
+# CHAT_ID da variabile d'ambiente TELEGRAM_SELFMON_CHAT_ID (configurare per server in OMD environment)
+CHAT_ID = os.environ.get("TELEGRAM_SELFMON_CHAT_ID", "")
 CMK_URL = "https://monitor.nethlab.it/monitoring"
 SITE = "monitoring"
 # ==============
