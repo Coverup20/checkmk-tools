@@ -12,7 +12,7 @@ Installa e configura CheckMK Agent su NethSecurity 8 / OpenWrt in modo persisten
 Uso:
   python3 install-checkmk-agent-persistent-nsec8.py [--uninstall]
 
-Version: 1.0.0
+Version: 1.0.1
 """
 
 import os
@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 # ---------------------------------------------------------------------------
 # Costanti configurabili via variabili d'ambiente
@@ -144,21 +144,35 @@ def start_agent_service() -> None:
         warn(f"check_mk_agent stato: {status} — verificare manualmente")
 
 
-def install_git_if_missing() -> None:
-    """Installa git e git-http via opkg se mancante."""
+def install_git_if_missing() -> bool:
+    """Installa git e git-http via opkg se mancante. Restituisce True se git disponibile."""
     if cmd_exists("git"):
         r = run(["git", "--version"], capture=True, check=False)
         log(f"Git già installato: {r.stdout.strip()}")
+        return True
+
+    log("Git non trovato, tento installazione via opkg...")
+    r = run(["opkg", "install", "git", "git-http"], check=False)
+    if r.returncode == 0 and cmd_exists("git"):
+        log("Git installato")
+        return True
+
+    warn("Git non disponibile nei repo NethSecurity — auto-sync disabilitato")
+    warn("I local checks sono stati deployati dal repo già presente in /opt/checkmk-tools/")
+    return False
+
+
+def setup_repo(git_available: bool = True) -> None:
+    """Clona o aggiorna /opt/checkmk-tools. Se git non disponibile, logga warning."""
+    repo = Path(REPO_DIR)
+
+    if not git_available:
+        if repo.exists():
+            log(f"Repository già presente in {REPO_DIR} (git non disponibile, skip update)")
+        else:
+            warn(f"Git non disponibile e {REPO_DIR} non esiste — impossibile clonare")
         return
 
-    log("Git non trovato, installo via opkg...")
-    run(["opkg", "install", "git", "git-http"])
-    log("Git installato")
-
-
-def setup_repo() -> None:
-    """Clona o aggiorna /opt/checkmk-tools."""
-    repo = Path(REPO_DIR)
     if (repo / ".git").exists():
         log(f"Repository presente in {REPO_DIR}, aggiorno...")
         r = run(["git", "-C", REPO_DIR, "pull"], check=False)
@@ -195,8 +209,11 @@ def deploy_local_checks() -> None:
     log(f"Deploy local checks: {deployed} file in {LOCAL_DIR}")
 
 
-def setup_cron() -> None:
-    """Crea sync script e aggiunge cron job ogni minuto."""
+def setup_cron(git_available: bool = True) -> None:
+    """Crea sync script e aggiunge cron job ogni minuto. Skip se git non disponibile."""
+    if not git_available:
+        log("Git non disponibile — skip configurazione auto-sync cron")
+        return
     sync_script_content = """\
 #!/bin/sh
 # Auto Git Sync Worker — generato da install-checkmk-agent-persistent-nsec8.py
@@ -342,16 +359,16 @@ def main() -> int:
     start_agent_service()
 
     log("--- [3/7] Installazione git ---")
-    install_git_if_missing()
+    git_ok = install_git_if_missing()
 
     log("--- [4/7] Setup repository ---")
-    setup_repo()
+    setup_repo(git_available=git_ok)
 
     log("--- [5/7] Deploy local checks ---")
     deploy_local_checks()
 
     log("--- [6/7] Cron auto-sync ---")
-    setup_cron()
+    setup_cron(git_available=git_ok)
 
     log("--- [7/7] Protezione sysupgrade ---")
     setup_sysupgrade()
