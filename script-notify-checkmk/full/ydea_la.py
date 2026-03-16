@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -464,6 +464,27 @@ def check_effettuato_grace(key: str) -> Optional[bool]:
     return in_grace
 
 
+RESOLVED_STATES = {'effettuato', 'chiuso', 'completato', 'risolto'}
+
+
+def fetch_ticket_stato(ticket_id: int) -> Optional[str]:
+    """
+    Interroga Ydea per lo stato attuale del ticket.
+    Ritorna il valore di 'stato' (es. 'Effettuato') o None in caso di errore/404.
+    """
+    exitcode, stdout, stderr = toolkit_cmd(['get', str(ticket_id)], timeout=15)
+    if exitcode != 0:
+        output_lower = (stdout + stderr).lower()
+        if '404' in output_lower or 'non trovato' in output_lower:
+            return None
+        debug(f"fetch_ticket_stato: get #{ticket_id} failed (code {exitcode})")
+        return None
+    response = parse_json_response(stdout)
+    if not response:
+        return None
+    return response.get('stato') or response.get('status')
+
+
 def record_state_change(key: str, state: str):
     """Record state change for flapping detection."""
     now = int(time.time())
@@ -725,6 +746,16 @@ def main():
     #   - WARNING  -> scartato silenziosamente (nessun commento)
     #   - CRITICAL -> riapertura con commento privato
     if ticket_id and state not in ["OK", "UP"]:
+        # Se effettuato_at non e' ancora in cache, interroga Ydea per rilevare
+        # se l'operatore ha chiuso il ticket manualmente (senza OK da CheckMK)
+        if get_cache_field(ticket_key, 'effettuato_at') is None and \
+                get_cache_field(ticket_key, 'reopen_at') is None:
+            ydea_stato = fetch_ticket_stato(ticket_id)
+            debug(f"Ticket #{ticket_id} stato Ydea: {ydea_stato}")
+            if ydea_stato and ydea_stato.lower() in RESOLVED_STATES:
+                log(f"Ticket #{ticket_id} risulta '{ydea_stato}' su Ydea - setto effettuato_at")
+                set_cache_field(ticket_key, 'effettuato_at', int(time.time()))
+                set_cache_field(ticket_key, 'reopen_at', None)
         grace = check_effettuato_grace(ticket_key)
         if grace is False:
             # Fuori 24h - ticket scaduto, rimuovi da cache
