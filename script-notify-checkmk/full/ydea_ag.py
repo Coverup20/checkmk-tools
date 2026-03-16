@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.0.1"
+VERSION = "1.1.0"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -35,6 +35,7 @@ RESOLVED_TICKET_TTL = 5 * 24 * 3600  # 5 giorni
 CACHE_MAX_AGE = 30 * 24 * 3600  # 30 giorni
 FLAPPING_THRESHOLD = 5  # Numero cambi stato
 FLAPPING_WINDOW = 600  # 10 minuti
+EFFETTUATO_GRACE_SECONDS = 24 * 3600  # 24 ore finestra grace post-Effettuato
 
 AGGREGATE_BY_HOST = int(os.getenv("AGGREGATE_BY_HOST", "1"))
 RESOLVE_ON_SERVICE_OK = int(os.getenv("RESOLVE_ON_SERVICE_OK", "0"))
@@ -368,9 +369,11 @@ def mark_ticket_resolved(key: str):
         now = int(time.time())
         if key in data:
             data[key]['resolved_at'] = now
+            data[key]['effettuato_at'] = now
+            data[key]['reopen_at'] = None
             data[key]['last_update'] = now
             atomic_cache_write(TICKET_CACHE, json.dumps(data))
-            debug(f"Ticket {key} marked as resolved")
+            debug(f"Ticket {key} marked as resolved (effettuato_at set)")
     except Exception as e:
         log(f"WARN: mark_ticket_resolved failed: {e}")
 
@@ -409,6 +412,56 @@ def remove_ticket_from_cache(key: str):
             debug(f"Ticket {key} removed from cache")
     except Exception as e:
         log(f"WARN: remove_ticket_from_cache failed: {e}")
+
+
+def get_cache_field(key: str, field: str) -> Any:
+    """Get a field value from ticket cache entry."""
+    try:
+        with open(TICKET_CACHE, 'r') as f:
+            data = json.load(f)
+        return data.get(key, {}).get(field)
+    except:
+        return None
+
+
+def set_cache_field(key: str, field: str, value: Any) -> bool:
+    """Set a field in ticket cache entry."""
+    try:
+        with open(TICKET_CACHE, 'r') as f:
+            data = json.load(f)
+        if key in data:
+            data[key][field] = value
+            data[key]['last_update'] = int(time.time())
+            atomic_cache_write(TICKET_CACHE, json.dumps(data))
+            return True
+        return False
+    except Exception as e:
+        log(f"WARN: set_cache_field({field}) failed: {e}")
+        return False
+
+
+def check_effettuato_grace(key: str) -> Optional[bool]:
+    """
+    Controlla se il ticket e' nella finestra grace 24h post-Effettuato.
+    Returns:
+      None  -> ticket attivo (non in stato Effettuato, o gia' riaperto)
+      True  -> in finestra grace (< 24h da effettuato_at)
+      False -> fuori finestra grace (>= 24h)
+    """
+    # Se il ticket e' stato riaperto da un CRITICAL, trattalo come attivo
+    if get_cache_field(key, 'reopen_at') is not None:
+        debug(f"Ticket {key}: reopen_at set -> attivo")
+        return None
+
+    effettuato_at = get_cache_field(key, 'effettuato_at')
+    if not effettuato_at:
+        return None  # Nessuna finestra grace attiva
+
+    now = int(time.time())
+    elapsed = now - int(effettuato_at)
+    in_grace = elapsed < EFFETTUATO_GRACE_SECONDS
+    debug(f"Ticket {key}: effettuato {elapsed/3600:.1f}h fa, in_grace={in_grace}")
+    return in_grace
 
 
 def record_state_change(key: str, state: str):
@@ -666,7 +719,45 @@ def main():
     
     # Get existing ticket
     ticket_id = get_ticket_id(ticket_key)
-    
+
+    # === GRACE WINDOW: post-Effettuato 24h ===
+    # Quando un ticket e' in stato Effettuato, per le 24h successive:
+    #   - WARNING  -> scartato silenziosamente (nessun commento)
+    #   - CRITICAL -> riapertura con commento privato
+    if ticket_id and state not in ["OK", "UP"]:
+        grace = check_effettuato_grace(ticket_key)
+        if grace is False:
+            # Fuori 24h - ticket scaduto, rimuovi da cache
+            log(f"Ticket #{ticket_id} fuori finestra grace 24h (Effettuato) - rimozione cache")
+            remove_ticket_from_cache(ticket_key)
+            ticket_id = None
+        elif grace is True:
+            # Dentro finestra grace 24h
+            if state in ["WARNING", "WARN"]:
+                log(f"[GRACE] WARNING scartato: ticket #{ticket_id} in Effettuato (grace 24h)")
+                return 0
+            elif state in ["CRITICAL", "CRIT", "DOWN"]:
+                log(f"[GRACE] CRITICAL: riapertura ticket #{ticket_id} con commento privato")
+                grace_note = (
+                    f"[{datetime.now().strftime('%d/%m/%y %H:%M')}] "
+                    f"RIAPERTURA: {service} | {last_state} -> {state} | "
+                    f"Output: {output_short}"
+                )
+                result = add_private_note(ticket_id, grace_note)
+                if result == 0:
+                    set_cache_field(ticket_key, 'reopen_at', int(time.time()))
+                    update_ticket_state(ticket_key, state)
+                    log_ticket_event("RIAPERTO", ticket_id, f"{hostname}/{service} {state}")
+                    log(f"Ticket #{ticket_id} riaperto con commento privato")
+                elif result == 2:
+                    log(f"Ticket #{ticket_id} not found (404), removing from cache")
+                    remove_ticket_from_cache(ticket_key)
+                    ticket_id = None
+                else:
+                    log(f"ERROR: aggiunta nota riapertura fallita su #{ticket_id}")
+                return 0
+    # === END GRACE WINDOW ===
+
     if ticket_id:
         # Update existing ticket
         log(f"Updating existing ticket #{ticket_id}")
