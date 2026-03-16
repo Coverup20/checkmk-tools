@@ -21,7 +21,8 @@ VERSION = "1.0.0"
 # === CONFIG ===
 TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 # CHAT_ID dedicato canale self-monitoring
-CHAT_ID = "-1003851005606"
+# TODO: aggiornare con nuovo chat ID canale SIM aziendale
+CHAT_ID = "-1003454341374"
 CMK_URL = "https://monitor.nethlab.it/monitoring"
 SITE = "monitoring"
 # ==============
