@@ -6,17 +6,50 @@ import sys
 import time
 from pathlib import Path
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 SERVICE = "DHCP.Leases"
 LEASE_FILE = Path("/tmp/dhcp.leases")
 
 
-def uci_get(path: str, default: int) -> int:
-    result = subprocess.run(["uci", "get", path], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=False)
+def get_total_max_leases() -> int:
+    """Somma i limit di tutti i pool DHCP attivi (ignora sezioni con ignore=1).
+    Gestisce correttamente firewall con multiple interfacce logiche."""
+    result = subprocess.run(["uci", "show", "dhcp"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=False)
     if result.returncode != 0:
-        return default
-    value = (result.stdout or "").strip()
-    return int(value) if value.isdigit() else default
+        return 150  # fallback
+
+    sections: dict = {}
+    for line in result.stdout.splitlines():
+        if '=' not in line:
+            continue
+        key, _, value = line.partition('=')
+        key = key.strip()
+        value = value.strip().strip("'")
+        parts = key.split('.')
+        if len(parts) == 2:
+            sec = parts[1]
+            if sec not in sections:
+                sections[sec] = {}
+            sections[sec]['_type'] = value
+        elif len(parts) == 3:
+            sec = parts[1]
+            field = parts[2]
+            if sec not in sections:
+                sections[sec] = {}
+            sections[sec][field] = value
+
+    total = 0
+    for fields in sections.values():
+        if fields.get('_type') != 'dhcp':
+            continue
+        if fields.get('ignore') == '1':
+            continue
+        try:
+            total += int(fields.get('limit', 0))
+        except ValueError:
+            pass
+
+    return total if total > 0 else 150
 
 
 def main() -> int:
@@ -40,7 +73,7 @@ def main() -> int:
         else:
             expired_leases += 1
 
-    max_leases = uci_get("dhcp.lan.limit", 150)
+    max_leases = get_total_max_leases()
     percent = int((active_leases * 100 / max_leases)) if max_leases > 0 else 0
 
     if percent >= 90:
