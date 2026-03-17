@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-install-agent-nsec8.py  —  CheckMK Agent Installer — ROCKSOLID Edition
+install-agent-nsec8.py  —  CheckMK Agent Installer — PERSISTENT Edition
 
 Installa e configura CheckMK Agent su NethSecurity 8 / OpenWrt in modo
 persistente e resistente ai major upgrade.
@@ -14,7 +14,7 @@ Funzionalità:
   - Protegge installazione in sysupgrade.conf
   - Backup binari critici (tar/ar/gzip/libbfd)
   - Script di ripristino post-upgrade automatico
-  - Autocheck all'avvio (rocksolid-startup-check.py)
+  - Autocheck all'avvio (persistent-startup-check.py)
 
 Uso:
   python3 install-agent-nsec8.py [--uninstall] [--help]
@@ -39,7 +39,7 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 
 # ---------------------------------------------------------------------------
 # Costanti
@@ -56,10 +56,10 @@ SYNC_SCRIPT = "/usr/local/bin/git-auto-sync.sh"
 BACKUP_DIR = "/opt/checkmk-backups/binaries"
 POST_UPGRADE_SCRIPT = "/etc/checkmk-post-upgrade.py"
 RC_LOCAL = "/etc/rc.local"
-AUTOCHECK_SCRIPT = "/opt/checkmk-backups/rocksolid-startup-check.py"
+AUTOCHECK_SCRIPT = "/opt/checkmk-backups/persistent-startup-check.py"
 AUTOCHECK_URL = (
     "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main"
-    "/script-tools/full/upgrade_maintenance/rocksolid-startup-check.py"
+    "/script-tools/full/upgrade_maintenance/persistent-startup-check.py"
 )
 
 # URL diretto pacchetto agente (fallback se opkg non trova ns-checkmk-agent)
@@ -434,7 +434,7 @@ def setup_cron(git_available: bool = True) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 8. Protezione sysupgrade (ROCKSOLID)
+# 8. Protezione sysupgrade (PERSISTENT)
 # ---------------------------------------------------------------------------
 
 
@@ -485,7 +485,7 @@ def setup_sysupgrade() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 9. Backup binari critici (ROCKSOLID)
+# 9. Backup binari critici (PERSISTENT)
 # ---------------------------------------------------------------------------
 
 
@@ -503,7 +503,7 @@ def backup_critical_binaries() -> None:
     backup_path = Path(BACKUP_DIR)
     backup_path.mkdir(parents=True, exist_ok=True)
 
-    log("ROCKSOLID: Backup binari critici (protegge da corruzione durante upgrade)...")
+    log("PERSISTENT: Backup binari critici (protegge da corruzione durante upgrade)...")
 
     ok = 0
     for bin_path in bins:
@@ -526,7 +526,7 @@ def backup_critical_binaries() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 10. Script post-upgrade (ROCKSOLID)
+# 10. Script post-upgrade (PERSISTENT)
 # ---------------------------------------------------------------------------
 
 
@@ -630,24 +630,24 @@ def create_post_upgrade_script() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 11. Autocheck all'avvio (ROCKSOLID)
+# 11. Autocheck all'avvio (PERSISTENT)
 # ---------------------------------------------------------------------------
 
 
 def install_autocheck() -> None:
-    """Scarica rocksolid-startup-check.py e lo configura in rc.local."""
+    """Scarica persistent-startup-check.py e lo configura in rc.local."""
     log("Installazione script autocheck all'avvio")
 
     Path(AUTOCHECK_SCRIPT).parent.mkdir(parents=True, exist_ok=True)
 
     downloaded = False
-    log("Download rocksolid-startup-check.py da GitHub...")
+    log("Download persistent-startup-check.py da GitHub...")
     try:
         urllib.request.urlretrieve(AUTOCHECK_URL, AUTOCHECK_SCRIPT)
         Path(AUTOCHECK_SCRIPT).chmod(
             Path(AUTOCHECK_SCRIPT).stat().st_mode | 0o111
         )
-        log(f"Script rocksolid installato: {AUTOCHECK_SCRIPT}")
+        log(f"Script autocheck installato: {AUTOCHECK_SCRIPT}")
         downloaded = True
     except Exception as exc:
         warn(f"Download da GitHub fallito ({exc}) — provo da repository locale")
@@ -655,20 +655,20 @@ def install_autocheck() -> None:
     if not downloaded:
         local_src = (
             Path(REPO_DIR)
-            / "script-tools/full/upgrade_maintenance/rocksolid-startup-check.sh"
+            / "script-tools/full/upgrade_maintenance/persistent-startup-check.sh"
         )
         local_src = (
             Path(REPO_DIR)
-            / "script-tools/full/upgrade_maintenance/rocksolid-startup-check.py"
+            / "script-tools/full/upgrade_maintenance/persistent-startup-check.py"
         )
         if local_src.exists():
             shutil.copy2(local_src, AUTOCHECK_SCRIPT)
             Path(AUTOCHECK_SCRIPT).chmod(
                 Path(AUTOCHECK_SCRIPT).stat().st_mode | 0o111
             )
-            log("Script rocksolid copiato da repository locale")
+            log("Script autocheck copiato da repository locale")
         else:
-            warn("ATTENZIONE: rocksolid-startup-check.py non disponibile — skip autocheck")
+            warn("ATTENZIONE: persistent-startup-check.py non disponibile — skip autocheck")
             return
 
     # Configura rc.local
@@ -685,16 +685,16 @@ def install_autocheck() -> None:
     content = rc_path.read_text()
     lines = [
         l for l in content.splitlines()
-        if "rocksolid-startup-check" not in l
-        and "ROCKSOLID Autocheck" not in l
+        if "persistent-startup-check" not in l
+        and "PERSISTENT Autocheck" not in l
         and l != "exit 0"
     ]
     lines.append(
-        "# ROCKSOLID Autocheck — avvio da /opt/checkmk-backups/ (upgrade-resistant)"
+        "# PERSISTENT Autocheck — avvio da /opt/checkmk-backups/ (upgrade-resistant)"
     )
     lines.append(
         f"[ -x {AUTOCHECK_SCRIPT} ] && bash {AUTOCHECK_SCRIPT} "
-        ">> /var/log/rocksolid-startup.log 2>&1 &"
+        ">> /var/log/persistent-startup.log 2>&1 &"
     )
     lines.append("exit 0")
     rc_path.write_text("\n".join(lines) + "\n")
@@ -706,7 +706,7 @@ def install_autocheck() -> None:
     log("Test esecuzione autocheck...")
     r = run([AUTOCHECK_SCRIPT], check=False)
     if r.returncode == 0:
-        log("Test autocheck completato — log in /var/log/rocksolid-startup.log")
+        log("Test autocheck completato — log in /var/log/persistent-startup.log")
     else:
         warn(f"Test autocheck exit code {r.returncode}")
 
@@ -747,8 +747,8 @@ def uninstall() -> None:
     if os.path.exists(RC_LOCAL):
         lines = [
             l for l in Path(RC_LOCAL).read_text().splitlines()
-            if "rocksolid-startup-check" not in l
-            and "ROCKSOLID Autocheck" not in l
+            if "persistent-startup-check" not in l
+            and "PERSISTENT Autocheck" not in l
         ]
         Path(RC_LOCAL).write_text("\n".join(lines) + "\n")
 
@@ -768,7 +768,7 @@ def uninstall() -> None:
 def usage() -> None:
     print(
         f"install-agent-nsec8.py v{VERSION}\n\n"
-        "CheckMK Agent Installer — ROCKSOLID Edition\n"
+        "CheckMK Agent Installer — PERSISTENT Edition\n"
         "Installazione persistente resistente ai major upgrade NethSecurity/OpenWrt\n\n"
         "Uso:\n"
         "  python3 install-agent-nsec8.py\n"
@@ -798,9 +798,9 @@ def main() -> int:
 
     print()
     print("=" * 62)
-    print("  CheckMK Agent Installer — ROCKSOLID Edition")
+    print("  CheckMK Agent Installer — PERSISTENT Edition")
     print(f"  v{VERSION}")
-    print("  Resistente ai major upgrade NethSecurity / OpenWrt")
+    print("  Persistente ai major upgrade NethSecurity / OpenWrt")
     print("=" * 62)
     print()
 
@@ -838,7 +838,7 @@ def main() -> int:
 
     print()
     print("=" * 62)
-    print("  INSTALLAZIONE COMPLETATA — ROCKSOLID MODE ATTIVO")
+    print("  INSTALLAZIONE COMPLETATA — PERSISTENT MODE ATTIVO")
     print("=" * 62)
     print()
     print("Protezioni attivate:")
