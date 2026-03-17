@@ -15,7 +15,7 @@ Funzionalità:
   - Protegge installazione in sysupgrade.conf
   - Backup binari critici (tar/ar/gzip/libbfd)
   - Script di ripristino post-upgrade automatico
-  - Autocheck all'avvio (rocksolid-startup-check.sh)
+  - Autocheck all'avvio (rocksolid-startup-check.py)
 
 Uso:
   python3 install-agent-nsec8.py [--uninstall] [--help]
@@ -57,10 +57,10 @@ SYNC_SCRIPT = "/usr/local/bin/git-auto-sync.sh"
 BACKUP_DIR = "/opt/checkmk-backups/binaries"
 POST_UPGRADE_SCRIPT = "/etc/checkmk-post-upgrade.sh"
 RC_LOCAL = "/etc/rc.local"
-AUTOCHECK_SCRIPT = "/opt/checkmk-backups/rocksolid-startup-check.sh"
+AUTOCHECK_SCRIPT = "/opt/checkmk-backups/rocksolid-startup-check.py"
 AUTOCHECK_URL = (
     "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main"
-    "/script-tools/full/upgrade_maintenance/rocksolid-startup-check.sh"
+    "/script-tools/full/upgrade_maintenance/rocksolid-startup-check.py"
 )
 
 # URL diretto pacchetto agente (fallback se opkg non trova ns-checkmk-agent)
@@ -422,6 +422,8 @@ def setup_repo(git_available: bool = True) -> None:
 
     if (repo / ".git").exists():
         log(f"Repository presente, aggiorno {REPO_DIR}...")
+        # Reset locale per evitare conflitti su file modificati in-place
+        run(["git", "-C", REPO_DIR, "reset", "--hard", "HEAD"], check=False)
         r = run(["git", "-C", REPO_DIR, "pull"], check=False)
         if r.returncode != 0:
             warn("git pull fallito — continuo comunque")
@@ -683,13 +685,13 @@ def create_post_upgrade_script() -> None:
 
 
 def install_autocheck() -> None:
-    """Scarica rocksolid-startup-check.sh e lo configura in rc.local."""
+    """Scarica rocksolid-startup-check.py e lo configura in rc.local."""
     log("Installazione script autocheck all'avvio")
 
     Path(AUTOCHECK_SCRIPT).parent.mkdir(parents=True, exist_ok=True)
 
     downloaded = False
-    log("Download rocksolid-startup-check.sh da GitHub...")
+    log("Download rocksolid-startup-check.py da GitHub...")
     try:
         urllib.request.urlretrieve(AUTOCHECK_URL, AUTOCHECK_SCRIPT)
         Path(AUTOCHECK_SCRIPT).chmod(
@@ -705,6 +707,10 @@ def install_autocheck() -> None:
             Path(REPO_DIR)
             / "script-tools/full/upgrade_maintenance/rocksolid-startup-check.sh"
         )
+        local_src = (
+            Path(REPO_DIR)
+            / "script-tools/full/upgrade_maintenance/rocksolid-startup-check.py"
+        )
         if local_src.exists():
             shutil.copy2(local_src, AUTOCHECK_SCRIPT)
             Path(AUTOCHECK_SCRIPT).chmod(
@@ -712,7 +718,7 @@ def install_autocheck() -> None:
             )
             log("Script rocksolid copiato da repository locale")
         else:
-            warn("ATTENZIONE: rocksolid-startup-check.sh non disponibile — skip autocheck")
+            warn("ATTENZIONE: rocksolid-startup-check.py non disponibile — skip autocheck")
             return
 
     # Configura rc.local
