@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 from typing import Optional, Tuple
 
-VERSION = "2.0.3"
+VERSION = "2.0.4"
 
 LOG_FILE = "/var/log/persistent-startup.log"
 BACKUP_DIR = "/opt/checkmk-backups/binaries"
@@ -32,6 +32,7 @@ CHECKS_SRC = os.path.join(REPO_DIR, "script-check-nsec8", "full")
 PLUGINS_SRC = os.path.join(REPO_DIR, "script-check-nsec8", "plugins")
 LOCAL_DIR = "/usr/lib/check_mk_agent/local"
 PLUGINS_DIR = "/usr/lib/check_mk_agent/plugins"
+AGENT_PKG_URL_FILE = "/opt/checkmk-backups/agent-pkg-url.conf"
 
 REPO_BASE = os.environ.get(
     "OPENWRT_REPO_BASE",
@@ -325,7 +326,17 @@ def verify_checkmk_agent() -> None:
         if not (agent_bin.is_file() and os.access(str(agent_bin), os.X_OK)):
             log("[CheckMK Agent] Binary ancora mancante — reinstallo ns-checkmk-agent...")
             if cmd_exists("opkg"):
+                # Aggiorna lists prima di tentare install
+                _run(["opkg", "update"], timeout=60)
                 rc_opkg, _ = _run_capture(["opkg", "install", "ns-checkmk-agent"], timeout=120)
+                # Fallback: URL diretto salvato dall'installer
+                if not (agent_bin.is_file() and os.access(str(agent_bin), os.X_OK)):
+                    url_file = Path(AGENT_PKG_URL_FILE)
+                    if url_file.is_file():
+                        agent_url = url_file.read_text().strip()
+                        if agent_url:
+                            log(f"[CheckMK Agent] Provo URL diretto: {agent_url}")
+                            _run(["opkg", "install", agent_url], timeout=120)
                 if agent_bin.is_file():
                     log("[CheckMK Agent] ns-checkmk-agent reinstallato con successo")
                     _run(["/etc/init.d/check_mk_agent", "enable"])

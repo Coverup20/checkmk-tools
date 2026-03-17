@@ -39,7 +39,7 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-VERSION = "2.2.3"
+VERSION = "2.2.4"
 
 # ---------------------------------------------------------------------------
 # Costanti
@@ -70,6 +70,9 @@ AGENT_IPK_URL = os.environ.get(
     "8.7.1-checkmk_agent+b37c288d8/packages/x86_64/nethsecurity/"
     "ns-checkmk-agent_0.0.1-r1_all.ipk",
 )
+
+# File dove salvare l'URL per il startup check post-upgrade
+AGENT_PKG_URL_FILE = "/opt/checkmk-backups/agent-pkg-url.conf"
 
 # Repository OpenWrt per download dinamico pacchetti
 REPO_BASE = os.environ.get(
@@ -270,14 +273,20 @@ def install_agent() -> None:
     r = run(["opkg", "install", "ns-checkmk-agent"], check=False)
     if r.returncode == 0:
         log("ns-checkmk-agent installato da repository opkg")
+        # Salva URL come fallback per startup check post-upgrade
+        Path(AGENT_PKG_URL_FILE).parent.mkdir(parents=True, exist_ok=True)
+        Path(AGENT_PKG_URL_FILE).write_text(AGENT_IPK_URL + "\n")
         return
 
     warn(
-        f"ns-checkmk-agent non trovato nei repo — installo da URL diretto: "
+        f"ns-checkmk-agent non trovato nei repo \u2014 installo da URL diretto: "
         f"{AGENT_IPK_URL}"
     )
     run(["opkg", "install", AGENT_IPK_URL])
     log("ns-checkmk-agent installato da URL diretto")
+    # Salva URL come fallback per startup check post-upgrade
+    Path(AGENT_PKG_URL_FILE).parent.mkdir(parents=True, exist_ok=True)
+    Path(AGENT_PKG_URL_FILE).write_text(AGENT_IPK_URL + "\n")
 
 
 def start_agent_service() -> None:
