@@ -8,7 +8,6 @@ persistente e resistente ai major upgrade.
 Funzionalità:
   - Installa prerequisiti (wget, socat, ar, tar, gzip)
   - Installa ns-checkmk-agent via opkg (con fallback a URL diretto)
-  - Installa QEMU Guest Agent (rilevamento VM automatico)
   - Installa git, clona/aggiorna /opt/checkmk-tools
   - Deploya local checks da script-check-nsec8/full/
   - Configura cron auto-sync ogni minuto
@@ -40,7 +39,7 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 
 # ---------------------------------------------------------------------------
 # Costanti
@@ -55,7 +54,7 @@ SYSUPGRADE_CONF = "/etc/sysupgrade.conf"
 CRON_FILE = "/etc/crontabs/root"
 SYNC_SCRIPT = "/usr/local/bin/git-auto-sync.sh"
 BACKUP_DIR = "/opt/checkmk-backups/binaries"
-POST_UPGRADE_SCRIPT = "/etc/checkmk-post-upgrade.sh"
+POST_UPGRADE_SCRIPT = "/etc/checkmk-post-upgrade.py"
 RC_LOCAL = "/etc/rc.local"
 AUTOCHECK_SCRIPT = "/opt/checkmk-backups/rocksolid-startup-check.py"
 AUTOCHECK_URL = (
@@ -299,84 +298,7 @@ def start_agent_service() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 4. QEMU Guest Agent
-# ---------------------------------------------------------------------------
-
-
-def install_qemu_ga() -> None:
-    """Installa QEMU Guest Agent se il sistema e' una VM (Proxmox/KVM)."""
-    product_name = ""
-    try:
-        product_name = Path("/sys/class/dmi/id/product_name").read_text().strip()
-    except OSError:
-        pass
-
-    vm_keywords = ("qemu", "standard pc", "virtual", "kvm")
-    if not any(kw in product_name.lower() for kw in vm_keywords):
-        log(f"Sistema non identificato come VM ({product_name!r}) — skip qemu-guest-agent")
-        return
-
-    log(f"VM rilevata: {product_name} — installazione qemu-guest-agent")
-
-    run(["opkg", "update"], check=False)
-    r = run(["opkg", "install", "qemu-ga"], check=False)
-    if r.returncode != 0:
-        warn("Pacchetto qemu-ga non disponibile o gia' installato")
-
-    if not os.path.exists("/usr/bin/qemu-ga"):
-        warn("/usr/bin/qemu-ga non trovato — qemu-guest-agent non disponibile")
-        return
-
-    # Determina device e modalita'
-    if os.path.exists("/dev/virtio-ports/org.qemu.guest_agent.0"):
-        qemu_mode = "virtio-serial"
-        qemu_path = "/dev/virtio-ports/org.qemu.guest_agent.0"
-        log("Rilevato virtio-serial — configurazione Proxmox piena integrazione")
-    elif os.path.exists("/dev/vport2p1"):
-        qemu_mode = "virtio-serial"
-        qemu_path = "/dev/vport2p1"
-        log("Rilevato /dev/vport2p1 — configurazione virtio-serial diretta")
-    else:
-        qemu_mode = "isa-serial"
-        qemu_path = "/dev/ttyS0"
-        log("Fallback isa-serial")
-
-    log(f"Modalita': {qemu_mode} su {qemu_path}")
-
-    init_content = (
-        "#!/bin/sh /etc/rc.common\n"
-        "# QEMU Guest Agent init — generato da install-agent-nsec8.py\n"
-        "START=99\n"
-        "USE_PROCD=1\n\n"
-        "start_service() {\n"
-        "    procd_open_instance\n"
-        f"    procd_set_param command /usr/bin/qemu-ga -m {qemu_mode} -p {qemu_path}\n"
-        "    procd_set_param respawn\n"
-        "    procd_set_param stdout 1\n"
-        "    procd_set_param stderr 1\n"
-        "    procd_close_instance\n"
-        "}\n"
-    )
-    init_path = Path("/etc/init.d/qemu-ga")
-    init_path.write_text(init_content)
-    init_path.chmod(init_path.stat().st_mode | 0o111)
-
-    run(["/etc/init.d/qemu-ga", "enable"], check=False)
-    run(["/etc/init.d/qemu-ga", "start"], check=False)
-
-    r = run(["pgrep", "qemu-ga"], capture=True, check=False)
-    if r.returncode == 0:
-        log(f"QEMU Guest Agent installato e attivo ({qemu_mode})")
-    else:
-        warn("QEMU Guest Agent non risulta in esecuzione")
-
-    _add_to_sysupgrade("/usr/bin/qemu-ga", "QEMU Guest Agent - Binary")
-    _add_to_sysupgrade("/etc/init.d/qemu-ga", "QEMU Guest Agent - Init Script")
-    log("Installazione QEMU Guest Agent protetta contro major upgrade")
-
-
-# ---------------------------------------------------------------------------
-# 5. Git e repository
+# 4. Git e repository
 # ---------------------------------------------------------------------------
 
 
@@ -609,67 +531,95 @@ def backup_critical_binaries() -> None:
 
 
 def create_post_upgrade_script() -> None:
-    """Crea /etc/checkmk-post-upgrade.sh — eseguito manualmente dopo major upgrade."""
+    """Crea /etc/checkmk-post-upgrade.py — eseguito manualmente dopo major upgrade."""
     log(f"Creo script di ripristino post-upgrade: {POST_UPGRADE_SCRIPT}")
 
     script_lines = [
-        "#!/bin/sh",
-        "# checkmk-post-upgrade.sh — ripristino automatico dopo major upgrade",
-        "# Generato da install-agent-nsec8.py",
-        "",
-        "log() { logger -t checkmk-post-upgrade \"$*\"; echo \"[POST-UPGRADE] $*\"; }",
-        "",
-        "log \"=== POST-UPGRADE: Inizio ripristino ===\"",
-        "",
-        "BACKUP_DIR=\"/opt/checkmk-backups/binaries\"",
-        "",
-        "if [ -d \"$BACKUP_DIR\" ]; then",
-        "    log \"Ripristino binari critici da backup...\"",
-        "    for backup in \"$BACKUP_DIR\"/*.backup; do",
-        "        [ -f \"$backup\" ] || continue",
-        "        basename_file=$(basename \"$backup\" .backup)",
-        "        case \"$basename_file\" in",
-        "            tar-gnu|gzip-gnu|gunzip-gnu|zcat-gnu) dest=\"/usr/libexec/$basename_file\" ;;",
-        "            ar)                                    dest=\"/usr/bin/$basename_file\" ;;",
-        "            libbfd-*.so)                           dest=\"/usr/lib/$basename_file\" ;;",
-        "            *) log \"  SKIP: $basename_file\"; continue ;;",
-        "        esac",
-        "        if [ -f \"$dest\" ]; then",
-        "            if ! file \"$dest\" 2>/dev/null | grep -q \"ELF\"; then",
-        "                log \"  CORROTTO: $dest — ripristino\"",
-        "                cp -p \"$backup\" \"$dest\" && log \"  RIPRISTINATO: $dest\" || log \"  ERRORE: $dest\"",
-        "            else",
-        "                log \"  OK: $dest\"",
-        "            fi",
-        "        else",
-        "            log \"  MANCANTE: $dest — ripristino\"",
-        "            cp -p \"$backup\" \"$dest\" && log \"  RIPRISTINATO: $dest\" || log \"  ERRORE: $dest\"",
-        "        fi",
-        "    done",
-        "else",
-        "    log \"ATTENZIONE: $BACKUP_DIR non trovata\"",
-        "fi",
-        "",
-        "[ -x /usr/bin/check_mk_agent ] || { log \"ERRORE: check_mk_agent mancante!\"; exit 1; }",
-        "[ -x /etc/init.d/check_mk_agent ] || { log \"ERRORE: init script mancante!\"; exit 1; }",
-        "/etc/init.d/check_mk_agent enable  2>/dev/null || true",
-        "/etc/init.d/check_mk_agent restart 2>/dev/null || true",
-        "",
-        "if [ ! -L /etc/nginx/uci.conf ] && [ -f /var/lib/nginx/uci.conf ]; then",
-        "    log \"Ripristino symlink nginx uci.conf...\"",
-        "    ln -sf /var/lib/nginx/uci.conf /etc/nginx/uci.conf 2>/dev/null || true",
-        "    /etc/init.d/nginx restart 2>/dev/null || true",
-        "fi",
-        "",
-        "sleep 2",
-        "if pgrep -f \"socat TCP-LISTEN:6556\" >/dev/null 2>&1; then",
-        "    log \"CheckMK Agent attivo su porta 6556\"",
-        "else",
-        "    log \"WARN: socat non in esecuzione — riavvio\"",
-        "    /etc/init.d/check_mk_agent restart 2>/dev/null || true",
-        "fi",
-        "",
-        "log \"=== POST-UPGRADE: Ripristino completato ===\"",
+        '#!/usr/bin/env python3',
+        '"""checkmk-post-upgrade.py - ripristino automatico dopo major upgrade.',
+        'Generato da install-agent-nsec8.py',
+        '"""',
+        'import os, shutil, subprocess, sys, time',
+        '',
+        'BACKUP_DIR = "/opt/checkmk-backups/binaries"',
+        '',
+        '',
+        'def log(msg):',
+        '    print(f"[POST-UPGRADE] {msg}", flush=True)',
+        '    subprocess.run(["logger", "-t", "checkmk-post-upgrade", msg], check=False)',
+        '',
+        '',
+        'def main():',
+        '    log("=== POST-UPGRADE: Inizio ripristino ===")',
+        '',
+        '    if os.path.isdir(BACKUP_DIR):',
+        '        log("Ripristino binari critici da backup...")',
+        '        for fname in os.listdir(BACKUP_DIR):',
+        '            if not fname.endswith(".backup"):',
+        '                continue',
+        '            backup = os.path.join(BACKUP_DIR, fname)',
+        '            base = fname[:-len(".backup")]',
+        '            if base in ("tar-gnu", "gzip-gnu", "gunzip-gnu", "zcat-gnu"):',
+        '                dest = f"/usr/libexec/{base}"',
+        '            elif base == "ar":',
+        '                dest = f"/usr/bin/{base}"',
+        '            elif base.startswith("libbfd") and base.endswith(".so"):',
+        '                dest = f"/usr/lib/{base}"',
+        '            else:',
+        '                log(f"  SKIP: {base}")',
+        '                continue',
+        '            if os.path.exists(dest):',
+        '                r = subprocess.run(["file", dest], capture_output=True, text=True, check=False)',
+        '                if "ELF" not in r.stdout:',
+        '                    log(f"  CORROTTO: {dest} - ripristino")',
+        '                    try:',
+        '                        shutil.copy2(backup, dest)',
+        '                        log(f"  RIPRISTINATO: {dest}")',
+        '                    except Exception as e:',
+        '                        log(f"  ERRORE: {dest}: {e}")',
+        '                else:',
+        '                    log(f"  OK: {dest}")',
+        '            else:',
+        '                log(f"  MANCANTE: {dest} - ripristino")',
+        '                try:',
+        '                    shutil.copy2(backup, dest)',
+        '                    log(f"  RIPRISTINATO: {dest}")',
+        '                except Exception as e:',
+        '                    log(f"  ERRORE: {dest}: {e}")',
+        '    else:',
+        '        log(f"ATTENZIONE: {BACKUP_DIR} non trovata")',
+        '',
+        '    for check in ("/usr/bin/check_mk_agent", "/etc/init.d/check_mk_agent"):',
+        '        if not os.access(check, os.X_OK):',
+        '            log(f"ERRORE: {check} mancante!")',
+        '            sys.exit(1)',
+        '',
+        '    subprocess.run(["/etc/init.d/check_mk_agent", "enable"], check=False)',
+        '    subprocess.run(["/etc/init.d/check_mk_agent", "restart"], check=False)',
+        '',
+        '    if not os.path.islink("/etc/nginx/uci.conf") and os.path.isfile("/var/lib/nginx/uci.conf"):',
+        '        log("Ripristino symlink nginx uci.conf...")',
+        '        try:',
+        '            os.symlink("/var/lib/nginx/uci.conf", "/etc/nginx/uci.conf")',
+        '        except FileExistsError:',
+        '            os.remove("/etc/nginx/uci.conf")',
+        '            os.symlink("/var/lib/nginx/uci.conf", "/etc/nginx/uci.conf")',
+        '        subprocess.run(["/etc/init.d/nginx", "restart"], check=False)',
+        '',
+        '    time.sleep(2)',
+        '    r = subprocess.run(["pgrep", "-f", "socat TCP-LISTEN:6556"], capture_output=True, check=False)',
+        '    if r.returncode == 0:',
+        '        log("CheckMK Agent attivo su porta 6556")',
+        '    else:',
+        '        log("WARN: socat non in esecuzione - riavvio")',
+        '        subprocess.run(["/etc/init.d/check_mk_agent", "restart"], check=False)',
+        '',
+        '    log("=== POST-UPGRADE: Ripristino completato ===")',
+        '    return 0',
+        '',
+        '',
+        'if __name__ == "__main__":',
+        '    sys.exit(main())',
     ]
 
     post_path = Path(POST_UPGRADE_SCRIPT)
@@ -856,37 +806,34 @@ def main() -> int:
 
     log(f"=== install-agent-nsec8.py v{VERSION} ===")
 
-    log("--- [1/10] Rilevamento sistema ---")
+    log("--- [1/9] Rilevamento sistema ---")
     detect_system()
 
-    log("--- [2/10] Installazione prerequisiti ---")
+    log("--- [2/9] Installazione prerequisiti ---")
     install_prereqs()
 
-    log("--- [3/10] Installazione agente CheckMK ---")
+    log("--- [3/9] Installazione agente CheckMK ---")
     install_agent()
 
-    log("--- [4/10] Avvio servizio agente ---")
+    log("--- [4/9] Avvio servizio agente ---")
     start_agent_service()
 
-    log("--- [5/10] QEMU Guest Agent ---")
-    install_qemu_ga()
-
-    log("--- [6/10] Installazione git ---")
+    log("--- [5/9] Installazione git ---")
     git_ok = install_git_if_missing()
 
-    log("--- [7/10] Setup repository ---")
+    log("--- [6/9] Setup repository ---")
     setup_repo(git_available=git_ok)
 
-    log("--- [8/10] Deploy local checks ---")
+    log("--- [7/9] Deploy local checks ---")
     deploy_local_checks()
 
-    log("--- [9/10] Cron auto-sync + sysupgrade + backup binari ---")
+    log("--- [8/9] Cron auto-sync + sysupgrade + backup binari ---")
     setup_cron(git_available=git_ok)
     setup_sysupgrade()
     backup_critical_binaries()
     create_post_upgrade_script()
 
-    log("--- [10/10] Autocheck all'avvio ---")
+    log("--- [9/9] Autocheck all'avvio ---")
     install_autocheck()
 
     print()
@@ -906,7 +853,7 @@ def main() -> int:
     print("  [+] Log: /var/log/auto-git-sync.log")
     print()
     print("Test agent locale: nc 127.0.0.1 6556 | head")
-    print(f"Post-upgrade manuale: sh {POST_UPGRADE_SCRIPT}")
+    print(f"Post-upgrade manuale: python3 {POST_UPGRADE_SCRIPT}")
     print(f"Disinstallazione: python3 {sys.argv[0]} --uninstall")
     return 0
 
