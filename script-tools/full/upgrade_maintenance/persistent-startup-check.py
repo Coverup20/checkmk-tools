@@ -1,39 +1,499 @@
 #!/usr/bin/env python3
 """
-rocksolid-startup-check.py
+persistent-startup-check.py - PERSISTENT Startup Verification
 
-Python entrypoint that delegates to rocksolid-startup-check.sh.
-Version: 1.0.0
+Verifica e ripristina automaticamente i servizi critici CheckMK
+dopo un major upgrade di NethSecurity 8 / OpenWrt.
+
+Eseguito da rc.local ad ogni avvio sistema.
+
+Version: 2.0.0
 """
 
+import gzip as _gzip
+import io
 import os
+import shutil
 import subprocess
 import sys
+import time
+import urllib.request
 from pathlib import Path
+from typing import Optional, Tuple
 
-VERSION = "1.0.0"
+VERSION = "2.0.0"
+
+LOG_FILE = "/var/log/persistent-startup.log"
+BACKUP_DIR = "/opt/checkmk-backups/binaries"
+POST_UPGRADE_SCRIPT = "/etc/checkmk-post-upgrade.py"
+SYSUPGRADE_CONF = "/etc/sysupgrade.conf"
+REPO_DIR = "/opt/checkmk-tools"
+CHECKS_SRC = os.path.join(REPO_DIR, "script-check-nsec8", "full")
+PLUGINS_SRC = os.path.join(REPO_DIR, "script-check-nsec8", "plugins")
+LOCAL_DIR = "/usr/lib/check_mk_agent/local"
+PLUGINS_DIR = "/usr/lib/check_mk_agent/plugins"
+
+REPO_BASE = os.environ.get(
+    "OPENWRT_REPO_BASE",
+    "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base",
+)
+REPO_PACKAGES = os.environ.get(
+    "OPENWRT_REPO_PACKAGES",
+    "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/packages",
+)
 
 
-def usage() -> None:
-    print(
-        "Usage:\n"
-        "  rocksolid-startup-check.py [args]\n\n"
-        "Delegates to rocksolid-startup-check.sh for full workflow."
-    )
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
+def log(msg: str) -> None:
+    import datetime
+    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{ts}] {msg}"
+    print(line, flush=True)
+    try:
+        with open(LOG_FILE, "a") as fh:
+            fh.write(line + "\n")
+    except OSError:
+        pass
+
+
+def _run(cmd: list, check: bool = False, timeout: int = 30) -> int:
+    """Run a command, return exit code."""
+    try:
+        return subprocess.run(cmd, timeout=timeout).returncode
+    except Exception:
+        return 1
+
+
+def _run_capture(cmd: list, timeout: int = 30) -> Tuple[int, str]:
+    """Run command, return (rc, combined stdout+stderr)."""
+    try:
+        r = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
+        )
+        return r.returncode, r.stdout + r.stderr
+    except Exception as exc:
+        return 1, str(exc)
+
+
+def cmd_exists(name: str) -> bool:
+    return shutil.which(name) is not None
+
+
+def is_elf(path: str) -> bool:
+    """Return True if the file starts with the ELF magic bytes."""
+    try:
+        with open(path, "rb") as fh:
+            return fh.read(4) == b"\x7fELF"
+    except OSError:
+        return False
+
+
+def _unlink(path: str) -> None:
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Download dinamico pacchetti OpenWrt
+# ---------------------------------------------------------------------------
+
+def download_openwrt_package(package_name: str, repo_url: str, output_file: str) -> bool:
+    """
+    Scarica un pacchetto OpenWrt dinamicamente dall'index Packages.gz.
+    Evita URL statici fragili: trova il filename dalla lista aggiornata.
+    """
+    log(f"Download dinamico pacchetto: {package_name}")
+    packages_url = f"{repo_url}/Packages.gz"
+
+    try:
+        with urllib.request.urlopen(packages_url, timeout=30) as resp:
+            raw = resp.read()
+    except Exception as exc:
+        log(f"[WARN] Download Packages.gz fallito [{repo_url}]: {exc}")
+        return False
+
+    try:
+        with _gzip.open(io.BytesIO(raw)) as fh:
+            text = fh.read().decode("utf-8", errors="replace")
+    except Exception as exc:
+        log(f"[WARN] Decompressione Packages.gz fallita: {exc}")
+        return False
+
+    package_file: Optional[str] = None
+    for line in text.splitlines():
+        if line.startswith("Filename:") and f"{package_name}_" in line:
+            package_file = line.split(":", 1)[1].strip()
+            break
+
+    if not package_file:
+        log(f"[WARN] Pacchetto '{package_name}' non trovato nell'index OpenWrt")
+        return False
+
+    log(f"Trovato nell'index: {package_file}")
+    try:
+        urllib.request.urlretrieve(f"{repo_url}/{package_file}", output_file)
+        log(f"Download completato: {package_file}")
+        return True
+    except Exception as exc:
+        log(f"[WARN] Download fallito [{package_file}]: {exc}")
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Section 0: Ripristino binari critici
+# ---------------------------------------------------------------------------
+
+def restore_critical_binaries() -> None:
+    log("[Binari Critici] Verifica in corso...")
+    backup_dir = Path(BACKUP_DIR)
+    if not backup_dir.is_dir():
+        log("[Binari Critici] Directory backup non trovata — skip")
+        return
+
+    for backup in sorted(backup_dir.glob("*.backup")):
+        basename = backup.name[: -len(".backup")]
+        if basename in ("tar-gnu", "gzip-gnu", "gunzip-gnu", "zcat-gnu"):
+            dest = Path("/usr/libexec") / basename
+        elif basename == "ar":
+            dest = Path("/usr/bin") / basename
+        elif basename.startswith("libbfd") and basename.endswith(".so"):
+            dest = Path("/usr/lib") / basename
+        else:
+            continue
+
+        if not dest.exists():
+            log(f"[Binari Critici] RIPRISTINO: {dest} (mancante)")
+            try:
+                shutil.copy2(str(backup), str(dest))
+            except OSError as exc:
+                log(f"[Binari Critici] ERRORE copia {dest}: {exc}")
+        elif not is_elf(str(dest)):
+            log(f"[Binari Critici] RIPRISTINO: {dest} (corrotto)")
+            try:
+                shutil.copy2(str(backup), str(dest))
+            except OSError as exc:
+                log(f"[Binari Critici] ERRORE copia {dest}: {exc}")
+
+    # Verifica se ar funziona dopo ripristino
+    binaries_corrupted = False
+    ar = Path("/usr/bin/ar")
+    if ar.is_file() and os.access(str(ar), os.X_OK):
+        rc, _ = _run_capture([str(ar), "--version"])
+        if rc != 0:
+            log("[Binari Critici] ar corrotto dopo ripristino — mancano shared libraries")
+            binaries_corrupted = True
+    else:
+        log("[Binari Critici] ar non eseguibile dopo ripristino")
+        binaries_corrupted = True
+
+    if binaries_corrupted:
+        if cmd_exists("opkg") and cmd_exists("wget"):
+            log("[Binari Critici] Reinstallo dependencies chain (libbfd → ar)...")
+            if download_openwrt_package("libbfd", REPO_BASE, "/tmp/libbfd.ipk"):
+                _run(["opkg", "install", "--force-depends", "/tmp/libbfd.ipk"])
+                _unlink("/tmp/libbfd.ipk")
+            if download_openwrt_package("ar", REPO_BASE, "/tmp/ar.ipk"):
+                _run(["opkg", "install", "--force-depends", "/tmp/ar.ipk"])
+                _unlink("/tmp/ar.ipk")
+                rc, _ = _run_capture(["/usr/bin/ar", "--version"])
+                if rc == 0:
+                    log("[Binari Critici] ar reinstallato e funzionante")
+                else:
+                    log("[Binari Critici] ERRORE: ar ancora non funzionante")
+    else:
+        log("[Binari Critici] ar funzionante dopo ripristino backup")
+
+    log("[Binari Critici] Verifica completata")
+
+
+# ---------------------------------------------------------------------------
+# Section 0.5: Node.js + Nginx (Web UI NethSecurity)
+# ---------------------------------------------------------------------------
+
+def verify_webui() -> None:
+    log("[Node.js] Verifica in corso...")
+    if not cmd_exists("node"):
+        log("[Node.js] MANCANTE - Reinstallazione automatica...")
+        if cmd_exists("wget"):
+            rc, out = _run_capture(["opkg", "list-installed"])
+            if "libcares" not in out:
+                log("[Node.js] Installazione dipendenza libcares...")
+                _run(["opkg", "update"], timeout=60)
+                _run(["opkg", "install", "libcares"], timeout=60)
+
+            if download_openwrt_package("node", REPO_PACKAGES, "/tmp/node.ipk"):
+                log("[Node.js] Installazione pacchetto...")
+                _run(["opkg", "install", "/tmp/node.ipk"], timeout=60)
+                _unlink("/tmp/node.ipk")
+                if cmd_exists("node"):
+                    rc, v = _run_capture(["node", "--version"])
+                    log(f"[Node.js] RIPRISTINATO: {v.strip()}")
+                else:
+                    log("[Node.js] ERRORE: Installazione fallita")
+            else:
+                log("[Node.js] ERRORE: Download dinamico fallito")
+        else:
+            log("[Node.js] ERRORE: wget non disponibile")
+    else:
+        rc, v = _run_capture(["node", "--version"])
+        log(f"[Node.js] OK - Presente: {v.strip()}")
+
+    log("[Web UI] Verifica servizi...")
+    if cmd_exists("nginx"):
+        # Ripristina symlink uci.conf se mancante (cancellato durante upgrade)
+        uci_conf = Path("/etc/nginx/uci.conf")
+        uci_target = Path("/var/lib/nginx/uci.conf")
+        if not uci_conf.is_symlink() and uci_target.is_file():
+            log("[Nginx] Ripristino symlink uci.conf...")
+            try:
+                uci_conf.symlink_to(str(uci_target))
+            except OSError as exc:
+                log(f"[Nginx] ERRORE symlink: {exc}")
+
+        rc, _ = _run_capture(["pgrep", "-f", "nginx.*master"])
+        if rc != 0:
+            log("[Nginx] Servizio non attivo, avvio...")
+            _run(["/etc/init.d/nginx", "enable"])
+            _run(["/etc/init.d/nginx", "restart"])
+            time.sleep(2)
+            rc, _ = _run_capture(["pgrep", "-f", "nginx.*master"])
+            if rc == 0:
+                log("[Nginx] Servizio riavviato")
+            else:
+                log("[Nginx] ERRORE: Impossibile avviare nginx")
+        else:
+            log("[Nginx] OK - Servizio attivo")
+
+        # Verifica porta 9090 (Web UI NethSecurity)
+        rc, out = _run_capture(["netstat", "-tlnp"], timeout=10)
+        if ":9090" not in out:
+            log("[Web UI] Porta 9090 non attiva, riconfigurazione...")
+            ns_ui = Path("/usr/sbin/ns-ui")
+            if ns_ui.is_file() and os.access(str(ns_ui), os.X_OK):
+                _run([str(ns_ui)])
+                _run(["/etc/init.d/nginx", "restart"])
+                time.sleep(2)
+                rc, out = _run_capture(["netstat", "-tlnp"], timeout=10)
+                if ":9090" in out:
+                    log("[Web UI] Porta 9090 attiva dopo riconfigurazione")
+                else:
+                    log("[Web UI] ERRORE: Porta 9090 non disponibile")
+            else:
+                log("[Web UI] ERRORE: /usr/sbin/ns-ui non disponibile")
+        else:
+            log("[Web UI] OK - Porta 9090 attiva")
+
+
+# ---------------------------------------------------------------------------
+# Section 1: CheckMK Agent
+# ---------------------------------------------------------------------------
+
+def verify_checkmk_agent() -> None:
+    log("[CheckMK Agent] Verifica in corso...")
+    agent_bin = Path("/usr/bin/check_mk_agent")
+    if not (agent_bin.is_file() and os.access(str(agent_bin), os.X_OK)):
+        log("[CheckMK Agent] ERRORE: Binary mancante!")
+        log("[CheckMK Agent] Eseguo script post-upgrade...")
+        post = Path(POST_UPGRADE_SCRIPT)
+        if post.is_file() and os.access(str(post), os.X_OK):
+            _run(["python3", str(post)], timeout=120)
+        else:
+            log("[CheckMK Agent] CRITICO: Script post-upgrade mancante!")
+    else:
+        rc, _ = _run_capture(["pgrep", "-f", "socat TCP-LISTEN:6556"])
+        if rc != 0:
+            log("[CheckMK Agent] Servizio non attivo, avvio...")
+            _run(["/etc/init.d/check_mk_agent", "enable"])
+            _run(["/etc/init.d/check_mk_agent", "restart"])
+            time.sleep(2)
+            rc, _ = _run_capture(["pgrep", "-f", "socat TCP-LISTEN:6556"])
+            if rc == 0:
+                log("[CheckMK Agent] Servizio riavviato con successo")
+            else:
+                log("[CheckMK Agent] ERRORE: Impossibile avviare servizio")
+        else:
+            log("[CheckMK Agent] OK - Servizio attivo")
+
+
+# ---------------------------------------------------------------------------
+# Section 2.7: Git (necessario per Auto-Sync repository)
+# ---------------------------------------------------------------------------
+
+def verify_git() -> None:
+    log("[Git] Verifica in corso...")
+    if not cmd_exists("git"):
+        log("[Git] Non trovato - installazione automatica per Auto-Sync...")
+        if cmd_exists("opkg") and cmd_exists("wget"):
+            git_ok = download_openwrt_package("git", REPO_PACKAGES, "/tmp/git.ipk")
+            http_ok = download_openwrt_package("git-http", REPO_PACKAGES, "/tmp/git-http.ipk")
+            if git_ok and http_ok:
+                _run(["opkg", "install", "/tmp/git.ipk", "/tmp/git-http.ipk"], timeout=60)
+                _unlink("/tmp/git.ipk")
+                _unlink("/tmp/git-http.ipk")
+                if cmd_exists("git"):
+                    rc, v = _run_capture(["git", "--version"])
+                    log(f"[Git] Installato con successo: {v.strip()}")
+                else:
+                    log("[Git] ERRORE: Installazione fallita")
+            elif not git_ok:
+                log("[Git] ERRORE: Download git fallito")
+            else:
+                log("[Git] ERRORE: Download git-http fallito")
+        else:
+            log("[Git] ERRORE: opkg o wget non disponibili")
+    else:
+        rc, v = _run_capture(["git", "--version"])
+        log(f"[Git] OK - Presente: {v.strip()}")
+
+
+# ---------------------------------------------------------------------------
+# Section 2.8: Auto-deploy local checks e plugin da repository
+# ---------------------------------------------------------------------------
+
+def auto_deploy_checks() -> None:
+    checks_src = Path(CHECKS_SRC)
+    if checks_src.is_dir():
+        log("[Auto-Deploy] Verifica nuovi script locali...")
+        local_dir = Path(LOCAL_DIR)
+        local_dir.mkdir(parents=True, exist_ok=True)
+        deployed = 0
+        for script in sorted(checks_src.glob("check_*.sh")):
+            dest = local_dir / script.name
+            if not dest.exists() or script.stat().st_mtime > dest.stat().st_mtime:
+                log(f"[Auto-Deploy] Deploy: {script.name}")
+                try:
+                    shutil.copy2(str(script), str(dest))
+                    dest.chmod(dest.stat().st_mode | 0o111)
+                    deployed += 1
+                except OSError as exc:
+                    log(f"[Auto-Deploy] ERRORE deploy {script.name}: {exc}")
+        log(
+            f"[Auto-Deploy] Deployed {deployed} local check(s)"
+            if deployed
+            else "[Auto-Deploy] Local checks già aggiornati"
+        )
+
+    plugins_src = Path(PLUGINS_SRC)
+    if plugins_src.is_dir():
+        log("[Auto-Deploy] Verifica nuovi plugin...")
+        plugins_dir = Path(PLUGINS_DIR)
+        plugins_dir.mkdir(parents=True, exist_ok=True)
+        deployed = 0
+        for plugin in sorted(plugins_src.iterdir()):
+            if not plugin.is_file():
+                continue
+            dest = plugins_dir / plugin.name
+            if not dest.exists() or plugin.stat().st_mtime > dest.stat().st_mtime:
+                log(f"[Auto-Deploy] Deploy: {plugin.name} (plugin)")
+                try:
+                    shutil.copy2(str(plugin), str(dest))
+                    dest.chmod(dest.stat().st_mode | 0o111)
+                    deployed += 1
+                except OSError as exc:
+                    log(f"[Auto-Deploy] ERRORE deploy {plugin.name}: {exc}")
+        log(
+            f"[Auto-Deploy] Deployed {deployed} plugin(s)"
+            if deployed
+            else "[Auto-Deploy] Plugin già aggiornati"
+        )
+    else:
+        log("[Auto-Deploy] Nessuna directory plugin nel repository")
+
+
+# ---------------------------------------------------------------------------
+# Section 3: Verifica protezioni sysupgrade.conf
+# ---------------------------------------------------------------------------
+
+def verify_sysupgrade() -> None:
+    log("[Protezioni] Verifica sysupgrade.conf...")
+    sysupgrade = Path(SYSUPGRADE_CONF)
+    if not sysupgrade.is_file():
+        log("[Protezioni] WARN: sysupgrade.conf non trovato")
+        return
+    count = 0
+    try:
+        with open(str(sysupgrade), errors="replace") as fh:
+            for line in fh:
+                line = line.strip()
+                if line and not line.startswith("#") and line.startswith("/"):
+                    count += 1
+    except OSError as exc:
+        log(f"[Protezioni] ERRORE lettura sysupgrade.conf: {exc}")
+        return
+    log(f"[Protezioni] File protetti: {count}")
+    if count < 5:
+        log("[Protezioni] WARN: Poche protezioni attive (attese almeno 5)")
+
+
+# ---------------------------------------------------------------------------
+# Section 4: Riepilogo finale
+# ---------------------------------------------------------------------------
+
+def print_summary() -> None:
+    log("=========================================")
+    log("RIEPILOGO STATO SERVIZI:")
+    log("=========================================")
+
+    rc, _ = _run_capture(["pgrep", "-f", "socat TCP-LISTEN:6556"])
+    log(f"  CheckMK Agent:  {'[OK]' if rc == 0 else '[FAIL]'}")
+
+    cron = Path("/etc/crontabs/root")
+    if cron.is_file():
+        try:
+            content = cron.read_text(errors="replace")
+            has_sync = "git" in content and "checkmk-tools" in content
+        except OSError:
+            has_sync = False
+        log(f"  Auto Git Sync:  {'[OK]' if has_sync else '[N/A]'}")
+    else:
+        log("  Auto Git Sync:  [N/A]")
+
+    local_dir = Path(LOCAL_DIR)
+    checks = list(local_dir.glob("check_*.sh")) if local_dir.is_dir() else []
+    log(f"  Local Checks:   [OK] ({len(checks)} scripts)" if checks else "  Local Checks:   [N/A]")
+
+    plugins_dir = Path(PLUGINS_DIR)
+    plugins = [p for p in plugins_dir.iterdir() if p.is_file()] if plugins_dir.is_dir() else []
+    log(f"  Plugins:        [OK] ({len(plugins)} plugins)" if plugins else "  Plugins:        [N/A]")
+
+    log("=========================================")
+    log("PERSISTENT Startup Check - COMPLETATO")
+    log("=========================================")
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
 def main() -> int:
     if any(arg in {"-h", "--help"} for arg in sys.argv[1:]):
-        usage()
+        print(f"persistent-startup-check.py v{VERSION}")
+        print("Verifica e ripristina servizi critici CheckMK dopo major upgrade NethSecurity 8.")
+        print(f"Log: {LOG_FILE}")
         return 0
 
-    script = Path(__file__).with_name("rocksolid-startup-check.sh")
-    if not script.exists():
-        print(f"ERROR: missing target script: {script}", file=sys.stderr)
-        return 1
+    log("=========================================")
+    log(f"PERSISTENT Startup Check v{VERSION} - AVVIO")
+    log("=========================================")
 
-    result = subprocess.run(["bash", str(script), *sys.argv[1:]], env=os.environ.copy())
-    return result.returncode
+    restore_critical_binaries()
+    verify_webui()
+    verify_checkmk_agent()
+    verify_git()
+    auto_deploy_checks()
+    verify_sysupgrade()
+    print_summary()
+
+    return 0
 
 
 if __name__ == "__main__":
