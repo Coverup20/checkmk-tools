@@ -26,7 +26,7 @@ Variabili d'ambiente:
   OPENWRT_REPO_BASE      Repository OpenWrt base per download dinamico
   OPENWRT_REPO_PACKAGES  Repository OpenWrt packages per download dinamico
 
-Version: 2.2.1
+Version: 2.2.2
 """
 
 import gzip as _gzip
@@ -39,7 +39,7 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-VERSION = "2.2.1"
+VERSION = "2.2.2"
 
 # ---------------------------------------------------------------------------
 # Costanti
@@ -50,6 +50,7 @@ REPO_URL = os.environ.get(
 REPO_DIR = os.environ.get("CHECKMK_REPO_DIR", "/opt/checkmk-tools")
 CHECKS_SRC = os.path.join(REPO_DIR, "script-check-nsec8", "full")
 LOCAL_DIR = "/usr/lib/check_mk_agent/local"
+PLUGINS_DIR = "/usr/lib/check_mk_agent/plugins"
 SYSUPGRADE_CONF = "/etc/sysupgrade.conf"
 CRON_FILE = "/etc/crontabs/root"
 SYNC_SCRIPT = "/usr/local/bin/git-auto-sync.sh"
@@ -384,6 +385,20 @@ def deploy_local_checks() -> None:
             deployed += 1
 
     log(f"Deploy local checks: {deployed} file in {LOCAL_DIR}")
+
+    # Rimuovi i vecchi .sh dalla cartella plugins (installati dal pacchetto ns-checkmk-agent)
+    # I check aggiornati in Python sono già in local/ - i .sh in plugins/ sono doppioni obsoleti
+    plugins_dir = Path(PLUGINS_DIR)
+    removed = 0
+    if plugins_dir.is_dir():
+        for f in plugins_dir.glob("*.sh"):
+            try:
+                f.unlink()
+                removed += 1
+            except OSError:
+                pass
+    if removed:
+        log(f"Rimossi {removed} vecchi .sh da {PLUGINS_DIR} (sostituiti da Python in local/)")
 
 
 # ---------------------------------------------------------------------------
