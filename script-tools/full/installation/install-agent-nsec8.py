@@ -39,7 +39,7 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-VERSION = "2.2.2"
+VERSION = "2.2.3"
 
 # ---------------------------------------------------------------------------
 # Costanti
@@ -477,7 +477,7 @@ def setup_sysupgrade() -> None:
         ("/usr/lib/check_mk_agent/plugins/", "CheckMK Agent Plugins"),
         (f"{REPO_DIR}/",                     "Repository checkmk-tools"),
         ("/opt/checkmk-backups/",            "Backup binari critici (tar, ar, gzip)"),
-        ("/etc/nginx/",                      "NGINX configuration (Web UI NethSecurity)"),
+        # /etc/nginx/ NON protetta: preservarla causa conflitti moduli nginx tra versioni
         (SYNC_SCRIPT,                        "Git Auto Sync Script"),
         (CRON_FILE,                          "Cron Jobs (include git sync)"),
         ("/etc/cron.d/",                     "Cron Jobs Directory"),
@@ -662,6 +662,9 @@ def install_autocheck() -> None:
     log("Download persistent-startup-check.py da GitHub...")
     try:
         urllib.request.urlretrieve(AUTOCHECK_URL, AUTOCHECK_SCRIPT)
+        # Strip CRLF (file potrebbe venire da Windows)
+        content = Path(AUTOCHECK_SCRIPT).read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        Path(AUTOCHECK_SCRIPT).write_bytes(content)
         Path(AUTOCHECK_SCRIPT).chmod(
             Path(AUTOCHECK_SCRIPT).stat().st_mode | 0o111
         )
@@ -681,6 +684,9 @@ def install_autocheck() -> None:
         )
         if local_src.exists():
             shutil.copy2(local_src, AUTOCHECK_SCRIPT)
+            # Strip CRLF (file potrebbe venire da Windows)
+            content = Path(AUTOCHECK_SCRIPT).read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+            Path(AUTOCHECK_SCRIPT).write_bytes(content)
             Path(AUTOCHECK_SCRIPT).chmod(
                 Path(AUTOCHECK_SCRIPT).stat().st_mode | 0o111
             )
@@ -711,7 +717,7 @@ def install_autocheck() -> None:
         "# PERSISTENT Autocheck — avvio da /opt/checkmk-backups/ (upgrade-resistant)"
     )
     lines.append(
-        f"[ -x {AUTOCHECK_SCRIPT} ] && bash {AUTOCHECK_SCRIPT} "
+        f"[ -x {AUTOCHECK_SCRIPT} ] && python3 {AUTOCHECK_SCRIPT} "
         ">> /var/log/persistent-startup.log 2>&1 &"
     )
     lines.append("exit 0")

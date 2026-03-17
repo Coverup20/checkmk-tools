@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 from typing import Optional, Tuple
 
-VERSION = "2.0.2"
+VERSION = "2.0.3"
 
 LOG_FILE = "/var/log/persistent-startup.log"
 BACKUP_DIR = "/opt/checkmk-backups/binaries"
@@ -262,6 +262,16 @@ def verify_webui() -> None:
             except OSError as exc:
                 log(f"[Nginx] ERRORE symlink: {exc}")
 
+        # Rimuovi luci.module se causa conflitto con ngx_http_ubus.module (upgrade da versione precedente)
+        luci_mod = Path("/etc/nginx/module.d/luci.module")
+        ubus_mod = Path("/etc/nginx/module.d/ngx_http_ubus.module")
+        if luci_mod.is_file() and ubus_mod.is_file():
+            try:
+                luci_mod.unlink()
+                log("[Nginx] Rimosso luci.module duplicato (conflitto con ngx_http_ubus.module)")
+            except OSError as exc:
+                log(f"[Nginx] ERRORE rimozione luci.module: {exc}")
+
         rc, _ = _run_capture(["pgrep", "-f", "nginx.*master"])
         if rc != 0:
             log("[Nginx] Servizio non attivo, avvio...")
@@ -311,6 +321,19 @@ def verify_checkmk_agent() -> None:
             _run(["python3", str(post)], timeout=120)
         else:
             log("[CheckMK Agent] CRITICO: Script post-upgrade mancante!")
+        # Se ancora mancante, reinstalla il pacchetto ns-checkmk-agent via opkg
+        if not (agent_bin.is_file() and os.access(str(agent_bin), os.X_OK)):
+            log("[CheckMK Agent] Binary ancora mancante — reinstallo ns-checkmk-agent...")
+            if cmd_exists("opkg"):
+                rc_opkg, _ = _run_capture(["opkg", "install", "ns-checkmk-agent"], timeout=120)
+                if agent_bin.is_file():
+                    log("[CheckMK Agent] ns-checkmk-agent reinstallato con successo")
+                    _run(["/etc/init.d/check_mk_agent", "enable"])
+                    _run(["/etc/init.d/check_mk_agent", "restart"])
+                else:
+                    log("[CheckMK Agent] CRITICO: reinstallazione ns-checkmk-agent fallita")
+            else:
+                log("[CheckMK Agent] CRITICO: opkg non disponibile")
     else:
         rc, _ = _run_capture(["pgrep", "-f", "socat TCP-LISTEN:6556"])
         if rc != 0:
