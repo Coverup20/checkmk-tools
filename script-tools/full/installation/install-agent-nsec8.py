@@ -26,7 +26,7 @@ Variabili d'ambiente:
   OPENWRT_REPO_BASE      Repository OpenWrt base per download dinamico
   OPENWRT_REPO_PACKAGES  Repository OpenWrt packages per download dinamico
 
-Version: 2.0.0
+Version: 2.2.1
 """
 
 import gzip as _gzip
@@ -39,7 +39,7 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-VERSION = "2.2.0"
+VERSION = "2.2.1"
 
 # ---------------------------------------------------------------------------
 # Costanti
@@ -147,9 +147,12 @@ def download_openwrt_package(
 
     package_file: Optional[str] = None
     for line in text.splitlines():
-        if line.startswith("Filename:") and f"{package_name}_" in line:
-            package_file = line.split(":", 1)[1].strip()
-            break
+        if line.startswith("Filename:"):
+            fname = line.split(":", 1)[1].strip()
+            basename = fname.split("/")[-1]
+            if basename.startswith(f"{package_name}_"):
+                package_file = fname
+                break
 
     if not package_file:
         warn(f"Pacchetto '{package_name}' non trovato nell'index OpenWrt")

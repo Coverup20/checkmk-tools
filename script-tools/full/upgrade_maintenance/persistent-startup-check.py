@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 from typing import Optional, Tuple
 
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 
 LOG_FILE = "/var/log/persistent-startup.log"
 BACKUP_DIR = "/opt/checkmk-backups/binaries"
@@ -130,9 +130,12 @@ def download_openwrt_package(package_name: str, repo_url: str, output_file: str)
 
     package_file: Optional[str] = None
     for line in text.splitlines():
-        if line.startswith("Filename:") and f"{package_name}_" in line:
-            package_file = line.split(":", 1)[1].strip()
-            break
+        if line.startswith("Filename:"):
+            fname = line.split(":", 1)[1].strip()
+            basename = fname.split("/")[-1]
+            if basename.startswith(f"{package_name}_"):
+                package_file = fname
+                break
 
     if not package_file:
         log(f"[WARN] Pacchetto '{package_name}' non trovato nell'index OpenWrt")
@@ -389,7 +392,7 @@ def auto_deploy_checks() -> None:
         plugins_dir.mkdir(parents=True, exist_ok=True)
         deployed = 0
         for plugin in sorted(plugins_src.iterdir()):
-            if not plugin.is_file():
+            if not plugin.is_file() or plugin.name.startswith("."):
                 continue
             dest = plugins_dir / plugin.name
             if not dest.exists() or plugin.stat().st_mtime > dest.stat().st_mtime:
@@ -450,7 +453,9 @@ def print_summary() -> None:
     if cron.is_file():
         try:
             content = cron.read_text(errors="replace")
-            has_sync = "git" in content and "checkmk-tools" in content
+            has_sync = "git-auto-sync" in content or (
+                "git" in content and "checkmk-tools" in content
+            )
         except OSError:
             has_sync = False
         log(f"  Auto Git Sync:  {'[OK]' if has_sync else '[N/A]'}")
@@ -458,7 +463,11 @@ def print_summary() -> None:
         log("  Auto Git Sync:  [N/A]")
 
     local_dir = Path(LOCAL_DIR)
-    checks = list(local_dir.glob("check_*.sh")) if local_dir.is_dir() else []
+    checks = (
+        [p for p in local_dir.iterdir() if p.is_file() and p.name.startswith("check")]
+        if local_dir.is_dir()
+        else []
+    )
     log(f"  Local Checks:   [OK] ({len(checks)} scripts)" if checks else "  Local Checks:   [N/A]")
 
     plugins_dir = Path(PLUGINS_DIR)
