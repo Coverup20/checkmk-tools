@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 from typing import Optional, Tuple
 
-VERSION = "2.0.1"
+VERSION = "2.0.2"
 
 LOG_FILE = "/var/log/persistent-startup.log"
 BACKUP_DIR = "/opt/checkmk-backups/binaries"
@@ -369,21 +369,40 @@ def auto_deploy_checks() -> None:
         local_dir = Path(LOCAL_DIR)
         local_dir.mkdir(parents=True, exist_ok=True)
         deployed = 0
-        for script in sorted(checks_src.glob("check_*.sh")):
-            dest = local_dir / script.name
+        for script in sorted(checks_src.iterdir()):
+            if not script.is_file() or script.name.startswith("."):
+                continue
+            if script.suffix not in (".py", ".sh") and not (script.stat().st_mode & 0o111):
+                continue
+            # Deploy .py senza estensione, .sh con estensione
+            dest_name = script.stem if script.suffix == ".py" else script.name
+            dest = local_dir / dest_name
             if not dest.exists() or script.stat().st_mtime > dest.stat().st_mtime:
-                log(f"[Auto-Deploy] Deploy: {script.name}")
+                log(f"[Auto-Deploy] Deploy: {dest_name}")
                 try:
                     shutil.copy2(str(script), str(dest))
                     dest.chmod(dest.stat().st_mode | 0o111)
                     deployed += 1
                 except OSError as exc:
-                    log(f"[Auto-Deploy] ERRORE deploy {script.name}: {exc}")
+                    log(f"[Auto-Deploy] ERRORE deploy {dest_name}: {exc}")
         log(
             f"[Auto-Deploy] Deployed {deployed} local check(s)"
             if deployed
             else "[Auto-Deploy] Local checks già aggiornati"
         )
+
+        # Rimuovi vecchi .sh da plugins/ (installati dal pacchetto ns-checkmk-agent, doppioni obsoleti)
+        plugins_dir = Path(PLUGINS_DIR)
+        removed = 0
+        if plugins_dir.is_dir():
+            for f in plugins_dir.glob("*.sh"):
+                try:
+                    f.unlink()
+                    removed += 1
+                except OSError:
+                    pass
+        if removed:
+            log(f"[Auto-Deploy] Rimossi {removed} vecchi .sh da {PLUGINS_DIR}")
 
     plugins_src = Path(PLUGINS_SRC)
     if plugins_src.is_dir():
