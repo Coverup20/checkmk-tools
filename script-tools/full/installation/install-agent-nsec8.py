@@ -1,46 +1,84 @@
 #!/usr/bin/env python3
 """
-install-checkmk-agent-persistent-nsec8.py
+install-agent-nsec8.py  —  CheckMK Agent Installer — ROCKSOLID Edition
 
-Installa e configura CheckMK Agent su NethSecurity 8 / OpenWrt in modo persistente:
+Installa e configura CheckMK Agent su NethSecurity 8 / OpenWrt in modo
+persistente e resistente ai major upgrade.
+
+Funzionalità:
+  - Installa prerequisiti (wget, socat, ar, tar, gzip)
   - Installa ns-checkmk-agent via opkg (con fallback a URL diretto)
-  - Crea /usr/lib/check_mk_agent/local/ e deploya i local check dal repo
-  - Installa git se mancante, clona/aggiorna /opt/checkmk-tools
+  - Installa QEMU Guest Agent (rilevamento VM automatico)
+  - Installa git, clona/aggiorna /opt/checkmk-tools
+  - Deploya local checks da script-check-nsec8/full/
   - Configura cron auto-sync ogni minuto
-  - Protegge installazione in sysupgrade.conf (sopravvive a major upgrade)
+  - Protegge installazione in sysupgrade.conf
+  - Backup binari critici (tar/ar/gzip/libbfd)
+  - Script di ripristino post-upgrade automatico
+  - Autocheck all'avvio (rocksolid-startup-check.sh)
 
 Uso:
-  python3 install-checkmk-agent-persistent-nsec8.py [--uninstall]
+  python3 install-agent-nsec8.py [--uninstall] [--help]
 
-Version: 1.0.1
+Variabili d'ambiente:
+  CHECKMK_REPO_URL       Repository git (default: GitHub Coverup20)
+  CHECKMK_REPO_DIR       Path clone locale (default: /opt/checkmk-tools)
+  CHECKMK_AGENT_IPK_URL  URL diretto .ipk agente (fallback opkg)
+  OPENWRT_REPO_BASE      Repository OpenWrt base per download dinamico
+  OPENWRT_REPO_PACKAGES  Repository OpenWrt packages per download dinamico
+
+Version: 2.0.0
 """
 
+import gzip as _gzip
+import io
 import os
 import shutil
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-VERSION = "1.0.1"
+VERSION = "2.0.0"
 
 # ---------------------------------------------------------------------------
-# Costanti configurabili via variabili d'ambiente
+# Costanti
 # ---------------------------------------------------------------------------
-REPO_URL = os.environ.get("CHECKMK_REPO_URL", "https://github.com/Coverup20/checkmk-tools.git")
+REPO_URL = os.environ.get(
+    "CHECKMK_REPO_URL", "https://github.com/Coverup20/checkmk-tools.git"
+)
 REPO_DIR = os.environ.get("CHECKMK_REPO_DIR", "/opt/checkmk-tools")
 CHECKS_SRC = os.path.join(REPO_DIR, "script-check-nsec8", "full")
 LOCAL_DIR = "/usr/lib/check_mk_agent/local"
 SYSUPGRADE_CONF = "/etc/sysupgrade.conf"
 CRON_FILE = "/etc/crontabs/root"
 SYNC_SCRIPT = "/usr/local/bin/git-auto-sync.sh"
+BACKUP_DIR = "/opt/checkmk-backups/binaries"
+POST_UPGRADE_SCRIPT = "/etc/checkmk-post-upgrade.sh"
+RC_LOCAL = "/etc/rc.local"
+AUTOCHECK_SCRIPT = "/opt/checkmk-backups/rocksolid-startup-check.sh"
+AUTOCHECK_URL = (
+    "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main"
+    "/script-tools/full/upgrade_maintenance/rocksolid-startup-check.sh"
+)
 
-# URL diretto pacchetto (usato come fallback se opkg non trova ns-checkmk-agent)
+# URL diretto pacchetto agente (fallback se opkg non trova ns-checkmk-agent)
 AGENT_IPK_URL = os.environ.get(
     "CHECKMK_AGENT_IPK_URL",
     "https://updates.nethsecurity.nethserver.org/checkmk_agent/"
     "8.7.1-checkmk_agent+b37c288d8/packages/x86_64/nethsecurity/"
     "ns-checkmk-agent_0.0.1-r1_all.ipk",
+)
+
+# Repository OpenWrt per download dinamico pacchetti
+REPO_BASE = os.environ.get(
+    "OPENWRT_REPO_BASE",
+    "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base",
+)
+REPO_PACKAGES = os.environ.get(
+    "OPENWRT_REPO_PACKAGES",
+    "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/packages",
 )
 
 # ---------------------------------------------------------------------------
