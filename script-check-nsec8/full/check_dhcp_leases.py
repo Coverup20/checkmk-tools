@@ -1,30 +1,47 @@
 #!/usr/bin/env python3
-"""check_dhcp_leases.py - CheckMK local check DHCP leases (Python puro)."""
+"""check_dhcp_leases.py - CheckMK local check DHCP leases per pool (Python puro).
 
+Un servizio CheckMK separato per ogni pool DHCP attivo su NethSecurity 8.
+Legge la configurazione da UCI (dhcp + network) e conta i lease da /tmp/dhcp.leases
+mappando ogni IP al pool di appartenenza tramite IP range.
+
+Version: 2.0.0
+"""
+
+import ipaddress
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-VERSION = "1.2.2"
-SERVICE = "DHCP.Leases"
+VERSION = "2.0.0"
 LEASE_FILE = Path("/tmp/dhcp.leases")
 
 
-def get_total_max_leases() -> int:
-    """Somma i limit di tutti i pool DHCP attivi (ignora sezioni con ignore=1).
-    Gestisce correttamente firewall con multiple interfacce logiche."""
-    result = subprocess.run(["uci", "show", "dhcp"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=False)
-    if result.returncode != 0:
-        return 150  # fallback
-
-    sections: dict = {}
+def uci_show_parsed(section: str) -> dict:
+    """Esegue 'uci show <section>' e restituisce dict {chiave_completa: valore}."""
+    result = subprocess.run(
+        ["uci", "show", section],
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        text=True, check=False
+    )
+    data = {}
     for line in result.stdout.splitlines():
         if '=' not in line:
             continue
         key, _, value = line.partition('=')
-        key = key.strip()
-        value = value.strip().strip("'")
+        data[key.strip()] = value.strip().strip("'")
+    return data
+
+
+def get_dhcp_pools() -> list:
+    """Restituisce lista di pool DHCP attivi da UCI dhcp.
+    Ogni elemento: {name, interface, start, limit}
+    Esclude: ignore=1, dhcpv4=disabled, limit=0."""
+    data = uci_show_parsed("dhcp")
+
+    sections: dict = {}
+    for key, value in data.items():
         parts = key.split('.')
         if len(parts) == 2:
             sec = parts[1]
@@ -38,61 +55,134 @@ def get_total_max_leases() -> int:
                 sections[sec] = {}
             sections[sec][field] = value
 
-    total = 0
-    for fields in sections.values():
+    pools = []
+    for sec_name, fields in sections.items():
         if fields.get('_type') != 'dhcp':
             continue
         if fields.get('ignore') == '1':
             continue
-        # Escludi sezioni con dhcpv4 esplicitamente disabilitato
         if fields.get('dhcpv4') == 'disabled':
             continue
+        iface = fields.get('interface', sec_name)
         try:
-            total += int(fields.get('limit', 0))
+            start = int(fields.get('start', 100))
+            limit = int(fields.get('limit', 0))
         except ValueError:
-            pass
+            continue
+        if limit == 0:
+            continue
+        pools.append({
+            'name': sec_name,
+            'interface': iface,
+            'start': start,
+            'limit': limit,
+        })
 
-    return total if total > 0 else 150
+    return pools
+
+
+def get_interface_network(iface: str) -> str | None:
+    """Restituisce il CIDR della rete associata all'interfaccia UCI (es: '10.30.30.0/24')."""
+    data = uci_show_parsed(f"network.{iface}")
+    ipaddr = data.get(f"network.{iface}.ipaddr")
+    netmask = data.get(f"network.{iface}.netmask")
+
+    if not ipaddr:
+        return None
+
+    try:
+        if netmask:
+            net = ipaddress.IPv4Network(f"{ipaddr}/{netmask}", strict=False)
+        else:
+            net = ipaddress.IPv4Network(f"{ipaddr}/24", strict=False)
+        return str(net)
+    except ValueError:
+        return None
+
+
+def read_leases() -> list:
+    """Legge /tmp/dhcp.leases e restituisce lista di (expire_ts: int, ip: str)."""
+    if not LEASE_FILE.exists():
+        return []
+    leases = []
+    for line in LEASE_FILE.read_text(encoding="utf-8", errors="ignore").splitlines():
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        try:
+            expire = int(parts[0])
+        except ValueError:
+            expire = 0
+        leases.append((expire, parts[2]))
+    return leases
+
+
+def count_leases_in_pool(pool: dict, network_cidr: str, leases: list, now: int) -> tuple:
+    """Conta lease attivi/scaduti nel range IP del pool.
+    Range: network_base + start ... network_base + start + limit - 1"""
+    try:
+        net = ipaddress.IPv4Network(network_cidr, strict=False)
+        base = int(net.network_address)
+        pool_start_int = base + pool['start']
+        pool_end_int = pool_start_int + pool['limit'] - 1
+    except Exception:
+        return 0, 0
+
+    active = 0
+    expired = 0
+    for expire, ip_str in leases:
+        try:
+            ip_int = int(ipaddress.IPv4Address(ip_str))
+        except Exception:
+            continue
+        if pool_start_int <= ip_int <= pool_end_int:
+            if expire > now:
+                active += 1
+            else:
+                expired += 1
+
+    return active, expired
 
 
 def main() -> int:
-    if not LEASE_FILE.exists():
-        print("1 DHCP.Leases - File leases non trovato")
+    pools = get_dhcp_pools()
+
+    if not pools:
+        print("1 DHCP.Leases - Nessun pool DHCP attivo trovato")
         return 0
 
+    leases = read_leases()
     now = int(time.time())
-    active_leases = 0
-    expired_leases = 0
-    total_leases = 0
 
-    for line in LEASE_FILE.read_text(encoding="utf-8", errors="ignore").splitlines():
-        parts = line.split()
-        if len(parts) < 1:
+    for pool in pools:
+        name = pool['name']
+        iface = pool['interface']
+        limit = pool['limit']
+
+        network_cidr = get_interface_network(iface)
+        if network_cidr is None:
+            print(f"3 DHCP.{name} - Interfaccia UCI '{iface}' non trovata in network config")
             continue
-        total_leases += 1
-        expire = int(parts[0]) if parts[0].isdigit() else 0
-        if expire > now:
-            active_leases += 1
+
+        active, expired = count_leases_in_pool(pool, network_cidr, leases, now)
+        percent = int(active * 100 / limit) if limit > 0 else 0
+
+        warn = int(limit * 80 / 100)
+        crit = int(limit * 90 / 100)
+
+        if percent >= 90:
+            status, status_text = 2, "CRITICAL"
+        elif percent >= 80:
+            status, status_text = 1, "WARNING"
         else:
-            expired_leases += 1
+            status, status_text = 0, "OK"
 
-    max_leases = get_total_max_leases()
-    percent = int((active_leases * 100 / max_leases)) if max_leases > 0 else 0
+        print(
+            f"{status} DHCP.{name} active={active};{warn};{crit};0;{limit} "
+            f"[{network_cidr}] Lease attivi: {active}/{limit} ({percent}%) - {status_text} "
+            f"| active={active} expired={expired} max={limit} percent={percent}"
+        )
 
-    if percent >= 90:
-        status, status_text = 2, "CRITICAL"
-    elif percent >= 80:
-        status, status_text = 1, "WARNING"
-    else:
-        status, status_text = 0, "OK"
-
-    warn = int(max_leases * 80 / 100)
-    crit = int(max_leases * 90 / 100)
-    print(
-        f"{status} {SERVICE} active={active_leases};{warn};{crit};0;{max_leases} "
-        f"Lease attivi: {active_leases}/{max_leases} ({percent}%) - {status_text} "
-        f"| active={active_leases} expired={expired_leases} total={total_leases} max={max_leases} percent={percent}"
-    )
     return 0
 
 
