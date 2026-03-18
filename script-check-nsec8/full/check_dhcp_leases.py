@@ -14,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 
-VERSION = "2.0.2"
+VERSION = "2.0.3"
 LEASE_FILE = Path("/tmp/dhcp.leases")
 
 
@@ -177,15 +177,24 @@ def main() -> int:
     leases = read_leases()
     now = int(time.time())
 
+    # Risolvi network CIDR per ogni pool, salta orfani silenziosamente,
+    # deduplica pool con stesso CIDR tenendo quello con limit maggiore
+    resolved: dict = {}  # cidr -> pool con limit massimo
     for pool in pools:
-        name = pool['name']
-        iface = pool['interface']
-        limit = pool['limit']
+        cidr = get_interface_network(pool['interface'])
+        if cidr is None:
+            continue  # sezione UCI orfana, nessuna interfaccia network corrispondente
+        existing = resolved.get(cidr)
+        if existing is None or pool['limit'] > existing['limit']:
+            resolved[cidr] = pool
 
-        network_cidr = get_interface_network(iface)
-        if network_cidr is None:
-            print(f"3 DHCP.{name} - Interfaccia UCI '{iface}' non trovata in network config")
-            continue
+    if not resolved:
+        print("1 DHCP.Leases - Nessun pool DHCP con interfaccia valida trovato")
+        return 0
+
+    for network_cidr, pool in resolved.items():
+        name = pool['name']
+        limit = pool['limit']
 
         active, expired = count_leases_in_pool(pool, network_cidr, leases, now)
         percent = int(active * 100 / limit) if limit > 0 else 0
