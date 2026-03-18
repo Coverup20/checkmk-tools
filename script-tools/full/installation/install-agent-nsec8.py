@@ -8,9 +8,9 @@ persistente e resistente ai major upgrade.
 Funzionalità:
   - Installa prerequisiti (wget, socat, ar, tar, gzip)
   - Installa ns-checkmk-agent via opkg (con fallback a URL diretto)
-  - Installa git, clona/aggiorna /opt/checkmk-tools
-  - Deploya local checks da script-check-nsec8/full/
-  - Configura cron auto-sync ogni minuto
+  - Scarica script check direttamente da GitHub (NO git, NO clone intero)
+  - Deploya local checks da /opt/checkmk-checks/
+  - Configura sync-checks.py ogni 5 minuti (footprint minimo)
   - Protegge installazione in sysupgrade.conf
   - Backup binari critici (tar/ar/gzip/libbfd)
   - Script di ripristino post-upgrade automatico
@@ -20,13 +20,11 @@ Uso:
   python3 install-agent-nsec8.py [--uninstall] [--help]
 
 Variabili d'ambiente:
-  CHECKMK_REPO_URL       Repository git (default: GitHub Coverup20)
-  CHECKMK_REPO_DIR       Path clone locale (default: /opt/checkmk-tools)
   CHECKMK_AGENT_IPK_URL  URL diretto .ipk agente (fallback opkg)
   OPENWRT_REPO_BASE      Repository OpenWrt base per download dinamico
   OPENWRT_REPO_PACKAGES  Repository OpenWrt packages per download dinamico
 
-Version: 2.2.2
+Version: 2.3.0
 """
 
 import gzip as _gzip
@@ -39,21 +37,17 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-VERSION = "2.2.4"
+VERSION = "2.3.0"
 
 # ---------------------------------------------------------------------------
 # Costanti
 # ---------------------------------------------------------------------------
-REPO_URL = os.environ.get(
-    "CHECKMK_REPO_URL", "https://github.com/Coverup20/checkmk-tools.git"
-)
-REPO_DIR = os.environ.get("CHECKMK_REPO_DIR", "/opt/checkmk-tools")
-CHECKS_SRC = os.path.join(REPO_DIR, "script-check-nsec8", "full")
+CHECKS_DIR = "/opt/checkmk-checks"               # Script check (NO git clone)
 LOCAL_DIR = "/usr/lib/check_mk_agent/local"
 PLUGINS_DIR = "/usr/lib/check_mk_agent/plugins"
 SYSUPGRADE_CONF = "/etc/sysupgrade.conf"
 CRON_FILE = "/etc/crontabs/root"
-SYNC_SCRIPT = "/usr/local/bin/git-auto-sync.sh"
+SYNC_SCRIPT = "/opt/checkmk-backups/sync-checks.py"
 BACKUP_DIR = "/opt/checkmk-backups/binaries"
 POST_UPGRADE_SCRIPT = "/etc/checkmk-post-upgrade.py"
 RC_LOCAL = "/etc/rc.local"
@@ -61,6 +55,10 @@ AUTOCHECK_SCRIPT = "/opt/checkmk-backups/persistent-startup-check.py"
 AUTOCHECK_URL = (
     "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main"
     "/script-tools/full/upgrade_maintenance/persistent-startup-check.py"
+)
+SYNC_SCRIPT_URL = (
+    "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main"
+    "/script-tools/full/upgrade_maintenance/sync-checks.py"
 )
 
 # URL diretto pacchetto agente (fallback se opkg non trova ns-checkmk-agent)
@@ -311,62 +309,38 @@ def start_agent_service() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 4. Git e repository
+# 4. Check scripts sync (NO git — footprint minimo)
 # ---------------------------------------------------------------------------
 
 
-def install_git_if_missing() -> bool:
-    """Installa git e git-http via opkg (o download dinamico). Restituisce True se disponibile."""
-    if cmd_exists("git"):
-        r = run(["git", "--version"], capture=True, check=False)
-        log(f"Git gia' installato: {r.stdout.strip()}")
-        return True
+def setup_checks_sync() -> None:
+    """Scarica sync-checks.py da GitHub, lo salva in /opt/checkmk-backups/,
+    poi esegue sync iniziale per popolare /opt/checkmk-checks/."""
+    import json
 
-    log("Git non trovato — installazione via opkg...")
-    r = run(["opkg", "install", "git", "git-http"], check=False)
-    if r.returncode == 0 and cmd_exists("git"):
-        log("Git installato via opkg")
-        return True
+    backup_base = Path("/opt/checkmk-backups")
+    backup_base.mkdir(parents=True, exist_ok=True)
 
-    warn("opkg install git fallito — provo download dinamico da REPO_PACKAGES")
-    for pkg in ("git", "git-http"):
-        tmp = f"/tmp/{pkg}.ipk"
-        if download_openwrt_package(pkg, REPO_PACKAGES, tmp):
-            run(["opkg", "install", tmp], check=False)
-            Path(tmp).unlink(missing_ok=True)
-
-    if cmd_exists("git"):
-        r = run(["git", "--version"], capture=True, check=False)
-        log(f"Git installato: {r.stdout.strip()}")
-        return True
-
-    warn("Git non disponibile — auto-sync disabilitato")
-    return False
-
-
-def setup_repo(git_available: bool = True) -> None:
-    """Clona o aggiorna /opt/checkmk-tools."""
-    repo = Path(REPO_DIR)
-
-    if not git_available:
-        if repo.exists():
-            log(f"Repository gia' presente in {REPO_DIR} (git non disponibile, skip update)")
-        else:
-            warn(f"Git non disponibile e {REPO_DIR} non esiste — impossibile clonare")
+    # 1. Scarica sync-checks.py da GitHub
+    log("Download sync-checks.py da GitHub...")
+    try:
+        urllib.request.urlretrieve(SYNC_SCRIPT_URL, SYNC_SCRIPT)
+        content = Path(SYNC_SCRIPT).read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        Path(SYNC_SCRIPT).write_bytes(content)
+        Path(SYNC_SCRIPT).chmod(Path(SYNC_SCRIPT).stat().st_mode | 0o111)
+        log(f"sync-checks.py installato: {SYNC_SCRIPT}")
+    except Exception as exc:
+        warn(f"Download sync-checks.py fallito: {exc} — skip auto-sync")
         return
 
-    if (repo / ".git").exists():
-        log(f"Repository presente, aggiorno {REPO_DIR}...")
-        # Reset locale per evitare conflitti su file modificati in-place
-        run(["git", "-C", REPO_DIR, "reset", "--hard", "HEAD"], check=False)
-        r = run(["git", "-C", REPO_DIR, "pull"], check=False)
-        if r.returncode != 0:
-            warn("git pull fallito — continuo comunque")
+    # 2. Esegui sync iniziale per popolare /opt/checkmk-checks/
+    log("Sync iniziale script check da GitHub...")
+    r = run(["python3", SYNC_SCRIPT], check=False)
+    if r.returncode == 0:
+        n = sum(1 for f in Path(CHECKS_DIR).glob("*.py")) if Path(CHECKS_DIR).exists() else 0
+        log(f"Script check sincronizzati: {n} file in {CHECKS_DIR}")
     else:
-        log(f"Clono {REPO_URL} in {REPO_DIR}...")
-        repo.parent.mkdir(parents=True, exist_ok=True)
-        run(["git", "clone", REPO_URL, REPO_DIR])
-        log("Repository clonato")
+        warn("Sync iniziale fallito — continuo senza check sincronizzati")
 
 
 # ---------------------------------------------------------------------------
@@ -375,8 +349,8 @@ def setup_repo(git_available: bool = True) -> None:
 
 
 def deploy_local_checks() -> None:
-    """Copia i local check da script-check-nsec8/full/ in LOCAL_DIR."""
-    src = Path(CHECKS_SRC)
+    """Copia i local check da /opt/checkmk-checks/ in LOCAL_DIR."""
+    src = Path(CHECKS_DIR)
     dst = Path(LOCAL_DIR)
     dst.mkdir(parents=True, exist_ok=True)
 
@@ -411,51 +385,27 @@ def deploy_local_checks() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 7. Cron auto-sync
+# 7. Cron sync-checks
 # ---------------------------------------------------------------------------
 
 
-def setup_cron(git_available: bool = True) -> None:
-    """Crea sync script e aggiunge cron job ogni minuto."""
-    if not git_available:
-        log("Git non disponibile — skip configurazione auto-sync cron")
+def setup_cron() -> None:
+    """Aggiunge cron job ogni 5 minuti per sync-checks.py."""
+    if not Path(SYNC_SCRIPT).exists():
+        log("sync-checks.py non presente — skip configurazione cron")
         return
-
-    sync_content = (
-        "#!/bin/sh\n"
-        f"# Auto Git Sync Worker — generato da install-agent-nsec8.py v{VERSION}\n"
-        f'REPO_DIR="{REPO_DIR}"\n'
-        'LOG_FILE="/var/log/auto-git-sync.log"\n'
-        "MAX_LOG_SIZE=1048576\n\n"
-        "if [ -f \"$LOG_FILE\" ] && [ \"$(stat -c%s \"$LOG_FILE\" 2>/dev/null || echo 0)\" -gt \"$MAX_LOG_SIZE\" ]; then\n"
-        "    mv \"$LOG_FILE\" \"$LOG_FILE.old\" 2>/dev/null || true\n"
-        "fi\n\n"
-        "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] Auto sync started\" >> \"$LOG_FILE\"\n\n"
-        "if [ ! -d \"$REPO_DIR/.git\" ]; then\n"
-        "    echo \"[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Repository not found\" >> \"$LOG_FILE\"\n"
-        "    exit 1\n"
-        "fi\n\n"
-        "cd \"$REPO_DIR\" || exit 1\n\n"
-        "if git pull origin main >> \"$LOG_FILE\" 2>&1; then\n"
-        "    echo \"[$(date '+%Y-%m-%d %H:%M:%S')] Sync completed\" >> \"$LOG_FILE\"\n"
-        "else\n"
-        "    echo \"[$(date '+%Y-%m-%d %H:%M:%S')] Git pull failed\" >> \"$LOG_FILE\"\n"
-        "fi\n"
-    )
-
-    sync_path = Path(SYNC_SCRIPT)
-    sync_path.parent.mkdir(parents=True, exist_ok=True)
-    sync_path.write_text(sync_content)
-    sync_path.chmod(sync_path.stat().st_mode | 0o111)
-    log(f"Script sync creato: {SYNC_SCRIPT}")
 
     cron_path = Path(CRON_FILE)
     cron_path.parent.mkdir(parents=True, exist_ok=True)
     existing = cron_path.read_text() if cron_path.exists() else ""
-    lines = [l for l in existing.splitlines() if "git-auto-sync" not in l]
-    lines.append(f"* * * * * {SYNC_SCRIPT}")
+    # Rimuovi eventuali entry precedenti (git-auto-sync o sync-checks)
+    lines = [
+        l for l in existing.splitlines()
+        if "git-auto-sync" not in l and "sync-checks" not in l
+    ]
+    lines.append(f"*/5 * * * * python3 {SYNC_SCRIPT} >> /var/log/auto-git-sync.log 2>&1")
     cron_path.write_text("\n".join(lines) + "\n")
-    log("Cron job aggiunto (ogni minuto)")
+    log("Cron job aggiunto (ogni 5 minuti)")
 
     run(["/etc/init.d/cron", "restart"], check=False)
 
@@ -481,14 +431,12 @@ def setup_sysupgrade() -> None:
         ("/usr/bin/check_mk_agent",         "CheckMK Agent - Binary"),
         ("/etc/init.d/check_mk_agent",       "CheckMK Agent - Init Script"),
         ("/etc/check_mk/",                   "CheckMK Agent - Configuration"),
-        ("/usr/local/bin/",                  "Script Custom Directory"),
         (f"{LOCAL_DIR}/",                    "CheckMK Agent Local Checks"),
         ("/usr/lib/check_mk_agent/plugins/", "CheckMK Agent Plugins"),
-        (f"{REPO_DIR}/",                     "Repository checkmk-tools"),
-        ("/opt/checkmk-backups/",            "Backup binari critici (tar, ar, gzip)"),
+        (f"{CHECKS_DIR}/",                   "Script check (sync da GitHub, NO git)"),
+        ("/opt/checkmk-backups/",            "Backup binari critici + sync-checks.py"),
         # /etc/nginx/ NON protetta: preservarla causa conflitti moduli nginx tra versioni
-        (SYNC_SCRIPT,                        "Git Auto Sync Script"),
-        (CRON_FILE,                          "Cron Jobs (include git sync)"),
+        (CRON_FILE,                          "Cron Jobs (include sync-checks)"),
         ("/etc/cron.d/",                     "Cron Jobs Directory"),
         ("/var/spool/cron/crontabs/",        "User Crontabs"),
         ("/etc/opkg/customfeeds.conf",       "Custom package repositories"),
@@ -683,26 +631,7 @@ def install_autocheck() -> None:
         warn(f"Download da GitHub fallito ({exc}) — provo da repository locale")
 
     if not downloaded:
-        local_src = (
-            Path(REPO_DIR)
-            / "script-tools/full/upgrade_maintenance/persistent-startup-check.sh"
-        )
-        local_src = (
-            Path(REPO_DIR)
-            / "script-tools/full/upgrade_maintenance/persistent-startup-check.py"
-        )
-        if local_src.exists():
-            shutil.copy2(local_src, AUTOCHECK_SCRIPT)
-            # Strip CRLF (file potrebbe venire da Windows)
-            content = Path(AUTOCHECK_SCRIPT).read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
-            Path(AUTOCHECK_SCRIPT).write_bytes(content)
-            Path(AUTOCHECK_SCRIPT).chmod(
-                Path(AUTOCHECK_SCRIPT).stat().st_mode | 0o111
-            )
-            log("Script autocheck copiato da repository locale")
-        else:
-            warn("ATTENZIONE: persistent-startup-check.py non disponibile — skip autocheck")
-            return
+        warn("ATTENZIONE: download persistent-startup-check.py fallito — skip autocheck")
 
     # Configura rc.local
     rc_path = Path(RC_LOCAL)
@@ -750,7 +679,7 @@ def install_autocheck() -> None:
 
 
 def uninstall() -> None:
-    """Rimuove agente, cron, sync script e post-upgrade. NON rimuove /opt/checkmk-tools."""
+    """Rimuove agente, cron, sync script e post-upgrade. NON rimuove /opt/checkmk-backups/."""
     log("Disinstallazione CheckMK Agent...")
 
     init = "/etc/init.d/check_mk_agent"
@@ -765,7 +694,7 @@ def uninstall() -> None:
     if os.path.exists(CRON_FILE):
         lines = [
             l for l in Path(CRON_FILE).read_text().splitlines()
-            if "git-auto-sync" not in l
+            if "git-auto-sync" not in l and "sync-checks" not in l
         ]
         Path(CRON_FILE).write_text("\n".join(lines) + "\n")
         run(["/etc/init.d/cron", "restart"], check=False)
@@ -786,7 +715,7 @@ def uninstall() -> None:
         Path(RC_LOCAL).write_text("\n".join(lines) + "\n")
 
     log("Disinstallazione completata")
-    log(f"NOTA: {REPO_DIR} e {BACKUP_DIR} NON sono stati rimossi")
+    log(f"NOTA: /opt/checkmk-backups/ e /opt/checkmk-checks/ NON sono stati rimossi")
     warn(
         f"Le entry in {SYSUPGRADE_CONF} non sono state modificate — "
         "rimuovile manualmente se desiderato"
@@ -807,8 +736,7 @@ def usage() -> None:
         "  python3 install-agent-nsec8.py\n"
         "  python3 install-agent-nsec8.py --uninstall\n\n"
         "Variabili d'ambiente:\n"
-        f"  CHECKMK_REPO_URL       (default: {REPO_URL})\n"
-        f"  CHECKMK_REPO_DIR       (default: {REPO_DIR})\n"
+
         f"  CHECKMK_AGENT_IPK_URL  (default: URL NethSecurity)\n"
         f"  OPENWRT_REPO_BASE      (default: downloads.openwrt.org/23.05.0 base)\n"
         f"  OPENWRT_REPO_PACKAGES  (default: downloads.openwrt.org/23.05.0 packages)\n"
@@ -848,25 +776,20 @@ def main() -> int:
     log("--- [3/9] Installazione agente CheckMK ---")
     install_agent()
 
-    log("--- [4/9] Avvio servizio agente ---")
+    log("--- [4/7] Avvio servizio agente ---")
     start_agent_service()
 
-    log("--- [5/9] Installazione git ---")
-    git_ok = install_git_if_missing()
+    log("--- [5/7] Download script check e sync ---")
+    setup_checks_sync()
 
-    log("--- [6/9] Setup repository ---")
-    setup_repo(git_available=git_ok)
-
-    log("--- [7/9] Deploy local checks ---")
+    log("--- [6/7] Deploy local checks ---")
     deploy_local_checks()
 
-    log("--- [8/9] Cron auto-sync + sysupgrade + backup binari ---")
-    setup_cron(git_available=git_ok)
+    log("--- [7/7] Cron sync + sysupgrade + backup binari + autocheck ---")
+    setup_cron()
     setup_sysupgrade()
     backup_critical_binaries()
     create_post_upgrade_script()
-
-    log("--- [9/9] Autocheck all'avvio ---")
     install_autocheck()
 
     print()
@@ -880,9 +803,9 @@ def main() -> int:
     print(f"  [+] Script post-upgrade: {POST_UPGRADE_SCRIPT}")
     print(f"  [+] Autocheck all'avvio: {AUTOCHECK_SCRIPT}")
     print()
-    print("Auto Git Sync:")
-    print(f"  [+] Repository: {REPO_DIR}")
-    print("  [+] Sync automatico ogni minuto (se git disponibile)")
+    print("Check Scripts Sync (NO git):")
+    print(f"  [+] Script check in: {CHECKS_DIR}")
+    print(f"  [+] Sync ogni 5 minuti via: {SYNC_SCRIPT}")
     print("  [+] Log: /var/log/auto-git-sync.log")
     print()
     print("Test agent locale: nc 127.0.0.1 6556 | head")

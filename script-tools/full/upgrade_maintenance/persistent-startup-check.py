@@ -21,15 +21,18 @@ import urllib.request
 from pathlib import Path
 from typing import Optional, Tuple
 
-VERSION = "2.0.4"
+VERSION = "2.1.0"
 
 LOG_FILE = "/var/log/persistent-startup.log"
 BACKUP_DIR = "/opt/checkmk-backups/binaries"
 POST_UPGRADE_SCRIPT = "/etc/checkmk-post-upgrade.py"
 SYSUPGRADE_CONF = "/etc/sysupgrade.conf"
-REPO_DIR = "/opt/checkmk-tools"
-CHECKS_SRC = os.path.join(REPO_DIR, "script-check-nsec8", "full")
-PLUGINS_SRC = os.path.join(REPO_DIR, "script-check-nsec8", "plugins")
+CHECKS_SRC = "/opt/checkmk-checks"           # Script check (NO git clone)
+SYNC_SCRIPT = "/opt/checkmk-backups/sync-checks.py"
+SYNC_SCRIPT_URL = (
+    "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main"
+    "/script-tools/full/upgrade_maintenance/sync-checks.py"
+)
 LOCAL_DIR = "/usr/lib/check_mk_agent/local"
 PLUGINS_DIR = "/usr/lib/check_mk_agent/plugins"
 AGENT_PKG_URL_FILE = "/opt/checkmk-backups/agent-pkg-url.conf"
@@ -362,34 +365,38 @@ def verify_checkmk_agent() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Section 2.7: Git (necessario per Auto-Sync repository)
+# Section 2.7: Sync script check (sostituisce git)
 # ---------------------------------------------------------------------------
 
-def verify_git() -> None:
-    log("[Git] Verifica in corso...")
-    if not cmd_exists("git"):
-        log("[Git] Non trovato - installazione automatica per Auto-Sync...")
-        if cmd_exists("opkg") and cmd_exists("wget"):
-            git_ok = download_openwrt_package("git", REPO_PACKAGES, "/tmp/git.ipk")
-            http_ok = download_openwrt_package("git-http", REPO_PACKAGES, "/tmp/git-http.ipk")
-            if git_ok and http_ok:
-                _run(["opkg", "install", "/tmp/git.ipk", "/tmp/git-http.ipk"], timeout=60)
-                _unlink("/tmp/git.ipk")
-                _unlink("/tmp/git-http.ipk")
-                if cmd_exists("git"):
-                    rc, v = _run_capture(["git", "--version"])
-                    log(f"[Git] Installato con successo: {v.strip()}")
-                else:
-                    log("[Git] ERRORE: Installazione fallita")
-            elif not git_ok:
-                log("[Git] ERRORE: Download git fallito")
-            else:
-                log("[Git] ERRORE: Download git-http fallito")
+def verify_sync() -> None:
+    """Verifica sync-checks.py e aggiorna script check se necessario."""
+    log("[Sync] Verifica sync-checks.py...")
+
+    sync = Path(SYNC_SCRIPT)
+
+    # Se manca, tenta download da GitHub
+    if not sync.exists():
+        log("[Sync] sync-checks.py non trovato — tentativo download da GitHub...")
+        try:
+            urllib.request.urlretrieve(SYNC_SCRIPT_URL, SYNC_SCRIPT)
+            content = sync.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+            sync.write_bytes(content)
+            sync.chmod(sync.stat().st_mode | 0o111)
+            log("[Sync] sync-checks.py scaricato con successo")
+        except Exception as exc:
+            log(f"[Sync] ERRORE: download sync-checks.py fallito: {exc}")
+            return
+
+    # Esegui sync per aggiornare script check
+    log("[Sync] Aggiornamento script check da GitHub...")
+    rc, out = _run_capture(["python3", SYNC_SCRIPT], timeout=60)
+    if rc == 0:
+        if out.strip():
+            log(f"[Sync] {out.strip()}")
         else:
-            log("[Git] ERRORE: opkg o wget non disponibili")
+            log("[Sync] Script check gia' aggiornati")
     else:
-        rc, v = _run_capture(["git", "--version"])
-        log(f"[Git] OK - Presente: {v.strip()}")
+        log(f"[Sync] WARN: sync fallito (no network?) — continuo con check locali")
 
 
 # ---------------------------------------------------------------------------
@@ -506,14 +513,12 @@ def print_summary() -> None:
     if cron.is_file():
         try:
             content = cron.read_text(errors="replace")
-            has_sync = "git-auto-sync" in content or (
-                "git" in content and "checkmk-tools" in content
-            )
+            has_sync = "sync-checks" in content or "git-auto-sync" in content
         except OSError:
             has_sync = False
-        log(f"  Auto Git Sync:  {'[OK]' if has_sync else '[N/A]'}")
+        log(f"  Check Sync:     {'[OK]' if has_sync else '[N/A]'}")
     else:
-        log("  Auto Git Sync:  [N/A]")
+        log("  Check Sync:     [N/A]")
 
     local_dir = Path(LOCAL_DIR)
     checks = (
@@ -550,7 +555,7 @@ def main() -> int:
     restore_critical_binaries()
     verify_webui()
     verify_checkmk_agent()
-    verify_git()
+    verify_sync()
     auto_deploy_checks()
     verify_sysupgrade()
     print_summary()
