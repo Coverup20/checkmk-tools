@@ -6,7 +6,7 @@ import sys
 import time
 from pathlib import Path
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 SERVICE = "DHCP.Leases"
 LEASE_FILE = Path("/tmp/dhcp.leases")
 
@@ -54,7 +54,7 @@ def get_total_max_leases() -> int:
 
 def main() -> int:
     if not LEASE_FILE.exists():
-        print("1 DHCP_Leases - File leases non trovato")
+        print("1 DHCP.Leases - File leases non trovato")
         return 0
 
     now = int(time.time())

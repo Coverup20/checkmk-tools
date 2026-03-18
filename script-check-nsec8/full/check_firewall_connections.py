@@ -15,7 +15,7 @@ def main() -> int:
     count_path = Path("/proc/sys/net/netfilter/nf_conntrack_count")
     max_path = Path("/proc/sys/net/netfilter/nf_conntrack_max")
     if not count_path.exists() or not max_path.exists():
-        print("1 Firewall_Connections - Conntrack non disponibile")
+        print("1 Firewall.Connections - Conntrack non disponibile")
         return 0
 
     current = read_int(str(count_path))

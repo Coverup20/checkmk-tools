@@ -17,7 +17,7 @@ def run_lines(cmd: list[str], timeout: int = 15) -> list[str]:
 
 def main() -> int:
     if shutil.which("opkg") is None:
-        print("2 OPKG_Packages - opkg non disponibile")
+        print("2 OPKG.Packages - opkg non disponibile")
         return 0
 
     installed_count = len(run_lines(["opkg", "list-installed"]))
