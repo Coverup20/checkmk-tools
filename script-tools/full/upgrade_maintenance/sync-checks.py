@@ -19,11 +19,12 @@ import sys
 import urllib.request
 from pathlib import Path
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 REPO = "Coverup20/checkmk-tools"
 BRANCH = "main"
 CHECKS_PATH = "script-check-nsec8/full"
+SELF_PATH = "script-tools/full/upgrade_maintenance/sync-checks.py"
 
 CHECKS_DIR = Path("/opt/checkmk-checks")
 LOCAL_DIR = Path("/usr/lib/check_mk_agent/local")
@@ -40,6 +41,26 @@ def _get_json(url: str) -> object:
 
 
 def main() -> int:
+    # 0. Self-update: scarica se stessa da GitHub e si sostituisce se cambiata
+    self_path = Path(__file__).resolve()
+    try:
+        url = f"{RAW_BASE}/{SELF_PATH}"
+        req = urllib.request.Request(url, headers={"User-Agent": f"nsec8-sync/{VERSION}"})
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            new_content = r.read()
+        current_content = self_path.read_bytes()
+        if new_content != current_content:
+            import tempfile, os
+            tmp = tempfile.NamedTemporaryFile(delete=False, dir=str(self_path.parent), suffix=".tmp")
+            tmp.write(new_content)
+            tmp.close()
+            os.replace(tmp.name, str(self_path))
+            self_path.chmod(0o755)
+            print(f"[sync-checks] Self-update completato — riavvio")
+            os.execv(str(self_path), [str(self_path)])  # riavvia con nuova versione
+    except Exception as exc:
+        print(f"[sync-checks] Self-update fallito (continuo con versione attuale): {exc}", file=sys.stderr)
+
     # 1. Ottieni SHA HEAD del branch main (1 API call)
     try:
         ref = _get_json(f"{API_BASE}/git/ref/heads/{BRANCH}")
