@@ -14,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 LEASE_FILE = Path("/tmp/dhcp.leases")
 
 
@@ -71,11 +71,13 @@ def get_dhcp_pools() -> list:
             continue
         if limit == 0:
             continue
+        # NethSecurity salva limit = IP_configurati + 1 (off-by-one UI→UCI)
+        # Sottraiamo 1 per mostrare il valore umano corretto
         pools.append({
             'name': sec_name,
             'interface': iface,
             'start': start,
-            'limit': limit,
+            'limit': limit - 1,
         })
 
     return pools
