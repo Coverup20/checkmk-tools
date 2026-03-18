@@ -6,7 +6,7 @@ import sys
 import time
 from pathlib import Path
 
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 SERVICE = "DHCP.Leases"
 LEASE_FILE = Path("/tmp/dhcp.leases")
 
@@ -43,6 +43,9 @@ def get_total_max_leases() -> int:
         if fields.get('_type') != 'dhcp':
             continue
         if fields.get('ignore') == '1':
+            continue
+        # Escludi sezioni con dhcpv4 esplicitamente disabilitato
+        if fields.get('dhcpv4') == 'disabled':
             continue
         try:
             total += int(fields.get('limit', 0))
