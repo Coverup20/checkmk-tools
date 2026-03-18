@@ -19,13 +19,14 @@ import sys
 import urllib.request
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 REPO = "Coverup20/checkmk-tools"
 BRANCH = "main"
 CHECKS_PATH = "script-check-nsec8/full"
 
 CHECKS_DIR = Path("/opt/checkmk-checks")
+LOCAL_DIR = Path("/usr/lib/check_mk_agent/local")
 SHA_CACHE = Path("/opt/checkmk-backups/last-sync-sha.txt")
 API_BASE = f"https://api.github.com/repos/{REPO}"
 RAW_BASE = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}"
@@ -79,10 +80,23 @@ def main() -> int:
         except Exception as exc:
             print(f"[sync-checks] ERRORE: download {name}: {exc}", file=sys.stderr)
 
-    # 5. Salva nuovo SHA
+    # 5. Deploy in local checks dir (senza estensione .py)
+    LOCAL_DIR.mkdir(parents=True, exist_ok=True)
+    deployed = 0
+    for src in CHECKS_DIR.glob("*.py"):
+        dest = LOCAL_DIR / src.stem  # es: check_uptime.py → check_uptime
+        try:
+            import shutil
+            shutil.copy2(str(src), str(dest))
+            dest.chmod(0o755)
+            deployed += 1
+        except Exception as exc:
+            print(f"[sync-checks] ERRORE deploy {src.name}: {exc}", file=sys.stderr)
+
+    # 6. Salva nuovo SHA
     SHA_CACHE.parent.mkdir(parents=True, exist_ok=True)
     SHA_CACHE.write_text(remote_sha + "\n")
-    print(f"[sync-checks] {count} file aggiornati (sha: {remote_sha[:8]})")
+    print(f"[sync-checks] {count} file aggiornati, {deployed} deployati (sha: {remote_sha[:8]})")
     return 0
 
 
