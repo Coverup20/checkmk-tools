@@ -14,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 
-VERSION = "2.0.1"
+VERSION = "2.0.2"
 LEASE_FILE = Path("/tmp/dhcp.leases")
 
 
@@ -84,22 +84,43 @@ def get_dhcp_pools() -> list:
 
 
 def get_interface_network(iface: str) -> str | None:
-    """Restituisce il CIDR della rete associata all'interfaccia UCI (es: '10.30.30.0/24')."""
-    data = uci_show_parsed(f"network.{iface}")
-    ipaddr = data.get(f"network.{iface}.ipaddr")
-    netmask = data.get(f"network.{iface}.netmask")
+    """Restituisce il CIDR della rete associata all'interfaccia UCI (es: '10.30.30.0/24').
+    Prova prima match esatto, poi case-insensitive su tutte le interfacce network."""
+    def _resolve(name: str) -> str | None:
+        data = uci_show_parsed(f"network.{name}")
+        ipaddr = data.get(f"network.{name}.ipaddr")
+        netmask = data.get(f"network.{name}.netmask")
+        if not ipaddr:
+            return None
+        try:
+            if netmask:
+                net = ipaddress.IPv4Network(f"{ipaddr}/{netmask}", strict=False)
+            else:
+                net = ipaddress.IPv4Network(f"{ipaddr}/24", strict=False)
+            return str(net)
+        except ValueError:
+            return None
 
-    if not ipaddr:
-        return None
+    # Tentativo 1: match esatto
+    result = _resolve(iface)
+    if result:
+        return result
 
-    try:
-        if netmask:
-            net = ipaddress.IPv4Network(f"{ipaddr}/{netmask}", strict=False)
-        else:
-            net = ipaddress.IPv4Network(f"{ipaddr}/24", strict=False)
-        return str(net)
-    except ValueError:
-        return None
+    # Tentativo 2: case-insensitive — scansiona tutte le interfacce network
+    all_net = uci_show_parsed("network")
+    iface_lower = iface.lower()
+    seen = set()
+    for key in all_net:
+        parts = key.split('.')
+        if len(parts) >= 2:
+            candidate = parts[1]
+            if candidate not in seen and candidate.lower() == iface_lower:
+                seen.add(candidate)
+                result = _resolve(candidate)
+                if result:
+                    return result
+
+    return None
 
 
 def read_leases() -> list:
