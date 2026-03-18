@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.1.1"
+VERSION = "1.1.2"
 WARN_THRESHOLD = 10
 CRIT_THRESHOLD = 50
 LOG_FILE = Path("/var/log/messages")
@@ -60,10 +60,10 @@ def main() -> int:
 
     if martian_sources:
         sample = " ".join(sorted(set(martian_sources))[:5])
-        print(f"0 Martian_Sources - IPs: {sample}")
+        print(f"0 Martian.Sources - IPs: {sample}")
     if martian_destinations:
         sample = " ".join(sorted(set(martian_destinations))[:5])
-        print(f"0 Martian_Destinations - IPs: {sample}")
+        print(f"0 Martian.Destinations - IPs: {sample}")
     return 0
 
 
