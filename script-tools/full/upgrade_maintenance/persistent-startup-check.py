@@ -21,10 +21,9 @@ import urllib.request
 from pathlib import Path
 from typing import Optional, Tuple
 
-VERSION = "2.1.1"
+VERSION = "2.2.0"
 
 LOG_FILE = "/var/log/persistent-startup.log"
-BACKUP_DIR = "/opt/checkmk-backups/binaries"
 POST_UPGRADE_SCRIPT = "/etc/checkmk-post-upgrade.py"
 SYSUPGRADE_CONF = "/etc/sysupgrade.conf"
 CHECKS_SRC = "/opt/checkmk-checks"           # Script check (NO git clone)
@@ -153,73 +152,6 @@ def download_openwrt_package(package_name: str, repo_url: str, output_file: str)
     except Exception as exc:
         log(f"[WARN] Download fallito [{package_file}]: {exc}")
         return False
-
-
-# ---------------------------------------------------------------------------
-# Section 0: Ripristino binari critici
-# ---------------------------------------------------------------------------
-
-def restore_critical_binaries() -> None:
-    log("[Binari Critici] Verifica in corso...")
-    backup_dir = Path(BACKUP_DIR)
-    if not backup_dir.is_dir():
-        log("[Binari Critici] Directory backup non trovata — skip")
-        return
-
-    for backup in sorted(backup_dir.glob("*.backup")):
-        basename = backup.name[: -len(".backup")]
-        if basename in ("tar-gnu", "gzip-gnu", "gunzip-gnu", "zcat-gnu"):
-            dest = Path("/usr/libexec") / basename
-        elif basename == "ar":
-            dest = Path("/usr/bin") / basename
-        elif basename.startswith("libbfd") and basename.endswith(".so"):
-            dest = Path("/usr/lib") / basename
-        else:
-            continue
-
-        if not dest.exists():
-            log(f"[Binari Critici] RIPRISTINO: {dest} (mancante)")
-            try:
-                shutil.copy2(str(backup), str(dest))
-            except OSError as exc:
-                log(f"[Binari Critici] ERRORE copia {dest}: {exc}")
-        elif not is_elf(str(dest)):
-            log(f"[Binari Critici] RIPRISTINO: {dest} (corrotto)")
-            try:
-                shutil.copy2(str(backup), str(dest))
-            except OSError as exc:
-                log(f"[Binari Critici] ERRORE copia {dest}: {exc}")
-
-    # Verifica se ar funziona dopo ripristino
-    binaries_corrupted = False
-    ar = Path("/usr/bin/ar")
-    if ar.is_file() and os.access(str(ar), os.X_OK):
-        rc, _ = _run_capture([str(ar), "--version"])
-        if rc != 0:
-            log("[Binari Critici] ar corrotto dopo ripristino — mancano shared libraries")
-            binaries_corrupted = True
-    else:
-        log("[Binari Critici] ar non eseguibile dopo ripristino")
-        binaries_corrupted = True
-
-    if binaries_corrupted:
-        if cmd_exists("opkg") and cmd_exists("wget"):
-            log("[Binari Critici] Reinstallo dependencies chain (libbfd → ar)...")
-            if download_openwrt_package("libbfd", REPO_BASE, "/tmp/libbfd.ipk"):
-                _run(["opkg", "install", "--force-depends", "/tmp/libbfd.ipk"])
-                _unlink("/tmp/libbfd.ipk")
-            if download_openwrt_package("ar", REPO_BASE, "/tmp/ar.ipk"):
-                _run(["opkg", "install", "--force-depends", "/tmp/ar.ipk"])
-                _unlink("/tmp/ar.ipk")
-                rc, _ = _run_capture(["/usr/bin/ar", "--version"])
-                if rc == 0:
-                    log("[Binari Critici] ar reinstallato e funzionante")
-                else:
-                    log("[Binari Critici] ERRORE: ar ancora non funzionante")
-    else:
-        log("[Binari Critici] ar funzionante dopo ripristino backup")
-
-    log("[Binari Critici] Verifica completata")
 
 
 # ---------------------------------------------------------------------------
@@ -526,7 +458,6 @@ def main() -> int:
     log(f"PERSISTENT Startup Check v{VERSION} - AVVIO")
     log("=========================================")
 
-    restore_critical_binaries()
     verify_webui()
     verify_checkmk_agent()
     verify_sync()

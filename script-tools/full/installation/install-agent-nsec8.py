@@ -37,7 +37,7 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-VERSION = "2.3.0"
+VERSION = "2.4.0"
 
 # ---------------------------------------------------------------------------
 # Costanti
@@ -48,7 +48,6 @@ PLUGINS_DIR = "/usr/lib/check_mk_agent/plugins"
 SYSUPGRADE_CONF = "/etc/sysupgrade.conf"
 CRON_FILE = "/etc/crontabs/root"
 SYNC_SCRIPT = "/opt/checkmk-backups/sync-checks.py"
-BACKUP_DIR = "/opt/checkmk-backups/binaries"
 POST_UPGRADE_SCRIPT = "/etc/checkmk-post-upgrade.py"
 RC_LOCAL = "/etc/rc.local"
 AUTOCHECK_SCRIPT = "/opt/checkmk-backups/persistent-startup-check.py"
@@ -460,48 +459,7 @@ def setup_sysupgrade() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 9. Backup binari critici (PERSISTENT)
-# ---------------------------------------------------------------------------
-
-
-def backup_critical_binaries() -> None:
-    """Backup di tar/ar/gzip/libbfd che si corrompono durante major upgrade."""
-    bins = [
-        "/usr/libexec/tar-gnu",
-        "/usr/bin/ar",
-        "/usr/libexec/gzip-gnu",
-        "/usr/libexec/gunzip-gnu",
-    ]
-    for p in Path("/usr/lib").glob("libbfd-*.so"):
-        bins.append(str(p))
-
-    backup_path = Path(BACKUP_DIR)
-    backup_path.mkdir(parents=True, exist_ok=True)
-
-    log("PERSISTENT: Backup binari critici (protegge da corruzione durante upgrade)...")
-
-    ok = 0
-    for bin_path in bins:
-        p = Path(bin_path)
-        if not p.exists():
-            continue
-        r = run(["file", str(p)], capture=True, check=False)
-        if "ELF" not in r.stdout:
-            warn(f"  Skip {p.name}: non e' un ELF valido")
-            continue
-        dest = backup_path / f"{p.name}.backup"
-        try:
-            shutil.copy2(p, dest)
-            log(f"  Backup: {p}")
-            ok += 1
-        except OSError as exc:
-            warn(f"  Backup fallito per {p}: {exc}")
-
-    log(f"Binari critici backuppati ({ok}) in: {BACKUP_DIR}")
-
-
-# ---------------------------------------------------------------------------
-# 10. Script post-upgrade (PERSISTENT)
+# 9. Script post-upgrade (PERSISTENT)
 # ---------------------------------------------------------------------------
 
 
@@ -514,9 +472,7 @@ def create_post_upgrade_script() -> None:
         '"""checkmk-post-upgrade.py - ripristino automatico dopo major upgrade.',
         'Generato da install-agent-nsec8.py',
         '"""',
-        'import os, shutil, subprocess, sys, time',
-        '',
-        'BACKUP_DIR = "/opt/checkmk-backups/binaries"',
+        'import os, subprocess, sys, time',
         '',
         '',
         'def log(msg):',
@@ -526,43 +482,6 @@ def create_post_upgrade_script() -> None:
         '',
         'def main():',
         '    log("=== POST-UPGRADE: Inizio ripristino ===")',
-        '',
-        '    if os.path.isdir(BACKUP_DIR):',
-        '        log("Ripristino binari critici da backup...")',
-        '        for fname in os.listdir(BACKUP_DIR):',
-        '            if not fname.endswith(".backup"):',
-        '                continue',
-        '            backup = os.path.join(BACKUP_DIR, fname)',
-        '            base = fname[:-len(".backup")]',
-        '            if base in ("tar-gnu", "gzip-gnu", "gunzip-gnu", "zcat-gnu"):',
-        '                dest = f"/usr/libexec/{base}"',
-        '            elif base == "ar":',
-        '                dest = f"/usr/bin/{base}"',
-        '            elif base.startswith("libbfd") and base.endswith(".so"):',
-        '                dest = f"/usr/lib/{base}"',
-        '            else:',
-        '                log(f"  SKIP: {base}")',
-        '                continue',
-        '            if os.path.exists(dest):',
-        '                r = subprocess.run(["file", dest], capture_output=True, text=True, check=False)',
-        '                if "ELF" not in r.stdout:',
-        '                    log(f"  CORROTTO: {dest} - ripristino")',
-        '                    try:',
-        '                        shutil.copy2(backup, dest)',
-        '                        log(f"  RIPRISTINATO: {dest}")',
-        '                    except Exception as e:',
-        '                        log(f"  ERRORE: {dest}: {e}")',
-        '                else:',
-        '                    log(f"  OK: {dest}")',
-        '            else:',
-        '                log(f"  MANCANTE: {dest} - ripristino")',
-        '                try:',
-        '                    shutil.copy2(backup, dest)',
-        '                    log(f"  RIPRISTINATO: {dest}")',
-        '                except Exception as e:',
-        '                    log(f"  ERRORE: {dest}: {e}")',
-        '    else:',
-        '        log(f"ATTENZIONE: {BACKUP_DIR} non trovata")',
         '',
         '    for check in ("/usr/bin/check_mk_agent", "/etc/init.d/check_mk_agent"):',
         '        if not os.access(check, os.X_OK):',
@@ -785,10 +704,9 @@ def main() -> int:
     log("--- [6/7] Deploy local checks ---")
     deploy_local_checks()
 
-    log("--- [7/7] Cron sync + sysupgrade + backup binari + autocheck ---")
+    log("--- [7/7] Cron sync + sysupgrade + autocheck ---")
     setup_cron()
     setup_sysupgrade()
-    backup_critical_binaries()
     create_post_upgrade_script()
     install_autocheck()
 
@@ -799,7 +717,6 @@ def main() -> int:
     print()
     print("Protezioni attivate:")
     print(f"  [+] File critici aggiunti a {SYSUPGRADE_CONF}")
-    print(f"  [+] Binari critici backuppati in {BACKUP_DIR}")
     print(f"  [+] Script post-upgrade: {POST_UPGRADE_SCRIPT}")
     print(f"  [+] Autocheck all'avvio: {AUTOCHECK_SCRIPT}")
     print()
