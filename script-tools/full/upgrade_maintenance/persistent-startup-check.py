@@ -445,32 +445,6 @@ def auto_deploy_checks() -> None:
         if removed:
             log(f"[Auto-Deploy] Rimossi {removed} vecchi .sh da {PLUGINS_DIR}")
 
-    plugins_src = Path(PLUGINS_SRC)
-    if plugins_src.is_dir():
-        log("[Auto-Deploy] Verifica nuovi plugin...")
-        plugins_dir = Path(PLUGINS_DIR)
-        plugins_dir.mkdir(parents=True, exist_ok=True)
-        deployed = 0
-        for plugin in sorted(plugins_src.iterdir()):
-            if not plugin.is_file() or plugin.name.startswith("."):
-                continue
-            dest = plugins_dir / plugin.name
-            if not dest.exists() or plugin.stat().st_mtime > dest.stat().st_mtime:
-                log(f"[Auto-Deploy] Deploy: {plugin.name} (plugin)")
-                try:
-                    shutil.copy2(str(plugin), str(dest))
-                    dest.chmod(dest.stat().st_mode | 0o111)
-                    deployed += 1
-                except OSError as exc:
-                    log(f"[Auto-Deploy] ERRORE deploy {plugin.name}: {exc}")
-        log(
-            f"[Auto-Deploy] Deployed {deployed} plugin(s)"
-            if deployed
-            else "[Auto-Deploy] Plugin già aggiornati"
-        )
-    else:
-        log("[Auto-Deploy] Nessuna directory plugin nel repository")
-
 
 # ---------------------------------------------------------------------------
 # Section 3: Verifica protezioni sysupgrade.conf
