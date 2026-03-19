@@ -69,7 +69,7 @@ import sys
 import time
 from typing import Dict, List, NamedTuple, Optional, Tuple
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 SCRIPT_NAME = "check_host_status"
 
 # Nagios exit codes
@@ -352,15 +352,15 @@ def format_output(
     if score >= crit:
         code   = CRITICAL
         status = "CRITICAL"
-        verb   = "OFFLINE"
+        verb   = f"SPENTO {score}%"
     elif score >= warn:
         code   = WARNING
         status = "WARNING"
-        verb   = "PROBABILE OFFLINE"
+        verb   = f"PROBABILE SPENTO {score}%"
     else:
         code   = OK
         status = "OK"
-        verb   = "attivo"
+        verb   = f"attivo {score}%"
 
     # Sintesi probe per il testo dell'output
     up_probes   = [r.name for r in results if r.status == "up"]
@@ -379,7 +379,7 @@ def format_output(
     # Performance data
     perf = f"confidence={score}%;{warn};{crit}"
 
-    output = f"{status} - {host} {verb} (confidenza: {score}%) - {detail} | {perf}"
+    output = f"{status} - {host} {verb} - {detail} | {perf}"
     return code, output
 
 
