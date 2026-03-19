@@ -69,7 +69,7 @@ import sys
 import time
 from typing import Dict, List, NamedTuple, Optional, Tuple
 
-VERSION = "2.3.0"
+VERSION = "2.4.0"
 SCRIPT_NAME = "check_host_status"
 
 # Nagios exit codes
@@ -367,20 +367,10 @@ def format_output(
     up_probes   = [r.name for r in results if r.status == "up"]
     down_probes = [r.name for r in results if r.status == "down"]
 
-    up_str   = ", ".join(up_probes)   if up_probes   else "nessuno"
-    down_str = ", ".join(down_probes) if down_probes else "nessuno"
-
-    if code == OK:
-        detail = f"risponde su: {up_str}"
-    elif code == CRITICAL:
-        detail = f"non risponde su: {down_str}"
-    else:
-        detail = f"up={up_str} | down={down_str}"
-
     # Performance data
     perf = f"confidence={score}%;{warn};{crit}"
 
-    output = f"{status} - {host} {verb} - {detail} | {perf}"
+    output = f"{status} - {host} {verb} | {perf}"
     return code, output
 
 
