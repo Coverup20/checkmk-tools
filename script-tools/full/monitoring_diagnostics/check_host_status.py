@@ -40,12 +40,23 @@ Configurazione WATO (Host Check Command):
   Plugin:    check_host_status
   Arguments: -H $HOSTADDRESS$
 
-  Varianti:
-  -H $HOSTADDRESS$ --ports 22 443          # Host senza CMK agent
-  -H $HOSTADDRESS$ --no-arp               # Host su segmento L2 diverso
-  -H $HOSTADDRESS$ --warn 50 --crit 80    # Soglie personalizzate
+Tipi host (--type):
+  server  → Server con agente CheckMK. Porta 6556: se risponde → ACCESO certo (early exit immediato).
+  client  → Client/workstation con agente CheckMK. Stessa logica del server.
+  switch  → Switch/Router. Ping + ARP ad alto peso (no agente CMK).
+  generic → Default, backward compatible (pesi bilanciati).
 
-Version: 1.0.0
+Configurazione WATO per folder:
+  Folder Servers:  -H $HOSTADDRESS$ --type server
+  Folder Clients:  -H $HOSTADDRESS$ --type client
+  Folder Network:  -H $HOSTADDRESS$ --type switch
+  Default (tutti): -H $HOSTADDRESS$
+
+  Opzioni aggiuntive:
+  -H $HOSTADDRESS$ --type server --no-arp    # Server su L2 diverso
+  -H $HOSTADDRESS$ --warn 50 --crit 80       # Soglie personalizzate
+
+Version: 2.0.0
 """
 
 import argparse
@@ -56,9 +67,9 @@ import socket
 import subprocess
 import sys
 import time
-from typing import List, NamedTuple, Optional, Tuple
+from typing import Dict, List, NamedTuple, Optional, Tuple
 
-VERSION = "1.0.0"
+VERSION = "2.0.0"
 SCRIPT_NAME = "check_host_status"
 
 # Nagios exit codes
@@ -99,6 +110,53 @@ W_ARP_PRESENT  = -10  # ARP presente           → host visto di recente
 W_DNS_OK       = 5    # DNS risolve            → non è errore DNS
 W_DNS_FAIL     = -10  # DNS non risolve        → forse problema DNS, non host
 
+# ─── Profili per tipo host ─────────────────────────────────────────────────────
+
+TYPE_PROFILES: Dict[str, dict] = {
+    "server": {
+        "description":      "Server con agente CheckMK (porta 6556 prioritaria)",
+        "ports":            [6556, 22, 443, 80],
+        "skip_arp":         False,
+        "early_exit_ports": [6556],   # se risponde → acceso, score=0 immediato
+        "w_ping_up":        -70,
+        "w_ping_down":       30,
+        "w_tcp_up":         -80,
+        "w_tcp_timeout":    {6556: 45, 22: 15, 443: 8, 80: 5},
+        "w_arp_present":    -25,
+        "w_arp_missing":     20,
+    },
+    "client": {
+        "description":      "Client/workstation con agente CheckMK (porta 6556 prioritaria)",
+        "ports":            [6556, 3389, 22],
+        "skip_arp":         False,
+        "early_exit_ports": [6556],
+        "w_ping_up":        -70,
+        "w_ping_down":       30,
+        "w_tcp_up":         -80,
+        "w_tcp_timeout":    {6556: 45, 3389: 12, 22: 10},
+        "w_arp_present":    -25,
+        "w_arp_missing":     20,
+    },
+    "switch": {
+        "description":      "Switch/Router gestito (ping + ARP prioritari, no agente CMK)",
+        "ports":            [22, 443, 80],
+        "skip_arp":         False,
+        "early_exit_ports": [],
+        "w_ping_up":        -80,    # switch risponde ping = certamente acceso
+        "w_ping_down":       45,    # switch non risponde ping = probabilmente spento
+        "w_tcp_up":         -20,
+        "w_tcp_timeout":    {22: 8, 443: 5, 80: 5},
+        "w_arp_present":    -30,    # ARP presente su switch = sicuramente acceso
+        "w_arp_missing":     25,
+    },
+    "generic": {
+        "description":      "Generico (default, backward compat)",
+        "ports":            [22, 6556, 443, 80],
+        "skip_arp":         False,
+        "early_exit_ports": [],
+        # usa i pesi globali W_* definiti sopra
+    },
+}
 
 # ─── Struttura risultato probe ────────────────────────────────────────────────
 
@@ -120,7 +178,8 @@ def probe_dns(host: str) -> Tuple[ProbeResult, Optional[str]]:
         return ProbeResult("dns", "unknown", W_DNS_FAIL, f"NXDOMAIN: {e}"), None
 
 
-def probe_ping(ip: str, count: int = 3, timeout: int = 1) -> ProbeResult:
+def probe_ping(ip: str, count: int = 3, timeout: int = 1,
+               w_up: int = W_PING_UP, w_down: int = W_PING_DOWN) -> ProbeResult:
     """ICMP ping multiplo. Analizza packet loss."""
     try:
         r = subprocess.run(
@@ -136,24 +195,25 @@ def probe_ping(ip: str, count: int = 3, timeout: int = 1) -> ProbeResult:
         if loss == 0:
             m_rtt = re.search(r"rtt \S+ = [\d.]+/([\d.]+)/", out)
             rtt = f"{float(m_rtt.group(1)):.1f}ms" if m_rtt else "ok"
-            return ProbeResult("ping", "up", W_PING_UP, f"risponde ({rtt})")
+            return ProbeResult("ping", "up", w_up, f"risponde ({rtt})")
         elif loss == 100:
-            return ProbeResult("ping", "down", W_PING_DOWN, "100% packet loss")
+            return ProbeResult("ping", "down", w_down, "100% packet loss")
         else:
             return ProbeResult("ping", "unknown", 0, f"{loss}% loss (instabile)")
 
     except subprocess.TimeoutExpired:
-        return ProbeResult("ping", "down", W_PING_DOWN, "timeout")
+        return ProbeResult("ping", "down", w_down, "timeout")
     except OSError:
         return ProbeResult("ping", "unknown", 0, "ping non disponibile")
     except Exception as e:
         return ProbeResult("ping", "unknown", 0, str(e))
 
 
-def probe_tcp(ip: str, port: int, timeout: float = 2.0) -> ProbeResult:
+def probe_tcp(ip: str, port: int, timeout: float = 2.0,
+              w_up: int = W_TCP_UP, w_timeout: Optional[int] = None) -> ProbeResult:
     """Test TCP su singola porta."""
     name = f"tcp/{PORT_NAMES.get(port, str(port))}"
-    weight_down = W_TCP_TIMEOUT.get(port, W_TCP_DEFAULT)
+    weight_down = w_timeout if w_timeout is not None else W_TCP_TIMEOUT.get(port, W_TCP_DEFAULT)
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(timeout)
@@ -161,10 +221,10 @@ def probe_tcp(ip: str, port: int, timeout: float = 2.0) -> ProbeResult:
         sock.close()
 
         if err == 0:
-            return ProbeResult(name, "up", W_TCP_UP, "aperta")
+            return ProbeResult(name, "up", w_up, "aperta")
         elif err == errno.ECONNREFUSED:
             # Host attivo, servizio non in ascolto su questa porta
-            return ProbeResult(name, "up", W_TCP_UP, "rifiutata (host attivo)")
+            return ProbeResult(name, "up", w_up, "rifiutata (host attivo)")
         else:
             return ProbeResult(name, "down", weight_down, f"timeout (errno {err})")
 
@@ -174,7 +234,7 @@ def probe_tcp(ip: str, port: int, timeout: float = 2.0) -> ProbeResult:
         return ProbeResult(name, "unknown", 0, str(e))
 
 
-def probe_arp(ip: str) -> ProbeResult:
+def probe_arp(ip: str, w_present: int = W_ARP_PRESENT, w_missing: int = W_ARP_MISSING) -> ProbeResult:
     """Verifica presenza entry ARP nella tabella locale."""
     try:
         r = subprocess.run(
@@ -184,13 +244,13 @@ def probe_arp(ip: str) -> ProbeResult:
         out = r.stdout.decode("utf-8", errors="replace")
 
         if r.returncode != 0 or "no entry" in out.lower():
-            return ProbeResult("arp", "down", W_ARP_MISSING, "nessuna entry ARP")
+            return ProbeResult("arp", "down", w_missing, "nessuna entry ARP")
         elif "(incomplete)" in out:
-            return ProbeResult("arp", "down", W_ARP_MISSING, "ARP incompleto (no risposta L2)")
+            return ProbeResult("arp", "down", w_missing, "ARP incompleto (no risposta L2)")
         else:
             mac_m = re.search(r"([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})", out)
             mac = mac_m.group(1) if mac_m else "n/a"
-            return ProbeResult("arp", "up", W_ARP_PRESENT, f"MAC {mac}")
+            return ProbeResult("arp", "up", w_present, f"MAC {mac}")
 
     except OSError:
         return ProbeResult("arp", "unknown", 0, "arp non disponibile")
@@ -205,31 +265,62 @@ def run_all_probes(
     ports: List[int],
     skip_arp: bool,
     tcp_timeout: float,
+    profile: Optional[dict] = None,
 ) -> Tuple[int, List[ProbeResult]]:
     """
     Esegue DNS + tutte le probe in parallelo ove possibile.
 
+    Se il profilo include early_exit_ports, testa quelle porte prima:
+    se rispondono → host acceso con certezza (score=0, ritorno immediato).
+
     Returns:
         (score_0_100, lista_ProbeResult)
     """
+    if profile is None:
+        profile = TYPE_PROFILES["generic"]
+
     results: List[ProbeResult] = []
 
-    # DNS prima (bloccante: serve l'IP per tutto il resto)
+    # Pesi dal profilo (fallback ai valori globali se non presenti)
+    w_ping_up   = profile.get("w_ping_up",    W_PING_UP)
+    w_ping_down = profile.get("w_ping_down",  W_PING_DOWN)
+    w_tcp_up    = profile.get("w_tcp_up",     W_TCP_UP)
+    w_arp_pres  = profile.get("w_arp_present", W_ARP_PRESENT)
+    w_arp_miss  = profile.get("w_arp_missing", W_ARP_MISSING)
+    w_tcp_t     = profile.get("w_tcp_timeout", {})  # per-porta overrides
+
+    # ── 1. DNS (bloccante: serve l'IP per tutto il resto) ──
     dns_result, ip = probe_dns(host)
     results.append(dns_result)
 
     if ip is None:
-        # Prova comunque con l'host così com'è (potrebbe essere già un IP)
         ip = host
 
-    # Ping + TCP + ARP in parallelo
-    futures = []
+    # ── 2. Early exit (server/client): porta 6556 risponde → ACCESO certo ──
+    early_ports = profile.get("early_exit_ports", [])
+    already_tested: set = set()
+    for port in early_ports:
+        wt = w_tcp_t.get(port, W_TCP_TIMEOUT.get(port, W_TCP_DEFAULT))
+        r = probe_tcp(ip, port, tcp_timeout, w_up=w_tcp_up, w_timeout=wt)
+        already_tested.add(port)
+        if r.status == "up":
+            # Acceso con certezza: early exit, score=0
+            early_r = ProbeResult(r.name, "up", -100, r.msg + " [acceso]")
+            return 0, [dns_result, early_r]
+        else:
+            results.append(r)
+
+    # ── 3. Tutte le altre probe in parallelo ──
+    ports_remaining = [p for p in ports if p not in already_tested]
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as ex:
-        futures.append(ex.submit(probe_ping, ip))
-        for port in ports:
-            futures.append(ex.submit(probe_tcp, ip, port, tcp_timeout))
+        futures = []
+        futures.append(ex.submit(probe_ping, ip, 3, 1, w_ping_up, w_ping_down))
+        for port in ports_remaining:
+            wt = w_tcp_t.get(port, W_TCP_TIMEOUT.get(port, W_TCP_DEFAULT))
+            futures.append(ex.submit(probe_tcp, ip, port, tcp_timeout, w_tcp_up, wt))
         if not skip_arp:
-            futures.append(ex.submit(probe_arp, ip))
+            futures.append(ex.submit(probe_arp, ip, w_arp_pres, w_arp_miss))
 
         for f in concurrent.futures.as_completed(futures):
             try:
@@ -297,25 +388,35 @@ def format_output(
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog=SCRIPT_NAME,
-        description=f"CheckMK active check: host status via multi-probe confidence v{VERSION}",
+        description=f"CheckMK active check: host ACCESO/SPENTO via multi-probe confidence v{VERSION}",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Esempi:
-  check_host_status -H 192.168.10.100
-  check_host_status -H ns8.dominio.it --ports 22 6556 443
-  check_host_status -H 10.0.0.50 --no-arp --warn 50 --crit 80
-  check_host_status -H 192.168.32.100 --timeout 3
+Tipi host e probe prioritaria:
+  server  → early exit su porta 6556 (agente CMK): se risponde → ACCESO certo
+  client  → early exit su porta 6556 (agente CMK): se risponde → ACCESO certo
+  switch  → ping ad alto peso: risponde → ACCESO; no risposta → probabile SPENTO
+  generic → pesi bilanciati (backward compat, default)
 
-Soglie:
-  confidenza >= --crit (default 90) → CRITICAL (host offline)
+Esempi:
+  check_host_status -H 192.168.10.100 --type server
+  check_host_status -H 192.168.32.55  --type client
+  check_host_status -H 192.168.1.1    --type switch
+  check_host_status -H host.domain.it --type server --no-arp
+  check_host_status -H 10.0.0.50      --warn 50 --crit 80
+
+Soglie (confidenza host SPENTO):
+  confidenza >= --crit (default 90) → CRITICAL (host spento)
   confidenza >= --warn (default 60) → WARNING  (incerto)
-  confidenza <  --warn              → OK       (host attivo)
+  confidenza <  --warn              → OK       (host acceso)
         """
     )
     parser.add_argument("-H", "--host", required=True,
                         help="Hostname o IP da controllare")
-    parser.add_argument("--ports", nargs="+", type=int, default=[22, 6556, 443, 80],
-                        help="Porte TCP da testare (default: 22 6556 443 80)")
+    parser.add_argument("--type", choices=list(TYPE_PROFILES.keys()), default="generic",
+                        metavar="TYPE",
+                        help=f"Tipo host: {', '.join(TYPE_PROFILES.keys())} (default: generic)")
+    parser.add_argument("--ports", nargs="+", type=int, default=None,
+                        help="Porte TCP da testare (default: dipende da --type)")
     parser.add_argument("--no-arp", action="store_true",
                         help="Salta ARP (host su segmento L2 diverso)")
     parser.add_argument("--timeout", type=float, default=2.0,
@@ -332,11 +433,21 @@ Soglie:
         print(f"UNKNOWN - --warn ({args.warn}) deve essere < --crit ({args.crit})")
         return UNKNOWN
 
+    # Profilo del tipo host scelto
+    profile = TYPE_PROFILES[args.type]
+
+    # Porte: usa quelle esplicite o quelle del profilo
+    ports = args.ports if args.ports is not None else profile["ports"]
+
+    # skip_arp: flag esplicito sovrascrive profilo
+    skip_arp = args.no_arp or profile.get("skip_arp", False)
+
     score, results = run_all_probes(
         args.host,
-        args.ports,
-        skip_arp=args.no_arp,
+        ports,
+        skip_arp=skip_arp,
         tcp_timeout=args.timeout,
+        profile=profile,
     )
 
     code, output = format_output(args.host, score, results, args.warn, args.crit)
