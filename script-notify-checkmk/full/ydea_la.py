@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.1.5"
+VERSION = "1.1.6"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -754,8 +754,11 @@ def main():
             elif state in ["CRITICAL", "CRIT", "DOWN"]:
                 log(f"[GRACE] CRITICAL: riapertura ticket #{ticket_id} con commento privato")
                 grace_note = (
-                    f"[{datetime.now().strftime('%d/%m/%y %H:%M')}] "
-                    f"RIAPERTURA: {service} | {last_state} -> {state}\n"
+                    f"[{datetime.now().strftime('%d/%m/%y %H:%M')}] *** RIAPERTURA ALERT ***\n"
+                    f"\n"
+                    f"Host: {hostname} ({real_ip})\n"
+                    f"Servizio: {service}\n"
+                    f"Stato: {last_state} → {state}\n"
                     f"Output: {full_output}"
                 )
                 result = add_private_note(ticket_id, grace_note)
@@ -776,19 +779,30 @@ def main():
     if ticket_id:
         # Update existing ticket
         log(f"Updating existing ticket #{ticket_id}")
-        
-        note = f"[{datetime.now().strftime('%d/%m/%y %H:%M')}] "
-        if what == "SERVICE":
-            note += f"Servizio: {service} | {last_state} -> {state}"
-        else:
-            note += f"HOST | {last_state} -> {state}"
-        
+
+        ts = datetime.now().strftime('%d/%m/%y %H:%M')
         if state in ["OK", "UP"]:
-            note += " | ✅ Allarme rientrato"
+            header = f"[{ts}] ✅ ALLARME RIENTRATO"
         elif flap_msg:
-            note += f" | {flap_msg}"
-        
-        note += f"\nOutput: {full_output}"
+            header = f"[{ts}] ⚡ FLAPPING RILEVATO"
+        else:
+            header = f"[{ts}] 🔴 AGGIORNAMENTO ALERT"
+
+        if what == "SERVICE":
+            subject_line = f"Servizio: {service}"
+        else:
+            subject_line = f"Host: {hostname} ({real_ip})"
+
+        note = (
+            f"{header}\n"
+            f"\n"
+            f"Host: {hostname} ({real_ip})\n"
+            f"{subject_line}\n"
+            f"Stato: {last_state} → {state}\n"
+            f"Output: {full_output}"
+        )
+        if flap_msg:
+            note += f"\nFlapping: {flap_msg}"
         
         result = add_private_note(ticket_id, note)
         
