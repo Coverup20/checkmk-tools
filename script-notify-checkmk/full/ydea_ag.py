@@ -6,7 +6,7 @@ Bulk: no
 CheckMK notification script - integrates with Ydea ticketing system.
 Features: smart detection, flapping protection, host aggregation, cache management.
 
-Version: 1.0.1
+Version: 1.0.2
 """
 
 import os
@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.1.2"
+VERSION = "1.1.3"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -729,7 +729,12 @@ def main():
         last_state = os.getenv("NOTIFY_PREVIOUSHOSTHARDSHORTSTATE", "UP")
         output = os.getenv("NOTIFY_HOSTOUTPUT", "N/A")
     
-    output_short = output[:200] if len(output) > 200 else output
+    # Full output including long output (no truncation)
+    if what == "SERVICE":
+        long_output = os.getenv("NOTIFY_SERVICELONGOUTPUT", "")
+    else:
+        long_output = os.getenv("NOTIFY_LONGHOSTOUTPUT", "")
+    full_output = output + ("\n" + long_output if long_output else "")
     
     # Ticket key
     ticket_key = get_ticket_key(hostname, service)
@@ -771,8 +776,8 @@ def main():
                 log(f"[GRACE] CRITICAL: riapertura ticket #{ticket_id} con commento privato")
                 grace_note = (
                     f"[{datetime.now().strftime('%d/%m/%y %H:%M')}] "
-                    f"RIAPERTURA: {service} | {last_state} -> {state} | "
-                    f"Output: {output_short}"
+                    f"RIAPERTURA: {service} | {last_state} -> {state}\n"
+                    f"Output: {full_output}"
                 )
                 result = add_private_note(ticket_id, grace_note)
                 if result == 0:
@@ -804,7 +809,7 @@ def main():
         elif flap_msg:
             note += f" | {flap_msg}"
         
-        note += f" | Output: {output_short}"
+        note += f"\nOutput: {full_output}"
         
         result = add_private_note(ticket_id, note)
         
