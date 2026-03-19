@@ -69,7 +69,7 @@ import sys
 import time
 from typing import Dict, List, NamedTuple, Optional, Tuple
 
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 SCRIPT_NAME = "check_host_status"
 
 # Nagios exit codes
@@ -356,7 +356,7 @@ def format_output(
     elif score >= warn:
         code   = WARNING
         status = "WARNING"
-        verb   = f"PROBABILE SPENTO {score}%"
+        verb   = f"OFFLINE {score}% di problemi con connettività"
     else:
         code   = OK
         status = "OK"
