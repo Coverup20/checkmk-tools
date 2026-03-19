@@ -6,7 +6,7 @@ Bulk: no
 CheckMK notification script - integrates with Ydea ticketing system.
 Features: smart detection, flapping protection, host aggregation, cache management.
 
-Version: 1.0.2
+Version: 1.0.3
 """
 
 import os
@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.1.3"
+VERSION = "1.1.4"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -660,53 +660,32 @@ def get_alert_label(alert_type: str, what: str, service: str) -> str:
     return labels.get(alert_type, "Alert")
 
 
-def generate_smart_description(alert_type: str, hostname: str, ip: str, 
-                               output: str, service: str, state: str, 
-                               last_state: str) -> str:
+def generate_smart_description(alert_type: str, hostname: str, ip: str,
+                               output: str, service: str, state: str,
+                               last_state: str, long_output: str = "") -> str:
     """Generate smart description based on alert type."""
-    
-    descriptions = {
-        "HOST_OFFLINE_REFUSED": f"""*** ALERT - CONNESSIONE RIFIUTATA ***
 
-Host: {hostname} ({ip})
-Servizio: {service}
-Stato: {state}
+    # Build full output block (output + long_output if present)
+    output_block = f"Output: {output}"
+    if long_output:
+        output_block += f"\n{long_output}"
 
-[CMK HOST={hostname} IP={ip}]""",
-        
-        "HOST_OFFLINE_NETWORK": f"""*** ALERT - NETWORK UNREACHABLE ***
-
-Host: {hostname} ({ip})
-Servizio: {service}
-Stato: {state}
-
-[CMK HOST={hostname} IP={ip}]""",
-        
-        "HOST_OFFLINE_TIMEOUT": f"""*** ALERT - HOST TIMEOUT ***
-
-Host: {hostname} ({ip})
-Servizio: {service}
-Stato: {state}
-
-[CMK HOST={hostname} IP={ip}]""",
-        
-        "HOST_NODATA": f"""*** ALERT - DATI DI MONITORAGGIO MANCANTI ***
-
-Host: {hostname} ({ip})
-Servizio: {service}
-Stato: {state}
-
-[CMK HOST={hostname} IP={ip}]""",
+    titles = {
+        "HOST_OFFLINE_REFUSED": "*** ALERT - CONNESSIONE RIFIUTATA ***",
+        "HOST_OFFLINE_NETWORK": "*** ALERT - NETWORK UNREACHABLE ***",
+        "HOST_OFFLINE_TIMEOUT": "*** ALERT - HOST TIMEOUT ***",
+        "HOST_NODATA":          "*** ALERT - DATI DI MONITORAGGIO MANCANTI ***",
     }
-    
-    return descriptions.get(alert_type, f"""*** ALERT MONITORAGGIO ***
+    title_line = titles.get(alert_type, "*** ALERT MONITORAGGIO ***")
+
+    return f"""{title_line}
 
 Host: {hostname} ({ip})
 Servizio: {service}
 Stato: {state}
-Output: {output}
+{output_block}
 
-[CMK HOST={hostname} IP={ip}]""")
+[CMK HOST={hostname} IP={ip}]"""
 
 
 def main():
@@ -838,8 +817,9 @@ def main():
                 if what == "SERVICE":
                     title += f" - {service}"
                 
-                description = generate_smart_description(alert_type, hostname, real_ip, 
-                                                        output, service, state, last_state)
+                description = generate_smart_description(alert_type, hostname, real_ip,
+                                                        output, service, state, last_state,
+                                                        long_output)
                 description += f"\n\nTicket precedente #{ticket_id} chiuso da operatore.\n\nMarcatore: {build_cmk_marker(hostname, real_ip)}"
                 
                 new_ticket_id = create_ydea_ticket(title, description, "low", 
@@ -861,10 +841,11 @@ def main():
         if what == "SERVICE":
             title += f" - {service}"
         
-        description = generate_smart_description(alert_type, hostname, real_ip, 
-                                                output, service, state, last_state)
-        
-        ticket_id = create_ydea_ticket(title, description, "low", 
+        description = generate_smart_description(alert_type, hostname, real_ip,
+                                                output, service, state, last_state,
+                                                long_output)
+
+        ticket_id = create_ydea_ticket(title, description, "low",
                                       YDEA_CATEGORY_ID, hostname, service, output)
         
         if ticket_id:
