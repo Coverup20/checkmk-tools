@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.1.4"
+VERSION = "1.1.5"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -710,9 +710,9 @@ def main():
     
     # Full output including long output (no truncation)
     if what == "SERVICE":
-        long_output = os.getenv("NOTIFY_SERVICELONGOUTPUT", "")
+        long_output = os.getenv("NOTIFY_SERVICELONGOUTPUT", "").replace("\\n", "\n")
     else:
-        long_output = os.getenv("NOTIFY_LONGHOSTOUTPUT", "")
+        long_output = os.getenv("NOTIFY_LONGHOSTOUTPUT", "").replace("\\n", "\n")
     full_output = output + ("\n" + long_output if long_output else "")
     
     # Ticket key
