@@ -69,7 +69,7 @@ import sys
 import time
 from typing import Dict, List, NamedTuple, Optional, Tuple
 
-VERSION = "2.2.0"
+VERSION = "2.3.0"
 SCRIPT_NAME = "check_host_status"
 
 # Nagios exit codes
@@ -116,7 +116,7 @@ TYPE_PROFILES: Dict[str, dict] = {
     "server": {
         "description":      "Server con agente CheckMK (porta 6556 prioritaria)",
         "ports":            [6556, 22, 443, 80],
-        "skip_arp":         False,
+        "skip_arp":         True,   # monitoring su VPS: ARP non raggiunge host cross-VLAN
         "early_exit_ports": [6556],   # se risponde → acceso, score=0 immediato
         "w_ping_up":        -70,
         "w_ping_down":       30,
@@ -128,7 +128,7 @@ TYPE_PROFILES: Dict[str, dict] = {
     "client": {
         "description":      "Client/workstation con agente CheckMK (porta 6556 prioritaria)",
         "ports":            [6556, 3389, 22],
-        "skip_arp":         False,
+        "skip_arp":         True,   # monitoring su VPS: ARP non raggiunge host cross-VLAN
         "early_exit_ports": [6556],
         "w_ping_up":        -70,
         "w_ping_down":       30,
@@ -138,23 +138,24 @@ TYPE_PROFILES: Dict[str, dict] = {
         "w_arp_missing":     20,
     },
     "switch": {
-        "description":      "Switch/Router gestito (ping + ARP prioritari, no agente CMK)",
+        "description":      "Switch/Router gestito (ping prioritario, no agente CMK, no ARP cross-VLAN)",
         "ports":            [22, 443, 80],
-        "skip_arp":         False,
+        "skip_arp":         True,   # monitoring su VPS: ARP non raggiunge host cross-VLAN
         "early_exit_ports": [],
         "w_ping_up":        -80,    # switch risponde ping = certamente acceso
-        "w_ping_down":       45,    # switch non risponde ping = probabilmente spento
+        "w_ping_down":       75,    # senza ARP, ping porta peso maggiore → 75+8+5+5=93% CRIT✓
         "w_tcp_up":         -20,
         "w_tcp_timeout":    {22: 8, 443: 5, 80: 5},
-        "w_arp_present":    -30,    # ARP presente su switch = sicuramente acceso
+        "w_arp_present":    -30,
         "w_arp_missing":     25,
     },
     "generic": {
         "description":      "Generico (default, backward compat)",
         "ports":            [22, 6556, 443, 80],
-        "skip_arp":         False,
+        "skip_arp":         True,   # monitoring su VPS: ARP non raggiunge host cross-VLAN
         "early_exit_ports": [],
-        # usa i pesi globali W_* definiti sopra
+        "w_ping_down":       40,    # senza ARP, ping porta peso maggiore → 40+15+20+10+8=93% CRIT✓
+        # altri pesi usano W_* globali
     },
 }
 
@@ -360,7 +361,7 @@ def format_output(
     else:
         code   = OK
         status = "OK"
-        verb   = f"attivo {score}%"
+        verb   = "attivo"
 
     # Sintesi probe per il testo dell'output
     up_probes   = [r.name for r in results if r.status == "up"]
