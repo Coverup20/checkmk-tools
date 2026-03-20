@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.1.6"
+VERSION = "1.1.7"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -782,11 +782,11 @@ def main():
 
         ts = datetime.now().strftime('%d/%m/%y %H:%M')
         if state in ["OK", "UP"]:
-            header = f"[{ts}] ✅ ALLARME RIENTRATO"
+            header = f"[{ts}] ALLARME RIENTRATO"
         elif flap_msg:
-            header = f"[{ts}] ⚡ FLAPPING RILEVATO"
+            header = f"[{ts}] FLAPPING RILEVATO"
         else:
-            header = f"[{ts}] 🔴 AGGIORNAMENTO ALERT"
+            header = f"[{ts}] AGGIORNAMENTO ALERT"
 
         if what == "SERVICE":
             subject_line = f"Servizio: {service}"
