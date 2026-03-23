@@ -14,13 +14,14 @@ USO:
   python3 fix_stale_checkmk.py --all       # tutti gli host stale
   python3 fix_stale_checkmk.py --host DC01 fw.studiopaci.info ns8
 
-Version: 1.2.0
+Version: 1.3.0
 """
-import subprocess, json, time, sys
+import subprocess, json, time, sys, os
 
 now = int(time.time())
 SAMPLE_SIZE = 3
 CMD_PIPE = "/omd/sites/monitoring/tmp/run/nagios.cmd"
+CMK_BIN = "/omd/sites/monitoring/bin/cmk"
 
 # Servizi Check_MK* da trattare
 CMK_SERVICES = ["Check_MK", "Check_MK Discovery", "Check_MK Agent", "Check_MK HW/SW Inventory"]
@@ -58,7 +59,7 @@ def send_pipe_cmds(commands):
 def cmk_check(host):
     """Esegue cmk --check <host> one-shot per aggiornare i sotto-servizi."""
     r = subprocess.run(
-        ['cmk', '--check', host],
+        [CMK_BIN, '--check', host],
         capture_output=True, text=True, timeout=60
     )
     return r.returncode, r.stdout.strip(), r.stderr.strip()
