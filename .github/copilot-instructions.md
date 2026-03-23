@@ -1738,7 +1738,33 @@ ssh checkmk-vps-01 'su - monitoring -c "rclone copy do:testmonbck/checkmk-backup
 
 ---
 
-## 🚨 INCIDENTI E TROUBLESHOOTING
+## � REGOLE ASSOLUTE - CheckMK Active/Passive Checks
+
+**⚠️ LEZIONE APPRESA IL 23 MARZO 2026 — COSTO: RESTORE COMPLETO DEL SITE**
+
+### MAI fare queste cose senza conferma esplicita utente:
+
+- ❌ **MAI** `ENABLE_SVC_CHECK` o `DISABLE_SVC_CHECK` su qualsiasi servizio
+- ❌ **MAI** `DISABLE_SVC_CHECK` su `Check_MK` o `Check_MK Discovery` → causa stale massivo su TUTTI i servizi
+- ❌ **MAI** interpretare "rimuovi active check" come `DISABLE_SVC_CHECK` — sono cose DIVERSE:
+  - "Rimuovere active check" = `active_checks_enabled=0` + `passive_checks_enabled=1` (servizio riceve push)
+  - "Disabilitare check" = `DISABLE_SVC_CHECK` → il check non viene MAI eseguito/aggiornato → stale
+- ❌ **MAI** usare `ENABLE_SVC_CHECK` per "fixare" stali → causa override active su servizi passivi → rompe tutto
+- ❌ **MAI** `STOP_EXECUTING_SVC_CHECKS` o `STOP_EXECUTING_HOST_CHECKS` globalmente
+- ❌ **MAI** modificare la nagios pipe (`/tmp/run/nagios.cmd`) con comandi bulk senza approvazione esplicita
+
+### Se ci sono stali:
+
+- ✅ **DIAGNOSTICARE PRIMA** — perché il collector non gira?
+- ✅ Verificare che `Check_MK` e `Check_MK Discovery` siano `active_checks_enabled=1`
+- ✅ Se il collector gira ma i servizi sono stale → aspettare il prossimo ciclo (max 1-2 min)
+- ✅ Se il problema persiste → `cmk --check <host>` come monitoring user (NON pipe nagios)
+- ❌ **MAI** iterare con enable/disable/enable/disable → causa flapping e peggiora tutto
+- ✅ **STOP e chiedi all'utente** prima di fare qualsiasi azione correttiva
+
+---
+
+## �🚨 INCIDENTI E TROUBLESHOOTING
 
 ### 30 Gennaio 2026 - Update Windows + VSCode Crash
 
