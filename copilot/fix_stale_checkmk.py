@@ -28,45 +28,38 @@ CMK_SERVICES = ["Check_MK", "Check_MK Discovery", "Check_MK Agent", "Check_MK HW
 
 
 def lq(query):
-    r = subprocess.run(
-        ['su', '-', 'monitoring', '-c', f'lq "{query}"'],
-        capture_output=True, text=True
-    )
-    raw = r.stdout.strip()
+    import socket as _socket
+    if not query.endswith("\n"):
+        query += "\n"
+    if not query.endswith("\n\n"):
+        query += "\n"
+    s = _socket.socket(_socket.AF_UNIX)
+    s.connect("/omd/sites/monitoring/tmp/run/live")
+    s.send(query.encode())
+    s.shutdown(_socket.SHUT_WR)
+    raw = s.makefile().read().strip()
     return json.loads(raw) if raw else []
 
 
 def send_pipe_cmds(commands):
-    """Invia comandi al pipe Nagios tramite file temporaneo (evita quoting issues)."""
+    """Invia comandi al pipe Nagios direttamente (scrittura per-comando)."""
     ts = int(time.time())
-    lines = [f"    '[{ts}] {cmd}\\n'" for cmd in commands]
-    cmds_str = ",\n".join(lines)
-    script = f"""import time
-pipe = "{CMD_PIPE}"
-ts = int(time.time())
-cmds = [
-{cmds_str}
-]
-with open(pipe, 'w') as f:
-    for line in cmds:
-        f.write(line.format(ts=ts))
-print(f"Inviati {{len(cmds)}} comandi OK")
-"""
-    tmp = "/tmp/pipe_runner_fix_stale.py"
-    with open(tmp, 'w') as f:
-        f.write(script)
-    r = subprocess.run(['su', '-', 'monitoring', '-c', f'python3 {tmp}'],
-                       capture_output=True, text=True)
-    print(f"  {r.stdout.strip()}")
-    if r.returncode != 0:
-        print(f"  ERRORE: {r.stderr.strip()[:200]}")
-    return r.returncode == 0
+    count = 0
+    for cmd in commands:
+        try:
+            with open(CMD_PIPE, 'w') as f:
+                f.write(f"[{ts}] {cmd}\n")
+            count += 1
+        except Exception as e:
+            print(f"  ERRORE pipe cmd '{cmd[:60]}': {e}")
+    print(f"  Inviati {count}/{len(commands)} comandi")
+    return count == len(commands)
 
 
 def cmk_check(host):
     """Esegue cmk --check <host> one-shot per aggiornare i sotto-servizi."""
     r = subprocess.run(
-        ['su', '-', 'monitoring', '-c', f'cmk --check {host}'],
+        ['cmk', '--check', host],
         capture_output=True, text=True, timeout=60
     )
     return r.returncode, r.stdout.strip(), r.stderr.strip()
