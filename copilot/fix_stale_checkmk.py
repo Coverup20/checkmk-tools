@@ -19,7 +19,7 @@ Version: 1.1.0
 import subprocess, json, time, sys
 
 now = int(time.time())
-STALE_MINUTES = 30
+STALE_MINUTES = 10
 SAMPLE_SIZE = 3
 CMD_PIPE = "/omd/sites/monitoring/tmp/run/nagios.cmd"
 
