@@ -14,7 +14,7 @@ USO:
   python3 fix_stale_checkmk.py --all       # tutti gli host stale
   python3 fix_stale_checkmk.py --host DC01 fw.studiopaci.info ns8
 
-Version: 1.1.0
+Version: 1.2.0
 """
 import subprocess, json, time, sys
 
@@ -83,14 +83,14 @@ print("=" * 62)
 # --- Trova servizi Check_MK* stale ---
 stale_svcs = lq(
     "GET services\n"
-    "Filter: staleness > 1.5\n"
+    f"Filter: last_check < {now - 60}\n"
     "Filter: description ~ Check_MK\n"
     "Columns: host_name description state last_check plugin_output\n"
     "OutputFormat: json\n"
 )
 
 stale_hosts = sorted(set(r[0] for r in stale_svcs if r[1] == "Check_MK"))
-print(f"\nServizi Check_MK* stale (staleness>1.5): {len(stale_svcs)}")
+print(f"\nServizi Check_MK* stale (last_check < now-1min): {len(stale_svcs)}")
 from collections import Counter
 by_type = Counter(r[1] for r in stale_svcs)
 for t, c in sorted(by_type.items()):
