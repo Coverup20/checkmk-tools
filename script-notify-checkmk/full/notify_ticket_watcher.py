@@ -4,17 +4,18 @@ notify_ticket_watcher.py - Watcher log CheckMK per notifiche Telegram ticket
 Legge notify.log, intercetta [TICKET-EVENT] [CREATO] e manda messaggio Telegram.
 Completamente indipendente dal sistema di notifica CheckMK.
 
-Version: 1.2.0
+Version: 1.3.0
 """
 
 import os
 import re
 import json
+import socket
 import urllib.request
 import urllib.parse
 import sys
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 LOG_FILE   = "/omd/sites/monitoring/var/log/notify.log"
 STATE_FILE = "/omd/sites/monitoring/var/log/notify_ticket_watcher.json"
@@ -42,12 +43,53 @@ def save_state(state: dict):
         json.dump(state, f)
 
 
-def send_telegram(ticket_id: str, hostname: str, service: str, state_str: str):
+LIVESTATUS_SOCK = "/omd/sites/monitoring/tmp/run/live"
+
+
+def get_service_info(hostname: str, service: str) -> tuple[str, str]:
+    """Interroga Livestatus per ottenere (host_address, plugin_output)."""
+    try:
+        query = (
+            f"GET services\n"
+            f"Filter: host_name = {hostname}\n"
+            f"Filter: description = {service}\n"
+            f"Columns: host_address plugin_output\n"
+            f"OutputFormat: json\n\n"
+        )
+        s = socket.socket(socket.AF_UNIX)
+        s.settimeout(5)
+        s.connect(LIVESTATUS_SOCK)
+        s.send(query.encode())
+        s.shutdown(socket.SHUT_WR)
+        raw = s.makefile().read().strip()
+        rows = json.loads(raw) if raw else []
+        if rows:
+            return rows[0][0], rows[0][1]
+    except Exception:
+        pass
+    return "", ""
+
+
+def send_telegram(ticket_id: str, hostname: str, service: str, state_str: str,
+                 host_address: str = "", svc_output: str = ""):
     emoji = "\U0001f534" if "CRIT" in state_str.upper() else "\U0001f7e0"
     host_enc = urllib.parse.quote(hostname, safe="")
+
+    # Riga host: «Hostname (IP)» se l'IP è disponibile
+    host_line = f"{hostname} ({host_address})" if host_address else hostname
+
+    # Output: tronca a 300 caratteri
+    output_line = ""
+    if svc_output:
+        truncated = svc_output[:300]
+        if len(svc_output) > 300:
+            truncated += "…"
+        output_line = f"\n<code>{truncated}</code>"
+
     text = (
         f"\U0001f3ab <b>Ticket #{ticket_id} aperto</b>\n"
-        f"{emoji} <b>{state_str}</b> \u2014 {hostname} / {service}\n"
+        f"{emoji} <b>{state_str}</b> \u2014 {host_line}\n"
+        f"\U0001f4cb {service}{output_line}\n"
         f'<a href="{CMK_URL}/check_mk/view.py?view_name=host&host={host_enc}">Vai a CheckMK</a>'
     )
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -95,7 +137,8 @@ def main():
             continue
 
         try:
-            send_telegram(ticket_id, hostname, service, state_str)
+            host_address, svc_output = get_service_info(hostname, service)
+            send_telegram(ticket_id, hostname, service, state_str, host_address, svc_output)
             sent.add(ticket_id)
         except Exception as e:
             errors.append(str(e))
