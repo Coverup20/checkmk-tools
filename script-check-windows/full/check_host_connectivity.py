@@ -1,30 +1,30 @@
 #!/usr/bin/env python3
 """
-check_windows_alive.py - CheckMK active check: host Windows UP/DOWN via ARP (nmap)
+check_host_connectivity.py - CheckMK active check: host UP/DOWN via ARP (nmap)
 
-Sostituisce check_icmp per host Windows con Windows Firewall attivo.
-Usa nmap -sn (ARP scan) che funziona anche con Windows Firewall che blocca ICMP e TCP.
+Sostituisce check_icmp per host con firewall attivo (Windows, Linux, router, ecc.).
+Usa nmap -sn (ARP scan) che funziona anche quando ICMP e TCP sono bloccati dal firewall.
 Richiede: sudo nmap configurato per utente monitoring in /etc/sudoers.d/monitoring-nmap
 
 Deploy su CheckMK server:
-  cp check_windows_alive.py /omd/sites/monitoring/local/lib/nagios/plugins/check_windows_alive
-  chmod +x /omd/sites/monitoring/local/lib/nagios/plugins/check_windows_alive
+  cp check_host_connectivity.py /omd/sites/monitoring/local/lib/nagios/plugins/check_host_connectivity
+  chmod +x /omd/sites/monitoring/local/lib/nagios/plugins/check_host_connectivity
 
 Prerequisito (già configurato):
   /etc/sudoers.d/monitoring-nmap:
     monitoring ALL=(root) NOPASSWD: /usr/bin/nmap
 
-Configurazione WATO (host check command per host Windows):
+Configurazione WATO (host check command):
   Setup → Hosts → Host Check Command → "Use a custom check plugin"
-  Plugin: check_windows_alive
+  Plugin: check_host_connectivity
   Arguments: -H $HOSTADDRESS$
 
 Usage:
-  check_windows_alive.py -H 192.168.32.100
-  check_windows_alive.py -H DESKTOP-ABC.ad.studiopaci.info
-  check_windows_alive.py -H 192.168.32.100 --timeout 3
+  check_host_connectivity.py -H 192.168.32.100
+  check_host_connectivity.py -H hostname.domain.local
+  check_host_connectivity.py -H 192.168.32.100 --timeout 3
 
-Version: 2.0.0
+Version: 2.1.0
 """
 
 import argparse
@@ -35,7 +35,7 @@ import sys
 import time
 from typing import Tuple
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 
 # Exit codes Nagios/CheckMK
 OK       = 0
@@ -89,13 +89,13 @@ def check_nmap_arp(ip: str, timeout: float) -> Tuple[bool, float]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description=f"CheckMK active check: Windows host UP/DOWN via ARP (nmap) v{VERSION}",
+        description=f"CheckMK active check: host UP/DOWN via ARP (nmap) v{VERSION}",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Esempi:
-  check_windows_alive.py -H 192.168.32.100
-  check_windows_alive.py -H DESKTOP-ABC.ad.studiopaci.info
-  check_windows_alive.py -H 192.168.32.100 --timeout 5
+  check_host_connectivity.py -H 192.168.32.100
+  check_host_connectivity.py -H hostname.domain.local
+  check_host_connectivity.py -H 192.168.32.100 --timeout 5
 """)
     parser.add_argument("-H", "--host", required=True,
                         help="Hostname o IP da controllare")
