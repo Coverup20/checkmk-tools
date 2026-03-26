@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-check_host_connectivity.py - CheckMK active check: host UP/DOWN via ARP (nmap)
+check_host_connectivity.py - CheckMK active check: host UP/DOWN via ARP (nmap) con fallback ICMP
 
 Sostituisce check_icmp per host con firewall attivo (Windows, Linux, router, ecc.).
 Usa nmap -sn (ARP scan) che funziona anche quando ICMP e TCP sono bloccati dal firewall.
+Se ARP fallisce (host su subnet diversa o nmap non disponibile), fa fallback su ping ICMP.
 Richiede: sudo nmap configurato per utente monitoring in /etc/sudoers.d/monitoring-nmap
 
 Deploy su CheckMK server:
@@ -24,7 +25,7 @@ Usage:
   check_host_connectivity.py -H hostname.domain.local
   check_host_connectivity.py -H 192.168.32.100 --timeout 3
 
-Version: 2.1.0
+Version: 2.2.0
 """
 
 import argparse
@@ -35,7 +36,7 @@ import sys
 import time
 from typing import Tuple
 
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 
 # Exit codes Nagios/CheckMK
 OK       = 0
@@ -87,6 +88,39 @@ def check_nmap_arp(ip: str, timeout: float) -> Tuple[bool, float]:
         return False, -1
 
 
+def check_ping_icmp(ip: str, timeout: float) -> Tuple[bool, float]:
+    """
+    Fallback ICMP ping quando ARP non è disponibile (host su subnet diversa o nmap assente).
+
+    Returns:
+        (is_up, rtt_ms) — rtt_ms = -1 se non risponde
+    """
+    t0 = time.monotonic()
+    try:
+        result = subprocess.run(
+            ["ping", "-c", "1", "-W", str(int(timeout)), ip],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout + 5
+        )
+        elapsed = (time.monotonic() - t0) * 1000
+
+        if result.returncode == 0:
+            # Estrai rtt da output ping (es: "rtt min/avg/max/mdev = 0.123/0.123/0.123/0.000 ms")
+            m = re.search(r"rtt .* = [\d.]+/([\d.]+)/", result.stdout)
+            if m:
+                rtt = float(m.group(1))
+            else:
+                rtt = round(elapsed, 1)
+            return True, round(rtt, 2)
+        return False, -1
+    except subprocess.TimeoutExpired:
+        return False, -1
+    except Exception:
+        return False, -1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=f"CheckMK active check: host UP/DOWN via ARP (nmap) v{VERSION}",
@@ -112,16 +146,22 @@ Esempi:
         print(f"CRITICAL - {host}: DNS non risolve")
         return CRITICAL
 
-    # Test ARP via nmap (bypassa Windows Firewall)
+    # Step 1: Test ARP via nmap (bypassa Windows Firewall, funziona solo stessa subnet)
     is_up, rtt = check_nmap_arp(resolved_ip, args.timeout)
 
     if is_up:
-        rtt_str = f"{rtt}ms" if rtt >= 0 else "n/a"
         print(f"OK - {host} raggiungibile (ARP) | rta={rtt}ms;500;1000;0")
         return OK
-    else:
-        print(f"CRITICAL - {host} NON raggiungibile (nessuna risposta ARP)")
-        return CRITICAL
+
+    # Step 2: Fallback ICMP ping (cross-subnet, host su reti diverse)
+    is_up_icmp, rtt_icmp = check_ping_icmp(resolved_ip, args.timeout)
+
+    if is_up_icmp:
+        print(f"OK - {host} raggiungibile (ICMP) | rta={rtt_icmp}ms;500;1000;0")
+        return OK
+
+    print(f"CRITICAL - {host} NON raggiungibile (nessuna risposta ARP né ICMP)")
+    return CRITICAL
 
 
 if __name__ == "__main__":
