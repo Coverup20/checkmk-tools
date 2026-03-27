@@ -3,7 +3,7 @@
 telegram_paci.py - Notifiche Telegram per Studio Paci
 Script dedicato per notifiche degli host del cliente Studio Paci.
 
-Version: 1.1.0
+Version: 1.2.0
 """
 
 import os
@@ -11,7 +11,7 @@ import sys
 import urllib.parse
 import urllib.request
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 # === CONFIG ===
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
