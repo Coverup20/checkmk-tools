@@ -1501,6 +1501,11 @@ wsl -d kali-linux ssh <host> "check_mk_agent 2>/dev/null | grep ServiceName"
   → Se l'host usa password, il tool va in `^C` indipendentemente dall'alias configurato
 - ✅ **Classificazione host per metodo auth**:
   - 🔑 **CHIAVE SSH** (run_in_terminal OK): checkmk-vps-01, checkmk-vps-02, ubntmarzio
+    → checkmk-vps-01/02: chiave ~/.ssh/checkmk (passphrase) - usare SEMPRE via WSL
+    → Comando: `wsl -d kali-linux bash -c "ssh checkmk-vps-02 'cmd'"`
+    → ControlMaster 30m attivo in WSL: dopo la prima connessione (passphrase), tutte le successive sono autonome
+    → ⚠️ Se il socket è scaduto (>30min), chiedere all'utente di riaprire: `wsl -d kali-linux ssh checkmk-vps-02`
+    → ubntmarzio: chiave ~/.ssh/copilot_ubntmarzio (ed25519, NO passphrase, installata 2026-03-28) - autonomo sempre
   - 🔑 **CHIAVE SSH** (run_in_terminal OK): srv-monitoring
     → Chiave: ~/.ssh/copilot_srv_monitoring (ed25519, installata 2026-03-10)
     → Comando: `wsl -d kali-linux bash -c "ssh srv-monitoring 'cmd'"` (NO -tt!)
@@ -1538,6 +1543,8 @@ laboratorio       # 10.155.100.1:2222 (root, NethSecurity 8)
                   # ROCKSOLID Mode validato - resistente major upgrade
 marziodemo        # 10.155.100.61:22 (root, Demo environment)
 ubntmarzio        # 10.155.100.108:22 (user: marzio) - 🔑 CHIAVE SSH (accesso autonomo OK, NO sudo senza password)
+                  # Chiave: ~/.ssh/copilot_ubntmarzio (ed25519, installata 2026-03-28)
+                  # Comando: ssh ubntmarzio 'cmd'  (alias in ~/.ssh/config)
 srv-monitoring    # 45.33.235.86:2333 (root, Monitoring)
                   # ⚠️ USARE SEMPRE root@45.33.235.86 - MAI admin-nethesis o altri utenti!
                   # ⚠️ NON usare sudo (connessione già come root - sudo non serve)
