@@ -61,6 +61,13 @@ Collezione completa di script per il monitoraggio e la gestione di infrastruttur
 - **Validazione**: Test sintassi e funzionalità pre-deployment
 - **Interactive Menu**: Deploy interattivo con selezione script per OS
 
+### 🎨 Nethesis Branding per CheckMK
+
+- **Rebranding completo**: Logo, colori e CSS per tema facelift di CheckMK
+- **Multi-server**: Deploy su tutti i server con un solo script
+- **Asset statici**: SVG con logo embedded in `nethesis-brand/`
+- **Idempotente**: Sicuro da rieseguire, non rompe la configurazione esistente
+
 ### ☁️ Backup Cloud Automatizzato
 
 - **rclone Integration**: Backup CheckMK su cloud storage (S3, DigitalOcean Spaces, ecc.)
@@ -173,6 +180,16 @@ checkmk-tools/
 │   ├── config/                    # File configurazione
 │   ├── README.md                  # Guida principale
 │   └── README-*.md                # Guide specifiche
+│
+├── nethesis-brand/                # 🎨 Asset branding Nethesis per CheckMK
+│   ├── checkmk_logo.svg           # Logo login (290px, bordo verde)
+│   ├── icon_checkmk_logo.svg      # Icona N sidebar 40px
+│   ├── icon_checkmk_logo_min.svg  # Icona N sidebar 28px
+│   ├── nethesis_color.png         # Logo originale colore (sorgente)
+│   ├── nethesis_n_icon.png        # Favicon N originale (sorgente)
+│   └── theme.css                  # CSS override colori Nethesis
+│
+├── deploy-nethesis-brand.sh       # 🎨 Deploy branding su tutti i server CheckMK
 │
 ├── tools/                         # Utility Python
 │   ├── fix_bash_syntax_corruption.py  # Fix corruzione sintassi

@@ -33,6 +33,21 @@ Script di notifica avanzati per CheckMK.
   - `telegram_realip` - Notifiche Telegram
   - Documentazione (TESTING_GUIDE, CHANGELOG, FIX guides)
 
+### 🎨 **nethesis-brand/** - Branding Nethesis per CheckMK
+
+Asset e script per il rebranding dell'interfaccia CheckMK con identità visiva Nethesis.
+
+- `checkmk_logo.svg` — Logo pagina login (290px, sfondo bianco, bordo verde `#3ecf8e`)
+- `icon_checkmk_logo.svg` — Icona N per sidebar (40×40px, angoli arrotondati)
+- `icon_checkmk_logo_min.svg` — Icona N minimale (28×28px)
+- `nethesis_color.png` — Logo wordmark colore (sorgente scaricata da nethesis.it)
+- `nethesis_n_icon.png` — Favicon N (sorgente)
+- `theme.css` — Override CSS: colori `#0369a1` / `#1a425c`, sfondo login gradient
+
+**Script di deploy**: `deploy-nethesis-brand.sh` (root repo)
+- Uso: `bash deploy-nethesis-brand.sh` (tutti i server) oppure `bash deploy-nethesis-brand.sh <host>`
+- Server target configurati: `ubntmarzio-root`, `checkmk-vps-01`, `checkmk-vps-02`, `srv-monitoring-sp`, `srv-monitoring-us`
+
 ### 📂 **Fix/** - Script di fix e troubleshooting
 Risoluzione problemi CheckMK e componenti.
 
