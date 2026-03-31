@@ -29,7 +29,7 @@ except ImportError:
     print("   pip3 install requests python-dotenv")
     sys.exit(127)
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 
 # ===== CONFIGURAZIONE GLOBALE =====
 
@@ -476,7 +476,10 @@ class TicketOperations:
         priority_num = priority_map.get(priority.lower(), 30)
         
         # Valori predefiniti
-        azienda = int(os.getenv("YDEA_AZIENDA", "2339268"))
+        azienda_str = os.getenv("YDEA_AZIENDA")
+        if not azienda_str:
+            raise ValueError("YDEA_AZIENDA non configurata nell'env file - impostare l'ID anagrafica azienda")
+        azienda = int(azienda_str)
         contatto = int(os.getenv("YDEA_CONTATTO", "773763"))
         contratto_id = os.getenv("YDEA_CONTRATTO_ID")
         
