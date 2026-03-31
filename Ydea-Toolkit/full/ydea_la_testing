@@ -20,12 +20,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.1.9"
+VERSION = "1.2.0"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
 YDEA_ENV = f"{YDEA_TOOLKIT_DIR}/.env.la_testing"
-YDEA_CONFIG = f"{YDEA_TOOLKIT_DIR}/premium-mon-config.json"
+YDEA_CONFIG = f"{YDEA_TOOLKIT_DIR}/config/premium-mon-config.json"
 YDEA_CACHE_DIR = "/opt/ydea-toolkit/cache"
 TICKET_CACHE = f"{YDEA_CACHE_DIR}/ydea_checkmk_tickets_testing.json"
 FLAPPING_CACHE = f"{YDEA_CACHE_DIR}/ydea_checkmk_flapping_testing.json"
