@@ -1,1 +1,0 @@
-#!/bin/bash# Launcher per eseguire ydea_realip remoto dal repo GitHub# Script notifica CheckMK → Ydea Ticketing con real_ipSCRIPT_URL="https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-notify-checkmk/ydea_realip"# Esegue lo script remotobash <(curl -fsSL "$SCRIPT_URL") "$@"
