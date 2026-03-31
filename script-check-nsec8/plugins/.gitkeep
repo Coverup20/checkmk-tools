@@ -1,3 +1,0 @@
-# Directory per plugin CheckMK
-# I plugin vanno in /usr/lib/check_mk_agent/plugins/
-# Auto-deploy gestito da rocksolid-startup-check.sh
