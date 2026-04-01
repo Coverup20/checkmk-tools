@@ -55,6 +55,15 @@
 - ✅ If a default is needed → use a clearly fake/generic value that cannot be mistaken for real data
 - ✅ This rule applies to ALL file types: scripts, config templates, markdown, instructions — no exceptions
 
+### No archived/ folders — delete replaced scripts
+
+- ❌ **NO `archived/` folders** — scripts that are replaced must be deleted, not archived
+- ❌ **NEVER move superseded scripts to `archived/`** — delete them directly with `git rm`
+- ❌ **NEVER keep old versions alongside new ones** — one version only, the current one
+- ✅ Git history preserves the old versions — no need to keep them in the tree
+- ✅ When replacing a script with a new one → `git rm` the old one in the same commit
+- ✅ If `archived/` folders are found → delete them immediately
+
 ---
 
 ## 🎯 FILOSOFIA DI LAVORO FONDAMENTALE
