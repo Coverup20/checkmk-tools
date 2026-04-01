@@ -16,6 +16,28 @@
 
 ---
 
+## 📏 REGOLE GENERALI OBBLIGATORIE
+
+### Lingua dei file (script, codice, commenti, documentazione)
+
+- ✅ **TUTTO il testo nei file deve essere in inglese**: commenti, docstring, messaggi log, variabili descrittive, README, doc
+- ✅ **Nuovi file**: scrivere direttamente in inglese
+- ✅ **File esistenti modificati**: tradurre in inglese le parti che si toccano
+- ✅ **Migrazione graduale**: quando si modifica uno script vecchio, tradurre l'intero file in inglese
+- ❌ **MAI aggiungere testo in italiano** in file di codice o documentazione
+
+### Emoji nei file
+
+- ❌ **ZERO emoji nei file** — nessuna eccezione: script, codice, commenti, markdown, file di istruzioni Copilot
+- ✅ **File esistenti modificati**: rimuovere tutte le emoji dall'intero file quando si tocca
+- ✅ **Nuovi file**: non inserire mai emoji
+
+### Chat communications
+
+- ✅ **Communications between us in chat always remain in Italian**
+
+---
+
 ## 🎯 FILOSOFIA DI LAVORO FONDAMENTALE
 
 **⚠️ REGOLA ZERO - QUALITÀ PRIMA DI TUTTO:**
@@ -55,6 +77,48 @@
 - ✅ **TENTARE SEMPRE** di eseguire ciò che viene chiesto, qualunque sia la difficoltà
 - ✅ Se ci sono ostacoli tecnici reali → risolverli autonomamente, non delegare all'utente
 - ✅ L'utente conosce già le tue capacità: fidati della sua richiesta e agisci
+
+---
+
+## 🔀 WORKFLOW GIT - Fork e Upstream
+
+### Struttura repository
+
+| Remote | URL | Ruolo |
+|--------|-----|-------|
+| `origin` | `git@github.com:Coverup20/checkmk-tools.git` | **Fork di lavoro** — push quotidiani |
+| `upstream` | `git@github.com:nethesis/checkmk-tools.git` | **Repo ufficiale Nethesis** — push a rilascio |
+
+### Regola OBBLIGATORIA - Due-push workflow
+
+**Tutto il lavoro quotidiano va su `origin` (fork). Solo a lavoro completato si pusha su `upstream`.**
+
+**Workflow completo:**
+
+```bash
+# 1. Lavora normalmente, commit su fork
+git add .
+git commit -m "type(scope): vX.Y.Z - descrizione"
+git push origin main
+
+# 2. Solo quando il lavoro è FINITO e testato → push su upstream Nethesis
+git push upstream main
+```
+
+**Regole:**
+
+- ✅ **Durante lo sviluppo**: push SOLO su `origin` (fork Coverup20)
+- ✅ **A lavoro completato**: stesso commit → push anche su `upstream` (nethesis)
+- ✅ **Commit message uguale** su entrambi i push (stesso commit, stesso tag/versione)
+- ❌ **MAI** push su `upstream` senza aver prima testato su `origin`
+- ❌ **MAI** `git push` senza specificare `origin` o `upstream` (potrebbero andare su quello sbagliato)
+- ✅ **Default push**: sempre `origin` se non specificato diversamente dall'utente
+
+**Quando fare il push su upstream:**
+
+- ✅ Feature/fix completata + testata su host remoti
+- ✅ Utente da il via libera esplicito ("ok, pusha anche su nethesis")
+- ❌ MAI durante iterazioni di sviluppo/debug
 
 ---
 
@@ -428,10 +492,10 @@ git commit -m "fix: risolto errore comando"
 └─────────────────────────────────────────────────────────┘
                          ↓
 ┌─────────────────────────────────────────────────────────┐
-│ 4. ALLINEA REPO E COMMIT                                │
+│ 4. ALLINEA REPO E COMMIT (sul fork)                     │
 │    git add script.sh                                    │
-│    git commit -m "descriptive message"                  │
-│    git push                                             │
+│    git commit -m "type(scope): vX.Y.Z - descrizione"   │
+│    git push origin main   ← SOLO sul fork!              │
 └─────────────────────────────────────────────────────────┘
                          ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -895,7 +959,34 @@ $errors = $null; $null = [System.Management.Automation.PSParser]::Tokenize((Get-
 
 **Non procedere mai se PSParser riporta errori!**
 
-### 📂 REGOLA DEPLOYMENT - Path Script Repository
+### �️ REGOLA OBBLIGATORIA - Pulizia Script Temporanei su Host Remoti
+
+**Script creati su host remoti (via WSL/SSH) per eseguire azioni puntuali → DEVONO essere cancellati al termine del lavoro.**
+
+- ❌ **NON lasciare script temporanei** in `/tmp/`, `/root/`, `/home/`, o qualsiasi altra directory degli host remoti
+- ✅ **SEMPRE cancellare** lo script appena il task è completato (o fallito)
+- ✅ **Cancellazione automatica**: includere `rm -f /tmp/script.py` nello stesso comando SSH dove si esegue lo script
+- ✅ Questo vale per: script Python, bash, file `.py`, `.sh` e qualsiasi altro file creato ad-hoc
+
+**Pattern corretto (esegui e cancella in un colpo solo):**
+
+```bash
+# ✅ CORRETTO - esegui e cancella
+ssh host 'python3 /tmp/fix.py; rm -f /tmp/fix.py'
+
+# ✅ CORRETTO - via base64 (non lascia file)
+ssh host 'echo <base64> | base64 -d | python3'
+
+# ❌ SBAGLIATO - script lasciato sull'host
+ssh host 'python3 /tmp/fix.py'
+# ... lavoro completato ...
+# (nessuna pulizia)
+```
+
+**Il metodo base64 è preferito** perché non crea mai file temporanei sull'host.
+Se per forza devi creare un file → cancellalo subito dopo con `rm -f`.
+
+### �📂 REGOLA DEPLOYMENT - Path Script Repository
 
 **⚠️ IMPORTANTE: Repository già clonato su tutte le macchine**
 
