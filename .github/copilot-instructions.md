@@ -36,6 +36,14 @@
 
 - ✅ **Communications between us in chat always remain in Italian**
 
+### No personal names or brand names in files
+
+- ❌ **NEVER include names of people** (real names, usernames, GitHub handles, etc.) in any file
+- ❌ **NEVER include internal brand names, customer names, or project codenames** in files
+- ✅ Use generic references: "Nethesis style", "upstream standard", "reference codebase"
+- ✅ If a person or brand must be referenced → use only the company name (e.g. "Nethesis")
+- ✅ This rule applies to: code, comments, docstrings, markdown, instructions files — no exceptions
+
 ---
 
 ## 🎯 FILOSOFIA DI LAVORO FONDAMENTALE
@@ -1530,9 +1538,9 @@ wsl -d kali-linux ssh <host> "check_mk_agent 2>/dev/null | grep ServiceName"
 
 ---
 
-## Python Style - gsanchietti Standard
+## Python Style - Nethesis Standard
 
-Reference style analyzed from `NethServer/nethsecurity` (`packages/ns-api/files/`).
+Reference style from `NethServer/nethsecurity` (`packages/ns-api/files/`).
 Apply this style to ALL new Python scripts in this project.
 
 ### Structure (mandatory)
@@ -1600,7 +1608,7 @@ check()
 
 **Imports:** stdlib first, then third-party/platform libs — no blank lines between groups
 
-### CheckMK local check template (gsanchietti style)
+### CheckMK local check template (Nethesis style)
 
 ```python
 #!/usr/bin/python3
