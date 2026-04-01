@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-checkmk_download_backup.py - CheckMK Backup Download Tool
+"""checkmk_download_backup.py - CheckMK Backup Download Tool
 
 Download CheckMK backups from DigitalOcean Spaces using rclone:
 - Interactive UI with color output
@@ -8,8 +7,7 @@ Download CheckMK backups from DigitalOcean Spaces using rclone:
 - Support for job00-daily and job01-weekly paths
 - Automatic rclone setup if not configured
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -233,12 +231,10 @@ def select_job_paths() -> List[str]:
 
 
 def list_backups(rclone_config: str, paths: List[str]) -> Dict[int, Dict[str, str]]:
-    """
-    List available backups from cloud.
+    """List available backups from cloud.
     
     Returns:
-        Dictionary mapping index to backup info
-    """
+        Dictionary mapping index to backup info"""
     title(" Backup Disponibili")
     
     item_map = {}
@@ -316,16 +312,14 @@ def list_backups(rclone_config: str, paths: List[str]) -> Dict[int, Dict[str, st
 
 
 def parse_selection(selection: str, max_index: int) -> List[int]:
-    """
-    Parse user selection (supports single, range, mixed).
+    """Parse user selection (supports single, range, mixed).
     
     Args:
-        selection: User input (e.g., "1,3-5,7")
+        selection: User input (e.g., "1.3-5.7")
         max_index: Maximum valid index
         
     Returns:
-        List of selected indices
-    """
+        List of selected indices"""
     selected = []
     
     for part in selection.split(','):
@@ -356,12 +350,10 @@ def parse_selection(selection: str, max_index: int) -> List[int]:
 
 def download_backups(rclone_config: str, selected_indices: List[int],
                      item_map: Dict[int, Dict[str, str]], download_dir: str) -> Tuple[List[str], List[str]]:
-    """
-    Download selected backups.
+    """Download selected backups.
     
     Returns:
-        Tuple of (downloaded_items, failed_items)
-    """
+        Tuple of (downloaded_items, failed_items)"""
     title("  Download")
     
     # Create download directory
@@ -406,7 +398,7 @@ def download_backups(rclone_config: str, selected_indices: List[int],
                 failed.append(f"{name}/ (download failed)")
         
         else:
-            # Download file
+            # Download files
             log(f"  Scarico file {name}...")
             result = run_command(
                 ["rclone", "copy",

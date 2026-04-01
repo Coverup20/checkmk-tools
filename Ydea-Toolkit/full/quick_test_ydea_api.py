@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-quick_test_ydea_api.py - Quick test Ydea API
+"""quick_test_ydea_api.py - Quick test Ydea API
 
 Test rapido funzionalità base API Ydea: login, get tickets, get categories.
 
 Usage:
     quick_test_ydea_api.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import importlib.util

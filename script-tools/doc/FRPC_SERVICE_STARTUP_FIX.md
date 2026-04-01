@@ -1,8 +1,8 @@
 # Windows Installer - FRPC Service Startup Fix
-> **Categoria:** Storico
+> **Category:** Historical
 
 **Date:** 2025-11-07 (FRPC Diagnostics & Fix)  
-**Status:**  FIXED - Installation Script Updated  
+**Status:** FIXED - Installation Script Updated  
 **Commit:** 90229ce
 
 ---
@@ -14,28 +14,28 @@ After running the installer, CheckMK Agent installed successfully, but **FRPC se
 ### Diagnostic Results
 
 **Positive Findings:**
--  FRPC executable: Present at `C:\Program Files\frp\frpc.exe`
--  Configuration file: Correct at `C:\ProgramData\frp\frpc.toml`
--  Service registered: `sc.exe qc frpc` showed proper configuration
--  **MANUAL EXECUTION: WORKS PERFECTLY!**
+- FRPC executable: Present at `C:\Program Files\frp\frpc.exe`
+- Configuration file: Correct at `C:\ProgramData\frp\frpc.toml`
+- Service registered: `sc.exe qc frpc` showed proper configuration
+- **MANUAL EXECUTION: WORKS PERFECTLY!**
 
 **Test Output (manual run):**
 ```
 2025-11-07 16:29:33.916 [I] start frpc service
-2025-11-07 16:29:34.004 [I] try to connect to server...
+2025-11-07 16:29:34.004 [I] trying to connect to server...
 2025-11-07 16:29:34.354 [I] login to server success
 2025-11-07 16:29:34.355 [I] proxy added: [NB-Marzio]
 2025-11-07 16:29:34.450 [I] [NB-Marzio] start proxy success
 ```
 
 **Problem:**
--  Service wouldn't auto-start when registered with `sc.exe create`
--  Calling `Start-Service` immediately after registration failed
--  Service status remained "Stopped"
+- Service wouldn't auto-start when registered with `sc.exe create`
+- Calling `Start-Service` immediately after registration failed
+- Service status remained "Stopped"
 
 ---
 
-## Root Cause
+## Root Causes
 
 The script created the service and immediately tried to start it without:
 1. Sufficient delay for service registration to complete
@@ -52,7 +52,7 @@ The script created the service and immediately tried to start it without:
 ```powershell
 sc.exe create frpc binPath= "$frpcPath -c $tomlFile" start= auto ...
 Start-Service -Name "frpc" -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 2
+Start-Sleep-Seconds 2
 # Check if running (fails)
 ```
 
@@ -60,7 +60,7 @@ Start-Sleep -Seconds 2
 ```powershell
 # 1. Register service
 Invoke-Expression $createCmd 2>$null
-Start-Sleep -Seconds 1
+Start-Sleep-Seconds 1
 
 # 2. Verify service was created
 $frpcService = Get-Service -Name "frpc" -ErrorAction SilentlyContinue
@@ -74,7 +74,7 @@ $serviceRunning = $false
 While ($retryCount -lt $maxRetries -and -not $serviceRunning) {
     $retryCount++
     Start-Service -Name "frpc" -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 3  # Increased wait
+    Start-Sleep -Seconds 3 # Increased wait
     
     $frpcService = Get-Service -Name "frpc" -ErrorAction SilentlyContinue
     if ($frpcService.Status -eq "Running") {
@@ -83,11 +83,11 @@ While ($retryCount -lt $maxRetries -and -not $serviceRunning) {
     }
     elseif ($retryCount -lt $maxRetries) {
         Stop-Service -Name "frpc" -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1
+        Start-Sleep-Seconds 1
     }
 }
 
-# 4. Better user feedback
+#4. Better user feedback
 if (-not $serviceRunning) {
     Write-Host "[WARN] Service created but not started (will start on next boot)"
     Write-Host "[INFO] Manual start: Start-Service -Name 'frpc'"
@@ -139,21 +139,21 @@ if (-not $serviceRunning) {
 
 3. **Expected Output:**
    ```
-   [*] Creazione servizio Windows...
-       [*] Arresto servizio esistente...
-       [*] Rimozione servizio precedente...
-       [*] Registrazione servizio Windows...
-       [OK] Servizio registrato
-       [*] Tentativo di avvio (1/3)...
-       [OK] Servizio FRPC avviato con successo
+   [*] Creating Windows Service...
+       [*] Stopping existing service...
+       [*] Removing previous service...
+       [*] Windows Service Logging...
+       [OK] Service registered
+       [*] Startup attempt (1/3)...
+       [OK] FRPC service started successfully
    
-   [OK] FRPC Configurazione:
-       Server:        monitor.nethlab.it:7000
-       Tunnel:        NB-Marzio
-       Porta remota:  6010
-       Porta locale:  6556
-       Config:        C:\ProgramData\frp\frpc.toml
-       Log:           C:\ProgramData\frp\logs\frpc.log
+   [OK] FRPC Configuration:
+       Server: monitor.nethlab.it:7000
+       Tunnel: NB-Marzio
+       Remote port: 6010
+       Local port: 6556
+       Config: C:\ProgramData\frp\frpc.toml
+Log: C:\ProgramData\frp\logs\frpc.log
    ```
 
 4. **Verify Service:**
@@ -183,11 +183,11 @@ The service is registered with:
 
 ### Service Startup Flow
 
-1.  Service registered with Windows (via `sc.exe create`)
-2.  Service verified to exist
-3.  Service start attempted (with retry logic)
-4.  Verification that service is actually running
-5.  User feedback on success/failure
+1. Service registered with Windows (via `sc.exe create`)
+2. Service verified to exist
+3. Service start attempted (with retry logic)
+4. Verification that service is actually running
+5. User feedback on success/failure
 
 ### Fallback Behavior
 
@@ -213,7 +213,7 @@ If service fails to start immediately:
 ```
 Commit: 90229ce
 Author: Marzio
-Date: 2025-11-07
+Dates: 2025-11-07
 
 Message: fix: Improve FRPC service startup with retry logic and better error handling
 
@@ -261,7 +261,7 @@ If the service still doesn't start automatically, you can:
    Get-Content 'C:\ProgramData\frp\frpc.toml'
    ```
 
-4. **Test Connectivity:**
+4. **Connectivity Test:**
    ```powershell
    Test-NetConnection -ComputerName monitor.nethlab.it -Port 7000
    ```
@@ -277,13 +277,13 @@ Successful connection shows:
 
 Error scenarios:
 ```
-[E] dial tcp: connect refused          # Server not responding
-[E] token auth failed                   # Wrong authentication token
-[E] EOF                                 # Connection interrupted
+[E] dial tcp: connect refused # Server not responding
+[E] token auth failed # Wrong authentication token
+[E] EOF # Connection interrupted
 ```
 
 ---
 
-**Status:**  FIXED AND TESTED  
+**Status:** FIXED AND TESTED  
 **Last Update:** 2025-11-07  
 **Next Step:** Production deployment

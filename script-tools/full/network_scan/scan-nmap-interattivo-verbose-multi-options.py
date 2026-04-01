@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-scan-nmap-interattivo-verbose-multi-options.py
+"""scan-nmap-interattivo-verbose-multi-options.py
 
 Python entrypoint that delegates to scan-nmap-interattivo-verbose-multi-options.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

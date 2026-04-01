@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-deploy-monitoring-scripts.py
+"""deploy-monitoring-scripts.py
 
 Python entrypoint that delegates to deploy-monitoring-scripts.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

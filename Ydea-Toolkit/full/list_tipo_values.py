@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-list_tipo_values.py - Lista valori possibili per campo 'tipo' ticket
+"""list_tipo_values.py - List of possible values for ticket 'type' field
 
 Usage:
-    list_tipo_values.py
+    list_type_values.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import json

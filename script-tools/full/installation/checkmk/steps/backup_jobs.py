@@ -38,7 +38,7 @@ def run(cfg: InstallerConfig) -> None:
         return
 
     log_info("Avvio installazione backup jobs (interattivo)...")
-    # Esegui dalla directory dello script così che BASH_SOURCE[0] trovi i file companion
+    # Run from the script directory so that BASH_SOURCE[0] finds the companion files
     result = subprocess.run(
         [sys.executable, str(script)],
         cwd=str(script.parent),

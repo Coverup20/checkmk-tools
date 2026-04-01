@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-pre-upgrade-nsec8.py
+"""pre-upgrade-nsec8.py
 
 Python entrypoint that delegates to pre-upgrade-nsec8.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

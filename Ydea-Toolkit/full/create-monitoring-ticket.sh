@@ -1,12 +1,12 @@
 #!/bin/bash
-# create-monitoring-ticket.sh - Crea ticket Ydea da allarme CheckMK
+# create-monitoring-ticket.sh - Create Ydea ticket from CheckMK alarm
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/ydea-toolkit.sh"
 
-# Carica configurazione Premium_Mon
+# Load Premium_Mon configuration
 CONFIG_FILE="$SCRIPT_DIR/../config/premium-mon-config.json"
 
 if [[ ! -f "$CONFIG_FILE" ]]; then
@@ -14,7 +14,7 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
     exit 1
 fi
 
-# Leggi parametri da CheckMK
+# Read parameters from CheckMK
 CMK_HOST="${1:-}"
 CMK_SERVICE="${2:-}"
 CMK_STATE="${3:-}"
@@ -22,7 +22,7 @@ CMK_OUTPUT="${4:-}"
 CMK_HOSTIP="${5:-}"
 
 if [[ -z "$CMK_HOST" ]]; then
-    echo " Uso: $0 <HOST> <SERVICE> <STATE> <OUTPUT> [HOST_IP]"
+    echo "Usage: $0 <HOST> <SERVICE> <STATE> <OUTPUT> [HOST_IP]"
     echo ""
     echo "Esempio:"
     echo "  $0 'mail.example.com' 'HTTP' 'CRITICAL' 'Connection timeout' '1.2.3.4'"
@@ -36,7 +36,7 @@ log_info "State: $CMK_STATE"
 log_info "Output: $CMK_OUTPUT"
 log_info "IP: ${CMK_HOSTIP:-N/A}"
 
-# Carica configurazione
+# Load configuration
 ANAGRAFICA_ID=$(jq -r '.anagrafica_id' "$CONFIG_FILE")
 PRIORITA_ID=$(jq -r '.priorita_id' "$CONFIG_FILE")
 FONTE=$(jq -r '.fonte' "$CONFIG_FILE")
@@ -46,16 +46,16 @@ DEFAULT_TIPO=$(jq -r '.default_tipo' "$CONFIG_FILE")
 
 log_debug "Config: anagrafica=$ANAGRAFICA_ID, priorita=$PRIORITA_ID, sla=$SLA_ID, assegnatoa=$ASSEGNATOA_ID"
 
-# Determina tipologia in base al servizio/host
+# Determine type based on service/host
 determine_tipo() {
   local service_lower=$(echo "$CMK_SERVICE $CMK_OUTPUT $CMK_HOST" | tr '[:upper:]' '[:lower:]')
     
-  # Controlla ogni tipologia
+  # Check each type
   while IFS= read -r tipologia_key; do
-    # Leggi keywords per questa tipologia
+    # Read keywords for this type
     local keywords=$(jq -r ".tipologie.${tipologia_key}.keywords[]" "$CONFIG_FILE" 2>/dev/null || echo "")
     
-    # Controlla se qualche keyword matcha
+    # Check if any keywords match
     while IFS= read -r keyword; do
       [[ -z "$keyword" ]] && continue
       if echo "$service_lower" | grep -qi "$keyword"; then
@@ -65,7 +65,7 @@ determine_tipo() {
     done <<< "$keywords"
   done < <(jq -r '.tipologie | keys[]' "$CONFIG_FILE")
     
-  # Default se non trovato match
+  # Default if no match found
   echo "$DEFAULT_TIPO"
 }
 
@@ -93,7 +93,7 @@ fi
 # Descrizione generica
 DESCRIZIONE="Allarme da sistema di monitoraggio CheckMK"
 
-# Dettagli allarme per nota privata
+# Alarm details for private note
 NOTA_PRIVATA="<p><strong>${STATE_ICON} Allarme da CheckMK Monitoring</strong></p><ul><li><strong>Host:</strong> ${CMK_HOST}</li><li><strong>Service:</strong> ${CMK_SERVICE:-Host Check}</li><li><strong>Stato:</strong> ${CMK_STATE}</li><li><strong>IP:</strong> ${CMK_HOSTIP:-N/A}</li><li><strong>Data/Ora:</strong> $(date '+%Y-%m-%d %H:%M:%S')</li></ul><p><strong>Output:</strong></p><pre>${CMK_OUTPUT}</pre><p><em>Ticket creato automaticamente dal sistema di monitoraggio CheckMK</em></p>"
 
 log_info "Titolo: $TITOLO"
@@ -131,12 +131,12 @@ fi
 
 log_debug "Body: $TICKET_BODY"
 
-# Chiamata API per creare ticket
+# API call to create tickets
 ensure_token
 
 RESPONSE=$(ydea_api POST "/ticket" "$TICKET_BODY")
 
-# Estrai ID ticket creato
+# Extract created ticket ID
 TICKET_ID=$(echo "$RESPONSE" | jq -r '.id // .ticket_id // .data.id // empty')
 TICKET_CODE=$(echo "$RESPONSE" | jq -r '.codice // .code // .data.codice // empty')
 
@@ -146,7 +146,7 @@ if [[ -n "$TICKET_ID" && "$TICKET_ID" != "null" ]]; then
   log_success "   Codice: ${TICKET_CODE:-N/A}"
   log_success "   Link: https://my.ydea.cloud/ticket/${TICKET_ID}"
     
-  # Aggiungi nota privata con dettagli allarme
+  # Add private note with alarm details
   log_info "Aggiunta nota privata con dettagli allarme..."
   
   NOTE_USER_ID="${ASSEGNATOA_ID:-12336}"
@@ -162,10 +162,10 @@ if [[ -n "$TICKET_ID" && "$TICKET_ID" != "null" ]]; then
     log_warn "  Nota privata non aggiunta (ticket comunque creato)"
   fi
     
-  # Traccia il ticket
+  # Track the ticket
   track_ticket "$TICKET_ID" "${TICKET_CODE:-TK-${TICKET_ID}}" "$CMK_HOST" "$CMK_SERVICE" "$CMK_OUTPUT"
     
-  # Output per CheckMK
+  # Output for CheckMK
   echo "TICKET_ID=$TICKET_ID"
   echo "TICKET_CODE=$TICKET_CODE"
   

@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check_ns8_container_health.py - CheckMK Local Check per stato container NS8
+"""check_ns8_container_health.py - CheckMK Local Check for NS8 container health
 
-Monitora i container delle istanze NS8 (runagent + podman):
-- conta container totali/running/problematici
-- segnala in CRITICAL i container non running
+Monitor NS8 instance containers (runagent + podman):
+- count total/running/problematic containers
+- report non-running containers in CRITICAL
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys

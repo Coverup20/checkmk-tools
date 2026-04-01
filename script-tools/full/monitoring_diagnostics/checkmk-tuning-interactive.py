@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-checkmk-tuning-interactive.py
+"""checkmk-tuning-interactive.py
 
-Tuning interattivo (semplice) per Checkmk RAW / OMD (Nagios core).
-Version: 1.0.0
-"""
+Interactive (simple) tuning for Checkmk RAW / OMD (Nagios core).
+Version: 1.0.0"""
 
 import datetime as dt
 import os

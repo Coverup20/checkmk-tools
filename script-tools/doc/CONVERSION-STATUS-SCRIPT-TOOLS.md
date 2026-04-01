@@ -1,41 +1,41 @@
 # Conversion Status - script-tools/full
-> **Categoria:** Operativo
+> **Category:** Operational
 
-Data report: 2026-02-18
+Report date: 2026-02-18
 
-## Stato attuale
+## Current status
 
-- Cartella analizzata: `script-tools/full`
-- Bash (`.sh`) senza equivalente Python: **0**
-- Copertura conversione Bash → Python: **100%**
+- Folder analyzed: `script-tools/full`
+- Bash (`.sh`) without Python equivalent: **0**
+- Bash → Python conversion coverage: **100%**
 
-## Metodo di verifica
+## Verification method
 
-Per confronto automatico è stata usata normalizzazione nomi:
+For automatic comparison, name normalization was used:
 
-- `-` e `_` trattati come equivalenti
-- confronto per basename (`file.sh` ↔ `file.py`)
+- `-` and `_` treated as equivalent
+- comparison by basename (`file.sh` ↔ `file.py`)
 
-Questo evita falsi negativi su naming misto (kebab_case/snake_case).
+This avoids false negatives on mixed naming (kebab_case/snake_case).
 
-## Decisione adottata in questa fase
+## Decision taken at this stage
 
-Per gli script complessi o ad alto rischio operativo sono stati creati entrypoint Python che delegano allo `.sh` canonico, così da ottenere:
+For complex or high operational risk scripts, Python entrypoints have been created that delegate to the canonical `.sh`, so as to obtain:
 
-- interfaccia Python uniforme
-- comportamento runtime invariato
-- riduzione regressioni durante migrazione
+- uniform Python interface
+- runtime behavior unchanged
+- reduction of regressions during migration
 
-## Cosa significa operativamente
+## What this means operationally
 
-- Se cerchi uno script in `script-tools/full`, ora esiste la controparte `.py`.
-- Per uso immediato puoi avviare il `.py`.
-- Dove presente delega interna, il `.py` inoltra args e ambiente allo `.sh` corrispondente.
+- If you look for a script in `script-tools/full`, the `.py` counterpart now exists.
+- For immediate use you can start the `.py`.
+- Where internal delegation exists, the `.py` forwards args and environment to the corresponding `.sh`.
 
-## Prossimo passo consigliato (opzionale)
+## Recommended next step (optional)
 
-Se vuoi massima manutenibilità futura, puoi pianificare una fase 2:
+If you want maximum future maintainability, you can plan a phase 2:
 
-1. identificare i wrapper Python che delegano a Bash
-2. prioritizzare i più usati in produzione
-3. convertire gradualmente la logica da Bash a Python nativo
+1. Identify Python wrappers that delegate to Bash
+2. prioritize the most used in production
+3. Gradually convert logic from Bash to native Python

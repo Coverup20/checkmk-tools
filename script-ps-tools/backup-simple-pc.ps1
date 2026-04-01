@@ -1,5 +1,5 @@
-# Script di Backup Automatico Repository CheckMK-Tools
-# Versione semplificata per Scheduled Task (solo caratteri ASCII)
+# Automatic Backup Script Repository CheckMK-Tools
+# Simplified version for Scheduled Task (ASCII characters only)
 
 param(
     [switch]$Unattended
@@ -7,7 +7,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# === CONFIGURAZIONE ===
+# === CONFIGURATION ===
 $REPO_PATH = "C:\Users\Gaming\Desktop\CheckMK\checkmk-tools"
 $LOCAL_BACKUP_BASE = "C:\CheckMK-Backups"
 $NETWORK_BACKUP_BASE = "\\192.168.10.132\usbshare\CheckMK-Backups"
@@ -16,7 +16,7 @@ $LOCAL_BACKUP_PATH = Join-Path $LOCAL_BACKUP_BASE $TIMESTAMP
 $NETWORK_BACKUP_PATH = Join-Path $NETWORK_BACKUP_BASE $TIMESTAMP
 $RETENTION_COUNT = 20
 
-# === CONFIGURAZIONE EMAIL ===
+# === EMAIL CONFIGURATION ===
 $SMTP_SERVER = "smtp-relay.nethesis.it"
 $SMTP_PORT = 587
 $SMTP_USE_SSL = $true
@@ -25,26 +25,26 @@ $EMAIL_TO = "marzio@nethesis.it"
 $EMAIL_CREDENTIAL_FILE = Join-Path $LOCAL_BACKUP_BASE "smtp_credential.xml"  # File credenziali crittografato
 $SEND_EMAIL = $true  # Email attivata
 
-# === VARIABILI GLOBALI PER EMAIL ERRORE ===
+# === GLOBAL VARIABLES FOR EMAIL ERROR ===
 $GLOBAL_ERROR_MESSAGE = ""
 
 Write-Host ""
 Write-Host "================================================================"
-Write-Host "     BACKUP COMPLETO REPOSITORY CHECKMK-TOOLS"
+Write-Host "FULL BACKUP CHECKMK-TOOLS REPOSITORY"
 Write-Host "================================================================"
 Write-Host ""
 
-# === INIZIO TRY GLOBALE PER GESTIONE ERRORI ===
+# === START GLOBAL TRY FOR ERROR MANAGEMENT ===
 try {
 
-# Crea cartella backup se non esiste
+# Create backup folder if it does not exist
 if (-not (Test-Path $LOCAL_BACKUP_BASE)) {
     New-Item -ItemType Directory -Path $LOCAL_BACKUP_BASE -Force | Out-Null
 }
 
-# Verifica che il repository esista
+# Verify that the repository exists
 if (-not (Test-Path $REPO_PATH)) {
-    Write-Host "[ERRORE] Repository non trovato: $REPO_PATH" -ForegroundColor Red
+    Write-Host "[ERROR] Repository not found: $REPO_PATH" -ForegroundColor Red
     throw "Repository non trovato: $REPO_PATH"
 }
 
@@ -54,7 +54,7 @@ Write-Host "    CONTROLLO INTEGRITA SCRIPT"
 Write-Host "================================================================"
 Write-Host ""
 
-# Verifica disponibilità WSL per controllo sintassi bash
+# Check WSL availability for bash syntax checking
 $wslAvailable = $false
 try {
     $null = wsl --version 2>&1
@@ -64,9 +64,9 @@ try {
 }
 
 if ($wslAvailable) {
-    Write-Host "[INFO] WSL disponibile - verifica sintassi bash abilitata" -ForegroundColor Green
+    Write-Host "[INFO] WSL available - bash syntax checking enabled" -ForegroundColor Green
 } else {
-    Write-Host "[WARN] WSL non disponibile - verifica bash limitata" -ForegroundColor Yellow
+    Write-Host "[WARN] WSL unavailable - limited bash testing" -ForegroundColor Yellow
 }
 
 $scriptFiles = Get-ChildItem -Path $REPO_PATH -Recurse -File -ErrorAction SilentlyContinue | 
@@ -85,9 +85,9 @@ $validScripts = 0
 $corruptedScripts = 0
 $corruptedList = @()
 
-Write-Host "[INFO] Verifica di $totalScripts script..." -ForegroundColor Cyan
+Write-Host "[INFO] Checking $totalScripts script..." -ForegroundColor Cyan
 
-# Whitelist file che possono essere legittimamente vuoti
+# Whitelist files that may be legitimately empty
 $allowedEmptyFiles = @(
     "corrupted-files-list.txt",
     ".gitkeep",
@@ -99,7 +99,7 @@ foreach ($script in $scriptFiles) {
     $fileName = $script.Name
     $canBeEmpty = $allowedEmptyFiles -contains $fileName
     
-    # Verifica file non vuoto (a meno che non sia nella whitelist)
+    # Check for non-empty file (unless whitelisted)
     if ($script.Length -eq 0 -and -not $canBeEmpty) {
         $corruptedScripts++
         $corruptedList += "[VUOTO] $relativePath"
@@ -110,7 +110,7 @@ foreach ($script in $scriptFiles) {
     $scriptType = $script.Extension
     
     if ($script.Extension -eq '') {
-        # File senza estensione: controlla shebang
+        # Files without extension: check shebang
         try {
             $firstLine = Get-Content $script.FullName -First 1 -ErrorAction Stop
             if ($firstLine -match '^#!/.*bash') {
@@ -118,18 +118,18 @@ foreach ($script in $scriptFiles) {
             } elseif ($firstLine -match '^#!/.*python') {
                 $scriptType = '.py'
             } else {
-                # Shebang non riconosciuto, salta
+                # Shebang not recognized, jump
                 $validScripts++
                 continue
             }
         } catch {
-            # Non può leggere il file, salta
+            # Cannot read file, skips
             $validScripts++
             continue
         }
     }
     
-    # Verifica sintassi PowerShell con ParseFile
+    # Check PowerShell syntax with ParseFile
     if ($scriptType -eq ".ps1") {
         try {
             $errors = $null
@@ -148,13 +148,13 @@ foreach ($script in $scriptFiles) {
         }
     }
     
-    # Verifica sintassi bash/sh con WSL (bash -n)
+    # Check bash/sh syntax with WSL (bash -n)
     if ($scriptType -in @(".sh", ".bash") -and $wslAvailable) {
         try {
-            # Converti path Windows in path WSL
+            # Convert Windows path to WSL path
             $wslPath = $script.FullName -replace '\\', '/' -replace '^([A-Z]):', { "/mnt/$($_.Groups[1].Value.ToLower())" }
             
-            # Usa bash -n per syntax check (non esegue lo script)
+            # Use bash -n for syntax check (does not run the script)
             $bashCheck = wsl bash -n "$wslPath" 2>&1
             $exitCode = $LASTEXITCODE
             if ($exitCode -ne 0) {
@@ -164,7 +164,7 @@ foreach ($script in $scriptFiles) {
                 continue
             }
         } catch {
-            # Se bash -n fallisce, prova almeno a verificare il shebang
+            # If bash -n fails, at least try to verify the shebang
             try {
                 $firstLine = Get-Content $script.FullName -First 1 -ErrorAction Stop
                 if (-not ($firstLine -match '^#!/')) {
@@ -178,10 +178,10 @@ foreach ($script in $scriptFiles) {
         }
     }
     
-    # Verifica sintassi Batch/CMD
+    # Check Batch/CMD syntax
     if ($scriptType -in @(".bat", ".cmd")) {
         try {
-            # cmd /c verifica la sintassi senza eseguire
+            # cmd /c checks the syntax without running
             $cmdCheck = cmd /c "echo off & call `"$($script.FullName)`" /?" 2>&1
             if ($LASTEXITCODE -ne 0 -and $cmdCheck -match "syntax error|unexpected|invalid") {
                 $corruptedScripts++
@@ -190,8 +190,8 @@ foreach ($script in $scriptFiles) {
                 continue
             }
         } catch {
-            # Errore durante la verifica, ma non blocchiamo
-            Write-Host "  [WARN] Impossibile verificare: $relativePath" -ForegroundColor DarkYellow
+            # Error during verification, but we don't block
+            Write-Host "[WARN] Failed to verify: $relativePath" -ForegroundColor DarkYellow
         }
     }
     
@@ -218,60 +218,60 @@ $corruptionPercentage = if ($totalScripts -gt 0) {
     0 
 }
 
-# Soglia 15%: se più del 15% degli script è corrotto, blocca il backup
+# 15% Threshold: If more than 15% of the scripts are corrupt, block the backup
 $CORRUPTION_THRESHOLD = 15
 
-Write-Host "Percentuale errori: $corruptionPercentage%" -ForegroundColor $(if ($corruptionPercentage -gt $CORRUPTION_THRESHOLD) { "Red" } else { "Yellow" })
+Write-Host "Error rate: $corruptionPercentage%" -ForegroundColor $(if ($corruptionPercentage -gt $CORRUPTION_THRESHOLD) { "Red" } else { "Yellow" })
 Write-Host ""
 
 if ($corruptionPercentage -gt $CORRUPTION_THRESHOLD) {
     Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Red
-    Write-Host "║        CORRUZIONE MASSIVA RILEVATA               ║" -ForegroundColor White
+    Write-Host "║ MASSIVE CORRUPTION DETECTED ║" -ForegroundColor White
     Write-Host "╚═══════════════════════════════════════════════════════╝" -ForegroundColor Red
     Write-Host ""
-    Write-Host "[ERRORE CRITICO] Rilevata corruzione massiva del repository!" -ForegroundColor Red
+    Write-Host "[CRITICAL ERROR] Massive repository corruption detected!" -ForegroundColor Red
     Write-Host "  • Script corrotti: $corruptedScripts / $totalScripts ($($corruptionPercentage)%)" -ForegroundColor Red
     Write-Host "  • Soglia sicurezza: $($CORRUPTION_THRESHOLD)%" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "[BACKUP ANNULLATO] Per evitare di propagare la corruzione ai backup esistenti!" -ForegroundColor Red
+    Write-Host "[BACKUP CANCELED] To avoid propagating corruption to existing backups!" -ForegroundColor Red
     Write-Host ""
     Write-Host "AZIONI CONSIGLIATE:" -ForegroundColor Yellow
-    Write-Host "  1. Verifica encoding dei file (UTF-8 vs ANSI)" -ForegroundColor Gray
-    Write-Host "  2. Controlla line endings (CRLF vs LF)" -ForegroundColor Gray
-    Write-Host "  3. Ripristina da un backup precedente se necessario" -ForegroundColor Gray
-    Write-Host "  4. Esegui 'git status' per verificare modifiche massive" -ForegroundColor Gray
-    Write-Host "  5. Controlla se c'è stata una conversione di massa non intenzionale" -ForegroundColor Gray
+    Write-Host "1. Check file encoding (UTF-8 vs ANSI)" -ForegroundColor Gray
+    Write-Host "2. Check line endings (CRLF vs LF)" -ForegroundColor Gray
+    Write-Host "3. Restore from a previous backup if necessary" -ForegroundColor Gray
+    Write-Host "4. Run 'git status' to check for massive changes" -ForegroundColor Gray
+    Write-Host "5. Check if there has been an unintentional mass conversion" -ForegroundColor Gray
     Write-Host ""
     
-    # Mostra primi 10 errori per diagnostica
-    Write-Host "Primi errori rilevati (per diagnostica):" -ForegroundColor Yellow
+    # Show top 10 errors for diagnostics
+    Write-Host "First errors detected (for diagnostics):" -ForegroundColor Yellow
     $corruptedList | Select-Object -First 10 | ForEach-Object {
         Write-Host "  - $_" -ForegroundColor Red
     }
     if ($corruptedList.Count -gt 10) {
-        Write-Host "  ... e altri $($corruptedList.Count - 10) errori" -ForegroundColor DarkRed
+        Write-Host "...and other $($corruptedList.Count - 10) errors" -ForegroundColor DarkRed
     }
     Write-Host ""
     
     exit 1
 }
 
-# Se sotto soglia, continua con warning
+# If below threshold, continue with warning
 if ($corruptedScripts -gt 0) {
-    Write-Host "[WARNING] Trovati $corruptedScripts errori (sotto soglia $CORRUPTION_THRESHOLD%, backup continua)" -ForegroundColor Yellow
+    Write-Host "[WARNING] $corruptedScripts errors found (below $CORRUPTION_THRESHOLD% threshold, backup continues)" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "Script segnalati (errori non critici):" -ForegroundColor Gray
+    Write-Host "Scripts reported (non-critical errors):" -ForegroundColor Gray
     foreach ($item in $corruptedList) {
         Write-Host "  - $item" -ForegroundColor DarkYellow
     }
     Write-Host ""
-    Write-Host "[INFO] Backup procede comunque..." -ForegroundColor Cyan
+    Write-Host "[INFO] Backup proceeds anyway..." -ForegroundColor Cyan
 }
 
-Write-Host "[OK] Proseguo con il backup..." -ForegroundColor Green
+Write-Host "[OK] I continue with the backup..." -ForegroundColor Green
 Write-Host ""
 
-# Conta tutti i file per il backup (con filtri di esclusione)
+# Count all files for backup (with exclusion filters)
 $allFiles = Get-ChildItem -Path $REPO_PATH -Recurse -File -ErrorAction SilentlyContinue | 
     Where-Object { 
         $_.FullName -notmatch '\\\.git\\' -and
@@ -283,39 +283,39 @@ $allFiles = Get-ChildItem -Path $REPO_PATH -Recurse -File -ErrorAction SilentlyC
 $totalFiles = $allFiles.Count
 
 if ($totalFiles -eq 0) {
-    Write-Host "[ERRORE] Nessun file trovato nel repository!" -ForegroundColor Red
+    Write-Host "[ERROR] No files found in the repository!" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "[INFO] Trovati $totalFiles file da backuppare" -ForegroundColor Cyan
+Write-Host "[INFO] $totalFiles files to backup found" -ForegroundColor Cyan
 Write-Host ""
 
 if (-not $Unattended) {
-    Write-Host "Premi un tasto per continuare con il backup..." -ForegroundColor Yellow
+    Write-Host "Press any key to continue with the backup..." -ForegroundColor Yellow
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
     Write-Host ""
 }
 
-# === BACKUP LOCALE ===
+# === LOCAL BACKUP ===
 Write-Host "================================================================"
-Write-Host "    BACKUP LOCALE"
+Write-Host "LOCAL BACKUP"
 Write-Host "================================================================"
 Write-Host ""
 Write-Host "[INFO] Destinazione: $LOCAL_BACKUP_PATH" -ForegroundColor Gray
 Write-Host ""
 
-# Crea cartella backup
+# Create backup folder
 try {
     New-Item -ItemType Directory -Path $LOCAL_BACKUP_PATH -Force | Out-Null
-    Write-Host "[OK] Cartella backup creata" -ForegroundColor Green
+    Write-Host "[OK] Backup folder created" -ForegroundColor Green
 } catch {
-    Write-Host "[ERRORE] Impossibile creare cartella backup: $_" -ForegroundColor Red
+    Write-Host "[ERROR] Failed to create backup folder: $_" -ForegroundColor Red
     exit 1
 }
 
-# Copia file
+# Copy files
 Write-Host ""
-Write-Host "[INFO] Copia file in corso..." -ForegroundColor Cyan
+Write-Host "[INFO] Copying files..." -ForegroundColor Cyan
 
 $copiedFiles = 0
 $errorCount = 0
@@ -334,45 +334,45 @@ foreach ($file in $allFiles) {
         $copiedFiles++
         
         if ($copiedFiles % 50 -eq 0) {
-            Write-Host "  Copiati $copiedFiles / $totalFiles file..." -ForegroundColor Gray
+            Write-Host "Copied $copiedFiles / $totalFiles file..." -ForegroundColor Gray
         }
     } catch {
         $errorCount++
-        Write-Host "[WARN] Errore copia file $relativePath" -ForegroundColor Yellow
+        Write-Host "[WARN] $relativePath file copy error" -ForegroundColor Yellow
     }
 }
 
-Write-Host "[OK] Completato: $copiedFiles file copiati" -ForegroundColor Green
+Write-Host "[OK] Completed: $copiedFiles copied files" -ForegroundColor Green
 
 if ($errorCount -gt 0) {
-    Write-Host "[WARN] $errorCount file non copiati" -ForegroundColor Yellow
+    Write-Host "[WARN] $errorCount files not copied" -ForegroundColor Yellow
 }
 
-# Calcola dimensione backup locale
+# Calculate local backup size
 $backupSize = (Get-ChildItem -Path $LOCAL_BACKUP_PATH -Recurse -File | Measure-Object -Property Length -Sum).Sum / 1MB
 
-# === BACKUP SU RETE ===
+# === NETWORK BACKUP ===
 Write-Host ""
 Write-Host "================================================================"
-Write-Host "    BACKUP SU RETE"
+Write-Host "NETWORK BACKUP"
 Write-Host "================================================================"
 Write-Host ""
 
 $networkCopied = 0
 $networkSuccess = $false
 
-# Verifica connessione rete
+# Check network connection
 if (Test-Path $NETWORK_BACKUP_BASE) {
-    Write-Host "[INFO] Share di rete raggiungibile" -ForegroundColor Green
+    Write-Host "[INFO] Reachable network share" -ForegroundColor Green
     Write-Host "[INFO] Destinazione: $NETWORK_BACKUP_PATH" -ForegroundColor Gray
     Write-Host ""
     
     try {
-        # Crea cartella backup di rete
+        # Create network backup folder
         New-Item -ItemType Directory -Path $NETWORK_BACKUP_PATH -Force -ErrorAction Stop | Out-Null
-        Write-Host "[OK] Cartella backup rete creata" -ForegroundColor Green
+        Write-Host "[OK] Network backup folder created" -ForegroundColor Green
         Write-Host ""
-        Write-Host "[INFO] Copia file su rete in corso..." -ForegroundColor Cyan
+        Write-Host "[INFO] Copying files to network..." -ForegroundColor Cyan
         
         # Copia ricorsiva
         foreach ($file in $allFiles) {
@@ -389,42 +389,42 @@ if (Test-Path $NETWORK_BACKUP_BASE) {
                 $networkCopied++
                 
                 if ($networkCopied % 50 -eq 0) {
-                    Write-Host "  Copiati $networkCopied / $totalFiles file..." -ForegroundColor Gray
+                    Write-Host "Copied $networkCopied / $totalFiles files..." -ForegroundColor Gray
                 }
             } catch {
-                Write-Host "[WARN] Errore copia file $relativePath su rete" -ForegroundColor Yellow
+                Write-Host "[WARN] Error copying $relativePath file over network" -ForegroundColor Yellow
             }
         }
         
-        Write-Host "[OK] Backup rete completato: $networkCopied file copiati" -ForegroundColor Green
+        Write-Host "[OK] Network backup complete: $networkCopied files copied" -ForegroundColor Green
         $networkSuccess = $true
         
     } catch {
-        Write-Host "[ERRORE] Backup su rete fallito: $_" -ForegroundColor Red
-        Write-Host "[INFO] Il backup locale e comunque disponibile" -ForegroundColor Yellow
+        Write-Host "[ERROR] Network backup failed: $_" -ForegroundColor Red
+        Write-Host "[INFO] Local backup is still available" -ForegroundColor Yellow
     }
 } else {
-    Write-Host "[WARN] Share di rete non raggiungibile: $NETWORK_BACKUP_BASE" -ForegroundColor Yellow
-    Write-Host "[INFO] Continuo solo con backup locale" -ForegroundColor Yellow
+    Write-Host "[WARN] Network share unreachable: $NETWORK_BACKUP_BASE" -ForegroundColor Yellow
+    Write-Host "[INFO] I continue only with local backup" -ForegroundColor Yellow
 }
 
 # === STATISTICHE ===
 Write-Host ""
 Write-Host "================================================================"
-Write-Host "    STATISTICHE BACKUP"
+Write-Host "BACKUP STATISTICS"
 Write-Host "================================================================"
 Write-Host ""
 Write-Host "  LOCALE:" -ForegroundColor Cyan
-Write-Host "    File copiati:     $copiedFiles" -ForegroundColor Gray
-Write-Host "    Dimensione:       $([math]::Round($backupSize, 2)) MB" -ForegroundColor Gray
-Write-Host "    Percorso:         $LOCAL_BACKUP_PATH" -ForegroundColor Gray
+Write-Host "Copied files: $copiedFiles" -ForegroundColor Gray
+Write-Host "Size: $([math]::Round($backupSize, 2)) MB" -ForegroundColor Gray
+Write-Host "Path: $LOCAL_BACKUP_PATH" -ForegroundColor Gray
 Write-Host ""
 if ($networkSuccess) {
-    Write-Host "  RETE:" -ForegroundColor Cyan
-    Write-Host "    File copiati:     $networkCopied" -ForegroundColor Gray
-    Write-Host "    Percorso:         $NETWORK_BACKUP_PATH" -ForegroundColor Gray
+    Write-Host "NET:" -ForegroundColor Cyan
+    Write-Host "Files copied: $networkCopied" -ForegroundColor Gray
+    Write-Host "Path: $NETWORK_BACKUP_PATH" -ForegroundColor Gray
 } else {
-    Write-Host "  RETE: Non disponibile" -ForegroundColor Yellow
+    Write-Host "NETWORK: Not available" -ForegroundColor Yellow
 }
 Write-Host ""
 Write-Host "  Timestamp:        $TIMESTAMP" -ForegroundColor Gray
@@ -432,7 +432,7 @@ Write-Host ""
 
 # === RETENTION POLICY ===
 Write-Host "================================================================"
-Write-Host "    PULIZIA BACKUP VECCHI (Retention)"
+Write-Host "CLEANING OLD BACKUPS (Retention)"
 Write-Host "================================================================"
 Write-Host ""
 
@@ -441,34 +441,34 @@ $existingBackups = Get-ChildItem -Path $LOCAL_BACKUP_BASE -Directory |
     Sort-Object Name -Descending
 
 $backupCount = $existingBackups.Count
-Write-Host "[INFO] Backup totali: $backupCount (retention: $RETENTION_COUNT)" -ForegroundColor Cyan
+Write-Host "[INFO] Total backups: $backupCount (retention: $RETENTION_COUNT)" -ForegroundColor Cyan
 
 if ($backupCount -gt $RETENTION_COUNT) {
     $toDelete = $backupCount - $RETENTION_COUNT
-    Write-Host "[INFO] Verranno eliminati $toDelete backup piu vecchi..." -ForegroundColor Yellow
+    Write-Host "[INFO] $toDelete older backups will be deleted..." -ForegroundColor Yellow
     Write-Host ""
     
     $backupsToDelete = $existingBackups | Select-Object -Skip $RETENTION_COUNT
     
     foreach ($backup in $backupsToDelete) {
         try {
-            Write-Host "  [DELETE] $($backup.Name)" -ForegroundColor Gray
+            Write-Host "[DELETE] $($backup.Name)" -ForegroundColor Gray
             Remove-Item -Path $backup.FullName -Recurse -Force -ErrorAction Stop
-            Write-Host "     [OK] Eliminato" -ForegroundColor Green
+            Write-Host "[OK] Deleted" -ForegroundColor Green
         } catch {
-            Write-Host "     [ERRORE] $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "[ERROR] $($_.Exception.Message)" -ForegroundColor Red
         }
     }
     
     Write-Host ""
-    Write-Host "[OK] Pulizia completata: mantenuti gli ultimi $RETENTION_COUNT backup" -ForegroundColor Green
+    Write-Host "[OK] Cleanup complete: Keep latest $RETENTION_COUNT backups" -ForegroundColor Green
 } else {
-    Write-Host "[INFO] Nessun backup da eliminare" -ForegroundColor Green
+    Write-Host "[INFO] No backups to delete" -ForegroundColor Green
 }
 
 Write-Host ""
 Write-Host "================================================================"
-Write-Host "    BACKUP COMPLETATO CON SUCCESSO"
+Write-Host "BACKUP COMPLETED SUCCESSFULLY"
 Write-Host "================================================================"
 Write-Host ""
 
@@ -500,7 +500,7 @@ Stato:                 $(if ($corruptedScripts -eq 0) { "OK" } else { "WARNING" 
 
 "@
         
-        # Aggiungi lista errori se presenti
+        # Add error list if present
         if ($corruptedScripts -gt 0 -and $corruptedList.Count -gt 0) {
             $emailBody += "`nScript con errori sintassi bash:`n"
             $emailBody += "---------------------------------------------------------------`n"
@@ -562,7 +562,7 @@ Retention:             $RETENTION_COUNT
 Questo e un messaggio automatico generato dal sistema di backup.
 "@
         
-        # Prepara credenziali se necessarie
+        # Prepare credentials if necessary
         $smtpParams = @{
             SmtpServer = $SMTP_SERVER
             Port = $SMTP_PORT
@@ -577,13 +577,13 @@ Questo e un messaggio automatico generato dal sistema di backup.
             $smtpParams.UseSsl = $true
         }
         
-        # Carica credenziali crittografate se esistono
+        # Upload encrypted credentials if they exist
         if (Test-Path $EMAIL_CREDENTIAL_FILE) {
             $credential = Import-Clixml -Path $EMAIL_CREDENTIAL_FILE
             $smtpParams.Credential = $credential
         } else {
-            Write-Host "[WARN] File credenziali non trovato: $EMAIL_CREDENTIAL_FILE" -ForegroundColor Yellow
-            Write-Host "[INFO] Esegui: .\setup-smtp-credentials.ps1 per configurare" -ForegroundColor Cyan
+            Write-Host "[WARN] Credential file not found: $EMAIL_CREDENTIAL_FILE" -ForegroundColor Yellow
+            Write-Host "[INFO] Run: .\setup-smtp-credentials.ps1 to configure" -ForegroundColor Cyan
             throw "Credenziali SMTP mancanti"
         }
         
@@ -592,8 +592,8 @@ Questo e un messaggio automatico generato dal sistema di backup.
         Write-Host "[OK] Email inviata a: $EMAIL_TO" -ForegroundColor Green
         
     } catch {
-        Write-Host "[WARN] Impossibile inviare email: $_" -ForegroundColor Yellow
-        Write-Host "[INFO] Il backup e comunque completato correttamente" -ForegroundColor Cyan
+        Write-Host "[WARN] Unable to send email: $_" -ForegroundColor Yellow
+        Write-Host "[INFO] The backup completed correctly" -ForegroundColor Cyan
     }
     
     Write-Host ""
@@ -602,19 +602,19 @@ Questo e un messaggio automatico generato dal sistema di backup.
 exit 0
 
 } catch {
-    # === GESTIONE ERRORE GLOBALE CON INVIO EMAIL ===
+    # === GLOBAL ERROR MANAGEMENT WITH EMAIL SENDING ===
     $GLOBAL_ERROR_MESSAGE = $_.Exception.Message
     $errorDetails = $_.Exception | Out-String
     
     Write-Host ""
     Write-Host "================================================================" -ForegroundColor Red
-    Write-Host "    BACKUP FALLITO - ERRORE CRITICO" -ForegroundColor Red
+    Write-Host "BACKUP FAILED - CRITICAL ERROR" -ForegroundColor Red
     Write-Host "================================================================" -ForegroundColor Red
     Write-Host ""
-    Write-Host "[ERRORE] $GLOBAL_ERROR_MESSAGE" -ForegroundColor Red
+    Write-Host "[ERROR] $GLOBAL_ERROR_MESSAGE" -ForegroundColor Red
     Write-Host ""
     
-    # Invia email di errore
+    # Send error email
     if ($SEND_EMAIL) {
         try {
             $emailSubject = "[CheckMK Backup] ERRORE - $TIMESTAMP"
@@ -670,13 +670,13 @@ Questo e un messaggio automatico generato dal sistema di backup.
                 $smtpParams.Credential = $credential
                 
                 Send-MailMessage @smtpParams -WarningAction SilentlyContinue
-                Write-Host "[OK] Email di errore inviata a: $EMAIL_TO" -ForegroundColor Green
+                Write-Host "[OK] Error email sent to: $EMAIL_TO" -ForegroundColor Green
             } else {
-                Write-Host "[WARN] Impossibile inviare email: credenziali mancanti" -ForegroundColor Yellow
+                Write-Host "[WARN] Unable to send email: missing credentials" -ForegroundColor Yellow
             }
             
         } catch {
-            Write-Host "[WARN] Impossibile inviare email di errore: $_" -ForegroundColor Yellow
+            Write-Host "[WARN] Failed to send error email: $_" -ForegroundColor Yellow
         }
     }
     

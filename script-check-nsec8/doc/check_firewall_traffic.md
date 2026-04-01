@@ -1,17 +1,17 @@
 # check_firewall_traffic.sh
 
-## Descrizione
-Monitora il traffico di rete (RX/TX) sulle interfacce WAN e LAN del firewall NSecFirewall8.
+## Description
+Monitor network traffic (RX/TX) on the WAN and LAN interfaces of the NSecFirewall8 firewall.
 
-## Funzionalità
-- Rileva automaticamente interfacce WAN (wan, wwan) e LAN (lan, br-lan)
-- Legge statistiche da `/sys/class/net/<device>/statistics/`
-- Conta bytes, pacchetti ed errori per RX e TX
-- Genera allarme se errori > 100
+## Features
+- Automatically detects WAN (wan, wwan) and LAN (lan, br-lan) interfaces
+- Read statistics from `/sys/class/net/<device>/statistics/`
+- Count bytes, packets and errors for RX and TX
+- Generate alarm if errors > 100
 
-## Stati
-- **OK (0)**: Errori RX/TX <= 100
-- **WARNING (1)**: Errori RX/TX > 100
+## States
+- **OK (0)**: RX/TX errors <= 100
+- **WARNING (1)**: RX/TX errors > 100
 
 ## Output CheckMK
 ```
@@ -20,33 +20,33 @@ Monitora il traffico di rete (RX/TX) sulle interfacce WAN e LAN del firewall NSe
 ```
 
 ## Performance Data
-- `rx_bytes`: Bytes ricevuti (cumulative counter)
-- `tx_bytes`: Bytes trasmessi (cumulative counter)
-- `rx_packets`: Pacchetti ricevuti
-- `tx_packets`: Pacchetti trasmessi
-- `rx_errors`: Errori in ricezione
-- `tx_errors`: Errori in trasmissione
+- `rx_bytes`: Bytes received (cumulative counter)
+- `tx_bytes`: Bytes transmitted (cumulative counter)
+- `rx_packets`: Received packets
+- `tx_packets`: Packets transmitted
+- `rx_errors`: Receiving errors
+- `tx_errors`: Transmission errors
 
-## Requisiti
-- OpenWrt con `ubus` per mappare interfacce logiche a device fisici
-- Directory `/sys/class/net/` accessibile
+## Requirements
+- OpenWrt with `ubus` to map logical interfaces to physical devices
+- Directory `/sys/class/net/` accessible
 
-## Installazione
+## Installation
 ```bash
 cp check_firewall_traffic.sh /usr/lib/check_mk_agent/local/rcheck_firewall_traffic.sh
 chmod +x /usr/lib/check_mk_agent/local/rcheck_firewall_traffic.sh
 ```
 
-## Test manuale
+## Manual testing
 ```bash
 bash /opt/checkmk-tools/script-check-nsec8/full/check_firewall_traffic.sh
 ```
 
-## Note
-- I counter sono cumulativi dall'ultimo boot
-- CheckMK calcola automaticamente i rate (bytes/sec, packets/sec)
-- Perfetti per creare grafici di banda nel tempo
-- Errori elevati possono indicare:
-  - Problemi hardware (cavo, scheda rete)
-  - Collisioni su half-duplex
+## Notes
+- The counters are cumulative since the last boot
+- CheckMK automatically calculates rates (bytes/sec, packets/sec)
+- Perfect for creating bandwidth graphs over time
+- High errors can indicate:
+  - Hardware problems (cable, network card)
+  - Collisions on half-duplex
   - MTU mismatch

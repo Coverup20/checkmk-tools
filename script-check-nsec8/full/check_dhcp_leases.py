@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""check_dhcp_leases.py - CheckMK local check DHCP leases per pool (Python puro).
+"""check_dhcp_leases.py - CheckMK local check DHCP leases per pool (pure Python).
 
-Un servizio CheckMK separato per ogni pool DHCP attivo su NethSecurity 8.
-Legge la configurazione da UCI (dhcp + network) e conta i lease da /tmp/dhcp.leases
-mappando ogni IP al pool di appartenenza tramite IP range.
+A separate CheckMK service for each DHCP pool active on NethSecurity 8.
+Reads configuration from UCI (dhcp + network) and counts leases from /tmp/dhcp.leases
+mapping each IP to the membership pool via IP range.
 
-Version: 2.0.0
-"""
+Version: 2.0.0"""
 
 import ipaddress
 import subprocess
@@ -19,7 +18,7 @@ LEASE_FILE = Path("/tmp/dhcp.leases")
 
 
 def uci_show_parsed(section: str) -> dict:
-    """Esegue 'uci show <section>' e restituisce dict {chiave_completa: valore}."""
+    """Executes 'uci show <section>' and returns dict {full_key: value}."""
     result = subprocess.run(
         ["uci", "show", section],
         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
@@ -35,9 +34,9 @@ def uci_show_parsed(section: str) -> dict:
 
 
 def get_dhcp_pools() -> list:
-    """Restituisce lista di pool DHCP attivi da UCI dhcp.
-    Ogni elemento: {name, interface, start, limit}
-    Esclude: ignore=1, dhcpv4=disabled, limit=0."""
+    """Returns list of active DHCP pools from UCI dhcp.
+    Each element: {name, interface, start, limit}
+    Excludes: ignore=1, dhcpv4=disabled, limit=0."""
     data = uci_show_parsed("dhcp")
 
     sections: dict = {}
@@ -72,7 +71,7 @@ def get_dhcp_pools() -> list:
         if limit == 0:
             continue
         # NethSecurity salva limit = IP_configurati + 1 (off-by-one UI→UCI)
-        # Sottraiamo 1 per mostrare il valore umano corretto
+        # We subtract 1 to show the correct human value
         pools.append({
             'name': sec_name,
             'interface': iface,
@@ -84,8 +83,8 @@ def get_dhcp_pools() -> list:
 
 
 def get_interface_network(iface: str) -> str | None:
-    """Restituisce il CIDR della rete associata all'interfaccia UCI (es: '10.30.30.0/24').
-    Prova prima match esatto, poi case-insensitive su tutte le interfacce network."""
+    """Returns the CIDR of the network associated with the UCI interface (e.g. '10.30.30.0/24').
+    Try exact match first, then case-insensitive on all network interfaces."""
     def _resolve(name: str) -> str | None:
         data = uci_show_parsed(f"network.{name}")
         ipaddr = data.get(f"network.{name}.ipaddr")
@@ -106,7 +105,7 @@ def get_interface_network(iface: str) -> str | None:
     if result:
         return result
 
-    # Tentativo 2: case-insensitive — scansiona tutte le interfacce network
+    # Attempt 2: case-insensitive — scan all network interfaces
     all_net = uci_show_parsed("network")
     iface_lower = iface.lower()
     seen = set()
@@ -124,7 +123,7 @@ def get_interface_network(iface: str) -> str | None:
 
 
 def read_leases() -> list:
-    """Legge /tmp/dhcp.leases e restituisce lista di (expire_ts: int, ip: str)."""
+    """Reads /tmp/dhcp.leases and returns list of (expire_ts: int, ip: str)."""
     if not LEASE_FILE.exists():
         return []
     leases = []
@@ -141,7 +140,7 @@ def read_leases() -> list:
 
 
 def count_leases_in_pool(pool: dict, network_cidr: str, leases: list, now: int) -> tuple:
-    """Conta lease attivi/scaduti nel range IP del pool.
+    """Count active/expired leases in the pool's IP range.
     Range: network_base + start ... network_base + start + limit - 1"""
     try:
         net = ipaddress.IPv4Network(network_cidr, strict=False)
@@ -177,8 +176,8 @@ def main() -> int:
     leases = read_leases()
     now = int(time.time())
 
-    # Risolvi network CIDR per ogni pool, salta orfani silenziosamente,
-    # deduplica pool con stesso CIDR tenendo quello con limit maggiore
+    # Fix network CIDR for each pool, skip orphans silently,
+    # deduplicate pool with same CIDR keeping the one with higher limit
     resolved: dict = {}  # cidr -> pool con limit massimo
     for pool in pools:
         cidr = get_interface_network(pool['interface'])

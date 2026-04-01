@@ -1,21 +1,21 @@
 #!/bin/bash
 # ydea-health-monitor.sh - Monitoraggio disponibilità Ydea API
-# Controlla ogni 15 minuti se Ydea è raggiungibile e notifica via email se down
+# Check every 15 minutes if Ydea is reachable and notify via email if down
 
 set -euo pipefail
 
 # ===== CONFIG =====
-# Usa path assoluto per supportare esecuzione via launcher remoto
+# Use absolute path to support execution via remote launcher
 TOOLKIT_DIR="${YDEA_TOOLKIT_DIR:-/opt/ydea-toolkit}"
 YDEA_TOOLKIT="${TOOLKIT_DIR}/ydea-toolkit.sh"
 YDEA_ENV="${TOOLKIT_DIR}/.env"
 STATE_FILE="/tmp/ydea_health_state.json"
 MAIL_SCRIPT="/omd/sites/monitoring/local/share/check_mk/notifications/mail_ydea_down"
 
-# Destinatario email per notifiche
+# Email recipient for notifications
 ALERT_EMAIL="${YDEA_ALERT_EMAIL:-massimo.palazzetti@nethesis.it}"
 
-# Soglia di errori consecutivi prima di notificare (per evitare falsi positivi)
+# Threshold of consecutive errors before reporting (to avoid false positives)
 FAILURE_THRESHOLD="${YDEA_FAILURE_THRESHOLD:-3}"
 
 # ===== UTILITY =====
@@ -27,20 +27,20 @@ log_error() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
 }
 
-# Inizializza stato se non esiste
+# Initialize state if it does not exist
 init_state() {
     if [[ ! -f "$STATE_FILE" ]]; then
         echo '{"status":"unknown","last_check":0,"consecutive_failures":0,"last_failure":"","notified":false}' > "$STATE_FILE"
     fi
 }
 
-# Leggi stato corrente
+# Read current status
 get_state() {
     local field="$1"
     jq -r ".${field} // empty" "$STATE_FILE" 2>/dev/null || echo ""
 }
 
-# Aggiorna stato
+# Update status
 update_state() {
     local status="$1"
     local now
@@ -64,9 +64,9 @@ send_email_alert() {
     
     log "Invio notifica email a $ALERT_EMAIL"
     
-    # Usa lo script mail_ydea_down se esiste, altrimenti fallback a mail command
+    # Use mail_ydea_down script if it exists, otherwise fallback to mail command
     if [[ -x "$MAIL_SCRIPT" ]]; then
-        # Esporta variabili per lo script di notifica
+        # Export variables for notification script
         export NOTIFY_HOSTNAME="ydea.cloud"
         export NOTIFY_HOSTADDRESS="my.ydea.cloud"
         export NOTIFY_WHAT="HOST"
@@ -103,7 +103,7 @@ test_ydea_login() {
         return 1
     fi
     
-    # Testa login (con timeout)
+    # Test login (with timeout)
     local result
     if result=$(timeout 30s "$YDEA_TOOLKIT" login 2>&1); then
         return 0
@@ -151,14 +151,14 @@ Monitor automatico Ydea Health"
             send_email_alert "$subject" "$body"
         fi
         
-        # Reset stato
+        # Reset status
         update_state "up" 0 "false"
     else
         # ===== YDEA DOWN =====
         consecutive_failures=$((consecutive_failures + 1))
         log_error " Ydea API non raggiungibile (tentativi falliti: $consecutive_failures/$FAILURE_THRESHOLD)"
         
-        # Notifica solo se raggiungiamo la soglia e non abbiamo già notificato
+        # Notify only if we reach the threshold and have not already notified
         if [[ $consecutive_failures -ge $FAILURE_THRESHOLD && "$was_notified" != "true" ]]; then
             log "Soglia di errori raggiunta, invio notifica"
             
@@ -196,7 +196,7 @@ Check ogni 15 minuti"
                 update_state "down" "$consecutive_failures" "false"
             fi
         else
-            # Aggiorna solo il contatore
+            # Only update the counter
             update_state "down" "$consecutive_failures" "$was_notified"
         fi
     fi

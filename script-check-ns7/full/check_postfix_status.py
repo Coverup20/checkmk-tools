@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check_postfix_status.py - CheckMK Local Check for Postfix service status
+"""check_postfix_status.py - CheckMK Local Check for Postfix service status
 
 Check if Postfix mail server is active via systemctl.
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -17,15 +15,13 @@ SERVICE_NAME = "Postfix-status"
 
 
 def is_service_active(service: str) -> bool:
-    """
-    Check if systemd service is active.
+    """Check if systemd service is active.
     
     Args:
         service: Systemd service name
         
     Returns:
-        True if active, False otherwise
-    """
+        True if active, False otherwise"""
     try:
         result = subprocess.run(
             ["systemctl", "is-active", "--quiet", service],
@@ -39,12 +35,10 @@ def is_service_active(service: str) -> bool:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     if is_service_active("postfix"):
         print(f"0 {SERVICE_NAME} - Postfix running")
     else:

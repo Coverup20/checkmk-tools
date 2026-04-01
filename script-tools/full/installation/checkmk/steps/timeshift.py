@@ -7,12 +7,12 @@ from pathlib import Path
 from lib.common import command_exists, log_header, log_info, log_success, log_warn, run as run_cmd
 from lib.config import InstallerConfig
 
-# Spazio libero minimo richiesto sulla partizione (GB)
+# Minimum free space required on the partition (GB)
 _MIN_FREE_GB = 5
 
 
 def _root_device_info() -> tuple[str, float] | None:
-    """Restituisce (device, avail_gb) del filesystem radice, o None se non rilevabile."""
+    """Returns (device, avail_gb) of the root filesystem, or None if undetectable."""
     try:
         out = subprocess.run(
             ["df", "--output=source,avail", "/"],
@@ -30,7 +30,7 @@ def _root_device_info() -> tuple[str, float] | None:
 
 
 def _device_uuid(device: str) -> str | None:
-    """Legge l'UUID del device tramite blkid."""
+    """Reads the device UUID via blkid."""
     try:
         out = subprocess.run(
             ["blkid", "-s", "UUID", "-o", "value", device],
@@ -82,7 +82,7 @@ def run_step(_: InstallerConfig) -> None:
         log_success("Timeshift step completed")
         return
 
-    # Trova il device root e verifica spazio disponibile
+    # Find the root device and check available space
     info = _root_device_info()
     if info is None:
         log_warn("Impossibile determinare il device root. Skip snapshot.")
@@ -97,7 +97,7 @@ def run_step(_: InstallerConfig) -> None:
         log_success("Timeshift step completed")
         return
 
-    # Configura Timeshift per usare il device root (non /boot)
+    # Configure Timeshift to use the root device (not /boot)
     uuid = _device_uuid(device)
     if uuid:
         _write_timeshift_config(uuid)

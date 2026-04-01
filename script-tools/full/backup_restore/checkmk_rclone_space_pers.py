@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-checkmk_rclone_space_pers.py
+"""checkmk_rclone_space_pers.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import argparse
 import datetime as dt
@@ -350,8 +348,7 @@ Restart=on-failure
 RestartSec=5
 
 [Install]
-WantedBy=multi-user.target
-"""
+WantedBy=multi-user.target"""
 
     unit_path.write_text(unit, encoding="utf-8")
     if not unit_path.exists():
@@ -405,8 +402,7 @@ while IFS= read -r -d '' backup; do
   rm -rf "$backup" && DELETED=$((DELETED+1))
 done < <(find "$MOUNTPOINT" -mindepth 1 -maxdepth 1 \( -type f -o -type d \) -mtime +${RETENTION_DAYS} -print0 2>/dev/null)
 
-log "Renamed $RENAMED backup(s), deleted $DELETED backup(s)."
-"""
+log "Renamed $RENAMED backup(s), deleted $DELETED backup(s).""""
     cleanup_script.write_text(script, encoding="utf-8")
     cleanup_script.chmod(0o755)
 
@@ -451,8 +447,7 @@ while IFS= read -r -d '' backup; do
   fi
 done < <(find "$MOUNTPOINT" -mindepth 1 -maxdepth 1 \( -type f -o -type d \) -name 'Check_MK-*' ! -name '*-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*' -print0 2>/dev/null)
 
-[[ $RENAMED -gt 0 ]] && log "Renamed $RENAMED backup(s)" || log "No backups to rename"
-"""
+[[ $RENAMED -gt 0 ]] && log "Renamed $RENAMED backup(s)" || log "No backups to rename""""
     rename_script.write_text(rename_body, encoding="utf-8")
     rename_script.chmod(0o755)
 
@@ -467,8 +462,7 @@ Description=Cleanup old backups for Checkmk site {site}
 
 [Service]
 Type=oneshot
-ExecStart={cleanup_script} {mountpoint} {retention_days}
-""",
+ExecStart={cleanup_script} {mountpoint} {retention_days}""",
         encoding="utf-8",
     )
 
@@ -482,8 +476,7 @@ OnBootSec=1h
 Persistent=true
 
 [Install]
-WantedBy=timers.target
-""",
+WantedBy=timers.target""",
         encoding="utf-8",
     )
 
@@ -493,8 +486,7 @@ Description=Rename backup after creation for Checkmk site {site}
 
 [Service]
 Type=oneshot
-ExecStart={rename_script} {mountpoint}
-""",
+ExecStart={rename_script} {mountpoint}""",
         encoding="utf-8",
     )
 
@@ -508,8 +500,7 @@ Persistent=true
 Unit=checkmk-backup-rename@{site}.service
 
 [Install]
-WantedBy=timers.target
-""",
+WantedBy=timers.target""",
         encoding="utf-8",
     )
 

@@ -1,3 +1,3 @@
 # upgrade_maintenance
 
-Script per upgrade, pre-upgrade, rocksolid e maintenance.
+Scripts for upgrade, pre-upgrade, rocksolid and maintenance.

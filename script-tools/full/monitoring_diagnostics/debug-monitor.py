@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-debug-monitor.py
+"""debug-monitor.py
 
 Python entrypoint that delegates to debug-monitor.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

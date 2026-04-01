@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
-"""
-setup_checkmk_upgrade.py - Setup CheckMK Auto-Upgrade
+"""setup_checkmk_upgrade.py - Setup CheckMK Auto-Upgrade
 
-Configura job Cron per l'aggiornamento automatico di CheckMK RAW Edition.
+Configure Cron jobs to automatically update CheckMK RAW Edition.
 Features:
-- Menu interattivo per frequenza (Settimanale, Mensile, Custom)
-- Configurazione email notifiche
-- Backup crontab esistente
-- Creazione wrapper per esecuzione via Cron
+- Interactive menu by frequency (Weekly, Monthly, Custom)
+- Email notification configuration
+- Backup existing crontab
+- Creation of wrappers for execution via Cron
 
 Usage:
     setup_checkmk_upgrade.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -24,7 +22,7 @@ from pathlib import Path
 
 VERSION = "1.0.0"
 
-# --- Configurazione ---
+# --- Configuration ---
 LOG_FILE = "/var/log/auto-upgrade-checkmk.log"
 UPGRADE_SCRIPT_PATH = "/opt/omd/sites/monitoring/local/bin/upgrade_checkmk.py" # Assumes local deploy
 # Fallback/Remote if needed, but we prefer local python script now
@@ -153,7 +151,7 @@ def main():
     if Console.input_choice("Confermi l'installazione?", ["s", "n"]) != "s":
         sys.exit(0)
         
-    # Backup
+    # Backups
     try:
         current_cron: str = subprocess.check_output(["crontab", "-l"], text=True, stderr=subprocess.DEVNULL)
     except:

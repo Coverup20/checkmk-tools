@@ -1,3 +1,3 @@
 # installation
 
-Script di installazione componenti (agent, FRPC, setup correlati).
+Component installation script (agent, FRPC, related setups).

@@ -1,36 +1,36 @@
-#  Ydea API Toolkit
+# Ydea API Toolkit
 
-Sistema completo per la gestione delle API Ydea v2, con focus su creazione e gestione ticket, integrazione con sistemi di monitoraggio, e automazione dei workflow.
+Complete system for managing Ydea v2 APIs, with a focus on ticket creation and management, integration with monitoring systems, and workflow automation.
 
-##  Indice
+## Index
 
-- [Caratteristiche](#caratteristiche)
-- [Requisiti](#requisiti)
-- [Installazione](#installazione)
-- [Configurazione](#configurazione)
-- [Utilizzo](#utilizzo)
-- [Esempi Pratici](#esempi-pratici)
-- [Integrazione Monitoraggio](#integrazione-monitoraggio)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [Practical Examples](#practical-examples)
+- [Monitoring Integration](#monitoring-integration)
 - [Best Practices](#best-practices)
 
-##  Caratteristiche
+## Features
 
--  **Gestione automatica token** con refresh automatico
--  **Funzioni helper** per operazioni comuni sui ticket
--  **Retry automatico** su errori 401
--  **Integrazione sistemi di monitoraggio** (Netdata, custom)
--  **Prevenzione duplicati** tramite cache intelligente
--  **Export dati** in formati CSV/JSON
--  **Logging strutturato** con timestamp e emoji
--  **Script di esempio** per casi d'uso comuni
+- **Automatic token management** with automatic refresh
+- **Helper functions** for common ticket operations
+- **Automatic retry** on 401 errors
+- **Integration of monitoring systems** (Netdata, custom)
+- **Duplicate prevention** via intelligent caching
+- **Export data** in CSV/JSON formats
+- **Structured logging** with timestamp and emoji
+- **Example script** for common use cases
 
-##  Requisiti
+## Requirements
 
 - **bash** >= 4.0
-- **curl**
-- **jq** (parser JSON)
+- **curls**
+- **jq** (JSON parser)
 
-### Installazione dipendenze
+### Installing dependencies
 
 ```bash
 # Debian/Ubuntu
@@ -43,204 +43,204 @@ sudo yum install curl jq
 brew install curl jq
 ```
 
-##  Installazione
+## Installation
 
 ```bash
-# 1. Scarica i file
+#1. Download the files
 git clone <repository> ydea-toolkit
 cd ydea-toolkit
 
-# 2. Rendi eseguibili gli script
-chmod +x ydea-toolkit.sh esempi-ydea.sh ydea-monitoring-integration.sh
+#2. Make scripts executable
+chmod +x ydea-toolkit.sh examples-ydea.sh ydea-monitoring-integration.sh
 
-# 3. Copia e configura le credenziali
+#3. Copy and configure credentials
 cp .env.example .env
-nano .env  # Inserisci YDEA_ID e YDEA_API_KEY
+nano .env # Enter YDEA_ID and YDEA_API_KEY
 ```
 
-##  Configurazione
+## Configuration
 
-### 1. Ottieni le credenziali API
+### 1. Get your API credentials
 
-1. Accedi a [Ydea](https://my.ydea.cloud)
-2. Vai su **Impostazioni** → **La mia azienda** → **API**
-3. Copia **ID** e **API Key**
+1. Login to [Ydea](https://my.ydea.cloud)
+2. Go to **Settings** → **My Company** → **API**
+3. Copy **ID** and **API Key**
 
-### 2. Configura il file .env
+### 2. Configure the .env file
 
 ```bash
-# Credenziali (OBBLIGATORIE)
-export YDEA_ID="il_tuo_id_azienda"
-export YDEA_API_KEY="la_tua_chiave_api"
+# Credentials (MANDATORY)
+export YDEA_ID="your_company_id"
+export YDEA_API_KEY="your_api_key"
 
-# Opzionali
+# Optional
 export YDEA_BASE_URL="https://my.ydea.cloud/app_api_v2"
 export YDEA_TOKEN_FILE="${HOME}/.ydea_token.json"
-export YDEA_DEBUG=0  # Imposta 1 per debug verboso
+export YDEA_DEBUG=0 # Set 1 for verbose debugging
 ```
 
-### 3. Carica le variabili
+### 3. Load the variables
 
 ```bash
 source .env
 ```
 
-### 4. Testa la connessione
+### 4. Test the connection
 
 ```bash
 ./ydea-toolkit.sh login
-# Output atteso:  Login effettuato (token valido ~1h)
+# Expected output: Login (valid token ~1h)
 ```
 
-##  Utilizzo
+## Usage
 
-### Comandi Base
+### Basic Commands
 
 ```bash
-# Login (effettuato automaticamente quando necessario)
+# Login (done automatically when needed)
 ./ydea-toolkit.sh login
 
-# Lista ticket
+# Ticket list
 ./ydea-toolkit.sh list [limit] [status]
 
-# Dettagli ticket
+# Ticket details
 ./ydea-toolkit.sh get <ticket_id>
 
-# Cerca ticket
+# Search tickets
 ./ydea-toolkit.sh search "<query>" [limit]
 
-# Crea ticket
-./ydea-toolkit.sh create "<titolo>" "<descrizione>" [priorità] [categoria_id]
+# Create ticket
+./ydea-toolkit.sh create "<title>" "<description>" [priority] [category_id]
 
-# Aggiorna ticket
+# Update ticket
 ./ydea-toolkit.sh update <ticket_id> '<json_updates>'
 
-# Aggiungi commento
-./ydea-toolkit.sh comment <ticket_id> "<testo>"
+# Add comment
+./ydea-toolkit.sh comment <ticket_id> "<text>"
 
-# Chiudi ticket
-./ydea-toolkit.sh close <ticket_id> "<nota>"
+# Close ticket
+./ydea-toolkit.sh close <ticket_id> "<note>"
 
-# Lista categorie
+# Category list
 ./ydea-toolkit.sh categories
 
-# Lista utenti
+# User list
 ./ydea-toolkit.sh users [limit]
 
-# Chiamata API generica
+# Generic API call
 ./ydea-toolkit.sh api <METHOD> </path> [json_body]
 ```
 
-##  Esempi Pratici
+## Practical Examples
 
-### Esempio 1: Lista ultimi 10 ticket aperti
+### Example 1: List of last 10 open tickets
 
 ```bash
 ./ydea-toolkit.sh list 10 open | jq '.data[] | {id, title, priority}'
 ```
 
-Output:
+Outputs:
 ```json
 {
   "id": 12345,
-  "title": "Server non raggiungibile",
+  "title": "Server unreachable",
   "priority": "high"
 }
 ...
 ```
 
-### Esempio 2: Crea ticket da script
+### Example 2: Create ticket from script
 
 ```bash
 #!/bin/bash
 RESULT=$(./ydea-toolkit.sh create \
-  "Backup fallito su server-prod" \
-  "Il backup notturno non è stato completato. Log allegato." \
+  "Backup failed on server-prod" \
+  "Nightly backup was not completed. Log attached." \
   "high")
 
 TICKET_ID=$(echo "$RESULT" | jq -r '.id')
-echo "Ticket creato: #$TICKET_ID"
+echo "Ticket created: #$TICKET_ID"
 ```
 
-### Esempio 3: Workflow completo
+### Example 3: Complete workflow
 
 ```bash
-# 1. Crea ticket
-TICKET=$(./ydea-toolkit.sh create "Manutenzione programmata" "Deploy nuova versione")
+#1. Create tickets
+TICKET=$(./ydea-toolkit.sh create "Scheduled maintenance" "Deploy new version")
 ID=$(echo "$TICKET" | jq -r '.id')
 
-# 2. Aggiungi commento
-./ydea-toolkit.sh comment "$ID" "Iniziata manutenzione alle $(date)"
+#2. Add comment
+./ydea-toolkit.sh comment "$ID" "Maintenance started at $(date)"
 
-# 3. Aggiorna stato
+#3. Update Status
 ./ydea-toolkit.sh update "$ID" '{"status":"in_progress"}'
 
-# 4. ... esegui operazioni ...
+#4. ...perform operations...
 
-# 5. Chiudi
-./ydea-toolkit.sh close "$ID" "Manutenzione completata con successo"
+#5. Close
+./ydea-toolkit.sh close "$ID" "Maintenance completed successfully"
 ```
 
-### Esempio 4: Report giornaliero via email
+### Example 4: Daily report via email
 
 ```bash
 #!/bin/bash
 {
-  echo "=== REPORT TICKET GIORNALIERO ==="
+  echo "=== DAILY TICKET REPORT ==="
   echo ""
-  echo "Ticket APERTI:"
-  ./ydea-toolkit.sh list 100 open | jq -r '.data[] | "  - #\(.id): \(.title)"'
+  echo "OPEN tickets:"
+  ./ydea-toolkit.sh list 100 open | jq -r '.data[] | " - #\(.id): \(.title)"'
   echo ""
-  echo "Ticket CHIUSI OGGI:"
-  ./ydea-toolkit.sh list 50 closed | jq -r '.data[] | select(.closed_at | startswith("2025-11-11")) | "  - #\(.id): \(.title)"'
+  echo "Tickets CLOSED TODAY:"
+  ./ydea-toolkit.sh list 50 closed | jq -r '.data[] | select(.closed_at | startswith("2025-11-11")) | " - #\(.id): \(.title)"'
 } | mail -s "Report Ydea $(date +%Y-%m-%d)" admin@example.com
 ```
 
-### Esempio 5: Export in CSV
+### Example 5: Export to CSV
 
 ```bash
 ./ydea-toolkit.sh list 1000 | jq -r '
-  ["ID","Titolo","Status","Priorità","Data"] as $headers |
-  ($headers | @csv),
+  ["ID","Title","Status","Priority","Date"] as $headers |
+($headers | @csv),
   (.data[] | [.id, .title, .status, .priority, .created_at] | @csv)
 ' > tickets_export.csv
 ```
 
-##  Integrazione Monitoraggio
+## Monitoring Integration
 
-### Monitoring Automatico
+### Automatic Monitoring
 
-Lo script `ydea-monitoring-integration.sh` crea automaticamente ticket quando rileva problemi:
+The `ydea-monitoring-integration.sh` script automatically creates tickets when it detects problems:
 
 ```bash
-# Monitoring completo (CPU, RAM, Disk)
+# Full monitoring (CPU, RAM, Disk)
 ./ydea-monitoring-integration.sh monitor
 
-# Monitora servizio specifico
+# Monitor specific service
 ./ydea-monitoring-integration.sh service nginx
 ./ydea-monitoring-integration.sh service postgresql
 ```
 
-### Configurazione CRON
+### CRON configuration
 
 ```bash
-# Aggiungi a crontab -e
+# Add to crontab -e
 */5 * * * * cd /path/to/ydea-toolkit && ./ydea-monitoring-integration.sh monitor >> /var/log/ydea-monitor.log 2>&1
 
-# Monitora servizi critici ogni minuto
+# Monitor critical services every minute
 * * * * * cd /path/to/ydea-toolkit && ./ydea-monitoring-integration.sh service nginx >> /var/log/ydea-monitor.log 2>&1
 ```
 
-### Integrazione Netdata
+### Netdata integration
 
-1. Configura Netdata per inviare notifiche custom:
+1. Configure Netdata to send custom notifications:
 
 ```bash
 # /etc/netdata/health_alarm_notify.conf
 SEND_CUSTOM="YES"
 DEFAULT_RECIPIENT_CUSTOM="ydea"
 
-# Script di notifica custom
+# Custom notification script
 cat > /usr/local/bin/netdata-to-ydea.sh << 'EOF'
 #!/bin/bash
 cd /path/to/ydea-toolkit
@@ -261,17 +261,17 @@ EOF
 chmod +x /usr/local/bin/netdata-to-ydea.sh
 ```
 
-2. Riavvia Netdata:
+2. Restart Netdata:
 
 ```bash
 sudo systemctl restart netdata
 ```
 
-### Alert da Script Custom
+### Alert from Custom Script
 
 ```bash
 #!/bin/bash
-# check-website.sh - Verifica disponibilità sito
+# check-website.sh - Check site availability
 
 SITE="https://example.com"
 if ! curl -f -s -o /dev/null "$SITE"; then
@@ -279,85 +279,85 @@ if ! curl -f -s -o /dev/null "$SITE"; then
   source .env
   
   ./ydea-toolkit.sh create \
-    "[ALERT] Sito $SITE non raggiungibile" \
-    "Il sito web non risponde. Verificare server e DNS." \
+    "[ALERT] Site $SITE unreachable" \
+    "The website is not responding. Check server and DNS." \
     "critical"
 fi
 ```
 
-##  Script di Esempio Inclusi
+## Sample Scripts Included
 
-### esempi-ydea.sh
+### examples-ydea.sh
 
-Script interattivo con menu che dimostra:
+Interactive script with menu demonstrating:
 
-1. **Report giornaliero ticket**
-2. **Creazione ticket da alert**
-3. **Ricerca e aggiornamento**
-4. **Workflow completo**
+1. **Daily ticket report**
+2. **Creation of ticket from alert**
+3. **Research and update**
+4. **Complete Workflow**
 5. **Export CSV**
 
-Uso:
+Usage:
 ```bash
-# Menu interattivo
-./esempi-ydea.sh --menu
+# Interactive menu
+./examples-ydea.sh --menu
 
-# O esegui singole funzioni
-source esempi-ydea.sh
-esempio_report_giornaliero
-esempio_workflow_completo
+# Or run individual functions
+source examples-ydea.sh
+example_daily_report
+complete_workflow_example
 ```
 
-##  Best Practices
+## Best Practices
 
-### 1. Gestione Token
+### 1. Token Management
 
-Il token viene salvato in `~/.ydea_token.json` e rinnovato automaticamente. Non serve fare login manualmente ogni volta.
+The token is saved in `~/.ydea_token.json` and automatically renewed. You don't need to log in manually every time.
 
-### 2. Prevenzione Duplicati
+### 2. Duplicate Prevention
 
-Per alert automatici, usa la cache integrata nel monitoring script per evitare ticket duplicati:
+For automatic alerts, use the built-in cache in the monitoring script to avoid duplicate tickets:
 
 ```bash
-# La cache in /tmp/ydea_tickets_cache.json traccia gli alert aperti
-# Viene pulita automaticamente dopo 24h
-./ydea-monitoring-integration.sh cleanup  # pulizia manuale
+# The cache in /tmp/ydea_tickets_cache.json tracks open alerts
+# It is cleaned automatically after 24h
+./ydea-monitoring-integration.sh cleanup # manual cleanup
 ```
 
-### 3. Priorità Ticket
+### 3. Ticket Priority
 
-Usa le priorità in modo coerente:
-- `critical` - Servizi down, dataloss
-- `high` - Performance degradate, alert critici
-- `normal` - Manutenzione programmata, richieste standard
-- `low` - Miglioramenti, documentazione
+Use priorities consistently:
+- `critical` - Services down, dataloss
+- `high` - Degraded performance, critical alerts
+- `normal` - Scheduled maintenance, standard requests
+- `low` - Improvements, documentation
 
-### 4. Descrizioni Strutturate
+### 4. Structured Descriptions
 
-Usa markdown nelle descrizioni per maggiore leggibilità:
+Use markdown in descriptions for readability:
 
 ```bash
 ./ydea-toolkit.sh create "Alert CPU" "
-## Dettagli Alert
+## Alert Details
 - Host: server-01
 - CPU: 95%
-- Soglia: 80%
+- Threshold: 80%
 
-## Diagnostica
+## Diagnostics
 \`\`\`
 top -bn1 | head -20
 \`\`\`
 
-## Azioni
-1. Verificare processi
-2. Controllare log
-3. Valutare scaling
+## Actions
+1. Test processes
+2. Check log
+3. Evaluate scaling
 "
 ```
 
 ### 5. Logging
 
-Abilita debug per troubleshooting:
+Enable debug for troubleshooting:
 
 ```bash
 export YDEA_DEBUG=1
@@ -366,90 +366,89 @@ export YDEA_DEBUG=1
 
 ### 6. Error Handling
 
-Gestisci sempre gli errori negli script:
+Always handle errors in scripts:
 
 ```bash
 if RESULT=$(./ydea-toolkit.sh create "..." "..." 2>&1); then
   TICKET_ID=$(echo "$RESULT" | jq -r '.id')
-  echo " Ticket #$TICKET_ID creato"
+  echo "Ticket #$TICKET_ID created"
 else
-  echo " Errore: $RESULT" >&2
-  # Invia notifica, scrivi log, etc.
+  echo " Error: $RESULT" >&2
+  # Send notification, write log, etc.
 fi
 ```
 
-##  Sicurezza
+## Security
 
-- **Mai committare** il file `.env` con credenziali
-- Usa permessi restrittivi: `chmod 600 .env`
-- Il token file ha permessi `644` di default
-- Considera l'uso di vault per produzione (Hashicorp Vault, AWS Secrets Manager)
+- **Never commit** the `.env` file with credentials
+- Use restrictive permissions: `chmod 600 .env`
+- The file token has `644` permissions by default
+- Consider using production vaults (Hashicorp Vault, AWS Secrets Manager)
 
-##  Troubleshooting
+## Troubleshooting
 
-### Login fallisce
+### Login fails
 
 ```bash
-# Verifica credenziali
+# Verify credentials
 echo "ID: $YDEA_ID"
 echo "API_KEY: ${YDEA_API_KEY:0:10}..."
 
-# Test con curl diretto
+# Test with direct curl
 curl -X POST https://my.ydea.cloud/app_api_v2/login \
   -H "Content-Type: application/json" \
   -d "{\"id\":\"$YDEA_ID\",\"api_key\":\"$YDEA_API_KEY\"}"
 ```
 
-### Token scade subito
+### Token expires immediately
 
 ```bash
-# Verifica orologio sistema
-date -u
-# Deve essere sincronizzato con NTP
+# Check system clock
+give -u
+# Must be synchronized with NTP
 ```
 
-### Errori jq
+### Errors jq
 
 ```bash
-# Verifica installazione jq
+# Check jq installation
 jq --version
 
 # Test parsing
 echo '{"test": "value"}' | jq .
 ```
 
-##  Supporto
-
-- **Documentazione API Ydea**: https://my.ydea.cloud/api/doc/v2
-- **Issues**: Apri una issue su GitHub
+## Support
+- **Ydea API documentation**: https://my.ydea.cloud/api/doc/v2
+- **Issues**: Open an issue on GitHub
 - **Email**: support@example.com
 
-##  Licenza
+## License
 
-MIT License - Vedi file LICENSE
+MIT License - See LICENSE file
 
-##  Contributi
+## Contributions
 
-I contributi sono benvenuti! Per favore:
+Contributions are welcome! Please:
 
-1. Fork del repository
-2. Crea branch per feature (`git checkout -b feature/nuova-funzione`)
-3. Commit modifiche (`git commit -am 'Aggiunta nuova funzione'`)
-4. Push al branch (`git push origin feature/nuova-funzione`)
-5. Apri Pull Request
+1. Fork the repository
+2. Create branches for features (`git checkout -b feature/new-feature`)
+3. Commit changes (`git commit -am 'Added new feature'`)
+4. Push to branch (`git push origin feature/new-feature`)
+5. Open Pull Request
 
-##  Roadmap
+## Roadmap
 
-- [ ] Supporto webhook bidirezionale
-- [ ] Dashboard web per visualizzazione ticket
-- [ ] Integrazione con Slack/Teams
-- [ ] Template ticket predefiniti
-- [ ] Reportistica avanzata
-- [ ] Supporto allegati
-- [ ] CLI interattiva con autocompletamento
+- [ ] Two-way webhook support
+- [ ] Web dashboard for ticket viewing
+- [ ] Integration with Slack/Teams
+- [ ] Default ticket templates
+- [ ] Advanced reporting
+- [ ] Attachment support
+- [ ] Interactive CLI with autocompletion
 
 ---
 
-**Versione**: 1.0.0  
-**Ultimo aggiornamento**: 2025-11-11  
-**Autore**: Marzio
+**Version**: 1.0.0  
+**Last update**: 2025-11-11  
+**Author**: Marzio

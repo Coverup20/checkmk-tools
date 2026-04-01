@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
-"""
-ydea_ticket_monitor.py - Monitoraggio automatico stato ticket tracciati
+"""ydea_ticket_monitor.py - Automatic tracking ticket status monitoring
 
-Aggiorna periodicamente lo stato dei ticket e rimuove quelli risolti vecchi.
-Rileva cambiamenti in:
-- Stato ticket
-- Descrizione
-- Priorità
-- Assegnazione
+Periodically updates the status of tickets and removes old resolved ones.
+Detect changes in:
+- Ticket status
+- Description
+- Priorities
+- Assignment
 
 Usage:
     ydea_ticket_monitor.py
 
-Version: 1.0.0 (convertito da Bash)
-"""
+Version: 1.0.0 (ported from Bash)"""
 
 VERSION = "1.0.0"  # Versione script (aggiornare ad ogni modifica)
 
@@ -31,7 +29,7 @@ sys.path.insert(0, str(script_dir))
 
 from ydea_common import Logger  # type: ignore
 
-# Import ydea-toolkit.py (nome con trattino richiede importlib)
+# Import ydea-toolkit.py (hyphenated name requires importlib)
 ydea_toolkit_path = script_dir / "ydea-toolkit.py"
 spec = importlib.util.spec_from_file_location("ydea_toolkit", ydea_toolkit_path)
 if spec and spec.loader:
@@ -45,7 +43,7 @@ YdeaAPI = ydea_toolkit.YdeaAPI
 TrackingSystem = ydea_toolkit.TrackingSystem
 
 
-# ===== CONFIGURAZIONE =====
+# ===== CONFIGURATION =====
 
 CLEANUP_MARKER = Path("/tmp/ydea_last_cleanup")
 CLEANUP_INTERVAL_HOURS = 6
@@ -54,28 +52,24 @@ CLEANUP_INTERVAL_HOURS = 6
 # ===== FUNZIONI UTILITY =====
 
 def log_ticket_event(event_type: str, ticket_id: int, details: str = ""):
-    """
-    Logga evento ticket
+    """Log ticket event
     
     Args:
-        event_type: Tipo evento (RISOLTO, STATO-CAMBIATO, etc.)
-        ticket_id: ID ticket
-        details: Dettagli aggiuntivi
-    """
+        event_type: Event type (RESOLVED, STATUS-CHANGED, etc.)
+        ticket_id: Ticket ID
+        details: Additional details"""
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print(f"[{timestamp}] [TICKET-EVENT] [{event_type}] #{ticket_id} {details}")
 
 
 def get_tracking_stats(tracking: TrackingSystem) -> Dict[str, int]:
-    """
-    Ottieni statistiche tracking
+    """Get tracking statistics
     
     Args:
-        tracking: Istanza TrackingSystem
+        tracking: TrackingSystem instance
         
     Returns:
-        Dict con total_tickets, open_tickets, resolved_tickets
-    """
+        Dict with total_tickets, open_tickets, resolved_tickets"""
     try:
         tracking_data = tracking.load_tracking()
         tickets = tracking_data.get('tickets', [])
@@ -94,15 +88,13 @@ def get_tracking_stats(tracking: TrackingSystem) -> Dict[str, int]:
 
 
 def get_previous_states(tracking: TrackingSystem) -> Dict[int, Dict[str, Any]]:
-    """
-    Ottieni stati precedenti dei ticket
+    """Get previous ticket statuses
     
     Args:
-        tracking: Istanza TrackingSystem
+        tracking: TrackingSystem instance
         
     Returns:
-        Dict con ticket_id come chiave e dati precedenti come valore
-    """
+        Dict with ticket_id as key and previous data as value"""
     previous = {}
     
     try:
@@ -133,14 +125,12 @@ def detect_changes(
     prev_data: Dict[str, Any],
     current_data: Dict[str, Any]
 ):
-    """
-    Rileva e logga cambiamenti in un ticket
+    """Track and log changes in a ticket
     
     Args:
-        ticket_id: ID ticket
-        prev_data: Dati precedenti
-        current_data: Dati correnti dall'API
-    """
+        ticket_id: Ticket ID
+        prev_data: Previous data
+        current_data: Current data from the API"""
     codice = prev_data.get('codice', '')
     host = prev_data.get('host', '')
     service = prev_data.get('service', '')
@@ -154,7 +144,7 @@ def detect_changes(
     current_desc = current_data.get('descrizione', '')
     current_prio = current_data.get('priorita', 'Normale')
     
-    # Gestione assegnatoA (può essere oggetto o stringa)
+    # Management assignedA (can be object or string)
     assigned = current_data.get('assegnatoA')
     if isinstance(assigned, dict):
         if assigned:
@@ -186,19 +176,17 @@ def detect_changes(
     if current_stato in resolved_states and prev_stato != current_stato:
         log_ticket_event("RISOLTO", ticket_id,
                         f"[{codice}] Host: {host}, Service: {service}, Stato: {prev_stato} → {current_stato}")
-    # Rileva cambio stato (non risolto)
+    # Detect state change (not resolved)
     elif prev_stato and prev_stato != "NUOVO" and prev_stato != current_stato:
         log_ticket_event("STATO-CAMBIATO", ticket_id,
                         f"[{codice}] {prev_stato} → {current_stato} (Host: {host}, Service: {service})")
 
 
 def should_cleanup() -> bool:
-    """
-    Verifica se è necessario eseguire cleanup
+    """Check if you need to run cleanup
     
     Returns:
-        True se sono passate almeno 6 ore dall'ultimo cleanup
-    """
+        True if at least 6 hours have passed since the last cleanup"""
     if not CLEANUP_MARKER.exists():
         return True
     
@@ -212,7 +200,7 @@ def should_cleanup() -> bool:
 
 
 def mark_cleanup_done():
-    """Segna cleanup come eseguito"""
+    """Mark cleanup as done"""
     try:
         CLEANUP_MARKER.write_text(str(int(time.time())))
     except Exception as e:
@@ -220,12 +208,10 @@ def mark_cleanup_done():
 
 
 def get_hours_until_next_cleanup() -> int:
-    """
-    Calcola ore mancanti al prossimo cleanup
+    """Calculate hours until the next cleanup
     
     Returns:
-        Ore mancanti (0 se cleanup necessario ora)
-    """
+        Hours missing (0 if cleanup needed now)"""
     if not CLEANUP_MARKER.exists():
         return 0
     
@@ -261,7 +247,7 @@ def main():
     
     Logger.info(" Aggiornamento stati ticket...")
     
-    # Aggiorna stati ticket
+    # Update ticket statuses
     try:
         tracking.update_tracked_tickets()
     except Exception as e:
@@ -290,7 +276,7 @@ def main():
     
     Logger.success(" Aggiornamento stati completato")
     
-    # Cleanup ticket risolti vecchi (ogni 6 ore)
+    # Cleanup old resolved tickets (every 6 hours)
     if should_cleanup():
         Logger.info(" Eseguo pulizia ticket risolti vecchi...")
         try:

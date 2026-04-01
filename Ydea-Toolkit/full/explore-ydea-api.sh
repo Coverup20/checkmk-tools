@@ -1,13 +1,13 @@
 #!/bin/bash
-# explore-ydea-api.sh — Esplora gli endpoint disponibili dell'API Ydea
-# Usa questo script per scoprire quali endpoint esistono e come risponde l'API
+# explore-ydea-api.sh — Explore available Ydea API endpoints
+# Use this script to find out what endpoints exist and how the API responds
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 YDEA_TOOLKIT="${SCRIPT_DIR}/ydea-toolkit.sh"
 
-# Carica le funzioni da ydea-toolkit
+# Load functions from ydea-toolkit
 # shellcheck disable=SC1090
 source "$YDEA_TOOLKIT"
 
@@ -17,13 +17,13 @@ echo "   ESPLORAZIONE API YDEA"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
 
-# Verifica autenticazione
+# Verify authentication
 echo " Step 1: Autenticazione..."
 
 set +e
 ensure_token 2>&1
 if [[ $? -ne 0 ]]; then
-    echo " Errore autenticazione"
+    echo "Authentication error"
     exit 1
 fi
 set -e
@@ -31,15 +31,15 @@ set -e
 echo " Autenticato"
 echo ""
 
-# Carica token
+# Load token
 TOKEN=$(load_token)
 BASE_URL="${YDEA_BASE_URL%/}"
 
 echo " Base URL: $BASE_URL"
-echo " Token: ${TOKEN:0:20}..."
+echo "Token: ${TOKEN:0:20}..."
 echo ""
 
-# Funzione helper per testare un endpoint
+# Helper function for testing an endpoint
 test_endpoint() {
   local method="$1"
   local endpoint="$2"
@@ -67,7 +67,7 @@ test_endpoint() {
   set -e
   
   if [[ $curl_exit -ne 0 ]]; then
-    echo " Errore curl (exit: $curl_exit)"
+    echo "Curl error (exit: $curl_exit)"
     echo "$response"
     return 1
   fi
@@ -78,20 +78,20 @@ test_endpoint() {
   echo " HTTP Status: $http_code"
   
   if [[ "$http_code" == "200" || "$http_code" == "201" ]]; then
-    echo " Successo!"
+    echo "Success!"
     echo ""
-    echo "Risposta (primi 50 caratteri):"
+    echo "Response (first 50 characters):"
     echo "$response" | head -c 500
     echo ""
     echo ""
     echo "Struttura JSON:"
-    echo "$response" | jq -r 'keys' 2>/dev/null || echo "Non è JSON valido"
+    echo "$response" | jq -r 'keys' 2>/dev/null || echo "This is not valid JSON"
     
     # Se ha array 'objs', mostra quanti elementi
     local count
     count=$(echo "$response" | jq -r '.objs | length' 2>/dev/null || echo "")
     if [[ -n "$count" && "$count" != "null" ]]; then
-      echo " Numero di oggetti (.objs): $count"
+      echo "Number of objects (.objs): $count"
       if [[ "$count" -gt 0 ]]; then
         echo ""
         echo "Esempio primo oggetto:"
@@ -107,7 +107,7 @@ test_endpoint() {
 
 # Test endpoint comuni
 echo "════════════════════════════════════════════════════════════════"
-echo "  INIZIO TEST ENDPOINT"
+echo "START ENDPOINT TEST"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
 
@@ -127,10 +127,10 @@ test_endpoint "GET" "/priorities" "Lista priorità (variant 1)"
 test_endpoint "GET" "/priority" "Lista priorità (variant 2)"
 test_endpoint "GET" "/ticket/priorities" "Priorità ticket"
 
-# Endpoint ticket (per riferimento)
+# Ticket endpoint (for reference)
 test_endpoint "GET" "/tickets?limit=1" "Lista ticket (per verifica)"
 
-# Endpoint users (per riferimento)
+# Endpoint users (for reference)
 test_endpoint "GET" "/users?limit=1" "Lista utenti (per verifica)"
 
 # Endpoint generico info
@@ -142,6 +142,6 @@ echo "════════════════════════�
 echo "   ESPLORAZIONE COMPLETATA"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
-echo " Suggerimento: Cerca negli output sopra gli HTTP 200 per vedere"
+echo "Tip: Look in the outputs above the HTTP 200 to see"
 echo "   quali endpoint funzionano e quale struttura hanno i dati."
 echo ""

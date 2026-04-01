@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-patch-wrapper-multicandidate.py - Patch the deployed wrapper on srv-monitoring
+"""patch-wrapper-multicandidate.py - Patch the deployed wrapper on srv-monitoring
 to process ALL backup candidates (not just the newest one).
 
-Fixes: job01 ignored when job00+job01 finish simultaneously.
-"""
+Fixes: job01 ignored when job00+job01 finish simultaneously."""
 
 import sys
 import os
@@ -155,7 +153,7 @@ for entry in "${candidates[@]}"; do
   PUSHED=$((PUSHED + 1))
 done
 
-log "Total backups pushed this run: $PUSHED" """
+log "Total backups pushed this run: $PUSHED""""
 
 def main():
     if not os.path.exists(WRAPPER_PATH):

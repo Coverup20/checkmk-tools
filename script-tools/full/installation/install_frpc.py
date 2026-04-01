@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
-"""
-install_frpc.py - Standalone FRPC Installer
+"""install_frpc.py - Standalone FRPC Installer
 
-Installazione e configurazione rapida di FRPC (Fast Reverse Proxy Client).
-Supporta Linux (systemd) e OpenWrt (procd).
+Quick installation and configuration of FRPC (Fast Reverse Proxy Client).
+Supports Linux (systemd) and OpenWrt (procd).
 
 Usage:
     install_frpc.py [options]
 
 Options:
-    --uninstall    Rimuovi FRPC
+    --uninstall Remove FRPC
 
 Env Vars:
-    FRP_VERSION    Versione FRPC (es. 0.64.0)
+    FRP_VERSION FRPC version (e.g. 0.64.0)
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -26,7 +24,7 @@ import platform
 import urllib.request
 from pathlib import Path
 
-# --- Configurazione ---
+# --- Configuration ---
 DEFAULT_FRP_VER = "0.64.0"
 
 class Console:
@@ -99,17 +97,16 @@ class FRPCInstaller:
 server_addr = "{server}"
 server_port = 7000
 auth.method = "token"
-auth.token  = "{token}"
-tls.enable  = true
-log.to      = "/var/log/frpc.log"
-log.level   = "info"
+auth.token = "{token}"
+tls.enable = true
+log.to = "/var/log/frpc.log"
+log.level = "info"
 
 [{host}]
-type        = "tcp"
-local_ip    = "127.0.0.1"
-local_port  = 6556
-remote_port = {port}
-"""
+type = "tcp"
+local_ip = "127.0.0.1"
+local_port = 6556
+remote_port = {port}"""
         with open("/etc/frp/frpc.toml", "w") as f: f.write(config)
         
         if self.os_type == "openwrt":
@@ -123,8 +120,7 @@ start_service() {
     procd_set_param command /usr/local/bin/frpc -c /etc/frp/frpc.toml
     procd_set_param respawn
     procd_close_instance
-}
-"""
+}"""
             with open("/etc/init.d/frpc", "w") as f: f.write(init)
             os.chmod("/etc/init.d/frpc", 0o755)
             run_cmd(["/etc/init.d/frpc", "enable"])
@@ -143,8 +139,7 @@ RestartSec=5s
 User=root
 
 [Install]
-WantedBy=multi-user.target
-"""
+WantedBy=multi-user.target"""
             with open("/etc/systemd/system/frpc.service", "w") as f: f.write(service)
             run_cmd(["systemctl", "daemon-reload"])
             run_cmd(["systemctl", "enable", "--now", "frpc"])

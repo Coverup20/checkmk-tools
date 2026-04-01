@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check-proxmox_backup_status.py - CheckMK Local Check for Proxmox Backup
+"""check-proxmox_backup_status.py - CheckMK Local Check for Proxmox Backup
 
 Monitor last vzdump backup age (WARN 30 hours, CRIT 54 hours).
 
 Proxmox VE
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys

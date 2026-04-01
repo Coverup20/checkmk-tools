@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""
-ydea_templates.py - Template predefiniti per ticket Ydea
+"""ydea_templates.py - Default templates for Ydea tickets
 
-Genera JSON per creazione ticket tramite API Ydea con template predefiniti
-per vari scenari: infrastruttura, applicazioni, sicurezza, manutenzione.
+Generate JSON for ticket creation via Ydea API with predefined templates
+for various scenarios: infrastructure, applications, security, maintenance.
 
 Usage:
     ydea_templates.py server-down <hostname> [service]
@@ -14,8 +13,7 @@ Examples:
     ydea_templates.py server-down web-prod-01 nginx
     ydea_templates.py disk-full server-01 /var 92
 
-Version: 1.0.0 (convertito da Bash)
-"""
+Version: 1.0.0 (ported from Bash)"""
 
 VERSION = "1.0.0"
 
@@ -28,29 +26,29 @@ from typing import Dict, Any
 # ===== TEMPLATE INFRASTRUTTURA =====
 
 def template_server_down(hostname: str, service: str = "N/A") -> Dict[str, Any]:
-    """Template per server non raggiungibile"""
+    """Template for server unreachable"""
     return {
         "title": f"[CRITICAL] Server {hostname} non raggiungibile",
-        "description": f""" Server Down Alert
+        "description": f"""Server Down Alert
 
-**Dettagli:**
+**Details:**
 - Hostname: {hostname}
-- Servizio: {service}
-- Data/Ora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-- Rilevato da: Sistema di monitoraggio automatico
+- Service: {service}
+- Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- Detected by: Automatic monitoring system
 
-**Impatto:**
-- [ ] Servizio completamente offline
-- [ ] Performance degradate
-- [ ] Accesso limitato
+**Impact:**
+- [ ] Completely offline service
+- [ ] Degraded performance
+- [ ] Limited access
 
-**Azioni immediate:**
-1. Verificare connettività di rete
-2. Controllare status hardware
-3. Verificare log di sistema
-4. Tentare restart se appropriato
+**Immediate actions:**
+1. Check network connectivity
+2. Check hardware status
+3. Check system logs
+4. Attempt restart if appropriate
 
-**Comandi diagnostici:**
+**Diagnostic Commands:**
 ```bash
 ping {hostname}
 ssh {hostname} 'uptime; systemctl status'
@@ -58,34 +56,34 @@ journalctl -xe
 ```
 
 **Priority:** CRITICAL
-**SLA:** 15 minuti""",
+**SLA:** 15 minutes""",
         "priority": "critical",
         "tags": ["infrastruttura", "downtime", "server"]
     }
 
 
 def template_backup_failed(backup_job: str, error_msg: str = "Unknown error") -> Dict[str, Any]:
-    """Template per backup fallito"""
+    """Template for failed backup"""
     return {
         "title": f"[HIGH] Backup fallito: {backup_job}",
-        "description": f""" Backup Failure Alert
+        "description": f"""Backup Failure Alert
 
-**Dettagli Job:**
-- Nome job: {backup_job}
-- Data/Ora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-- Errore: {error_msg}
+**Job Details:**
+- Job name: {backup_job}
+- Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- Error: {error_msg}
 
-**Impatto:**
-- [ ] Dati non protetti per questo ciclo
-- [ ] RPO a rischio
-- [ ] Storage backup non aggiornato
+**Impact:**
+- [ ] Data not protected for this cycle
+- [ ] RPO at risk
+- [ ] Storage backup not updated
 
-**Azioni richieste:**
-1. Verificare spazio disco disponibile
-2. Controllare permessi file/directory
-3. Verificare connettività storage remoto
-4. Controllare log backup dettagliati
-5. Tentare backup manuale se possibile
+**Action Required:**
+1. Check available disk space
+2. Check file/directory permissions
+3. Verify remote storage connectivity
+4. Check detailed backup logs
+5. Attempt manual backup if possible
 
 **Log Path:**
 ```
@@ -93,60 +91,60 @@ def template_backup_failed(backup_job: str, error_msg: str = "Unknown error") ->
 ```
 
 **Priority:** HIGH
-**SLA:** 2 ore""",
+**SLA:** 2 hours""",
         "priority": "high",
         "tags": ["backup", "storage", "dati"]
     }
 
 
 def template_disk_full(hostname: str, mount_point: str, usage: str) -> Dict[str, Any]:
-    """Template per disco quasi pieno"""
+    """Template for almost full disk"""
     return {
         "title": f"[HIGH] Disco quasi pieno su {hostname}:{mount_point}",
-        "description": f""" Disk Space Alert
+        "description": f"""Disk Space Alert
 
-**Dettagli:**
+**Details:**
 - Hostname: {hostname}
 - Mount Point: {mount_point}
-- Utilizzo: {usage}%
-- Data/Ora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- Usage: {usage}%
+- Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-**Impatto potenziale:**
-- [ ] Applicazioni potrebbero fallire
-- [ ] Log potrebbero non essere scritti
-- [ ] Database a rischio corruzione
-- [ ] Sistema potrebbe diventare instabile
+**Potential impact:**
+- [ ] Applications may fail
+- [ ] Logs may not be written
+- [ ] Database at risk of corruption
+- [ ] System may become unstable
 
-**Azioni immediate:**
-1. Identificare file più grandi
-2. Pulire log vecchi
-3. Rimuovere file temporanei
-4. Verificare necessità espansione
+**Immediate actions:**
+1. Identify larger files
+2. Clean old logs
+3. Remove temporary files
+4. Check for expansion needs
 
-**Comandi per pulizia:**
+**Cleaning commands:**
 ```bash
-# Trova file grandi
+# Find large files
 du -sh {mount_point}/* | sort -rh | head -20
 
-# Pulisci log vecchi
+# Clean old logs
 find /var/log -type f -name '*.log' -mtime +30 -delete
 
-# Pulisci cache apt/yum
-apt-get clean  # o yum clean all
+# Clear apt/yum cache
+apt-get clean # or yum clean all
 
-# Svuota cestino
+# Empty trash
 rm -rf ~/.local/share/Trash/*
 ```
 
 **Priority:** HIGH
-**SLA:** 4 ore""",
+**SLA:** 4 hours""",
         "priority": "high",
         "tags": ["storage", "disk", "infrastruttura"]
     }
 
 
 def template_ssl_expiring(domain: str, days_left: str) -> Dict[str, Any]:
-    """Template per certificato SSL in scadenza"""
+    """Template for expiring SSL certificate"""
     try:
         expiry_date = (datetime.now() + timedelta(days=int(days_left))).strftime('%Y-%m-%d')
     except:
@@ -154,40 +152,40 @@ def template_ssl_expiring(domain: str, days_left: str) -> Dict[str, Any]:
     
     return {
         "title": f"[MEDIUM] Certificato SSL in scadenza per {domain}",
-        "description": f""" SSL Certificate Expiration Warning
+        "description": f"""SSL Certificate Expiration Warning
 
-**Dettagli:**
-- Dominio: {domain}
-- Giorni rimanenti: {days_left}
-- Data scadenza: {expiry_date}
-- Data/Ora controllo: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+**Details:**
+- Domain: {domain}
+- Days remaining: {days_left}
+- Expiry date: {expiry_date}
+- Date/Time control: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-**Impatto se scade:**
-- [ ] Sito web inaccessibile
-- [ ] Errori browser per utenti
-- [ ] API potrebbero fallire
-- [ ] Email potrebbero non funzionare
+**Impact if it expires:**
+- [ ] Website inaccessible
+- [ ] Browser errors for users
+- [ ] API may fail
+- [ ] Email may not work
 
-**Azioni richieste:**
-1. Rinnovare certificato tramite CA
-2. Aggiornare configurazione web server
-3. Testare nuovo certificato
-4. Aggiornare monitoring
+**Action Required:**
+1. Renew certificate via CA
+2. Update web server configuration
+3. Test new certificate
+4. Update monitoring
 
-**Rinnovo Let's Encrypt:**
+**Let's Encrypt renewal:**
 ```bash
-certbot renew --dry-run  # test
-certbot renew            # rinnovo effettivo
+certbot renew --dry-run # test
+certbot renew # effective renewal
 sudo systemctl reload nginx
 ```
 
-**Verifica certificato:**
+**Verify certificate:**
 ```bash
 echo | openssl s_client -servername {domain} -connect {domain}:443 2>/dev/null | openssl x509 -noout -dates
 ```
 
 **Priority:** MEDIUM
-**SLA:** Prima della scadenza""",
+**SLA:** Before expiration""",
         "priority": "normal",
         "tags": ["ssl", "sicurezza", "certificati"]
     }
@@ -196,89 +194,89 @@ echo | openssl s_client -servername {domain} -connect {domain}:443 2>/dev/null |
 # ===== TEMPLATE APPLICAZIONI =====
 
 def template_app_error_rate(app_name: str, error_rate: str, threshold: str = "5") -> Dict[str, Any]:
-    """Template per error rate elevato"""
+    """Template for high error rate"""
     return {
         "title": f"[HIGH] Error rate elevato per {app_name}",
-        "description": f""" Application Error Rate Alert
+        "description": f"""Application Error Rate Alert
 
-**Dettagli:**
-- Applicazione: {app_name}
+**Details:**
+- Application: {app_name}
 - Error rate: {error_rate}%
-- Soglia: {threshold}%
-- Data/Ora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- Threshold: {threshold}%
+- Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-**Metriche:**
-- Richieste totali: [DA VERIFICARE]
-- Errori: [DA VERIFICARE]
-- Endpoint più colpiti: [DA VERIFICARE]
+**Metrics:**
+- Total requests: [TO BE CHECKED]
+- Errors: [MUST CHECK]
+- Most affected endpoints: [TO BE CHECKED]
 
-**Azioni immediate:**
-1. Verificare log applicazione
-2. Controllare dipendenze (DB, cache, API esterne)
-3. Verificare recenti deployment
-4. Controllare risorse sistema
-5. Valutare rollback se necessario
+**Immediate actions:**
+1. Check application log
+2. Check dependencies (DB, cache, external APIs)
+3. Check recent deployments
+4. Check system resources
+5. Consider rollbacks if necessary
 
-**Log da controllare:**
+**Logs to check:**
 ```bash
 tail -f /var/log/{app_name}/error.log
 grep -i 'error\\|exception' /var/log/{app_name}/*.log | tail -50
 ```
 
 **Priority:** HIGH
-**SLA:** 1 ora""",
+**SLA:** 1 hour""",
         "priority": "high",
         "tags": ["applicazione", "errori", "performance"]
     }
 
 
 def template_db_slow_queries(db_name: str, slow_count: str) -> Dict[str, Any]:
-    """Template per query lente database"""
+    """Template for slow database queries"""
     return {
         "title": f"[MEDIUM] Query lente rilevate su database {db_name}",
-        "description": f""" Database Performance Alert
+        "description": f"""Database Performance Alerts
 
-**Dettagli:**
+**Details:**
 - Database: {db_name}
-- Query lente: {slow_count}
-- Periodo: ultima ora
-- Data/Ora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- Slow queries: {slow_count}
+- Period: last hour
+- Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-**Impatto:**
-- [ ] Performance applicazione degradate
-- [ ] Timeout per utenti
-- [ ] Carico DB elevato
+**Impact:**
+- [ ] Degraded application performance
+- [ ] Timeout for users
+- [ ] High DB load
 
-**Azioni richieste:**
-1. Identificare query problematiche
-2. Verificare indici mancanti
-3. Analizzare execution plan
-4. Controllare statistiche tabelle
-5. Valutare ottimizzazioni
+**Action Required:**
+1. Identify problematic queries
+2. Check for missing indexes
+3. Analyze execution plans
+4. Check statistics tables
+5. Evaluate optimizations
 
-**Diagnostica MySQL/MariaDB:**
+**MySQL/MariaDB Diagnostics:**
 ```sql
--- Query più lente
+-- Slower queries
 SELECT * FROM mysql.slow_log ORDER BY query_time DESC LIMIT 10;
 
--- Query attive
-SHOW FULL PROCESSLIST;
+-- Active queries
+FULL PROCESS SHOW;
 
--- Indici non usati
+-- Indexes not used
 SELECT * FROM sys.schema_unused_indexes;
 ```
 
-**Diagnostica PostgreSQL:**
+**PostgreSQL Diagnostics:**
 ```sql
--- Query lente
+-- Slow queries
 SELECT * FROM pg_stat_statements ORDER BY total_time DESC LIMIT 10;
 
--- Sessioni attive
+-- Active sessions
 SELECT * FROM pg_stat_activity WHERE state = 'active';
 ```
 
 **Priority:** MEDIUM
-**SLA:** 4 ore""",
+**SLA:** 4 hours""",
         "priority": "normal",
         "tags": ["database", "performance", "ottimizzazione"]
     }
@@ -287,96 +285,96 @@ SELECT * FROM pg_stat_activity WHERE state = 'active';
 # ===== TEMPLATE SICUREZZA =====
 
 def template_security_breach(incident_type: str, affected_system: str) -> Dict[str, Any]:
-    """Template per incidente di sicurezza"""
+    """Security Incident Template"""
     return {
         "title": f"[CRITICAL] Potenziale incidente di sicurezza: {incident_type}",
-        "description": f""" SECURITY INCIDENT ALERT
+        "description": f"""SECURITY INCIDENT ALERT
 
-**ATTENZIONE: INCIDENT RESPONSE IMMEDIATA RICHIESTA**
+**WARNING: IMMEDIATE INCIDENT RESPONSE REQUIRED**
 
-**Dettagli:**
-- Tipo incidente: {incident_type}
-- Sistema interessato: {affected_system}
-- Data/Ora rilevamento: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-- Severità: CRITICAL
+**Details:**
+- Incident type: {incident_type}
+- Affected system: {affected_system}
+- Date/Time detection: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- Severity: CRITICAL
 
-**Azioni immediate (NON MODIFICARE IL SISTEMA):**
-1.  Isolare sistema compromesso dalla rete
-2.  Preservare log e evidenze
-3.  Notificare team security
-4.  Attivare piano incident response
-5.  Documentare ogni azione
+**Immediate actions (DO NOT MODIFY THE SYSTEM):**
+1. Isolate compromised system from network
+2. Preserve logs and evidence
+3. Notify security team
+4. Activate incident response plan
+5. Document every action
 
-**NON FARE:**
--  Non riavviare il sistema
--  Non modificare file
--  Non cancellare log
--  Non informare pubblicamente
+**DON'T:**
+- Do not restart the system
+- Do not modify files
+- Do not delete logs
+- Do not inform publicly
 
-**Contatti emergenza:**
-- Security Team: [INSERIRE CONTATTO]
-- Manager: [INSERIRE CONTATTO]
-- Legal: [INSERIRE CONTATTO]
+**Emergency contacts:**
+- Security Team: [INSERT CONTACT]
+- Manager: [INSERT CONTACT]
+- Legal: [INSERT CONTACT]
 
-**Preservazione evidenze:**
+**Evidence preservation:**
 ```bash
-# Backup log
+# Log backups
 tar czf /tmp/incident-logs-$(date +%s).tar.gz /var/log/
 
-# Cattura stato sistema
+# Capture system state
 ps auxf > /tmp/processes.txt
 netstat -tulpn > /tmp/connections.txt
 lsof > /tmp/openfiles.txt
 ```
 
 **Priority:** CRITICAL
-**SLA:** IMMEDIATO""",
+**SLA:** IMMEDIATE""",
         "priority": "critical",
         "tags": ["sicurezza", "incident", "emergenza"]
     }
 
 
 def template_failed_login(username: str, ip_address: str, attempts: str) -> Dict[str, Any]:
-    """Template per tentativi di login falliti"""
+    """Template for failed login attempts"""
     return {
         "title": f"[HIGH] Tentativi di login falliti per {username}",
-        "description": f""" Failed Login Attempts Alert
+        "description": f"""Failed Login Attempts Alert
 
-**Dettagli:**
+**Details:**
 - Username: {username}
 - IP Address: {ip_address}
-- Tentativi: {attempts}
-- Periodo: ultima ora
-- Data/Ora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- Attempts: {attempts}
+- Period: last hour
+- Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-**Azioni immediate:**
-1. Verificare se attacco brute force
-2. Controllare altri account compromessi
-3. Verificare se IP già noto
-4. Valutare blocco temporaneo IP
-5. Notificare utente se legittimo
+**Immediate actions:**
+1. Check if brute force attack
+2. Check other compromised accounts
+3. Check if IP already known
+4. Consider temporary IP blocking
+5. Notify user if legitimate
 
-**Analisi log:**
+**Log analysis:**
 ```bash
-# Login falliti SSH
+# SSH failed logins
 grep 'Failed password' /var/log/auth.log | tail -50
 
-# IP più attivi
+# Most active IPs
 grep 'Failed password' /var/log/auth.log | awk '{{print $(NF-3)}}' | sort | uniq -c | sort -rn
 
-# Blocco IP con fail2ban
+# IP blocking with fail2ban
 fail2ban-client status sshd
 fail2ban-client set sshd banip {ip_address}
 ```
 
-**Geolocalizzazione IP:**
+**IP geolocation:**
 ```bash
 whois {ip_address} | grep -i country
 curl -s ipinfo.io/{ip_address}
 ```
 
 **Priority:** HIGH
-**SLA:** 2 ore""",
+**SLA:** 2 hours""",
         "priority": "high",
         "tags": ["sicurezza", "autenticazione", "brute-force"]
     }
@@ -385,47 +383,47 @@ curl -s ipinfo.io/{ip_address}
 # ===== TEMPLATE MANUTENZIONE =====
 
 def template_planned_maintenance(system: str, date_time: str, duration: str) -> Dict[str, Any]:
-    """Template per manutenzione programmata"""
+    """Template for scheduled maintenance"""
     return {
         "title": f"[PLANNED] Manutenzione programmata: {system}",
-        "description": f""" Scheduled Maintenance
+        "description": f"""Scheduled Maintenance
 
-**Dettagli:**
-- Sistema: {system}
-- Data/Ora: {date_time}
-- Durata stimata: {duration}
-- Creato: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+**Details:**
+- System: {system}
+- Date/Time: {date_time}
+- Estimated duration: {duration}
+- Created: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-**Lavori pianificati:**
-- [ ] Backup sistema completo
-- [ ] Update sistema operativo
-- [ ] Update applicazioni
-- [ ] Riavvio servizi
-- [ ] Testing post-manutenzione
+**Planned works:**
+- [ ] Full system backup
+- [ ] Update operating system
+- [ ] Update applications
+- [ ] Restarting services
+- [ ] Post-maintenance testing
 
-**Impatto atteso:**
-- [ ] Downtime totale
-- [ ] Performance ridotte
-- [ ] Accesso limitato
-- [ ] Nessun impatto
+**Expected impact:**
+- [ ] Total downtime
+- [ ] Reduced performance
+- [ ] Limited access
+- [ ] No impact
 
-**Checklist pre-manutenzione:**
-- [ ] Backup verificato
-- [ ] Utenti notificati
-- [ ] Change request approvato
-- [ ] Rollback plan pronto
-- [ ] Team di supporto allertato
+**Pre-Maintenance Checklist:**
+- [ ] Backup verified
+- [ ] Users notified
+- [ ] Change request approved
+- [ ] Rollback plan ready
+- [ ] Support team alerted
 
-**Checklist post-manutenzione:**
-- [ ] Servizi riavviati
-- [ ] Smoke test completato
-- [ ] Monitoring verificato
-- [ ] Performance baseline ristabilita
-- [ ] Utenti notificati (completamento)
+**Post-maintenance checklist:**
+- [ ] Services restarted
+- [ ] Smoke test completed
+- [ ] Monitoring verified
+- [ ] Baseline performance re-established
+- [ ] Users notified (completion)
 
-**Rollback procedure:**
+**Rollback procedures:**
 ```bash
-# [INSERIRE COMANDI ROLLBACK]
+# [INSERT ROLLBACK COMMANDS]
 ```
 
 **Priority:** NORMAL
@@ -438,36 +436,35 @@ def template_planned_maintenance(system: str, date_time: str, duration: str) -> 
 # ===== CLI =====
 
 def print_usage():
-    """Stampa usage"""
-    print(""" Ydea Ticket Templates
+    """Print usage"""
+    print("""Ydea Ticket Templates
 
-USO:
-  # Template infrastruttura
+USE:
+  # Infrastructure template
   ydea_templates.py server-down <hostname> [service]
   ydea_templates.py backup-failed <job_name> [error_msg]
   ydea_templates.py disk-full <hostname> <mount_point> <usage_%>
   ydea_templates.py ssl-expiring <domain> <days_left>
   
-  # Template applicazioni
+  # Application templates
   ydea_templates.py app-errors <app_name> <error_rate_%> [threshold]
   ydea_templates.py db-slow <db_name> <slow_query_count>
   
-  # Template sicurezza
+  # Security template
   ydea_templates.py security-breach <incident_type> <affected_system>
   ydea_templates.py failed-login <username> <ip_address> <attempts>
   
-  # Template manutenzione
+  # Maintenance template
   ydea_templates.py maintenance <system> <date_time> <duration>
 
-ESEMPI:
-  # Stampa template JSON
+EXAMPLES:
+  # Print JSON template
   ydea_templates.py server-down web-prod-01 nginx
   
-  # Usa in script Python
+  # Use in Python scripts
   import ydea_templates
   template = ydea_templates.template_disk_full("server-01", "/var", "92")
-  print(json.dumps(template, indent=2))
-""", file=sys.stderr)
+  print(json.dumps(template, indent=2))""", file=sys.stderr)
 
 
 def main():
@@ -539,7 +536,7 @@ def main():
         print_usage()
         sys.exit(1)
     
-    # Stampa JSON
+    # Print JSON
     print(json.dumps(template, indent=2, ensure_ascii=False))
 
 

@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-update-scripts-from-repo.py
+"""update-scripts-from-repo.py
 
 Python entrypoint that delegates to update-scripts-from-repo.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

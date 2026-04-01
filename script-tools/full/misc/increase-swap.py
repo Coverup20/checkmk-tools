@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-increase-swap.py
+"""increase-swap.py
 
 Python entrypoint that delegates to increase-swap.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

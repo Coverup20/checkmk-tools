@@ -1,11 +1,11 @@
 #!/bin/bash
-# inspect-ticket.sh - Ispeziona un singolo ticket per vedere la struttura completa
+# inspect-ticket.sh - Inspect a single ticket to see the complete structure
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Source del toolkit solo per funzioni helper
+# Toolkit source for helper functions only
 source "$SCRIPT_DIR/ydea-toolkit.sh"
 
 TICKET_ID="${1:-}"
@@ -21,11 +21,11 @@ fi
 echo " Ispezionando ticket #$TICKET_ID..."
 echo ""
 
-# Assicurati di avere il token
+# Make sure you have the token
 ensure_token
 TOKEN="$(load_token)"
 
-# Chiamata diretta all'API per ottenere lista ticket e filtrare per ID
+# Direct call to the API to get ticket list and filter by ID
 echo " Chiamata API: GET /tickets?limit=100"
 echo ""
 
@@ -40,35 +40,35 @@ HTTP_CODE="$(echo "$RESPONSE" | tail -n1)"
 echo " HTTP Status: $HTTP_CODE"
 
 if [[ "$HTTP_CODE" != "200" ]]; then
-    echo " Errore nella chiamata API"
+    echo "Error in API call"
     echo "$HTTP_BODY" | jq . 2>/dev/null || echo "$HTTP_BODY"
     exit 1
 fi
 
-# Filtra per il ticket specifico
+# Filter for the specific ticket
 TICKET_DATA=$(echo "$HTTP_BODY" | jq --arg tid "$TICKET_ID" '.objs[] | select(.id == ($tid|tonumber))')
 
 if [[ -z "$TICKET_DATA" || "$TICKET_DATA" == "null" ]]; then
-    echo " Ticket #$TICKET_ID non trovato nei risultati"
+    echo "Ticket #$TICKET_ID not found in results"
     echo ""
     echo "Ticket disponibili:"
     echo "$HTTP_BODY" | jq -r '.objs[] | "\(.id) - \(.codice) - \(.titolo)"' | head -20
     exit 1
 fi
 
-echo " Ticket trovato!"
+echo "Ticket found!"
 echo ""
 echo "════════════════════════════════════════════════════════════════════"
-echo "STRUTTURA COMPLETA DEL TICKET"
+echo "COMPLETE TICKET STRUCTURE"
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
 
-# Mostra tutto il JSON formattato
+# Show all formatted JSON
 echo "$TICKET_DATA" | jq '.'
 
 echo ""
 echo "════════════════════════════════════════════════════════════════════"
-echo "CAMPI CHIAVE ESTRATTI"
+echo "KEY FIELDS EXTRACTED"
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
 
@@ -93,19 +93,19 @@ echo ""
 echo "  SLA:"
 echo "   SLA: $(echo "$TICKET_DATA" | jq -r '.sla // "N/A"')"
 echo "   SLA ID: $(echo "$TICKET_DATA" | jq -r '.sla_id // .slaId // "N/A"')"
-echo "   SLA Nome: $(echo "$TICKET_DATA" | jq -r '.sla_nome // .slaNome // "N/A"')"
+echo "SLA Name: $(echo"$TICKET_DATA" | jq -r '.sla_nome // .slaNome // "N/A"')"
 echo ""
 
-echo " Stato:"
-echo "   Stato: $(echo "$TICKET_DATA" | jq -r '.stato // "N/A"')"
-echo "   Stato ID: $(echo "$TICKET_DATA" | jq -r '.stato_id // .statoId // "N/A"')"
+echo "State:"
+echo "Status: $(echo"$TICKET_DATA" | jq -r '.stato // "N/A"')"
+echo "ID Status: $(echo"$TICKET_DATA" | jq -r '.stato_id // .statoId // "N/A"')"
 echo ""
 
 echo " Custom Attributes:"
 if echo "$TICKET_DATA" | jq -e '.customAttributes' >/dev/null 2>&1; then
     echo "$TICKET_DATA" | jq '.customAttributes'
 else
-    echo "   Nessun custom attribute trovato"
+    echo "No custom attributes found"
 fi
 echo ""
 
@@ -114,7 +114,7 @@ echo "   Assegnato A: $(echo "$TICKET_DATA" | jq -r '.assegnatoA // .assegnato_a
 echo ""
 
 echo "════════════════════════════════════════════════════════════════════"
-echo "TUTTE LE CHIAVI DISPONIBILI NEL JSON"
+echo "ALL KEYS AVAILABLE IN JSON"
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
 
@@ -123,5 +123,5 @@ echo "$TICKET_DATA" | jq -r 'keys[]' | sort
 echo ""
 echo " Ispezione completata!"
 echo ""
-echo " Suggerimento: Per vedere solo i campi che contengono 'categoria' o 'sla':"
+echo "Tip: To see only fields that contain 'category' or 'sla':"
 echo "   echo '\$TICKET_DATA' | jq 'to_entries | map(select(.key | test(\"categoria|sla|categor\"; \"i\")))'"

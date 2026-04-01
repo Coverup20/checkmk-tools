@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-Wrapper deprecated variant.
+"""Wrapper deprecated variant.
 Use checkmk-tuning-interactive.py
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys

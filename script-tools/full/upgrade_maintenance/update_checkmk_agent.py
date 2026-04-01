@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
-"""
-update_checkmk_agent.py - Aggiornamento automatico CheckMK Agent
+"""update_checkmk_agent.py - Automatically update CheckMK Agent
 
-Controlla se l'agent locale è allineato alla versione del server CheckMK.
-Se il server è più nuovo → scarica e installa il nuovo agent dal server stesso.
-Se il server non è ancora aggiornato → skip (versione disponibile == versione locale).
+Check if the local agent is aligned with the CheckMK server version.
+If the server is newer → download and install the new agent from the server itself.
+If the server is not yet updated → skip (available version == local version).
 
-Questo garantisce che l'agent non venga mai aggiornato prima del server.
+This ensures that the agent is never updated before the server.
 
 Usage:
-    # Auto-rileva server da installazione OMD locale
+    # Auto-detect server from local OMD installation
     python3 update_checkmk_agent.py
 
-    # Specifica server manualmente (override o host senza OMD locale)
+    # Specify server manually (override or host without local OMD)
     python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring
     python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring --dry-run
     python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring --force
 
-Version: 0.3.0
-"""
+Version: 0.3.0"""
 
 # Python 3.6 compatibility: 'text' alias for 'universal_newlines'
 import sys as _sys
@@ -65,12 +63,10 @@ VERSION = "0.7.3"
 # ─── OS Detection ─────────────────────────────────────────────────────────────
 
 def detect_pkg_type() -> str:
-    """
-    Rileva il tipo di pacchetto richiesto per questo OS.
+    """Detects the type of package required for this OS.
 
     Returns:
-        'deb', 'rpm', o 'openwrt'
-    """
+        'deb', 'rpm', or 'openwrt'"""
     if Path("/etc/openwrt_release").exists():
         return "openwrt"
     if shutil.which("dpkg"):
@@ -81,15 +77,13 @@ def detect_pkg_type() -> str:
     sys.exit(1)
 
 
-# ─── Versione Agent Locale ────────────────────────────────────────────────────
+# ─── Local Agent Version ────────────────────────── ──────────────────────────
 
 def get_local_agent_version(pkg_type: str) -> Optional[str]:
-    """
-    Legge la versione dell'agent CheckMK installato localmente.
+    """Reads the version of the locally installed CheckMK agent.
 
     Returns:
-        Stringa versione es. '2.4.0p23' oppure None se non installato.
-    """
+        String version e.g. '2.4.0p23' or None if not installed."""
     if pkg_type == "deb":
         try:
             out = subprocess.check_output(
@@ -114,8 +108,8 @@ def get_local_agent_version(pkg_type: str) -> Optional[str]:
             return None
 
     if pkg_type == "openwrt":
-        # Su OpenWrt l'agent è un binario standalone, non un pacchetto gestito
-        # Prova a leggere la versione dall'output dell'agent
+        # On OpenWrt the agent is a standalone binary, not a managed package
+        # Try reading the version from the agent output
         try:
             out = subprocess.check_output(
                 ["/usr/bin/check_mk_agent", "--version"],
@@ -130,18 +124,16 @@ def get_local_agent_version(pkg_type: str) -> Optional[str]:
 
     return None
 
-# ─── Auto-detection Server URL ───────────────────────────────────────────────────────────
+# ─── Auto-detect Server URL ───────────────────────────── ──────────────────────────────
 
 def detect_local_server_url() -> Optional[str]:
-    """
-    Auto-rileva URL del server CheckMK dall'installazione OMD locale.
+    """Auto-detect CheckMK server URL from local OMD installation.
 
-    Cerca il nome del sito OMD, poi prova a raggiungere la REST API su:
+    Search for the OMD site name, then try reaching the REST API at:
       1. http://localhost/{site}
       2. https://localhost/{site}
       3. https://{fqdn}/{site}
-    Restituisce il primo URL che risponde oppure None se OMD non è installato.
-    """
+    Returns the first URL that responds or None if OMD is not installed."""
     # Trova sito OMD
     site: Optional[str] = None
 
@@ -167,7 +159,7 @@ def detect_local_server_url() -> Optional[str]:
     if not site:
         return None
 
-    # Usa hostname -f per ottenere il FQDN della macchina corrente
+    # Use hostname -f to get the FQDN of the current machine
     try:
         hostname = subprocess.check_output(
             ["hostname", "-f"], text=True, timeout=5
@@ -179,7 +171,7 @@ def detect_local_server_url() -> Optional[str]:
 
 
 def normalize_server_url(url: str) -> str:
-    """Garantisce che l'URL abbia schema https:// e sia ben formato."""
+    """It ensures that the URL has https:// scheme and is well-formed."""
     url = url.strip()
     if url and not url.startswith(("http://", "https://")):
         url = "https://" + url
@@ -187,42 +179,38 @@ def normalize_server_url(url: str) -> str:
 
 
 def parse_server_url(server_url: str) -> Tuple[str, str]:
-    """
-    Estrae hostname e site name dall'URL del server.
+    """Extracts hostname and site name from the server URL.
 
     Args:
-        server_url: es. 'https://monitor.nethlab.it/monitoring'
+        server_url: e.g. 'https://monitor.nethlab.it/monitoring'
 
     Returns:
-        Tupla (hostname, site) es. ('monitor.nethlab.it', 'monitoring')
-    """
+        Tuple (hostname, site) e.g. ('monitor.nethlab.it', 'monitoring')"""
     parsed = urllib.parse.urlparse(server_url)
     hostname = parsed.netloc
     site = parsed.path.strip('/').split('/')[0] if parsed.path.strip('/') else ''
     return hostname, site
 
-# ─── Versione Agent sul Server ────────────────────────────────────────────────
+# ─── Agent version on the Server ──────────────────────── ────────────────────────
 
 def get_server_agent_version(server_url: str, pkg_type: str) -> Optional[str]:
-    """
-    Interroga il server CheckMK per ottenere la versione dell'agent disponibile.
+    """Query the CheckMK server to get the available agent version.
 
-    Strategie in ordine:
-      1. Lettura diretta symlink /omd/sites/{site}/version (solo se OMD locale,
-         zero HTTP, zero autenticazione — metodo più affidabile)
-      2. REST API /check_mk/api/1.0/version (richiede server raggiungibile, no auth)
-      3. Scraping pagina /check_mk/agents/ (fallback finale)
+    Strategies in order:
+      1. Direct reading symlink /omd/sites/{site}/version (only if local OMD,
+         zero HTTP, zero authentication — most reliable method)
+      2. REST API /check_mk/api/1.0/version (requires reachable server, no auth)
+      3. Scraping page /check_mk/agents/ (final fallback)
 
     Args:
-        server_url: URL base del sito CheckMK (es. https://monitor.nethlab.it/monitoring)
-        pkg_type:   Tipo pacchetto (per costruire URL download)
+        server_url: base URL of the CheckMK site (e.g. https://monitor.nethlab.it/monitoring)
+        pkg_type: Package type (to build download URL)
 
     Returns:
-        Stringa versione es. '2.4.0p23' oppure None se non raggiungibile.
-    """
+        String version e.g. '2.4.0p23' or None if unreachable."""
     import json, ssl
 
-    # Strategia 1: lettura locale symlink OMD (quando lo script gira sul server stesso)
+    # Strategy 1: local symlink OMD reading (when the script runs on the server itself)
     # /omd/sites/{site}/version -> ../../versions/2.4.0p23.cre
     _, site = parse_server_url(server_url)
     if site:
@@ -233,8 +221,8 @@ def get_server_agent_version(server_url: str, pkg_type: str) -> Optional[str]:
             if m:
                 return m.group(1)
 
-    # Strategia 2: REST API (non richiede autenticazione per /version su server esterni)
-    # Usa SSLContext che accetta self-signed per localhost
+    # Strategy 2: REST API (does not require authentication for /version on external servers)
+    # Use SSLContext which accepts self-signed for localhost
     api_url = f"{server_url.rstrip('/')}/check_mk/api/1.0/version"
     ssl_ctx = ssl.create_default_context()
     ssl_ctx.check_hostname = False
@@ -268,20 +256,18 @@ def get_server_agent_version(server_url: str, pkg_type: str) -> Optional[str]:
 # ─── Download Agent ───────────────────────────────────────────────────────────
 
 def build_download_url(server_url: str, server_ver: str, pkg_type: str) -> Tuple[str, str]:
-    """
-    Costruisce URL di download e filename del pacchetto agent in modo dinamico,
-    a partire dalla versione già ottenuta tramite REST API.
+    """Constructs download URL and filename of the agent package dynamically,
+    starting from the version already obtained via REST API.
 
-    Non esegue nessuna chiamata HTTP: URL e filename sono deterministici.
+    Does not make any HTTP calls: URL and filename are deterministic.
 
     Args:
-        server_url: URL base sito CheckMK
-        server_ver: Versione agent sul server (es. '2.4.0p23')
-        pkg_type:   Tipo pacchetto ('deb', 'rpm', 'openwrt')
+        server_url: CheckMK site base URL
+        server_ver: Agent version on the server (e.g. '2.4.0p23')
+        pkg_type: Package type ('deb', 'rpm', 'openwrt')
 
     Returns:
-        Tupla (url_completo, filename)
-    """
+        Tuple (full_url, filename)"""
     agents_base = f"{server_url.rstrip('/')}/check_mk/agents/"
     if pkg_type in ("deb", "openwrt"):
         filename = f"check-mk-agent_{server_ver}-1_all.deb"
@@ -293,20 +279,18 @@ def build_download_url(server_url: str, server_ver: str, pkg_type: str) -> Tuple
 
 
 def download_agent(server_url: str, server_ver: str, pkg_type: str, dest_dir: Path) -> Optional[Path]:
-    """
-    Scarica il pacchetto agent dal server CheckMK.
+    """Download the agent package from the CheckMK server.
 
-    L'URL viene costruito dinamicamente dalla versione già nota (nessuno scraping HTML).
+    The URL is built dynamically from the already known version (no HTML scraping).
 
     Args:
-        server_url: URL base sito CheckMK
-        server_ver: Versione agent sul server (già ottenuta via REST API)
-        pkg_type:   Tipo pacchetto
-        dest_dir:   Directory temporanea dove salvare il file
+        server_url: CheckMK site base URL
+        server_ver: Agent version on the server (already obtained via REST API)
+        pkg_type: Package type
+        dest_dir: Temporary directory where to save the file
 
     Returns:
-        Path al file scaricato oppure None in caso di errore.
-    """
+        Path to the downloaded file or None in case of error."""
     url, filename = build_download_url(server_url, server_ver, pkg_type)
     dest = dest_dir / filename
 
@@ -320,16 +304,16 @@ def download_agent(server_url: str, server_ver: str, pkg_type: str, dest_dir: Pa
         return None
 
 
-# ─── Installazione Agent ──────────────────────────────────────────────────────
+# ─── Agent installation ─────────────────────────── ───────────────────────────
 
 def install_agent_deb(pkg_path: Path) -> bool:
-    """Installa pacchetto .deb e corregge dipendenze."""
+    """Install .deb package and fix dependencies."""
     print(f"[INFO] Installazione {pkg_path.name}...")
     ret = subprocess.run(["dpkg", "-i", str(pkg_path)]).returncode
     if ret != 0:
         # fix dipendenze rotte
         subprocess.run(["apt-get", "install", "-f", "-y"])
-    # Disabilita cmk-agent-ctl-daemon (causa conflitto porta 6556)
+    # Disable cmk-agent-ctl-daemon (due to port 6556 conflict)
     subprocess.run(["systemctl", "stop", "cmk-agent-ctl-daemon.service"],
                    stderr=subprocess.DEVNULL)
     subprocess.run(["systemctl", "disable", "cmk-agent-ctl-daemon.service"],
@@ -340,17 +324,15 @@ def install_agent_deb(pkg_path: Path) -> bool:
 
 
 def install_agent_rpm(pkg_path: Path) -> bool:
-    """Installa pacchetto .rpm."""
+    """Install .rpm package."""
     print(f"[INFO] Installazione {pkg_path.name}...")
     ret = subprocess.run(["rpm", "-Uvh", "--replacepkgs", str(pkg_path)]).returncode
     return ret == 0
 
 
 def install_agent_openwrt(pkg_path: Path) -> bool:
-    """
-    Installa agent su OpenWrt estraendo il binario dal .deb manualmente
-    (ar + tar, nessun dpkg disponibile).
-    """
+    """Install agent on OpenWrt by extracting the binary from the .deb manually
+    (ar + tar, no dpkg available)."""
     print(f"[INFO] Estrazione binario da {pkg_path.name} (OpenWrt)...")
     tmpdir = Path(tempfile.mkdtemp())
     try:
@@ -379,11 +361,9 @@ def install_agent_openwrt(pkg_path: Path) -> bool:
 # ─── Comparazione Versioni ────────────────────────────────────────────────────
 
 def parse_version(ver: str) -> Tuple[int, int, int, int]:
-    """
-    Converte stringa versione CheckMK in tupla comparabile.
-    Es: '2.4.0p23' → (2, 4, 0, 23)
-        '2.4.0'    → (2, 4, 0, 0)
-    """
+    """Converts CheckMK version string to comparable tuple.
+    Ex: '2.4.0p23' → (2, 4, 0, 23)
+        '2.4.0' → (2, 4, 0, 0)"""
     m = re.match(r"(\d+)\.(\d+)\.(\d+)(?:p(\d+))?", ver.strip())
     if not m:
         return (0, 0, 0, 0)
@@ -397,17 +377,15 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=f"update_checkmk_agent.py v{VERSION} - Aggiornamento automatico agent",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Esempi:
-  # Auto-rileva server da installazione OMD locale (macchina con CheckMK server)
+        epilog="""Examples:
+  # Auto-detect server from local OMD installation (machine with CheckMK server)
   python3 update_checkmk_agent.py
   python3 update_checkmk_agent.py --dry-run
 
-  # Specifica server manualmente (host monitorati senza OMD locale)
+  # Specify server manually (monitored hosts without local OMD)
   python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring
   python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring --dry-run
-  python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring --force
-        """,
+  python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring --force""",
     )
     p.add_argument("--server-url", required=False, default=None,
                    help="URL sito CheckMK es. https://hostname/site. "
@@ -428,8 +406,8 @@ def main() -> int:
         print("[ERROR] Richiesto root", file=sys.stderr)
         return 1
 
-    # Risolvi server URL: se passato via CLI usalo direttamente (normalizzato),
-    # altrimenti chiedi SEMPRE all'utente (auto-detect come suggerimento)
+    # Resolve URL server: if passed via CLI use it directly (normalized),
+    # otherwise ALWAYS ask the user (auto-detect as a hint)
     server_url = normalize_server_url(args.server_url) if args.server_url else None
     if not server_url:
         if sys.stdin.isatty():
@@ -471,7 +449,7 @@ def main() -> int:
             print("[ERROR] Fornire: --server-url https://hostname/site", file=sys.stderr)
             return 1
 
-    # Hostname della macchina locale (quella che stiamo aggiornando)
+    # Hostname of the local machine (the one we are updating)
     try:
         local_hostname = subprocess.check_output(
             ["hostname", "-f"], text=True, timeout=5
@@ -479,8 +457,8 @@ def main() -> int:
     except Exception:
         local_hostname = socket.gethostname()
 
-    # Dal server_url estraiamo solo le info per display; l'URL rimane invariato
-    # per le operazioni di rete (query versione + download)
+    # From the server_url we extract only the information for display; the URL remains unchanged
+    # for network operations (version query + download)
     server_hostname, server_site = parse_server_url(server_url)
 
     print(f"{'='*55}")
@@ -489,7 +467,7 @@ def main() -> int:
     print(f"  Server:      {server_hostname}/{server_site}")
     print(f"{'='*55}")
 
-    # Modalità install-cron: configura cron job e termina
+    # Install-cron mode: Configure cron job and exit
     if args.install_cron:
         return install_cron_job(server_url)
 
@@ -497,14 +475,14 @@ def main() -> int:
     pkg_type = detect_pkg_type()
     print(f"[INFO] Tipo pacchetto: {pkg_type}")
 
-    # 2. Versione locale
+    # 2. Local version
     local_ver = get_local_agent_version(pkg_type)
     if local_ver:
         print(f"[INFO] Agent locale:   {local_ver}")
     else:
         print("[INFO] Agent locale:   non installato")
 
-    # 3. Versione disponibile sul server
+    # 3. Version available on the server
     print(f"[INFO] Query server ({server_hostname}/{server_site})...")
     server_ver = get_server_agent_version(server_url, pkg_type)
     if not server_ver:
@@ -518,7 +496,7 @@ def main() -> int:
     server_tuple = parse_version(server_ver)
 
     if server_tuple < local_tuple:
-        # Agent più nuovo del server → il server non è ancora aggiornato
+        # Agent newer than the server → the server is not yet updated
         print(f"[WARN] Agent locale ({local_ver}) è più nuovo del server ({server_ver}).")
         print("[WARN] Il server non è ancora stato aggiornato. Skip.")
         return 0
@@ -543,7 +521,7 @@ def main() -> int:
         if not pkg_path:
             return 1
 
-        # 6. Installazione
+        # 6. Installation
         if pkg_type == "deb":
             ok = install_agent_deb(pkg_path)
         elif pkg_type == "rpm":
@@ -565,7 +543,7 @@ def main() -> int:
 
 
 def install_cron_job(server_url: str) -> int:
-    """Installa un cron job per aggiornamento automatico periodico."""
+    """Install a cron job for periodic automatic updating."""
     script_path = os.path.abspath(__file__)
     log_file = "/var/log/update_checkmk_agent.log"
 

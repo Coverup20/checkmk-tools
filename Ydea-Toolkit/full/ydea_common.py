@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-"""
-ydea_common.py - Modulo condiviso per utilities comuni Ydea-Toolkit
+"""ydea_common.py - Shared module for Ydea-Toolkit common utilities
 
-Fornisce funzionalità comuni utilizzate da tutti gli script:
+Provides common functionality used by all scripts:
 - Logging utilities
 - Cache management (JSON file-based)
 - Configuration loading
 - State management
 - Email notifications
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 VERSION = "1.0.0"  # Versione modulo (aggiornare ad ogni modifica)
 
@@ -29,11 +27,11 @@ from email.mime.multipart import MIMEMultipart
 # ===== LOGGING UTILITIES =====
 
 class Logger:
-    """Logger semplice con timestamp e emoji"""
+    """Simple logger with timestamp and emoji"""
     
     @staticmethod
     def _log(emoji: str, level: str, message: str, to_stderr: bool = False):
-        """Log generico con timestamp"""
+        """Generic log with timestamp"""
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         log_line = f"[{timestamp}] {emoji} {message}"
         
@@ -54,17 +52,17 @@ class Logger:
     
     @staticmethod
     def error(message: str):
-        """Log errore"""
+        """Error log"""
         Logger._log("", "ERROR", message, to_stderr=True)
     
     @staticmethod
     def success(message: str):
-        """Log successo"""
+        """Log success"""
         Logger._log("", "SUCCESS", message)
     
     @staticmethod
     def debug(message: str):
-        """Log debug (solo se DEBUG=1)"""
+        """Debug log (only if DEBUG=1)"""
         if os.getenv("DEBUG", "0") == "1":
             Logger._log("", "DEBUG", message, to_stderr=True)
 
@@ -72,31 +70,27 @@ class Logger:
 # ===== CACHE MANAGEMENT =====
 
 class CacheManager:
-    """Gestione cache JSON file-based"""
+    """File-based JSON cache management"""
     
     def __init__(self, cache_file: str):
-        """
-        Inizializza cache manager
+        """Initialize cache manager
         
         Args:
-            cache_file: Path al file cache JSON
-        """
+            cache_file: Path to the JSON cache file"""
         self.cache_file = Path(cache_file)
         self._init_cache()
     
     def _init_cache(self):
-        """Inizializza file cache se non esiste"""
+        """Initialize cache file if it does not exist"""
         if not self.cache_file.exists():
             self.cache_file.parent.mkdir(parents=True, exist_ok=True)
             self.save({})
     
     def load(self) -> Dict[str, Any]:
-        """
-        Carica cache da file
+        """Load cache from file
         
         Returns:
-            Dizionario con contenuto cache
-        """
+            Dictionary with cached content"""
         try:
             with open(self.cache_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
@@ -104,12 +98,10 @@ class CacheManager:
             return {}
     
     def save(self, data: Dict[str, Any]):
-        """
-        Salva cache su file
+        """Save cache to file
         
         Args:
-            data: Dizionario da salvare
-        """
+            data: Dictionary to save"""
         try:
             self.cache_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.cache_file, 'w', encoding='utf-8') as f:
@@ -118,64 +110,54 @@ class CacheManager:
             Logger.error(f"Errore salvataggio cache: {e}")
     
     def get(self, key: str, default: Any = None) -> Any:
-        """
-        Ottieni valore dalla cache
+        """Get value from cache
         
         Args:
-            key: Chiave da cercare
-            default: Valore di default se chiave non trovata
+            key: Key to search for
+            default: Default value if key not found
         
         Returns:
-            Valore associato alla chiave o default
-        """
+            Value associated with the key or default"""
         cache = self.load()
         return cache.get(key, default)
     
     def set(self, key: str, value: Any):
-        """
-        Imposta valore in cache
+        """Set value in cache
         
         Args:
-            key: Chiave
-            value: Valore da salvare
-        """
+            key: Key
+            value: Value to save"""
         cache = self.load()
         cache[key] = value
         self.save(cache)
     
     def delete(self, key: str):
-        """
-        Rimuovi chiave dalla cache
+        """Remove key from cache
         
         Args:
-            key: Chiave da rimuovere
-        """
+            key: Key to remove"""
         cache = self.load()
         if key in cache:
             del cache[key]
             self.save(cache)
     
     def exists(self, key: str) -> bool:
-        """
-        Verifica se chiave esiste in cache
+        """Check if key exists in cache
         
         Args:
-            key: Chiave da verificare
+            key: Key to verify
         
         Returns:
-            True se chiave esiste, False altrimenti
-        """
+            True if key exists, False otherwise"""
         cache = self.load()
         return key in cache
     
     def cleanup_old_entries(self, max_age_seconds: int, timestamp_key: str = 'created_at'):
-        """
-        Pulisci entry vecchie dalla cache
+        """Clear old entries from cache
         
         Args:
-            max_age_seconds: Età massima in secondi
-            timestamp_key: Nome campo timestamp nelle entry
-        """
+            max_age_seconds: Maximum age in seconds
+            timestamp_key: Timestamp field name in entries"""
         cache = self.load()
         now = int(time.time())
         cutoff = now - max_age_seconds
@@ -194,23 +176,21 @@ class CacheManager:
 # ===== CONFIGURATION LOADING =====
 
 class ConfigLoader:
-    """Caricamento configurazione da file JSON"""
+    """Loading configuration from JSON file"""
     
     @staticmethod
     def load_json(config_file: str) -> Dict[str, Any]:
-        """
-        Carica configurazione da file JSON
+        """Load configuration from JSON file
         
         Args:
-            config_file: Path al file di configurazione
+            config_file: Path to the configuration file
         
         Returns:
-            Dizionario con configurazione
+            Dictionary with configuration
         
         Raises:
-            FileNotFoundError: Se file non esiste
-            json.JSONDecodeError: Se JSON non valido
-        """
+            FileNotFoundError: If file does not exist
+            json.JSONDecodeError: If JSON is invalid"""
         config_path = Path(config_file)
         
         if not config_path.exists():
@@ -221,15 +201,13 @@ class ConfigLoader:
     
     @staticmethod
     def load_env(env_file: str = ".env") -> Dict[str, str]:
-        """
-        Carica variabili da file .env
+        """Load variables from .env file
         
         Args:
-            env_file: Path al file .env
+            env_file: Path to the .env file
         
         Returns:
-            Dizionario con variabili ambiente
-        """
+            Dictionary with environment variables"""
         env_vars = {}
         env_path = Path(env_file)
         
@@ -240,7 +218,7 @@ class ConfigLoader:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith('#') and '=' in line:
-                    # Rimuovi 'export' se presente
+                    # Remove 'export' if present
                     line = line.replace('export ', '', 1).strip()
                     key, value = line.split('=', 1)
                     # Rimuovi quotes
@@ -253,33 +231,29 @@ class ConfigLoader:
 # ===== STATE MANAGEMENT =====
 
 class StateManager:
-    """Gestione stato applicazione con persistenza JSON"""
+    """Application state management with JSON persistence"""
     
     def __init__(self, state_file: str, default_state: Optional[Dict[str, Any]] = None):
-        """
-        Inizializza state manager
+        """Initialize state manager
         
         Args:
-            state_file: Path al file stato JSON
-            default_state: Stato di default se file non esiste
-        """
+            state_file: Path to the JSON state file
+            default_state: Default state if file does not exist"""
         self.state_file = Path(state_file)
         self.default_state = default_state or {}
         self._init_state()
     
     def _init_state(self):
-        """Inizializza file stato se non esiste"""
+        """Initialize state file if it does not exist"""
         if not self.state_file.exists():
             self.state_file.parent.mkdir(parents=True, exist_ok=True)
             self.save(self.default_state)
     
     def load(self) -> Dict[str, Any]:
-        """
-        Carica stato da file
+        """Load state from file
         
         Returns:
-            Dizionario con stato corrente
-        """
+            Dictionary with current status"""
         try:
             with open(self.state_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
@@ -287,12 +261,10 @@ class StateManager:
             return self.default_state.copy()
     
     def save(self, state: Dict[str, Any]):
-        """
-        Salva stato su file
+        """Save state to file
         
         Args:
-            state: Dizionario stato da salvare
-        """
+            state: State dictionary to save"""
         try:
             self.state_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.state_file, 'w', encoding='utf-8') as f:
@@ -301,23 +273,21 @@ class StateManager:
             Logger.error(f"Errore salvataggio stato: {e}")
     
     def get(self, key: str, default: Any = None) -> Any:
-        """Ottieni valore dallo stato"""
+        """Get value from the state"""
         state = self.load()
         return state.get(key, default)
     
     def set(self, key: str, value: Any):
-        """Imposta valore nello stato"""
+        """Set value in state"""
         state = self.load()
         state[key] = value
         self.save(state)
     
     def update(self, updates: Dict[str, Any]):
-        """
-        Aggiorna multiple chiavi nello stato
+        """Update multiple keys in the state
         
         Args:
-            updates: Dizionario con aggiornamenti
-        """
+            updates: Dictionary with updates"""
         state = self.load()
         state.update(updates)
         self.save(state)
@@ -334,14 +304,12 @@ class EmailNotifier:
         smtp_port: int = 25,
         from_email: Optional[str] = None
     ):
-        """
-        Inizializza email notifier
+        """Initialize email notifier
         
         Args:
-            smtp_host: Host SMTP
-            smtp_port: Porta SMTP
-            from_email: Email mittente
-        """
+            smtp_host: SMTP host
+            smtp_port: SMTP port
+            from_email: Sender email"""
         self.smtp_host = smtp_host
         self.smtp_port = smtp_port
         self.from_email = from_email or f"checkmk@{os.uname().nodename}"
@@ -353,18 +321,16 @@ class EmailNotifier:
         body: str,
         html: bool = False
     ) -> bool:
-        """
-        Invia email
+        """Send email
         
         Args:
-            to_email: Destinatario
-            subject: Oggetto
-            body: Corpo messaggio
-            html: True se body è HTML
+            to_email: Recipient
+            subject: Object
+            body: Message body
+            html: True if body is HTML
         
         Returns:
-            True se invio riuscito, False altrimenti
-        """
+            True if sending successful, False otherwise"""
         try:
             msg = MIMEMultipart('alternative') if html else MIMEText(body)
             
@@ -390,16 +356,14 @@ class EmailNotifier:
 # ===== UTILITY FUNCTIONS =====
 
 def format_timestamp(timestamp: Optional[int] = None, fmt: str = '%Y-%m-%d %H:%M:%S') -> str:
-    """
-    Formatta timestamp Unix in stringa
+    """Format Unix timestamp to string
     
     Args:
-        timestamp: Timestamp Unix (None = now)
-        fmt: Formato output
+        timestamp: Unix timestamp (None = now)
+        fmt: Output format
     
     Returns:
-        Stringa formattata
-    """
+        Formatted string"""
     if timestamp is None:
         timestamp = int(time.time())
     
@@ -407,22 +371,18 @@ def format_timestamp(timestamp: Optional[int] = None, fmt: str = '%Y-%m-%d %H:%M
 
 
 def get_current_timestamp() -> int:
-    """
-    Ottieni timestamp Unix corrente
+    """Get current Unix timestamp
     
     Returns:
-        Timestamp Unix (secondi)
-    """
+        Unix timestamp (seconds)"""
     return int(time.time())
 
 
 def ensure_directory(path: str):
-    """
-    Assicura che directory esista, creandola se necessario
+    """Ensure directory exists, creating it if necessary
     
     Args:
-        path: Path directory
-    """
+        path: Path directory"""
     Path(path).mkdir(parents=True, exist_ok=True)
 
 

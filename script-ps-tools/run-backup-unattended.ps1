@@ -1,19 +1,19 @@
-# Wrapper per eseguire backup in modalità unattended con logging
+# Wrapper for performing backups in unattended mode with logging
 $ErrorActionPreference = "Continue"
 
 $SCRIPT_PATH = Join-Path $PSScriptRoot "backup-simple.ps1"
 $LOG_PATH = "C:\CheckMK-Backups\logs"
 $LOG_FILE = Join-Path $LOG_PATH "backup_$(Get-Date -Format 'yyyy-MM-dd').log"
 
-# Crea cartella log se non esiste
+# Create log folder if it does not exist
 if (-not (Test-Path $LOG_PATH)) {
     New-Item -ItemType Directory -Path $LOG_PATH -Force | Out-Null
 }
 
-# Registra inizio esecuzione
+# Record start of execution
 "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Inizio backup automatico..." | Out-File -FilePath $LOG_FILE -Append -Encoding UTF8
 
-# Attendi che la share di rete sia disponibile (max 60 secondi)
+# Wait for the network share to be available (max 60 seconds)
 $NETWORK_SHARE = "\\192.168.10.132\usbshare"
 $maxRetries = 12
 $retryDelay = 5
@@ -34,7 +34,7 @@ for ($i = 1; $i -le $maxRetries; $i++) {
     }
 }
 
-# Esegui backup
+# Run backups
 try {
     & $SCRIPT_PATH -Unattended 2>&1 | Out-File -FilePath $LOG_FILE -Append -Encoding UTF8
     $exitCode = $LASTEXITCODE

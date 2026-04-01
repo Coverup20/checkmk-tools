@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
-"""
-upgrade_checkmk.py - CheckMK RAW Upgrade Automation
+"""upgrade_checkmk.py - CheckMK RAW Upgrade Automation
 
-Automatizza il processo di aggiornamento di CheckMK RAW Edition.
+Automates the CheckMK RAW Edition update process.
 Features:
-- Rilevamento versione corrente e ultima disponibile
-- Backup del site prima dell'upgrade
-- Download e installazione pacchetto .deb
-- Stop/Update/Start del site
-- Cleanup versioni obsolete e pacchetti vecchi
-- Report dettagliato
+- Current and latest available version detection
+- Site backup before upgrade
+- Download and install .deb package
+- Stop/Update/Start the site
+- Cleanup obsolete versions and old packages
+- Detailed report
 
 Usage:
     upgrade_checkmk.py [site_name]
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -28,7 +26,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-# --- Configurazione ---
+# --- Configuration ---
 DOWNLOAD_DIR = Path("/tmp/checkmk-upgrade")
 BACKUP_DIR = Path("/opt/omd/backups")
 REPORT_FILE = Path("/tmp/checkmk-upgrade-report.txt")
@@ -138,7 +136,7 @@ class Upgrader:
 
         Console.log(f"Upgrading {current} -> {latest}")
         
-        # Backup
+        # Backups
         BACKUP_DIR.mkdir(parents=True, exist_ok=True)
         backup_file = BACKUP_DIR / f"{self.site}_pre-upgrade_{datetime.now().strftime('%Y%m%d_%H%M%S')}.tar.gz"
         Console.log(f"Backup site to {backup_file}...")

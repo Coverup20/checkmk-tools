@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-get_full_ticket.py - Recupera ticket completo con tutti i dettagli
+"""get_full_ticket.py - Retrieve full ticket with all details
 
 Usage:
     get_full_ticket.py <ticket_id>
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import json

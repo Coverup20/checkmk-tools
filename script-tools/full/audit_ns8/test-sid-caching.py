@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-test-sid-caching.py - Test pre-caching SID per debug NS8
+"""test-sid-caching.py - SID pre-caching test for NS8 debugging
 
-Test di conversione SID → username con timeout progressivo.
-Identifica punti di blocco nelle conversioni SID via wbinfo.
+SID → username conversion test with progressive timeout.
+Identify checkpoints in SID conversions via wbinfo.
 
-Prerequisito: Eseguire prima ns8-audit-report-unified.sh per generare file ACL.
+Prerequisite: Run ns8-audit-report-unified.sh first to generate ACL files.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -21,16 +19,14 @@ VERSION = "1.0.0"
 
 
 def run_command(cmd: List[str], timeout: int = 10) -> Tuple[int, str, str]:
-    """
-    Execute a shell command with timeout.
+    """Execute a shell command with timeout.
     
     Args:
         cmd: Command as list of strings
         timeout: Timeout in seconds
         
     Returns:
-        Tuple of (exit_code, stdout, stderr)
-    """
+        Tuple of (exit_code, stdout, stderr)"""
     try:
         result = subprocess.run(
             cmd,
@@ -49,12 +45,10 @@ def run_command(cmd: List[str], timeout: int = 10) -> Tuple[int, str, str]:
 
 
 def find_samba_module() -> Optional[str]:
-    """
-    Find first Samba module in NS8.
+    """Find first Samba module in NS8.
     
     Returns:
-        Module name (e.g., "samba1") or None if not found
-    """
+        Module name (e.g., "samba1") or None if not found"""
     exit_code, stdout, _ = run_command(["runagent", "--list-modules"])
     if exit_code != 0:
         return None
@@ -67,12 +61,10 @@ def find_samba_module() -> Optional[str]:
 
 
 def find_latest_acl_dir() -> Optional[Path]:
-    """
-    Find latest ACL directory in /tmp/ns8-audit-*.
+    """Find latest ACL directory in /tmp/ns8-audit-*.
     
     Returns:
-        Path to ACL directory or None if not found
-    """
+        Path to ACL directory or None if not found"""
     tmp_path = Path("/tmp")
     audit_dirs = sorted(tmp_path.glob("ns8-audit-*"), reverse=True)
     
@@ -85,15 +77,13 @@ def find_latest_acl_dir() -> Optional[Path]:
 
 
 def extract_unique_sids(acl_dir: Path) -> List[str]:
-    """
-    Extract unique SIDs from ACL files.
+    """Extract unique SIDs from ACL files.
     
     Args:
         acl_dir: Path to ACL directory
         
     Returns:
-        List of unique SIDs
-    """
+        List of unique SIDs"""
     sids = set()
     
     for acl_file in acl_dir.glob("*_acl.txt"):
@@ -112,15 +102,13 @@ def extract_unique_sids(acl_dir: Path) -> List[str]:
 
 
 def is_system_sid(sid: str) -> bool:
-    """
-    Check if SID is a well-known system SID.
+    """Check if SID is a well-known system SID.
     
     Args:
         sid: SID string
         
     Returns:
-        True if system SID, False otherwise
-    """
+        True if system SID, False otherwise"""
     system_sids = [
         "S-1-5-18",      # Local System
         "S-1-5-32-544",  # Administrators
@@ -131,8 +119,7 @@ def is_system_sid(sid: str) -> bool:
 
 
 def convert_sid_to_name(sid: str, samba_module: str, timeout: int = 5) -> Tuple[bool, str, float]:
-    """
-    Convert SID to name using wbinfo.
+    """Convert SID to name using wbinfo.
     
     Args:
         sid: SID to convert
@@ -140,8 +127,7 @@ def convert_sid_to_name(sid: str, samba_module: str, timeout: int = 5) -> Tuple[
         timeout: Timeout in seconds
         
     Returns:
-        Tuple of (success, name, elapsed_time)
-    """
+        Tuple of (success, name, elapsed_time)"""
     start_time = time.time()
     
     cmd = [
@@ -160,12 +146,10 @@ def convert_sid_to_name(sid: str, samba_module: str, timeout: int = 5) -> Tuple[
 
 
 def main() -> int:
-    """
-    Main test logic.
+    """Main test logic.
     
     Returns:
-        Exit code
-    """
+        Exit code"""
     print("=" * 50)
     print("TEST PRE-CACHING SID - DEBUG")
     print("=" * 50)

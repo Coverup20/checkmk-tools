@@ -4,7 +4,7 @@
 #
 # Usage:
 #   bash deploy-nethesis-brand.sh                  # deploy to all servers
-#   bash deploy-nethesis-brand.sh ubntmarzio-root  # deploy to a single server
+# bash deploy-nethesis-brand.sh ubntmarzio-root # deploy to a single server
 #
 # Requirements: SSH access configured in ~/.ssh/config for each target.
 

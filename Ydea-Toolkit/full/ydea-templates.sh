@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ydea-templates.sh - Template predefiniti per ticket Ydea
-# Genera JSON per creazione ticket tramite API Ydea
+# ydea-templates.sh - Default templates for Ydea tickets
+# Generate JSON for ticket creation via Ydea API
 
 # ===== TEMPLATE INFRASTRUTTURA =====
 
@@ -204,14 +204,14 @@ USO:
   ./ydea-templates.sh maintenance <system> <date_time> <duration>
 
 ESEMPI:
-  # Crea ticket da template
+  # Create tickets from template
   TEMPLATE=$(./ydea-templates.sh server-down "web-prod-01" "nginx")
   echo "$TEMPLATE" | jq -r '.title, .description, .priority'
   
   # Crea ticket direttamente
   ./ydea-toolkit.sh api POST /tickets "$(./ydea-templates.sh disk-full server-01 /var 92)"
   
-  # Usa in script
+  # Use in script
   if [[ $(df / | tail -1 | awk '{print $5}' | sed 's/%//') -gt 90 ]]; then
     TICKET=$(./ydea-templates.sh disk-full $(hostname) / 92)
     ./ydea-toolkit.sh api POST /tickets "$TICKET"

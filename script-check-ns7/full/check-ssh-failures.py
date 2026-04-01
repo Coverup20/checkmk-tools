@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check-ssh-failures.py - CheckMK Local Check for SSH banned IPs
+"""check-ssh-failures.py - CheckMK Local Check for SSH banned IPs
 
 Count currently banned IPs by fail2ban SSH jail.
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -18,12 +16,10 @@ SERVICE_NAME = "SSH-Failures"
 
 
 def get_banned_count() -> int:
-    """
-    Get number of currently banned IPs in sshd jail.
+    """Get number of currently banned IPs in sshd jail.
     
     Returns:
-        Number of banned IPs, -1 if fail2ban not active or jail not found
-    """
+        Number of banned IPs, -1 if fail2ban not active or jail not found"""
     try:
         result = subprocess.run(
             ["fail2ban-client", "status", "sshd"],
@@ -53,12 +49,10 @@ def get_banned_count() -> int:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     banned = get_banned_count()
     
     if banned < 0:

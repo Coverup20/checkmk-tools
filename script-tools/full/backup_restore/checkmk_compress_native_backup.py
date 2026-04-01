@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-checkmk_compress_native_backup.py
+"""checkmk_compress_native_backup.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import argparse
 import datetime as dt

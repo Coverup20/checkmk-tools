@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# test-ydea-integration.sh - Script di test completo integrazione CheckMK → Ydea
-# Esegui questo script per verificare che tutto funzioni correttamente
+# test-ydea-integration.sh - Complete CheckMK integration test script → Ydea
+# Run this script to verify that everything is working correctly
 
 set -euo pipefail
 
@@ -16,7 +16,7 @@ echo -e "${BLUE}║      Test Integrazione CheckMK → Ydea Ticketing          �
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-# Configurazione
+# Configuration
 CHECKMK_SITE="${CHECKMK_SITE:-monitoring}"
 NOTIFY_SCRIPT="/omd/sites/${CHECKMK_SITE}/local/share/check_mk/notifications/ydea_realip"
 HEALTH_SCRIPT="/opt/ydea-toolkit/ydea-health-monitor.sh"
@@ -49,7 +49,7 @@ test_warn() {
   echo -e "${YELLOW}    WARN${NC}: $1"
 }
 
-# ===== TEST 1: Verifica File =====
+# ===== TEST 1: Check File =====
 test_start "Verifica esistenza file necessari"
 
 if [[ -f "$NOTIFY_SCRIPT" ]]; then
@@ -70,7 +70,7 @@ else
   test_fail "Ydea toolkit non trovato: $YDEA_TOOLKIT"
 fi
 
-# ===== TEST 2: Permessi =====
+# ===== TEST 2: Permissions =====
 test_start "Verifica permessi esecuzione"
 
 if [[ -x "$NOTIFY_SCRIPT" ]]; then
@@ -85,7 +85,7 @@ else
   test_fail "ydea-health-monitor.sh NON è eseguibile"
 fi
 
-# ===== TEST 3: Configurazione =====
+# ===== TEST 3: Configuration =====
 test_start "Verifica configurazione .env"
 
 ENV_FILE="/opt/ydea-toolkit/.env"
@@ -113,7 +113,7 @@ else
   test_fail "File .env non trovato: $ENV_FILE"
 fi
 
-# ===== TEST 4: Connessione Ydea =====
+# ===== TEST 4: Ydea Connection =====
 test_start "Test connessione Ydea API"
 
 if [[ -f "$YDEA_TOOLKIT" && -f "$ENV_FILE" ]]; then
@@ -209,9 +209,9 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
   if "$NOTIFY_SCRIPT" 2>&1 | tee /tmp/ydea_test_output.log; then
     echo ""
     test_pass "Script eseguito senza errori"
-    echo "  Output salvato in: /tmp/ydea_test_output.log"
+    echo "Output saved in: /tmp/ydea_test_output.log"
     
-    # Verifica se ticket creato
+    # Check if ticket created
     if [[ -f "$TICKET_CACHE" ]]; then
       TICKET_ID=$(jq -r '.["192.168.99.99:Test Alert"].ticket_id // empty' "$TICKET_CACHE" 2>/dev/null)
       if [[ -n "$TICKET_ID" ]]; then
@@ -238,7 +238,7 @@ echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
   if "$HEALTH_SCRIPT" 2>&1 | tee /tmp/ydea_health_test.log; then
     test_pass "Health monitor eseguito"
-    echo "  Output salvato in: /tmp/ydea_health_test.log"
+    echo "Output saved in: /tmp/ydea_health_test.log"
   else
     test_fail "Health monitor fallito"
   fi
@@ -264,20 +264,20 @@ if [[ $TESTS_FAILED -eq 0 ]]; then
   echo -e "${GREEN} Sistema pronto per la produzione!${NC}"
   echo ""
   echo "Prossimi passi:"
-  echo "1. Configura notification rule in CheckMK"
+  echo "1. Configure notification rule in CheckMK"
   echo "2. Monitora i log durante i primi alert"
-  echo "3. Verifica creazione ticket su Ydea"
+  echo "3. Check ticket creation on Ydea"
 else
   echo -e "${RED} ALCUNI TEST FALLITI${NC}"
   echo ""
-  echo "Correggi gli errori prima di usare in produzione:"
-  echo "1. Verifica messaggi di errore sopra"
+  echo "Fix errors before using in production:"
+  echo "1. Check above error messages"
   echo "2. Consulta: README-CHECKMK-INTEGRATION.md → Troubleshooting"
-  echo "3. Ri-esegui questo script dopo le correzioni"
+  echo "3. Re-run this script after corrections"
 fi
 echo ""
 
-# File di report
+# Report files
 REPORT_FILE="/tmp/ydea_integration_test_report_$(date +%Y%m%d_%H%M%S).txt"
 {
   echo "=== REPORT TEST INTEGRAZIONE YDEA-CHECKMK ==="
@@ -288,20 +288,20 @@ REPORT_FILE="/tmp/ydea_integration_test_report_$(date +%Y%m%d_%H%M%S).txt"
   echo "Passati: $TESTS_PASSED"
   echo "Falliti: $TESTS_FAILED"
   echo ""
-  echo "=== CONFIGURAZIONE ==="
+  echo "=== CONFIGURATION ==="
   echo "CheckMK site: $CHECKMK_SITE"
   echo "Script notifica: $NOTIFY_SCRIPT"
   echo "Health monitor: $HEALTH_SCRIPT"
   echo "Ydea toolkit: $YDEA_TOOLKIT"
   echo ""
   echo "=== CACHE FILES ==="
-  ls -lh /tmp/ydea_*.json 2>/dev/null || echo "Nessuna cache trovata"
+  ls -lh /tmp/ydea_*.json 2>/dev/null || echo "No cache found"
   echo ""
   echo "=== CRON JOB ==="
-  crontab -l 2>/dev/null | grep ydea || echo "Nessun cron job trovato"
+  crontab -l 2>/dev/null | grep ydea || echo "No cron jobs found"
 } > "$REPORT_FILE"
 
-echo " Report completo salvato in: $REPORT_FILE"
+echo "Complete report saved in: $REPORT_FILE"
 echo ""
 
 exit $TESTS_FAILED

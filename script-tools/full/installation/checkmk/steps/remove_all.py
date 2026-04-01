@@ -102,7 +102,7 @@ def run(cfg: InstallerConfig, *, assume_yes: bool = False, confirm_hostname: str
         _confirm_or_abort(host=host, site=cfg.site_name)
 
     log_header("Stopping services")
-    # auto-git-sync e check locali NON vengono rimossi (esclusi da remove-all)
+    # auto-git-sync and local checks are NOT removed (excluded from remove-all)
     run_cmd(["systemctl", "stop", "--now", "apache2"], check=False)
     run_cmd(["systemctl", "stop", "--now", "postfix"], check=False)
     run_cmd(["systemctl", "stop", "--now", "fail2ban"], check=False)
@@ -110,13 +110,13 @@ def run(cfg: InstallerConfig, *, assume_yes: bool = False, confirm_hostname: str
     if command_exists("omd"):
         log_header("Removing OMD site")
         run_cmd(["omd", "stop", cfg.site_name], check=False)
-        # omd rm non supporta --yes su tutte le versioni: usa umount + rm manuale direttamente
+        # omd rm doesn't support --yes on all versions: use manual umount + rm directly
         run_cmd(["omd", "rm", cfg.site_name], check=False)
         # Fallback: if site dir still exists after omd rm, delete it manually
         site_dir = Path(f"/omd/sites/{cfg.site_name}")
         if site_dir.exists():
             log_warn(f"omd rm did not remove {site_dir} - deleting manually")
-            # Unmount tmp (tmpfs) per evitare 'device or resource busy'
+            # Unmount tmp (tmpfs) to avoid 'device or resource busy'
             tmp_dir = site_dir / "tmp"
             if tmp_dir.exists():
                 run_cmd(["umount", "-l", str(tmp_dir)], check=False)

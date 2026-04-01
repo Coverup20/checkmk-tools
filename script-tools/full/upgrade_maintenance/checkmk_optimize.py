@@ -1,23 +1,21 @@
 #!/usr/bin/env python3
-"""
-checkmk_optimize.py - CheckMK Host Optimization Tool
+"""checkmk_optimize.py - CheckMK Host Optimization Tool
 
-Ottimizzazioni bilanciate per host CheckMK (Debian/Ubuntu).
+Balanced optimizations for CheckMK hosts (Debian/Ubuntu).
 Features:
-- Timeshift snapshots (Backup sistema)
+- Timeshift snapshots (System backup)
 - Tuning Swap/ZRAM
-- Disabilitazione servizi non essenziali
+- Disabling non-essential services
 - Tuning I/O Scheduler
-- Tuning DB (MariaDB/MySQL)
-- Tuning Apache (LimitNOFILE)
-- Preparazione Cache Agente
-- Tuning FRP (compressione)
+- DB Tuning (MariaDB/MySQL)
+- Apache Tuning (LimitNOFILE)
+- Agent Cache Preparation
+- FRP Tuning (compression)
 
 Usage:
     checkmk_optimize.py [--auto]
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -29,7 +27,7 @@ from pathlib import Path
 
 VERSION = "1.0.0"
 
-# --- Configurazione ---
+# --- Configuration ---
 LOG_FILE = "/var/log/checkmk-optimize.log"
 TS_LOG = "/var/log/timeshift-rotation.log"
 BACKUP_DIR = Path("/var/backups/checkmk-optimize")
@@ -168,15 +166,13 @@ def optimize_db():
         if "# END CHECKMK_OPTIMIZE" in line: skip = False
         
     # Add new block
-    block = """
-# BEGIN CHECKMK_OPTIMIZE
+    block = """# BEGIN CHECKMK_OPTIMIZE
 # Tuning "bilanciato"
 innodb_buffer_pool_size = 512M
 innodb_log_file_size = 128M
 query_cache_size = 32M
 query_cache_type = 1
-# END CHECKMK_OPTIMIZE
-"""
+# END CHECKMK_OPTIMIZE"""
     assert conf_file is not None
     with open(conf_file, "w") as f:
         f.write("\n".join(new_lines) + block)

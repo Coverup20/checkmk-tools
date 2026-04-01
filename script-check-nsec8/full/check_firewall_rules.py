@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""check_firewall_rules.py - CheckMK local check firewall rules (Python puro).
+"""check_firewall_rules.py - CheckMK local check firewall rules (pure Python).
 
-Supporta nftables (NethSecurity 8 / OpenWrt) e iptables (sistemi legacy).
-Version: 1.1.0
-"""
+Supports nftables (NethSecurity 8 / OpenWrt) and iptables (legacy systems).
+Version: 1.1.0"""
 
 import shutil
 import subprocess
@@ -19,7 +18,7 @@ def run(cmd: list[str]) -> str:
 
 
 def is_nftables_system() -> bool:
-    """Rileva se il sistema usa nftables (NethSecurity/OpenWrt)."""
+    """Detect if the system uses nftables (NethSecurity/OpenWrt)."""
     return (
         shutil.which("nft") is not None
         and not shutil.which("iptables")
@@ -36,9 +35,9 @@ def _openwrt_detected() -> bool:
 
 
 def check_nftables() -> int:
-    """Conta le regole nftables. Ritorna (status, text, total_rules)."""
+    """Count nftables rules. Return (status, text, total_rules)."""
     out = run(["nft", "list", "ruleset"])
-    # Conta righe con keyword tipiche delle regole nft
+    # Count lines with keywords typical of nft rules
     rule_lines = [l for l in out.splitlines() if l.strip().startswith(("ip ", "ip6 ", "inet ", "meta ", "iifname", "oifname", "tcp ", "udp ", "ct state", "accept", "drop", "reject", "masquerade", "dnat", "snat"))]
     total = len(rule_lines)
     # Conta catene definite
@@ -75,7 +74,7 @@ def main() -> int:
         print(f"{status} {SERVICE} - {status_text} | total_rules={total}")
         return 0
 
-    # Sistemi legacy con iptables
+    # Legacy systems with iptables
     if shutil.which("iptables") is None:
         print(f"3 {SERVICE} - né iptables né nft trovati")
         return 0

@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-explore_ydea_api.py - Esplora endpoint API Ydea disponibili
+"""explore_ydea_api.py - Explore available Ydea API endpoints
 
-Testa vari endpoint API per scoprire funzionalità disponibili.
+Test various API endpoints to discover available functionality.
 
 Usage:
     explore_ydea_api.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import json
@@ -54,7 +52,7 @@ def main():
     try:
         api = YdeaAPI()
         
-        # Lista endpoint da testare
+        # List of endpoints to test
         endpoints = [
             ("/tickets", {"limit": 5}),
             ("/categories", {}),

@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-check-sos-ns7.py - CheckMK Local Check for SOS session status
+"""check-sos-ns7.py - CheckMK Local Check for SOS session status
 
 Check SOS session status (WindMill VPN + SSH) on NethServer 7.
 Monitor systemd services don-openvpn and don-sshd.
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -21,15 +19,13 @@ SSH_UNIT = "don-sshd"
 
 
 def is_active(unit: str) -> int:
-    """
-    Check if systemd unit is active.
+    """Check if systemd unit is active.
     
     Args:
         unit: Systemd unit name
         
     Returns:
-        1 if active, 0 if not active
-    """
+        1 if active, 0 if not active"""
     try:
         result = subprocess.run(
             ["systemctl", "is-active", "--quiet", unit],
@@ -43,12 +39,10 @@ def is_active(unit: str) -> int:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     vpn_status = is_active(VPN_UNIT)
     ssh_status = is_active(SSH_UNIT)
     

@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-upgrade-checkmk.py
+"""upgrade-checkmk.py
 
-Wrapper Python per upgrade-checkmk.sh con gestione esito per automazioni/email:
-- Nessun aggiornamento disponibile
-- Aggiornamento completato con versione finale
-- Aggiornamento fallito con rollback eseguito
+Python wrapper for upgrade-checkmk.sh with outcome management for automations/emails:
+- No updates available
+- Update completed with final version
+- Update failed with rollback performed
 
-Version: 1.1.1
-"""
+Version: 1.1.1"""
 
 from __future__ import annotations
 

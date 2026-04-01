@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-Interactive Launcher - Esegui script remoti dal repository GitHub
-Scansiona tutte le cartelle remote/ e presenta menu interattivo
+"""Interactive Launcher - Run remote scripts from the GitHub repository
+Scans all remote folders/ and features interactive menu
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -34,7 +32,7 @@ class Colors:
 
 
 class LauncherData:
-    """Gestisce dati persistenti del launcher."""
+    """Manages persistent launcher data."""
     
     def __init__(self):
         self.scripts: List[str] = []
@@ -49,7 +47,7 @@ class LauncherData:
         self.load_stats()
     
     def load_favorites(self) -> None:
-        """Carica preferiti da file JSON."""
+        """Load bookmarks from JSON file."""
         if FAVORITES_FILE.exists():
             try:
                 with open(FAVORITES_FILE, 'r', encoding='utf-8') as f:
@@ -58,7 +56,7 @@ class LauncherData:
                 self.favorites = {}
     
     def save_favorites(self) -> None:
-        """Salva preferiti su file JSON."""
+        """Save bookmarks to JSON file."""
         try:
             with open(FAVORITES_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.favorites, f, indent=2)
@@ -66,7 +64,7 @@ class LauncherData:
             print(f"{Colors.RED} Errore salvataggio preferiti: {e}{Colors.NC}")
     
     def load_stats(self) -> None:
-        """Carica statistiche da file JSON."""
+        """Load statistics from JSON file."""
         if STATS_FILE.exists():
             try:
                 with open(STATS_FILE, 'r', encoding='utf-8') as f:
@@ -75,7 +73,7 @@ class LauncherData:
                 self.stats = {}
     
     def save_stats(self) -> None:
-        """Salva statistiche su file JSON."""
+        """Save statistics to JSON file."""
         try:
             with open(STATS_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.stats, f, indent=2)
@@ -93,7 +91,7 @@ class LauncherData:
         return sum(self.stats.values())
 
     def build_categories(self) -> None:
-        """Costruisce la mappatura categorie -> indici script."""
+        """Constructs the mapping categories -> script indexes."""
         self.categories = {}
         self.category_order = []
 
@@ -111,7 +109,7 @@ class LauncherData:
 
 
 def print_header(data: LauncherData) -> None:
-    """Stampa header del launcher."""
+    """Print launcher header."""
     print(f"{Colors.BLUE}═══════════════════════════════════════════════════════════{Colors.NC}")
     print(f"{Colors.GREEN} Interactive Launcher - CheckMK Tools Repository{Colors.NC}")
     print(f"{Colors.CYAN} Preferiti: {len(data.favorites)}{Colors.NC}    {Colors.MAGENTA} Script eseguiti: {data.get_total_runs()}{Colors.NC}")
@@ -119,15 +117,13 @@ def print_header(data: LauncherData) -> None:
 
 
 def get_script_description(script_path: Path) -> str:
-    """
-    Estrae descrizione dallo script leggendo i commenti iniziali.
+    """Estrae descrizione dallo script leggendo i commenti iniziali.
     
     Args:
         script_path: Path assoluto allo script
         
     Returns:
-        Descrizione estratta o fallback
-    """
+        Descrizione estratta o fallback"""
     if not script_path.exists():
         return "Script non trovato localmente"
     
@@ -135,7 +131,7 @@ def get_script_description(script_path: Path) -> str:
         with open(script_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()[:10]
             
-        # Cerca commento con Description/Desc/Purpose
+        # Search comment with Description/Desc/Purpose
         for line in lines:
             if line.startswith('# ') and any(keyword in line for keyword in ['Desc:', 'Description:', 'Purpose:']):
                 return line.split(':', 1)[1].strip()
@@ -151,15 +147,15 @@ def get_script_description(script_path: Path) -> str:
 
 
 def scan_remote_scripts(data: LauncherData) -> None:
-    """Scansiona repository locale per trovare script COMPLETI (no remote)."""
+    """Scan local repository to find COMPLETE scripts (no remote)."""
     print(f"{Colors.YELLOW} Scansione script completi (full/) in corso...{Colors.NC}\n")
 
-    # Trova tutti gli script completi nelle directory full/
+    # Find all full scripts in full/ directories
     full_scripts: List[Path] = []
 
     # Script Python completi
     full_scripts.extend(sorted(SCRIPT_DIR.glob("*/full/*.py")))
-    # Script Bash completi (per tool non ancora convertiti)
+    # Complete Bash scripts (for tools not yet converted)
     full_scripts.extend(sorted(SCRIPT_DIR.glob("*/full/*.sh")))
 
     for script in full_scripts:
@@ -174,20 +170,18 @@ def scan_remote_scripts(data: LauncherData) -> None:
         data.script_descriptions.append(get_script_description(script))
         data.script_extensions.append(script.suffix.lower())
 
-    # Costruisce la mappatura categorie -> script
+    # Constructs the categories -> script mapping
     data.build_categories()
 
     print(f"{Colors.GREEN} Trovati {len(data.scripts)} script completi{Colors.NC}\n")
 
 
 def search_scripts(data: LauncherData, query: str) -> None:
-    """
-    Ricerca script per nome o descrizione.
+    """Search scripts by name or description.
     
     Args:
-        data: Oggetto LauncherData
-        query: Termine di ricerca
-    """
+        data: LauncherData object
+        query: Search term"""
     query_lower = query.lower()
     results = []
     
@@ -208,13 +202,11 @@ def search_scripts(data: LauncherData, query: str) -> None:
 
 
 def show_script_details(data: LauncherData, idx: int) -> None:
-    """
-    Mostra dettagli di uno script.
+    """Show details of a script.
     
     Args:
-        data: Oggetto LauncherData
-        idx: Indice dello script
-    """
+        data: LauncherData object
+        idx: Index of the script"""
     if idx < 0 or idx >= len(data.scripts):
         print(f"{Colors.RED} Script non valido!{Colors.NC}\n")
         return
@@ -233,7 +225,7 @@ def show_script_details(data: LauncherData, idx: int) -> None:
 
 
 def show_favorites(data: LauncherData) -> None:
-    """Mostra solo script preferiti."""
+    """Show only favorite scripts."""
     if not data.favorites:
         print(f"{Colors.YELLOW} Nessun preferito salvato{Colors.NC}\n")
         return
@@ -248,13 +240,11 @@ def show_favorites(data: LauncherData) -> None:
 
 
 def toggle_favorite(data: LauncherData, idx: int) -> None:
-    """
-    Aggiungi/rimuovi script dai preferiti.
+    """Add/remove scripts from favorites.
     
     Args:
-        data: Oggetto LauncherData
-        idx: Indice dello script
-    """
+        data: LauncherData object
+        idx: Index of the script"""
     idx_str = str(idx)
     
     if idx_str in data.favorites:
@@ -268,7 +258,7 @@ def toggle_favorite(data: LauncherData, idx: int) -> None:
 
 
 def show_statistics(data: LauncherData) -> None:
-    """Mostra statistiche di utilizzo."""
+    """Show usage statistics."""
     print(f"{Colors.MAGENTA}╔═══════════════════════════════════════════════════════════╗{Colors.NC}")
     print(f"{Colors.MAGENTA}║{Colors.NC}   {Colors.GREEN}Statistiche di Utilizzo{Colors.NC}                          {Colors.MAGENTA}║{Colors.NC}")
     print(f"{Colors.MAGENTA}╠═══════════════════════════════════════════════════════════╣{Colors.NC}")
@@ -291,7 +281,7 @@ def show_statistics(data: LauncherData) -> None:
 
 
 def show_menu(data: LauncherData) -> None:
-    """Mostra menu principale con le categorie compresse."""
+    """Show main menu with collapsed categories."""
     print(f"{Colors.BLUE}═══════════════════════════════════════════════════════════{Colors.NC}")
     print(f"{Colors.GREEN}Categorie disponibili:{Colors.NC}")
     print(f"{Colors.CYAN}Comandi: {Colors.YELLOW}s){Colors.NC}Cerca {Colors.YELLOW}f){Colors.NC}Preferiti {Colors.YELLOW}i){Colors.NC}Info {Colors.YELLOW}t){Colors.NC}Stats {Colors.YELLOW}*+){Colors.NC}Aggiungi/Rimuovi {Colors.NC}\n")
@@ -302,7 +292,7 @@ def show_menu(data: LauncherData) -> None:
         for idx, category in enumerate(data.category_order, start=1):
             scripts_idx = data.categories.get(category, [])
             count = len(scripts_idx)
-            # Calcola utilizzi totali per la categoria
+            # Calculate total uses for the category
             total_uses = sum(data.stats.get(str(i), 0) for i in scripts_idx)
             print(f"  {Colors.BLUE}{idx:3d}){Colors.NC} {category} {Colors.CYAN}({count} script, {total_uses} run){Colors.NC}")
 
@@ -315,11 +305,10 @@ def show_category_scripts_menu(data: LauncherData, category: str, filter_ext: Op
     """Mostra gli script di una singola categoria.
 
     Restituisce la lista degli indici globali visualizzati (dopo il filtro),
-    in modo che il chiamante possa mappare la scelta locale → indice globale.
-    """
+    in modo che il chiamante possa mappare la scelta locale → indice globale."""
     scripts_idx = data.categories.get(category, [])
 
-    # Applica filtro per estensione se richiesto
+    # Apply extension filter if required
     if filter_ext:
         filtered_idx = [i for i in scripts_idx if data.script_extensions[i] == filter_ext]
     else:
@@ -340,7 +329,7 @@ def show_category_scripts_menu(data: LauncherData, category: str, filter_ext: Op
         # Stella se preferito
         star = f"{Colors.YELLOW}{Colors.NC} " if str(global_idx) in data.favorites else ""
 
-        # Numero di utilizzi
+        # Number of uses
         uses = ""
         if str(global_idx) in data.stats:
             uses = f" {Colors.CYAN}({data.stats[str(global_idx)]}){Colors.NC}"
@@ -361,16 +350,14 @@ def show_category_scripts_menu(data: LauncherData, category: str, filter_ext: Op
 
 
 def execute_script(data: LauncherData, selection: int) -> bool:
-    """
-    Esegui script selezionato scaricandolo da GitHub.
+    """Run selected script by downloading it from GitHub.
     
     Args:
-        data: Oggetto LauncherData
-        selection: Indice dello script da eseguire
+        data: LauncherData object
+        selection: Index of the script to execute
         
     Returns:
-        True se esecuzione riuscita, False altrimenti
-    """
+        True if successful, False otherwise"""
     if selection < 0 or selection >= len(data.scripts):
         print(f"{Colors.RED} Selezione non valida!{Colors.NC}\n")
         return False
@@ -391,12 +378,12 @@ def execute_script(data: LauncherData, selection: int) -> bool:
     
     print(f"\n{Colors.BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Colors.NC}\n")
     
-    # Scarica script completo in file temporaneo
+    # Download complete script in temporary file
     try:
-        # Determina tipo di script in base all'estensione
+        # Determines script type based on extension
         script_suffix = Path(script_path).suffix.lower()
 
-        # Estensione file temporaneo coerente con il tipo di script
+        # Temporary file extension consistent with the script type
         temp_suffix = script_suffix if script_suffix in ['.py', '.sh'] else '.sh'
 
         with tempfile.NamedTemporaryFile(mode='w', suffix=temp_suffix, delete=False) as temp_file:
@@ -411,7 +398,7 @@ def execute_script(data: LauncherData, selection: int) -> bool:
         # Rendi eseguibile
         os.chmod(temp_script, 0o755)
 
-        # Costruisci comando di esecuzione in base al tipo
+        # Construct execute command based on type
         if script_suffix == '.py':
             cmd = ['python3', temp_script]
         else:
@@ -420,11 +407,11 @@ def execute_script(data: LauncherData, selection: int) -> bool:
         if params:
             cmd.extend(params.split())
 
-        # Determina se serve sudo/su
+        # Determine if sudo/su is needed
         is_root = os.geteuid() == 0 if hasattr(os, 'geteuid') else False
         
         if not is_root:
-            # Prova con sudo
+            # Try sudo
             if os.system('which sudo >/dev/null 2>&1') == 0:
                 cmd.insert(0, 'sudo')
             elif os.system('which su >/dev/null 2>&1') == 0:
@@ -455,20 +442,20 @@ def execute_script(data: LauncherData, selection: int) -> bool:
         print(f"{Colors.RED} Errore esecuzione: {e}{Colors.NC}\n")
         return False
     finally:
-        # Pausa prima di tornare al menu
+        # Pause before returning to the menu
         print(f"{Colors.YELLOW}Premi INVIO per continuare...{Colors.NC}")
         input()
 
 
 def clear_screen() -> None:
-    """Pulisce lo schermo in modo cross-platform."""
+    """Cleans the screen cross-platformly."""
     os.system('clear' if os.name != 'nt' else 'cls')
 
 
 def main() -> int:
-    """Main entry point del launcher."""
+    """Main entry point of the launcher."""
     
-    # Verifica prerequisiti
+    # Check prerequisites
     if os.system('which curl >/dev/null 2>&1') != 0:
         print(f"{Colors.RED} Errore: curl non trovato. Installalo con: apt install curl{Colors.NC}")
         return 1
@@ -476,7 +463,7 @@ def main() -> int:
     # Inizializza dati
     data = LauncherData()
     
-    # Stampa header e scansiona script
+    # Print headers and scan scripts
     print_header(data)
     scan_remote_scripts(data)
     
@@ -533,13 +520,13 @@ def main() -> int:
                 time.sleep(2)
         
         elif selection.isdigit():
-            # Selezione di una categoria dal menu principale
+            # Selecting a category from the main menu
             cat_idx = int(selection)
 
             if 1 <= cat_idx <= len(data.category_order):
                 category = data.category_order[cat_idx - 1]
 
-                # Sottomenu per la categoria scelta (con filtro per estensione)
+                # Submenu for the chosen category (with filter by extension)
                 current_filter: Optional[str] = None  # None=tutti, '.py', '.sh'
 
                 while True:

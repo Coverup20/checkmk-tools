@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-get_ticket_detail.py - Get ticket detail by ID
+"""get_ticket_detail.py - Get ticket detail by ID
 
 Usage:
     get_ticket_detail.py <ticket_id>
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import json

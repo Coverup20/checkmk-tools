@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check-proxmox-vm-status.py - CheckMK Local Check for Proxmox VM/CT Status
+"""check-proxmox-vm-status.py - CheckMK Local Check for Proxmox VM/CT Status
 
 Monitor runtime status of QEMU VMs and LXC containers with uptime.
 
 Proxmox VE
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys

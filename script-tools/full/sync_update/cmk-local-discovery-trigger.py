@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
-"""
-cmk-local-discovery-trigger.py
+"""cmk-local-discovery-trigger.py
 
-Rileva variazioni nei servizi local check visti da CheckMK (via `cmk -d HOST`) e
-lancia discovery/reload solo quando necessario.
+Detect changes in local check services seen by CheckMK (via `cmk -d HOST`) e
+launch discovery/reload only when necessary.
 
 Workflow:
-1) Legge host dal site (`cmk --list-hosts`) o da `--hosts`
-2) Estrae la sezione <<<local>>> dell'agent output
-3) Calcola hash stabile della lista service name
-4) Se hash cambiato: esegue `cmk -IIv HOST`
-5) Se almeno un host aggiornato: esegue un solo `cmk -O` (se `--activate`)
+1) Read hosts from site (`cmk --list-hosts`) or `--hosts`
+2) Extracts the <<<local>>> section of the agent output
+3) Compute stable hash of the service name list
+4) If hash changed: run `cmk -IIv HOST`
+5) If at least one host updated: run a single `cmk -O` (if `--activate`)
 
-Version: 1.3.8
-"""
+Version: 1.3.8"""
 
 import argparse
 import fcntl

@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""
-test_ydea_integration.py - Test completo integrazione CheckMK -> Ydea
+"""test_ydea_integration.py - Complete CheckMK -> Ydea integration test
 
-Esegue una serie di test per verificare:
-1. Esistenza e permessi file
-2. Configurazione variabili ambiente
-3. Connessione API Ydea
-4. Esistenza cache file
-5. Dipendenze sistema
-6. Cron Job
+Performs a series of tests to verify:
+1. File existence and permissions
+2. Configuring environment variables
+3. Ydea API connection
+4. File cache existence
+5. System dependencies
+6. Cron Jobs
 
 Usage:
     test_ydea_integration.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -22,7 +20,7 @@ import shutil
 import importlib.util
 from pathlib import Path
 
-# Colori per output
+# Colors for output
 class Colors:
     RED = '\033[0;31m'
     GREEN = '\033[0;32m'
@@ -37,7 +35,7 @@ sys.path.insert(0, str(script_dir))
 ydea_common_path = script_dir / "ydea_common.py"
 ydea_toolkit_path = script_dir / "ydea-toolkit.py"
 
-# Configurazione default
+# Default configuration
 CHECKMK_SITE = os.environ.get("CHECKMK_SITE", "monitoring")
 BASE_DIR = Path("/opt/ydea-toolkit")
 NOTIFY_SCRIPT = Path(f"/omd/sites/{CHECKMK_SITE}/local/share/check_mk/notifications/ydea_realip")
@@ -83,14 +81,14 @@ def main():
     print(f"{Colors.BLUE}║      Test Integrazione CheckMK -> Ydea Ticketing          ║{Colors.NC}")
     print(f"{Colors.BLUE}╚══════════════════════════════════════════════════════════════╝{Colors.NC}\n")
 
-    # 1. Verifica File Necessari
+    # 1. Check Required Files
     test_start("Verifica file necessari")
     check_file(NOTIFY_SCRIPT, "Script notifica", executable=True)
     check_file(HEALTH_SCRIPT, "Health Monitor", executable=True)
     check_file(ydea_toolkit_path, "Toolkit UI", executable=True)
     check_file(ydea_common_path, "Common Module")
 
-    # 2. Configurazione .env
+    # 2. .env configuration
     test_start("Verifica configurazione .env")
     env_file = BASE_DIR / ".env"
     if env_file.exists():
@@ -118,7 +116,7 @@ def main():
     else:
         test_fail(f"File .env non trovato: {env_file}")
 
-    # 3. Connessione API
+    # 3. API connection
     test_start("Test Connessione Ydea API")
     try:
         # Carica modulo ydea_toolkit dinamicamente

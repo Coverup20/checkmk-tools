@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-checkmk_disaster_recovery.py - CheckMK Disaster Recovery Tool
+"""checkmk_disaster_recovery.py - CheckMK Disaster Recovery Tool
 
 Complete disaster recovery solution for CheckMK:
 1. Lists available backups on cloud (job00-daily or job01-weekly)
@@ -8,8 +7,7 @@ Complete disaster recovery solution for CheckMK:
 3. Automatic restore (with decompression if needed)
 4. Services verification
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -63,16 +61,14 @@ def title(message: str) -> None:
 
 
 def confirm(prompt: str, default: str = "n") -> bool:
-    """
-    Ask user for confirmation.
+    """Ask user for confirmation.
     
     Args:
         prompt: Confirmation prompt
         default: Default answer (y/n)
         
     Returns:
-        True if confirmed, False otherwise
-    """
+        True if confirmed, False otherwise"""
     if default == "y":
         reply = input(f"{prompt} [Y/n] ").strip().lower()
         reply = reply if reply else "y"
@@ -91,8 +87,7 @@ def check_root() -> None:
 
 def run_command(cmd: List[str], check: bool = True, capture_output: bool = False, 
                 shell: bool = False, timeout: int = 300) -> subprocess.CompletedProcess:
-    """
-    Execute a shell command.
+    """Execute a shell command.
     
     Args:
         cmd: Command as list of strings (or string if shell=True)
@@ -102,8 +97,7 @@ def run_command(cmd: List[str], check: bool = True, capture_output: bool = False
         timeout: Command timeout in seconds
         
     Returns:
-        CompletedProcess object
-    """
+        CompletedProcess object"""
     try:
         if shell:
             return subprocess.run(
@@ -151,12 +145,10 @@ def install_rclone() -> None:
 
 
 def find_rclone_config() -> str:
-    """
-    Find rclone configuration file.
+    """Find rclone configuration file.
     
     Returns:
-        Path to rclone.conf
-    """
+        Path to rclone.conf"""
     title("  Configurazione rclone")
     
     possible_configs = [
@@ -183,12 +175,10 @@ def find_rclone_config() -> str:
 
 
 def select_job_type() -> Tuple[str, bool]:
-    """
-    Let user select backup job type.
+    """Let user select backup job type.
     
     Returns:
-        Tuple of (rclone_path, is_compressed)
-    """
+        Tuple of (rclone_path, is_compressed)"""
     title("  Selezione Job")
     
     print("Quale tipo di backup vuoi ripristinare?")
@@ -210,16 +200,14 @@ def select_job_type() -> Tuple[str, bool]:
 
 
 def list_available_backups(rclone_config: str, rclone_path: str) -> Dict[int, str]:
-    """
-    List available backups from cloud.
+    """List available backups from cloud.
     
     Args:
         rclone_config: Path to rclone config
         rclone_path: Path in rclone remote
         
     Returns:
-        Dictionary mapping index to backup name
-    """
+        Dictionary mapping index to backup name"""
     title(" Backup Disponibili")
     
     log(f"Recupero lista da {RCLONE_REMOTE}/{rclone_path}...")
@@ -269,15 +257,13 @@ def list_available_backups(rclone_config: str, rclone_path: str) -> Dict[int, st
 
 
 def select_backup(backup_map: Dict[int, str]) -> str:
-    """
-    Let user select a backup from the map.
+    """Let user select a backup from the map.
     
     Args:
         backup_map: Dictionary of backups
         
     Returns:
-        Selected backup name
-    """
+        Selected backup name"""
     print("")
     max_index = max(backup_map.keys())
     selection = input(f"Seleziona backup da ripristinare [1-{max_index}]: ").strip()
@@ -294,15 +280,13 @@ def select_backup(backup_map: Dict[int, str]) -> str:
 
 
 def extract_site_name(backup_name: str) -> str:
-    """
-    Extract site name from backup directory name.
+    """Extract site name from backup directory name.
     
     Args:
         backup_name: Backup directory name
         
     Returns:
-        Site name
-    """
+        Site name"""
     # Format: Check_MK-monitor-monitoring-job00-complete-2026-01-27-16h30
     # Site name: monitoring
     match = re.search(r'Check_MK-[^-]+-([^-]+)-', backup_name)
@@ -316,15 +300,13 @@ def extract_site_name(backup_name: str) -> str:
 
 def confirm_disaster_recovery(selected_backup: str, rclone_path: str, 
                                is_compressed: bool, site_name: str) -> None:
-    """
-    Ask user to confirm disaster recovery operation.
+    """Ask user to confirm disaster recovery operation.
     
     Args:
         selected_backup: Selected backup name
         rclone_path: Rclone path
         is_compressed: Whether backup is compressed
-        site_name: Site name
-    """
+        site_name: Site name"""
     title("  CONFERMA DISASTER RECOVERY")
     
     backup_type = "Backup compresso (job00)" if is_compressed else "Backup completo (job01)"
@@ -347,8 +329,7 @@ def confirm_disaster_recovery(selected_backup: str, rclone_path: str,
 
 def download_backup(rclone_config: str, rclone_path: str, 
                     selected_backup: str) -> Path:
-    """
-    Download backup from cloud.
+    """Download backup from cloud.
     
     Args:
         rclone_config: Rclone config path
@@ -356,8 +337,7 @@ def download_backup(rclone_config: str, rclone_path: str,
         selected_backup: Selected backup name
         
     Returns:
-        Path to downloaded backup tar.gz file
-    """
+        Path to downloaded backup tar.gz file"""
     title(" Preparazione Directory Download")
     
     download_path = Path(DOWNLOAD_DIR)
@@ -394,16 +374,14 @@ def download_backup(rclone_config: str, rclone_path: str,
 
 
 def verify_downloaded_backup(backup_dir: Path, site_name: str) -> Path:
-    """
-    Verify downloaded backup has required tar.gz file.
+    """Verify downloaded backup has required tar.gz file.
     
     Args:
         backup_dir: Downloaded backup directory
         site_name: Site name
         
     Returns:
-        Path to tar.gz file
-    """
+        Path to tar.gz file"""
     tarfile = backup_dir / f"site-{site_name}.tar.gz"
     if not tarfile.exists():
         error(f"File backup non trovato: {tarfile}")
@@ -417,12 +395,10 @@ def verify_downloaded_backup(backup_dir: Path, site_name: str) -> Path:
 
 
 def remove_existing_site(site_name: str) -> None:
-    """
-    Check if site exists and remove it if user confirms.
+    """Check if site exists and remove it if user confirms.
     
     Args:
-        site_name: Site name to check/remove
-    """
+        site_name: Site name to check/remove"""
     title(" Verifica Site Esistente")
     
     # Check if site exists
@@ -457,12 +433,10 @@ def remove_existing_site(site_name: str) -> None:
 
 
 def restore_backup(tarfile: Path) -> None:
-    """
-    Restore backup using omd restore.
+    """Restore backup using omd restore.
     
     Args:
-        tarfile: Path to backup tar.gz file
-    """
+        tarfile: Path to backup tar.gz file"""
     title(" Restore Backup")
     
     log(f"Ripristino backup da {tarfile}...")
@@ -475,12 +449,10 @@ def restore_backup(tarfile: Path) -> None:
 
 
 def post_restore_compressed(site_name: str) -> None:
-    """
-    Post-restore actions for compressed backups (job00-daily).
+    """Post-restore actions for compressed backups (job00-daily).
     
     Args:
-        site_name: Site name
-    """
+        site_name: Site name"""
     title(" Post-Restore: Backup Compresso (job00-daily)")
     
     log("Backup compresso rilevato - creo directory mancanti...")
@@ -531,12 +503,10 @@ def post_restore_compressed(site_name: str) -> None:
 
 
 def post_restore_full(site_name: str) -> None:
-    """
-    Post-restore actions for full backups (job01-weekly).
+    """Post-restore actions for full backups (job01-weekly).
     
     Args:
-        site_name: Site name
-    """
+        site_name: Site name"""
     title(" Post-Restore: Backup Completo (job01-weekly)")
     
     log("Backup completo rilevato - nessuna directory da ricreare")
@@ -549,12 +519,10 @@ def post_restore_full(site_name: str) -> None:
 
 
 def start_site(site_name: str) -> None:
-    """
-    Start the CheckMK site.
+    """Start the CheckMK site.
     
     Args:
-        site_name: Site name
-    """
+        site_name: Site name"""
     title(" Avvio Site")
     
     log(f"Avvio site '{site_name}'...")
@@ -567,12 +535,10 @@ def start_site(site_name: str) -> None:
 
 
 def verify_site_status(site_name: str) -> None:
-    """
-    Verify site status after restore.
+    """Verify site status after restore.
     
     Args:
-        site_name: Site name
-    """
+        site_name: Site name"""
     title(" Verifica Status Finale")
     
     print("")
@@ -580,12 +546,10 @@ def verify_site_status(site_name: str) -> None:
 
 
 def change_cmkadmin_password(site_name: str) -> None:
-    """
-    Force change of cmkadmin password for security.
+    """Force change of cmkadmin password for security.
     
     Args:
-        site_name: Site name
-    """
+        site_name: Site name"""
     print("")
     title(" Cambio Password cmkadmin (OBBLIGATORIO)")
     
@@ -607,15 +571,13 @@ def change_cmkadmin_password(site_name: str) -> None:
 
 def print_final_summary(selected_backup: str, is_compressed: bool, 
                         site_name: str, backup_size_mb: float) -> None:
-    """
-    Print final summary of disaster recovery operation.
+    """Print final summary of disaster recovery operation.
     
     Args:
         selected_backup: Backup name
         is_compressed: Whether it was compressed
         site_name: Site name
-        backup_size_mb: Backup size in MB
-    """
+        backup_size_mb: Backup size in MB"""
     print("")
     title(" DISASTER RECOVERY COMPLETATO!")
     
@@ -651,12 +613,10 @@ def print_final_summary(selected_backup: str, is_compressed: bool,
 
 
 def main() -> int:
-    """
-    Main entry point.
+    """Main entry point.
     
     Returns:
-        Exit code (0=success, 1=error)
-    """
+        Exit code (0=success, 1=error)"""
     check_root()
     
     # Clear screen and show banner
@@ -695,7 +655,7 @@ def main() -> int:
     # Confirm operation
     confirm_disaster_recovery(selected_backup, rclone_path, is_compressed, site_name)
     
-    # Download backup
+    # Download backups
     backup_dir = download_backup(rclone_config, rclone_path, selected_backup)
     
     # Verify downloaded backup

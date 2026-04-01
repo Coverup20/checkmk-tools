@@ -1,31 +1,29 @@
 #!/usr/bin/env python3
-"""
-check_nv8_status_trunk.py - CheckMK Local Check per stato trunk NethVoice NS8
+"""check_nv8_status_trunk.py - CheckMK Local Check for NethVoice NS8 trunk status
 
-Monitora la registrazione dei trunk PJSIP su NethVoice NS8.
-Usa runagent + podman exec per eseguire `asterisk -rx "pjsip show registrations"`
-all'interno del container Asterisk del modulo NethVoice.
+Monitor PJSIP trunk logging on NethVoice NS8.
+Use runagent + podman exec to run `asterisk -rx "pjsip show registrations"`
+inside the Asterisk container of the NethVoice module.
 
-Output CheckMK:
-  - Una riga per trunk (servizio dedicato per granularità in caso di problemi)
-  - Una riga di sommario complessivo (NethVoice_Trunks)
+CheckMK Output:
+  - One line per trunk (dedicated service for granularity in case of problems)
+  - One overall summary line (NethVoice_Trunks)
 
-Stati PJSIP riconosciuti:
-  Registered     → OK (0)
-  Not Registered → WARNING (1)  es: trunk IP-based non registranti
-  Trying         → WARNING (1)  registrazione in corso
-  No Auth        → CRITICAL (2) errore autenticazione
-  Rejected       → CRITICAL (2) rifiutato dal provider
-  Failed         → CRITICAL (2) fallimento generico
-  Stopped        → CRITICAL (2) registrazione fermata
-  Unregistered   → CRITICAL (2) deregistrato
+Recognized PJSIP states:
+  Registered → OK (0)
+  Not Registered → WARNING (1) e.g. non-registering IP-based trunks
+  Trying → WARNING (1) recording in progress
+  No Auth → CRITICAL (2) authentication error
+  Rejected → CRITICAL (2) rejected by the provider
+  Failed → CRITICAL (2) generic failure
+  Stopped → CRITICAL (2) recording stopped
+  Unregistered → CRITICAL (2) deregistered
 
 Deployment:
   cp check_nethvoice_trunks.py /usr/lib/check_mk_agent/local/
   chmod +x /usr/lib/check_mk_agent/local/check_nethvoice_trunks.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -40,7 +38,7 @@ SERVICE_SUMMARY = "NV8.Status.Trunks"
 SCRIPT_TIMEOUT = 20  # secondi totali a disposizione dello script
 _START = time.monotonic()
 
-# PJSIP registration states → stato CheckMK (0=OK, 1=WARN, 2=CRIT, 3=UNKNOWN)
+# PJSIP registration states → CheckMK state (0=OK, 1=WARN, 2=CRIT, 3=UNKNOWN)
 STATE_MAP: Dict[str, int] = {
     "Registered":     0,  # registrato correttamente
     "Not Registered": 1,  # non registrato (potrebbe essere intenzionale per trunk IP-based)
@@ -52,8 +50,8 @@ STATE_MAP: Dict[str, int] = {
     "Unregistered":   2,  # deregistrato manualmente
 }
 
-# Regex per rilevare lo stato PJSIP nella riga (non necessariamente a fine riga)
-# es: "trunk/sip:host:5060   auth   Rejected          (exp. 28s)"
+# Regex to detect PJSIP status in the line (not necessarily at the end of the line)
+# ex: "trunk/sip:host:5060 auth Rejected (exp. 28s)"
 STATUS_RE = re.compile(
     r"\b(Not\s+Registered|No\s+Auth|Registered|Trying|Rejected|Failed|Stopped|Unregistered)\b",
     re.IGNORECASE,
@@ -65,15 +63,13 @@ STATUS_RE = re.compile(
 # ---------------------------------------------------------------------------
 
 def elapsed() -> float:
-    """Secondi trascorsi dall'avvio dello script."""
+    """Seconds elapsed since the script was started."""
     return time.monotonic() - _START
 
 
 def run_command(cmd: List[str], timeout: int = 8) -> Tuple[int, str, str]:
-    """
-    Esegue un comando e restituisce (exit_code, stdout, stderr).
-    Rispetta il budget temporale globale SCRIPT_TIMEOUT.
-    """
+    """Executes a command and returns (exit_code, stdout, stderr).
+    Respect the SCRIPT_TIMEOUT global time budget."""
     try:
         remaining = max(1, int(SCRIPT_TIMEOUT - elapsed()))
         effective = min(timeout, remaining)
@@ -94,11 +90,9 @@ def run_command(cmd: List[str], timeout: int = 8) -> Tuple[int, str, str]:
 
 
 def sanitize_name(name: str) -> str:
-    """
-    Converte il nome di un trunk in un service name valido per CheckMK.
-    - Rimuove prefisso reg- / reg_
-    - Sostituisce caratteri non alfanumerici (incluso _ e -) con punto
-    """
+    """Converts a trunk name into a valid service name for CheckMK.
+    - Remove prefix reg- / reg_
+    - Replaces non-alphanumeric characters (including _ and -) with dots"""
     name = re.sub(r"^reg[-_]", "", name, flags=re.IGNORECASE)
     name = re.sub(r"[^a-zA-Z0-9]", ".", name)
     name = re.sub(r"\.{2,}", ".", name)  # collassa punti multipli
@@ -106,11 +100,11 @@ def sanitize_name(name: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Discovery del container Asterisk
+# Discovery of the Asterisk container
 # ---------------------------------------------------------------------------
 
 def get_modules() -> List[str]:
-    """Ritorna la lista di tutti i moduli NS8 (output di runagent -l)."""
+    """Returns the list of all NS8 modules (output of runagent -l)."""
     code, out, _ = run_command(["runagent", "-l"])
     if code != 0 or not out:
         return []
@@ -122,10 +116,8 @@ def get_modules() -> List[str]:
 
 
 def get_containers(module: str) -> List[Tuple[str, str]]:
-    """
-    Ritorna i container del modulo come lista di (nome, status).
-    Usa `podman ps` (solo container in running) per escludere container fermati.
-    """
+    """Returns the module containers as a list of (name, status).
+    Use `podman ps` (running containers only) to exclude stopped containers."""
     code, out, _ = run_command(
         ["runagent", "-m", module, "podman", "ps",
          "--format", "{{.Names}}|{{.Status}}"]
@@ -142,15 +134,13 @@ def get_containers(module: str) -> List[Tuple[str, str]]:
 
 
 def find_nethvoice_containers() -> List[Tuple[str, str]]:
-    """
-    Trova TUTTI i container FreePBX/Asterisk in tutti i moduli nethvoice.
-    Ritorna lista di (module_name, container_name).
-    """
+    """Find ALL FreePBX/Asterisk containers in all nethvoice modules.
+    Returns list of (module_name, container_name)."""
     results = []
     for module in get_modules():
         if elapsed() >= SCRIPT_TIMEOUT:
             break
-        # Ottimizzazione: salta moduli che non sono nethvoice/asterisk/pbx
+        # Optimization: Skip modules that are not nethvoice/asterisk/pbx
         if not any(kw in module.lower() for kw in ("nethvoice", "asterisk", "freepbx", "pbx")):
             continue
         for cname, _ in get_containers(module):
@@ -164,43 +154,39 @@ def find_nethvoice_containers() -> List[Tuple[str, str]]:
 # ---------------------------------------------------------------------------
 
 def run_asterisk_cmd(module: str, container: str, asterisk_cmd: str) -> Optional[str]:
-    """
-    Esegue un comando Asterisk via runagent + podman exec.
+    """Run an Asterisk command via runagent + podman exec.
 
     Returns:
-        Output grezzo (stdout) oppure None in caso di errore grave.
-    """
+        Raw output (stdout) or None in case of serious error."""
     code, out, err = run_command(
         ["runagent", "-m", module, "podman", "exec",
          container, "asterisk", "-rx", asterisk_cmd],
         timeout=10,
     )
-    # Asterisk CLI può uscire con code != 0 anche con output valido;
-    # consideriamo errore solo timeout (124) o comando non trovato (127)
+    # Asterisk CLI can exit with code != 0 even with valid output;
+    # we consider only timeout error (124) or command not found (127)
     if code in (124, 127):
         return None
-    # "No objects found." è output valido (nessun trunk configurato)
+    # "No objects found." is valid output (no trunk configured)
     return out
 
 
 # ---------------------------------------------------------------------------
-# Parsing di `pjsip show registrations`
+# Parsing `pjsip show registrations`
 # ---------------------------------------------------------------------------
 
 def parse_pjsip_registrations(output: str) -> List[Dict[str, str]]:
-    """
-    Parsa l'output di `asterisk -rx "pjsip show registrations"`.
+    """Parse the output of `asterisk -rx "pjsip show registrations"`.
 
-    Formato tipico:
-        <Registration/ServerURI......>  <Auth.......>  <Status>
-        =========================================================
-        reg-trunk1/sip:user@host       auth-t1        Registered
-        reg-trunk2/sip:user@host2      auth-t2        Rejected
+    Typical format:
+        <Registration/ServerURI......> <Auth.......> <Status>
+        ========================================================================
+        reg-trunk1/sip:user@host auth-t1 Registered
+        reg-trunk2/sip:user@host2 auth-t2 Rejected
         2 registrations.
 
     Returns:
-        Lista di dict con chiavi: name, server, status
-    """
+        List of dicts with keys: name, server, status"""
     trunks: List[Dict[str, str]] = []
 
     for line in output.splitlines():
@@ -218,14 +204,14 @@ def parse_pjsip_registrations(output: str) -> List[Dict[str, str]]:
         if "no registrations" in stripped.lower():
             continue
 
-        # Cerca stato PJSIP in fondo alla riga
+        # Look for PJSIP status at the bottom of the line
         m = STATUS_RE.search(stripped)
         if not m:
             continue
 
         status = re.sub(r"\s+", " ", m.group(1)).strip()
 
-        # Colonna 1: la prima parte (separata da 2+ spazi)
+        # Column 1: the first part (separated by 2+ spaces)
         parts = re.split(r"\s{2,}", stripped)
         if not parts:
             continue
@@ -248,7 +234,7 @@ def parse_pjsip_registrations(output: str) -> List[Dict[str, str]]:
 # ---------------------------------------------------------------------------
 
 def get_state(status: str) -> int:
-    """Ritorna lo stato CheckMK per uno stato PJSIP (default: 1 WARN per sconosciuti)."""
+    """Returns CheckMK status for a PJSIP status (default: 1 WARN for unknown)."""
     return STATE_MAP.get(status, 1)
 
 
@@ -260,12 +246,12 @@ STATE_LABEL = {0: "OK", 1: "WARNING", 2: "CRITICAL", 3: "UNKNOWN"}
 # ---------------------------------------------------------------------------
 
 def main() -> int:
-    # --- 1. Verifica runagent disponibile (NS8) ---
+    # --- 1. Check runagent available (NS8) ---
     if run_command(["which", "runagent"])[0] != 0:
         print(f"3 {SERVICE_SUMMARY} - UNKNOWN: runagent non trovato, questo script richiede NS8")
         return 0
 
-    # --- 2. Cerca TUTTI i container FreePBX/Asterisk ---
+    # --- 2. Search ALL FreePBX/Asterisk containers ---
     containers = find_nethvoice_containers()
     if not containers:
         print(
@@ -274,7 +260,7 @@ def main() -> int:
         )
         return 0
 
-    # --- 3. Raccoglie registrazioni da TUTTI i moduli nethvoice ---
+    # --- 3. Collect recordings from ALL nethvoice modules ---
     all_trunks: List[Dict[str, str]] = []
     modules_checked: List[str] = []
 
@@ -290,7 +276,7 @@ def main() -> int:
 
     modules_str = ",".join(modules_checked) if modules_checked else "none"
 
-    # --- 4. Nessun trunk trovato ---
+    # --- 4. No trunks found ---
     if not all_trunks:
         print(
             f"1 {SERVICE_SUMMARY} - WARNING: nessun trunk PJSIP outbound configurato "
@@ -298,7 +284,7 @@ def main() -> int:
         )
         return 0
 
-    # --- 5. Output una riga per trunk ---
+    # --- 5. Output one line per trunk ---
     overall_state = 0
     registered_count = 0
 
@@ -311,7 +297,7 @@ def main() -> int:
 
         svc_name = f"{SERVICE_PREFIX}.{sanitize_name(trunk['name'])}"
 
-        # Server URI abbreviato: domain[:porta] senza sip:/sips:
+        # Shortened server URI: domain[:port] without sip:/sips:
         server = trunk["server"]
         server_clean = re.sub(r"^sips?:", "", server)          # rimuovi schema
         server_clean = server_clean.split("@")[-1]              # solo host (senza utente)

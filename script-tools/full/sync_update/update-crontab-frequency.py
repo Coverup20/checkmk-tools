@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-update-crontab-frequency.py
+"""update-crontab-frequency.py
 
 Python entrypoint that delegates to update-crontab-frequency.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

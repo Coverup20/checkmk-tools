@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-scan-nmap-interattivo-verbose.py
+"""scan-nmap-interattivo-verbose.py
 
 Python entrypoint that delegates to scan-nmap-interattivo-verbose.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

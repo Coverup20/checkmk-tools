@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-update_deployed_launchers.py - Aggiorna launcher deployati dal repository.
+"""update_deployed_launchers.py - Updates launchers deployed from the repository.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import shutil

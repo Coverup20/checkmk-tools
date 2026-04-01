@@ -1,7 +1,7 @@
 # FRPC Installation Fix - Changelog
-> **Categoria:** Storico
+> **Category:** Historical
 
-**Date**: 2025-11-07  
+**Dates**: 2025-11-07  
 **Script**: `install-agent-interactive.sh`  
 **Version**: 1.2 (Post-Fix)
 
@@ -117,10 +117,10 @@ rm -rf "$FRP_EXTRACTED" "frp_${FRP_VERSION}_linux_amd64.tar.gz"
 ## Compatibility
 
 **Platforms Tested**:
--  OpenWrt / NethSecurity 8.7.1 (init.d + procd)
--  Debian/Ubuntu (systemd, apt)
--  RHEL/Rocky/CentOS (systemd, yum)
--  NethServer Enterprise
+- OpenWrt/NethSecurity 8.7.1 (init.d + procd)
+- Debian/Ubuntu (systemd, apt)
+- RHEL/Rocky/CentOS (systemd, yum)
+- NethServer Enterprise
 
 **Temporary Directory Handling**:
 - **OpenWrt**: `/tmp` (always, `/usr/local/src` doesn't exist)
@@ -136,8 +136,8 @@ rm -rf "$FRP_EXTRACTED" "frp_${FRP_VERSION}_linux_amd64.tar.gz"
 1. Detects OS type (openwrt/deb/rpm)
 2. Installs CheckMK Agent
 3. Configures Plain TCP on port 6556
-4. Prompts: "Vuoi installare anche FRPC? [s/N]:"
-5. If yes:
+4. Prompts: "Do you also want to install FRPC? [y/N]:"
+5.If yes:
    - Downloads FRPC to `/tmp` (or `/usr/local/src`)
    - Extracts with dynamic directory detection
    - Creates TOML config with user prompts
@@ -146,9 +146,9 @@ rm -rf "$FRP_EXTRACTED" "frp_${FRP_VERSION}_linux_amd64.tar.gz"
 
 ### Uninstallation
 ```bash
-./install-agent-interactive.sh --uninstall-frpc    # Only FRPC
-./install-agent-interactive.sh --uninstall-agent   # Only Agent
-./install-agent-interactive.sh --uninstall         # Both
+./install-agent-interactive.sh --uninstall-frpc # Only FRPC
+./install-agent-interactive.sh --uninstall-agent # Only Agent
+./install-agent-interactive.sh --uninstall # Both
 ```
 
 ## Testing Recommendations
@@ -180,7 +180,7 @@ rm -rf "$FRP_EXTRACTED" "frp_${FRP_VERSION}_linux_amd64.tar.gz"
 
 1. **FRP_URL Variable**: Still marked as unused by linter (set at line 21 but dynamically used)
 2. **PKG_MANAGER Variable**: Set but not explicitly used (preserved for future extensibility)
-3. **WSL Environment**: Some systemd issues in WSL testing (expected, not production issue)
+3. **WSL Environment**: Some system issues in WSL testing (expected, not production issue)
 
 ## Files Modified
 
@@ -201,7 +201,6 @@ rm -rf "$FRP_EXTRACTED" "frp_${FRP_VERSION}_linux_amd64.tar.gz"
 ## References
 
 **Working Reference Script**:
-- `install-checkmk-agent-debtools-frp-nsec8c.sh` (v3.0 - stabile socat mode)
+- `install-checkmk-agent-debtools-frp-nsec8c.sh` (v3.0 - stable socat mode)
 - Successfully deployed on NethSecurity 8.7.1
 - Proven process management and cleanup logic
-

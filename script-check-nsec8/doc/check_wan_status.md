@@ -1,55 +1,55 @@
 # check_wan_status.sh
 
-## Descrizione
-Script di monitoraggio per CheckMK che verifica lo stato delle interfacce WAN su NSecFirewall8 (OpenWrt).
+## Description
+Monitoring script for CheckMK that checks the status of WAN interfaces on NSecFirewall8 (OpenWrt).
 
-## Funzionalità
-- Rileva automaticamente tutte le interfacce WAN configurate (wan, wan6, wwan, vwan)
-- Verifica lo stato UP/DOWN tramite `ubus`
-- Testa la connettività reale pingando il gateway
-- Fallback su DNS pubblici (8.8.8.8, 1.1.1.1) se gateway non disponibile
-- Output formato CheckMK con perfdata
+## Features
+- Automatically detect all configured WAN interfaces (wan, wan6, wwan, vwan)
+- Check UP/DOWN status via `ubus`
+- Test real connectivity by pinging the gateway
+- Fallback to public DNS (8.8.8.8, 1.1.1.1) if gateway unavailable
+- CheckMK format output with perfdata
 
-## Stati
-- **OK (0)**: Tutte le WAN sono UP e raggiungibili
-- **WARNING (1)**: WAN UP ma senza connettività o stato sconosciuto
-- **CRITICAL (2)**: Almeno una WAN è DOWN
+## States
+- **OK (0)**: All WANs are UP and reachable
+- **WARNING (1)**: WAN UP but no connectivity or unknown status
+- **CRITICAL (2)**: At least one WAN is DOWN
 
 ## Output CheckMK
-### Sezione wan_status
+### wan_status section
 ```
 0 WAN_Status status=OK wan=OK - wan: UP (gateway 192.168.1.1 reachable)
 ```
 
-### Sezione wan_metrics
+### wan_metrics section
 ```
 0 WAN_Metrics - Total=1 Up=1 Down=0 Degraded=0 | total=1 up=1 down=0 degraded=0
 ```
 
 ## Performance Data
-- `total`: Numero totale di interfacce WAN
-- `up`: Numero di interfacce UP e funzionanti
-- `down`: Numero di interfacce DOWN
-- `degraded`: Numero di interfacce UP ma senza connettività
+- `total`: Total number of WAN interfaces
+- `up`: Number of UP and functioning interfaces
+- `down`: Number of DOWN interfaces
+- `degraded`: Number of UP interfaces but without connectivity
 
-## Requisiti
-- OpenWrt con `ubus`
-- Comando `ping` disponibile
-- Comando `jsonfilter` per parsing JSON
+## Requirements
+- OpenWrt with `ubus`
+- `ping` command available
+- `jsonfilter` command for JSON parsing
 
-## Installazione
+## Installation
 ```bash
-# Copia in directory agent CheckMK
+# Copy to CheckMK agent directory
 cp check_wan_status.sh /usr/lib/check_mk_agent/local/rcheck_wan_status.sh
 chmod +x /usr/lib/check_mk_agent/local/rcheck_wan_status.sh
 ```
 
-## Test manuale
+## Manual testing
 ```bash
 bash /opt/checkmk-tools/script-check-nsec8/full/check_wan_status.sh
 ```
 
-## Note
-- Lo script usa `ubus call network.interface.<name> status` per ottenere lo stato
-- Test di connettività con timeout di 2 secondi e 2 tentativi
-- Interfacce multiple WAN supportate (failover, load balancing)
+## Notes
+- The script uses `ubus call network.interface.<name> status` to get the status
+- Connectivity test with 2 second timeout and 2 retries
+- Multiple WAN interfaces supported (failover, load balancing)

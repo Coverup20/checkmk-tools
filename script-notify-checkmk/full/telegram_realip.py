@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-telegram_realip - Telegram Notification with Real IP Support
+"""telegram_realip - Telegram Notification with Real IP Support
 Bulk: no
 
 CheckMK notification script - sends Telegram message with real IP and inline buttons.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import sys
@@ -105,7 +103,7 @@ def main():
             ]
         }
     
-    # Prefix per identificare VPS
+    # Prefix to identify VPS
     msg = f" [VPS]  {msg}"
     
     # Send to Telegram
@@ -126,7 +124,7 @@ def main():
         return 0
     
     except (URLError, Exception) as e:
-        # Log error ma return 0 per non bloccare CheckMK
+        # Log error but return 0 to not block CheckMK
         print(f"WARNING: Telegram send failed: {e}", file=sys.stderr)
         return 0
 

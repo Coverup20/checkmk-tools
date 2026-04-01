@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-diagnose-auto-git-sync.py
+"""diagnose-auto-git-sync.py
 
 Python entrypoint that delegates to diagnose-auto-git-sync.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

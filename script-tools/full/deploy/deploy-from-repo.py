@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-deploy-from-repo.py
+"""deploy-from-repo.py
 
 Python entrypoint that delegates to deploy-from-repo.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

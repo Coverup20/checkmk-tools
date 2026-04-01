@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-persistent-startup-check.py - PERSISTENT Startup Verification
+"""persistent-startup-check.py - PERSISTENT Startup Verification
 
-Verifica e ripristina automaticamente i servizi critici CheckMK
-dopo un major upgrade di NethSecurity 8 / OpenWrt.
+Automatically checks and restores critical CheckMK services
+after a major upgrade of NethSecurity 8 / OpenWrt.
 
-Eseguito da rc.local ad ogni avvio sistema.
+Executed by rc.local at every system startup.
 
-Version: 2.0.0
-"""
+Version: 2.0.0"""
 
 import gzip as _gzip
 import io
@@ -106,14 +104,12 @@ def _unlink(path: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Download dinamico pacchetti OpenWrt
+# Dynamic download of OpenWrt packages
 # ---------------------------------------------------------------------------
 
 def download_openwrt_package(package_name: str, repo_url: str, output_file: str) -> bool:
-    """
-    Scarica un pacchetto OpenWrt dinamicamente dall'index Packages.gz.
-    Evita URL statici fragili: trova il filename dalla lista aggiornata.
-    """
+    """Download an OpenWrt package dynamically from the Packages.gz index.
+    Avoid fragile static URLs: find the filename from the updated list."""
     log(f"Download dinamico pacchetto: {package_name}")
     packages_url = f"{repo_url}/Packages.gz"
 
@@ -188,7 +184,7 @@ def verify_webui() -> None:
 
     log("[Web UI] Verifica servizi...")
     if cmd_exists("nginx"):
-        # Ripristina symlink uci.conf se mancante (cancellato durante upgrade)
+        # Restore symlink uci.conf if missing (deleted during upgrade)
         uci_conf = Path("/etc/nginx/uci.conf")
         uci_target = Path("/var/lib/nginx/uci.conf")
         if not uci_conf.is_symlink() and uci_target.is_file():
@@ -198,7 +194,7 @@ def verify_webui() -> None:
             except OSError as exc:
                 log(f"[Nginx] ERRORE symlink: {exc}")
 
-        # Rimuovi luci.module se causa conflitto con ngx_http_ubus.module (upgrade da versione precedente)
+        # Remove luci.module if it causes conflict with ngx_http_ubus.module (upgrade from previous version)
         luci_mod = Path("/etc/nginx/module.d/luci.module")
         ubus_mod = Path("/etc/nginx/module.d/ngx_http_ubus.module")
         if luci_mod.is_file() and ubus_mod.is_file():
@@ -222,7 +218,7 @@ def verify_webui() -> None:
         else:
             log("[Nginx] OK - Servizio attivo")
 
-        # Verifica porta 9090 (Web UI NethSecurity)
+        # Check port 9090 (Web UI NethSecurity)
         rc, out = _run_capture(["netstat", "-tlnp"], timeout=10)
         if ":9090" not in out:
             log("[Web UI] Porta 9090 non attiva, riconfigurazione...")
@@ -257,11 +253,11 @@ def verify_checkmk_agent() -> None:
             _run(["python3", str(post)], timeout=120)
         else:
             log("[CheckMK Agent] CRITICO: Script post-upgrade mancante!")
-        # Se ancora mancante, reinstalla il pacchetto ns-checkmk-agent via opkg
+        # If still missing, reinstall the ns-checkmk-agent package via opkg
         if not (agent_bin.is_file() and os.access(str(agent_bin), os.X_OK)):
             log("[CheckMK Agent] Binary ancora mancante — reinstallo ns-checkmk-agent...")
             if cmd_exists("opkg"):
-                # Aggiorna lists prima di tentare install
+                # Update lists before attempting install
                 _run(["opkg", "update"], timeout=60)
                 rc_opkg, _ = _run_capture(["opkg", "install", "ns-checkmk-agent"], timeout=120)
                 # Fallback: URL diretto salvato dall'installer
@@ -301,12 +297,12 @@ def verify_checkmk_agent() -> None:
 # ---------------------------------------------------------------------------
 
 def verify_sync() -> None:
-    """Verifica sync-checks.py e aggiorna script check se necessario."""
+    """Check sync-checks.py and update script checks if necessary."""
     log("[Sync] Verifica sync-checks.py...")
 
     sync = Path(SYNC_SCRIPT)
 
-    # Se manca, tenta download da GitHub
+    # If missing, try downloading from GitHub
     if not sync.exists():
         log("[Sync] sync-checks.py non trovato — tentativo download da GitHub...")
         try:
@@ -319,7 +315,7 @@ def verify_sync() -> None:
             log(f"[Sync] ERRORE: download sync-checks.py fallito: {exc}")
             return
 
-    # Esegui sync per aggiornare script check
+    # Run sync to update script check
     log("[Sync] Aggiornamento script check da GitHub...")
     rc, out = _run_capture(["python3", SYNC_SCRIPT], timeout=60)
     if rc == 0:
@@ -332,7 +328,7 @@ def verify_sync() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Section 2.8: Auto-deploy local checks e plugin da repository
+# Section 2.8: Auto-deploy local checks and plugins from repository
 # ---------------------------------------------------------------------------
 
 def auto_deploy_checks() -> None:
@@ -347,7 +343,7 @@ def auto_deploy_checks() -> None:
                 continue
             if script.suffix not in (".py", ".sh") and not (script.stat().st_mode & 0o111):
                 continue
-            # Deploy .py senza estensione, .sh con estensione
+            # Deploy .py without extension, .sh with extension
             dest_name = script.stem if script.suffix == ".py" else script.name
             dest = local_dir / dest_name
             if not dest.exists() or script.stat().st_mtime > dest.stat().st_mtime:
@@ -364,7 +360,7 @@ def auto_deploy_checks() -> None:
             else "[Auto-Deploy] Local checks già aggiornati"
         )
 
-        # Rimuovi vecchi .sh da plugins/ (installati dal pacchetto ns-checkmk-agent, doppioni obsoleti)
+        # Remove old .sh from plugins/ (installed from ns-checkmk-agent package, obsolete duplicates)
         plugins_dir = Path(PLUGINS_DIR)
         removed = 0
         if plugins_dir.is_dir():
@@ -379,7 +375,7 @@ def auto_deploy_checks() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Section 3: Verifica protezioni sysupgrade.conf
+# Section 3: Check sysupgrade.conf protections
 # ---------------------------------------------------------------------------
 
 def verify_sysupgrade() -> None:

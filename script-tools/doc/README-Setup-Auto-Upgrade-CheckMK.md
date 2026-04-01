@@ -1,187 +1,187 @@
-# Setup Auto-Upgrade CheckMK - Configurazione Upgrade Automatici
-> **Categoria:** Operativo
+# CheckMK Auto-Upgrade Setup - Automatic Upgrade Configuration
+> **Category:** Operational
 
-##  ATTENZIONE - Script Avanzato
+## WARNING - Advanced Script
 
-Questo script configura upgrade **AUTOMATICI** di CheckMK tramite crontab. Si tratta di un'operazione potenzialmente rischiosa che deve essere configurata con attenzione.
+This script sets up **AUTOMATIC** CheckMK upgrades via crontab. This is a potentially risky operation that must be configured carefully.
 
-## Descrizione
+## Description
 
-Script per pianificare upgrade automatici di CheckMK RAW Edition. Il sistema verificherà periodicamente la disponibilità di nuove versioni ed eseguirà l'upgrade in modo completamente automatico e non interattivo.
+Script to schedule automatic upgrades of CheckMK RAW Edition. The system will periodically check for the availability of new versions and perform the upgrade completely automatically and non-interactively.
 
-## Componenti
+## Components
 
-### 1. Script Full (Interattivo)
+### 1. Script Full (Interactive)
 **Path:** `script-tools/full/upgrade_maintenance/setup-auto-upgrade-checkmk.sh`
 
-Versione completa con interfaccia interattiva per configurare gli upgrade automatici.
+Full version with interactive interface to configure automatic upgrades.
 
 ### 2. Remote Launcher
 **Path:** `script-tools/remote/rsetup-auto-upgrade-checkmk.sh`
 
-Launcher che scarica ed esegue lo script completo direttamente da GitHub.
+Launcher that downloads and runs the complete script directly from GitHub.
 
-### 3. Script di Upgrade
-**Dipendenza:** `script-tools/full/upgrade_maintenance/upgrade-checkmk.sh`
+### 3. Upgrade Script
+**Dependency:** `script-tools/full/upgrade_maintenance/upgrade-checkmk.sh`
 
-Script che esegue effettivamente l'upgrade di CheckMK (deve essere presente).
+Script that actually upgrades CheckMK (must be present).
 
-## Caratteristiche di Sicurezza
+## Security Features
 
--  **Backup automatico** prima di ogni upgrade
--  **Upgrade non interattivo** completamente automatizzato
--  **Logging dettagliato** di tutte le operazioni
--  **Notifiche email** opzionali per successo/fallimento
--  **Verifica versione** - upgrade solo se disponibile nuova versione
--  **Riavvio automatico** del sito CheckMK dopo upgrade
--  **Backup crontab** prima di modifiche
--  **Gestione duplicati** nel crontab
+- **Automatic backup** before each upgrade
+- Fully automated **non-interactive upgrade**
+- **Detailed logging** of all operations
+- Optional **email notifications** for success/failure
+- **Check version** - upgrade only if new version available
+- **Automatic restart** of CheckMK site after upgrade
+- **Backup crontab** before changes
+- **Duplicate management** in crontab
 
-## Prerequisiti
+## Prerequisites
 
-### Software Richiesto
-- CheckMK RAW Edition installato
-- Comando `omd` disponibile
-- Permessi root (sudo)
-- `curl`, `wget`, `dpkg` installati
-- Script `upgrade-checkmk.sh` presente in `script-tools/full/upgrade_maintenance/`
+### Software Required
+- CheckMK RAW Edition installed
+- `omd` command available
+- Root permissions (sudo)
+- `curl`, `wget`, `dpkg` installed
+- `upgrade-checkmk.sh` script present in `script-tools/full/upgrade_maintenance/`
 
-### Opzionale
-- `mailutils` per notifiche email
+### Optional
+- `mailutils` for email notifications
 
 ```bash
-# Installa mailutils se vuoi le notifiche email
+# Install mailutils if you want email notifications
 apt install mailutils
 ```
 
-## Utilizzo
+## Usage
 
-### Esecuzione Locale (Interattiva)
+### Local Execution (Interactive)
 
 ```bash
-# Dalla cartella dello script
+# From the script folder
 cd /path/to/script-tools/full
 sudo bash setup-auto-upgrade-checkmk.sh
 ```
 
-### Esecuzione Remota
+### Remote Execution
 
 ```bash
-# Download ed esecuzione in un comando
+# Download and run in one command
 bash <(curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/remote/rsetup-auto-upgrade-checkmk.sh)
 ```
 
-## Opzioni di Pianificazione
+## Scheduling Options
 
-### 1. Settimanale (CONSIGLIATO)
-- **Frequenza:** Ogni domenica
-- **Orario default:** 02:00
+### 1. Weekly (RECOMMENDED)
+- **Frequency:** Every Sunday
+- **Default time:** 02:00
 - **Cron:** `0 2 * * 0`
-- **Pro:** Bilancia sicurezza e aggiornamenti tempestivi
+- **Pros:** Balance security and timely updates
 
-### 2. Mensile
-- **Frequenza:** 1° giorno del mese
-- **Orario default:** 02:00
-- **Cron:** `0 2 1 * *`
-- **Pro:** Massima stabilità, tempo per testare nuove versioni
+### 2. Monthly
+- **Frequency:** 1st day of the month
+- **Default time:** 02:00
+- **Chron:** `0 2 1 * *`
+- **Pros:** Maximum stability, time to test new versions
 
-### 3. Personalizzato
-- **Frequenza:** Inserimento manuale
-- **Formato:** `minuto ora giorno mese giornosettimana`
-- **Esempio:** `0 3 1,15 * *` (1° e 15° del mese alle 03:00)
+### 3. Customized
+- **Frequency:** Manual entry
+- **Format:** `minute hour day month weekday`
+- **Example:** `0 3 1.15 * *` (1st and 15th of the month at 03:00)
 
-## Menu Interattivo
+## Interactive Menu
 
 ```
-╔════════════════════════════════════════════════════════════════╗
-║    Configurazione Upgrade Automatici CheckMK                  ║
-╚════════════════════════════════════════════════════════════════╝
+╔════════════════════════════════ ════════════════════════════════╗
+║ CheckMK Automatic Upgrade Configuration ║
+╚════════════════════════════════ ════════════════════════════════╝
 
-ATTENZIONE: Stai per configurare upgrade AUTOMATICI di CheckMK!
+ATTENTION: You are about to set up AUTOMATIC CheckMK upgrades!
 
-Considerazioni importanti:
-  - Lo script farà backup automatico prima di ogni upgrade
-  - L'upgrade sarà completamente non interattivo
-  - Il sito CheckMK sarà riavviato durante l'upgrade
-  - Gli upgrade avverranno SOLO se disponibile una nuova versione
+Important considerations:
+  - The script will make automatic backup before each upgrade
+  - The upgrade will be completely non-interactive
+  - The CheckMK site will be restarted during the upgrade
+  - Upgrades will ONLY occur if a new version is available
 
-Sei sicuro di voler procedere? [s/N]:
+Are you sure you want to proceed? [y/N]:
 
-Seleziona la frequenza degli upgrade automatici:
+Select the frequency of automatic upgrades:
 
-  1) Settimanale  - Ogni domenica alle 02:00 (CONSIGLIATO)
-  2) Mensile      - Il primo giorno del mese alle 02:00
-  3) Personalizzato - Specifica orario e frequenza custom
-  4) Annulla
+  1) Weekly - Every Sunday at 02:00 (RECOMMENDED)
+  2) Monthly - The first day of the month at 02:00
+  3) Custom - Specify custom time and frequency
+  4) Cancel
 
-Scelta [1-4]:
+Choice [1-4]:
 ```
 
-## File di Log
+## Log files
 
-### Posizione
+### Location
 ```
 /var/log/auto-upgrade-checkmk.log
 ```
 
-### Formato Log
+### Log Format
 ```
 [Sun Jan 12 02:00:01 2026] Starting CheckMK auto-upgrade
-[INFO] Sito: mysite
-[INFO] Versione corrente: 2.3.0p1
-[INFO] Ultima versione:   2.3.0p2
-Aggiornamento previsto: 2.3.0p1 -> 2.3.0p2
-[INFO] Backup: /opt/omd/backups/mysite_pre-upgrade_20260112_020015.tar.gz
+[INFO] Site: mysite
+[INFO] Current version: 2.3.0p1
+[INFO] Latest version: 2.3.0p2
+Expected update: 2.3.0p1 -> 2.3.0p2
+[INFO] Backups: /opt/omd/backups/mysite_pre-upgrade_20260112_020015.tar.gz
 [INFO] Download: https://download.checkmk.com/checkmk/2.3.0p2/...
-[INFO] Installazione pacchetto (.deb)
-[INFO] Stop sito: mysite
-[INFO] Upgrade sito (omd update) - modalità automatica
-[INFO] Start sito: mysite
-[INFO] Versione dopo upgrade: 2.3.0p2
+[INFO] Package installation (.deb)
+[INFO] Stop site: mysite
+[INFO] Site upgrade (omd update) - automatic mode
+[INFO] Start site: mysite
+[INFO] Version after upgrade: 2.3.0p2
 [Sun Jan 12 02:08:45 2026] CheckMK upgrade completed successfully
 ```
 
-### Monitoraggio Log
+### Log monitoring
 ```bash
-# Visualizzare gli ultimi upgrade
+# View the latest upgrades
 tail -f /var/log/auto-upgrade-checkmk.log
 
-# Vedere le ultime 100 righe
+# See last 100 lines
 tail -n 100 /var/log/auto-upgrade-checkmk.log
 
-# Cercare errori
+# Look for errors
 grep -i error /var/log/auto-upgrade-checkmk.log
 
-# Vedere tutti gli upgrade completati
+# See all completed upgrades
 grep "upgrade completed successfully" /var/log/auto-upgrade-checkmk.log
 ```
 
-## Notifiche Email
+## Email notifications
 
-### Configurazione
-Durante la configurazione, lo script chiede se vuoi ricevere notifiche email:
+### Configuration
+During setup, the script asks if you want to receive email notifications:
 
 ```bash
-Vuoi ricevere notifiche email sui risultati degli upgrade? [s/N]: s
-Inserisci l'indirizzo email: admin@example.com
+Do you want to receive email notifications about upgrade results? [y/N]: yes
+Enter your email address: admin@example.com
 ```
 
-### Formato Email - Successo
+### Email Format - Success
 ```
 Subject: CheckMK Auto-Upgrade Report
-Body: CheckMK upgrade completato su monitor01 alle Sun Jan 12 02:08:45 2026
+Body: CheckMK upgrade completed on monitor01 at Sun Jan 12 02:08:45 2026
 ```
 
-### Formato Email - Errore
+### Email Format - Error
 ```
 Subject: [ERROR] CheckMK Auto-Upgrade Failed
-Body: CheckMK upgrade fallito su monitor01 alle Sun Jan 12 02:15:30 2026
+Body: CheckMK upgrade failed on monitor01 at Sun Jan 12 02:15:30 2026
 ```
 
-## Backup e Ripristino
+## Backup and Restore
 
-### Backup Automatici CheckMK
-Prima di ogni upgrade viene creato un backup completo:
+### CheckMK Automatic Backups
+Before each upgrade a complete backup is created:
 ```
 /opt/omd/backups/
 ├── mysite_pre-upgrade_20260112_020015.tar.gz
@@ -189,15 +189,15 @@ Prima di ogni upgrade viene creato un backup completo:
 └── mysite_pre-upgrade_20260126_020009.tar.gz
 ```
 
-### Ripristino Backup CheckMK
+### Restore Backup CheckMK
 ```bash
-# Lista backup disponibili
+# List of available backups
 ls -lh /opt/omd/backups/
 
-# Ripristina un backup specifico
+# Restore a specific backup
 omd restore mysite /opt/omd/backups/mysite_pre-upgrade_20260112_020015.tar.gz
 
-# Verifica ripristino
+# Verify recovery
 omd status mysite
 ```
 
@@ -207,92 +207,92 @@ omd status mysite
 └── crontab_backup_20260112_100530.txt
 ```
 
-### Ripristino Crontab
+### Restore Crontab
 ```bash
-# Visualizza backup disponibili
+# View available backups
 ls -lh /root/crontab_backups/
 
-# Ripristina un backup specifico
+# Restore a specific backup
 crontab /root/crontab_backups/crontab_backup_20260112_100530.txt
 
-# Verifica ripristino
+# Verify recovery
 crontab -l
 ```
 
-## Gestione Crontab
+## Crontab management
 
-### Visualizzare Entry Correnti
+### View Current Entries
 ```bash
 crontab -l
 ```
 
-### Modificare Manualmente
+### Edit Manually
 ```bash
 crontab -e
 ```
 
-### Rimuovere Auto-Upgrade CheckMK
+### Remove Auto-Upgrade CheckMK
 ```bash
 crontab -l | grep -v "upgrade-checkmk.sh" | crontab -
 ```
 
 ## Best Practices
 
-### 1.  Orario di Esecuzione
-- **Consigliato:** 02:00-04:00 (basso traffico)
-- **Evita:** Ore di punta e orari lavorativi
-- **Weekend:** Preferibile per sistemi di produzione
-- **Considera:** Fuso orario del server
+### 1. Execution Time
+- **Recommended:** 02:00-04:00 (low traffic)
+- **Avoid:** Rush hours and business hours
+- **Weekend:** Preferable for production systems
+- **Consider:** Server time zone
 
-### 2.  Frequenza Upgrade
-- **Produzione critica:** Mensile + test preventivi su ambiente staging
-- **Produzione standard:** Settimanale
-- **Sviluppo/Test:** Anche settimanale va bene
-- **Mai:** Giornaliero (troppo rischioso)
+### 2. Upgrade Frequency
+- **Critical production:** Monthly + preventive tests on staging environment
+- **Standard production:** Weekly
+- **Development/Testing:** Weekly is fine too
+- **Never:** Daily (too risky)
 
-### 3.  Monitoraggio
-- Controlla i log **dopo ogni upgrade automatico**
-- Imposta alert per fallimenti
-- Verifica funzionamento CheckMK post-upgrade
-- Controlla spazio disco per backup
+### 3. Tracking
+- Check logs **after each automatic upgrade**
+- Set alerts for failures
+- Check CheckMK operation post-upgrade
+- Check disk space for backup
 
-### 4.  Gestione Backup
-- I backup si accumulano in `/opt/omd/backups/`
-- Implementa rotazione backup (mantieni ultimi 5-10)
-- Verifica regolarmente l'integrità dei backup
-- Considera backup esterni aggiuntivi
+### 4. Backup Management
+- Backups accumulate in `/opt/omd/backups/`
+- Implement backup rotation (keep last 5-10)
+- Regularly check the integrity of backups
+- Consider additional external backups
 
-### 5.  Testing
-- **Prima volta:** Testa l'upgrade manuale
-- **Staging:** Prova su ambiente di test prima
-- **Verifica:** Controlla il primo upgrade automatico
-- **Rollback:** Preparati a ripristinare se necessario
+### 5. Testing
+- **First time:** Test the manual upgrade
+- **Staging:** Test on test environment first
+- **Check:** Check the first automatic upgrade
+- **Rollback:** Be prepared to rollback if necessary
 
-### 6.  Notifiche
-- Configura email per amministratori
-- Integra con sistemi di monitoring esistenti
-- Verifica che le email arrivino correttamente
-- Test iniziale di invio email
+### 6. Notifications
+- Configure email for administrators
+- Integrate with existing monitoring systems
+- Check that emails arrive correctly
+- Initial email sending test
 
-## Script di Manutenzione
+## Maintenance Script
 
-### Pulizia Backup Vecchi
+### Cleaning Old Backups
 ```bash
 #!/bin/bash
-# Mantieni solo gli ultimi 5 backup per ogni sito
+# Keep only the latest 5 backups for each site
 cd /opt/omd/backups/
 for site in $(omd sites | awk '{print $1}' | grep -v SITE); do
     ls -t ${site}_pre-upgrade_*.tar.gz | tail -n +6 | xargs -r rm
 done
 ```
 
-### Rotazione Log
+### Log Rotation
 ```bash
-# Aggiungi a /etc/logrotate.d/checkmk-auto-upgrade
+# Add to /etc/logrotate.d/checkmk-auto-upgrade
 /var/log/auto-upgrade-checkmk.log {
     weekly
     rotate 12
-    compress
+    compressed
     delaycompress
     missingok
     notifempty
@@ -301,139 +301,138 @@ done
 
 ## Troubleshooting
 
-### Upgrade non viene eseguito
+### Upgrade fails
 
-**1. Verifica cron attivo:**
+**1. Check active cron:**
 ```bash
 systemctl status cron
 systemctl start cron
 ```
 
-**2. Controlla entry crontab:**
+**2. Check crontab entry:**
 ```bash
 crontab -l | grep upgrade-checkmk
 ```
 
-**3. Controlla log cron:**
+**3. Check cron log:**
 ```bash
 grep CRON /var/log/syslog | grep upgrade-checkmk
 ```
 
-**4. Test manuale:**
+**4. Manual test:**
 ```bash
 bash /path/to/upgrade-checkmk.sh
 ```
 
-### Upgrade fallisce
+### Upgrade fails
 
-**1. Controlla log dettagliato:**
+**1. Check detailed log:**
 ```bash
 tail -n 200 /var/log/auto-upgrade-checkmk.log
 ```
 
-**2. Verifica spazio disco:**
+**2. Check disk space:**
 ```bash
 df -h
 ```
 
-**3. Controlla dipendenze:**
+**3. Check dependencies:**
 ```bash
 apt-get -f install
 ```
 
-**4. Verifica download:**
+**4. Check download:**
 ```bash
 ls -lh /tmp/checkmk-upgrade/
 ```
 
-### Email non arrivano
+### Emails not arriving
 
-**1. Verifica mailutils installato:**
+**1. Check installed mailutils:**
 ```bash
 dpkg -l | grep mailutils
 apt install mailutils
 ```
 
-**2. Test invio email:**
+**2. Email sending test:**
 ```bash
 echo "Test email" | mail -s "Test" your@email.com
 ```
-
-**3. Controlla configurazione mail:**
+**3. Check email configuration:**
 ```bash
 cat /etc/postfix/main.cf
 ```
 
-### Interfaccia interattiva appare ancora
+### Interactive interface appears again
 
-**1. Verifica parametri omd update:**
+**1. Check omd update parameters:**
 ```bash
-# Controlla nel log se usa -f e --conflict=install
+# Check the log to see if it uses -f and --conflict=install
 grep "omd update" /var/log/auto-upgrade-checkmk.log
 ```
 
-**2. Aggiungi protezioni extra** (modifica upgrade-checkmk.sh):
+**2. Add extra protections** (edit upgrade-checkmk.sh):
 ```bash
 DEBIAN_FRONTEND=noninteractive omd -f update --conflict=install "$SITE_NAME" < /dev/null
 ```
 
-## Disinstallazione
+## Uninstall
 
-### Rimozione Completa
+### Complete Removal
 ```bash
-# 1. Rimuovi entry crontab
+#1. Remove crontab entry
 crontab -l | grep -v "upgrade-checkmk.sh" | grep -v "^# Auto-upgrade CheckMK:" | crontab -
 
-# 2. Rimuovi log
+#2. Remove logs
 rm /var/log/auto-upgrade-checkmk.log
 
-# 3. (Opzionale) Rimuovi backup crontab
+#3. (Optional) Remove crontab backup
 rm -rf /root/crontab_backups/
 
-# 4. (Opzionale) Rimuovi backup CheckMK vecchi
+#4. (Optional) Remove old CheckMK backups
 cd /opt/omd/backups/
 rm *_pre-upgrade_*.tar.gz
 ```
 
-### Sospensione Temporanea
+### Temporary Suspension
 ```bash
-# Commenta la riga nel crontab (aggiungi # all'inizio)
+# Comment out the line in the crontab (add # to the beginning)
 crontab -e
 ```
 
-## Esempi di Configurazione
+## Configuration Examples
 
-### Setup Conservativo (Produzione)
+### Conservative Setup (Production)
 ```
-Frequenza: Mensile
-Orario: 02:00 domenica notte
-Email: Sì
-Log: Monitora settimanalmente
-Backup: Mantieni ultimi 12 mesi
-```
-
-### Setup Bilanciato (Consigliato)
-```
-Frequenza: Settimanale (domenica)
-Orario: 02:00
-Email: Sì
-Log: Monitora mensilmente
-Backup: Mantieni ultimi 3 mesi
+Frequency: Monthly
+Time: 02:00 Sunday night
+Email: Yes
+Log: Monitor weekly
+Backup: Keep last 12 months
 ```
 
-### Setup Aggressivo (Solo Development)
+### Balanced Setup (Recommended)
 ```
-Frequenza: Settimanale (qualsiasi giorno)
-Orario: 03:00
-Email: Opzionale
-Log: Controlla se fallisce
-Backup: Mantieni ultimo mese
+Frequency: Weekly (Sunday)
+Time: 02:00
+Email: Yes
+Log: Monitor monthly
+Backup: Keep last 3 months
 ```
 
-## Integrazione con Monitoring
+### Aggressive Setup (Development Only)
+```
+Frequency: Weekly (any day)
+Time: 03:00
+Email: Optional
+Log: Check if it fails
+Backup: Keep last month
+```
+
+## Integration with Monitoring
 
 ### CheckMK Self-Monitoring
-Crea un check locale per monitorare gli upgrade automatici:
+Create a local check to monitor automatic upgrades:
 
 ```bash
 # /usr/lib/check_mk_agent/local/check_auto_upgrade
@@ -451,69 +450,69 @@ else
 fi
 ```
 
-## Sicurezza e Responsabilità
+## Safety and Responsibility
 
-###  Disclaimer
-- Gli upgrade automatici comportano rischi intrinseci
-- Testa sempre in ambiente di staging prima
-- Mantieni backup esterni e indipendenti
-- Monitora attivamente il sistema post-upgrade
-- Preparati a interventi manuali in caso di problemi
+### Disclaimer
+- Automatic upgrades carry inherent risks
+- Always test in staging environment first
+- Maintain external and independent backups
+- Actively monitor the system post-upgrade
+- Be prepared for manual intervention in case of problems
 
-###  Raccomandazioni di Sicurezza
-1. **Backup esterni** oltre a quelli automatici
-2. **Ambiente di test** per validare upgrade
-3. **Documentazione** delle configurazioni custom
-4. **Piano di rollback** testato e documentato
-5. **Contatti reperibili** durante finestre di upgrade
-6. **Monitoraggio attivo** post-upgrade
+### Safety Recommendations
+1. **External backups** in addition to automatic ones
+2. **Test environment** to validate upgrades
+3. **Documentation** of custom configurations
+4. **Rollback plan** tested and documented
+5. **Contacts available** during upgrade windows
+6. **Active monitoring** post-upgrade
 
-## Supporto e Contributi
+## Support and Contributions
 
 - **Repository:** https://github.com/Coverup20/checkmk-tools
 - **Issues:** https://github.com/Coverup20/checkmk-tools/issues
-- **Documentazione:** `script-tools/doc/`
+- **Documentation:** `script-tools/doc/`
 
 ## Changelog
 
 ### Version 1.0 (2026-01-12)
-- Release iniziale
-- Menu interattivo con opzioni di frequenza
-- Notifiche email opzionali
-- Logging completo
-- Backup automatici
-- Upgrade completamente non-interattivo
-- Gestione duplicati crontab
-- Validazione input
+- Initial release
+- Interactive menu with frequency options
+- Optional email notifications
+- Complete logging
+- Automatic backups
+- Completely non-interactive upgrade
+- Management of crontab duplicates
+- Input validation
 
-## Licenza
+## License
 
-Questo script fa parte del progetto checkmk-tools.
+This script is part of the checkmk-tools project.
 
-## Note Finali
+## Final Notes
 
- **IMPORTANTE:**
-- Questo è uno strumento potente ma potenzialmente pericoloso
-- Usalo SOLO se comprendi completamente i rischi
-- Per sistemi critici, considera upgrade manuali con test preventivi
-- Gli upgrade possono richiedere riavvii del server
-- Non tutti gli upgrade sono backward-compatible
+ **IMPORTANT:**
+- This is a powerful but potentially dangerous tool
+- ONLY use it if you completely understand the risks
+- For critical systems, consider manual upgrades with preventive testing
+- Upgrades may require server reboots
+- Not all upgrades are backward-compatible
 
- **QUANDO USARLO:**
-- Ambienti di sviluppo/test
-- Sistemi non critici
-- Con monitoring attivo e alerting
-- Con backup esterni robusti
-- Quando hai competenza per gestire problemi
+ **WHEN TO USE IT:**
+- Development/test environments
+- Non-critical systems
+- With active monitoring and alerting
+- With robust external backups
+- When you have competence to handle problems
 
- **QUANDO NON USARLO:**
-- Sistemi critici di produzione senza test
-- Se non hai familiarità con CheckMK
-- Senza piano di disaster recovery
-- Senza possibilità di intervento rapido
-- In ambienti con SLA stringenti
+ **WHEN NOT TO USE IT:**
+- Production critical systems without testing
+- If you are not familiar with CheckMK
+- Without disaster recovery plan
+- Without the possibility of rapid intervention
+- In environments with stringent SLAs
 
- **RISORSE UTILI:**
+ **USEFUL RESOURCES:**
 - [CheckMK Official Documentation](https://docs.checkmk.com/)
 - [OMD Update Guide](https://docs.checkmk.com/latest/en/update.html)
 - [CheckMK Backup/Restore](https://docs.checkmk.com/latest/en/backup.html)

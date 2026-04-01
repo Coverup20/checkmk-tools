@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check_postfix_process.py - CheckMK Local Check for Postfix process count
+"""check_postfix_process.py - CheckMK Local Check for Postfix process count
 
 Count running Postfix processes via pgrep.
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -17,12 +15,10 @@ SERVICE_NAME = "Postfix-processes"
 
 
 def count_postfix_processes() -> int:
-    """
-    Count running Postfix processes.
+    """Count running Postfix processes.
     
     Returns:
-        Number of Postfix processes
-    """
+        Number of Postfix processes"""
     try:
         result = subprocess.run(
             ["pgrep", "-c", "-f", "postfix"],
@@ -43,12 +39,10 @@ def count_postfix_processes() -> int:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     proc_count = count_postfix_processes()
     
     if proc_count > 0:

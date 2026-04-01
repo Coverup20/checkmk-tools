@@ -1,6 +1,6 @@
-# Script di Backup Veloce Repository CheckMK-Tools
-# Versione QUICK senza controllo integrita (da usare dopo check-integrity.ps1)
-# Ottimizzato per workflow conversione Python
+# Quick Backup Script Repository CheckMK-Tools
+# QUICK version without integrity check (to be used after check-integrity.ps1)
+# Optimized for Python conversion workflow
 
 param(
     [switch]$Unattended
@@ -8,7 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# === CONFIGURAZIONE ===
+# === CONFIGURATION ===
 $REPO_PATH = "C:\Users\Marzio\Desktop\CheckMK\checkmk-tools"
 $LOCAL_BACKUP_BASE = "C:\CheckMK-Backups"
 $NETWORK_BACKUP_BASE = "\\192.168.10.132\usbshare\CheckMK-Backups"
@@ -17,7 +17,7 @@ $LOCAL_BACKUP_PATH = Join-Path $LOCAL_BACKUP_BASE $TIMESTAMP
 $NETWORK_BACKUP_PATH = Join-Path $NETWORK_BACKUP_BASE $TIMESTAMP
 $RETENTION_COUNT = 20
 
-# === CONFIGURAZIONE EMAIL ===
+# === EMAIL CONFIGURATION ===
 $SMTP_SERVER = "smtp-relay.nethesis.it"
 $SMTP_PORT = 587
 $SMTP_USE_SSL = $true
@@ -26,33 +26,33 @@ $EMAIL_TO = "marzio@nethesis.it"
 $EMAIL_CREDENTIAL_FILE = Join-Path $LOCAL_BACKUP_BASE "smtp_credential.xml"
 $SEND_EMAIL = $true
 
-# === VARIABILI GLOBALI PER EMAIL ERRORE ===
+# === GLOBAL VARIABLES FOR EMAIL ERROR ===
 $GLOBAL_ERROR_MESSAGE = ""
 
 Write-Host ""
 Write-Host "================================================================"
-Write-Host "     BACKUP VELOCE REPOSITORY CHECKMK-TOOLS"
+Write-Host "FAST BACKUP REPOSITORY CHECKMK-TOOLS"
 Write-Host "================================================================"
 Write-Host ""
-Write-Host "[INFO] Modalita QUICK - controllo integrita DISABILITATO" -ForegroundColor Cyan
-Write-Host "[INFO] Eseguire check-integrity.ps1 separatamente se necessario" -ForegroundColor Gray
+Write-Host "[INFO] QUICK mode - integrity check DISABLED" -ForegroundColor Cyan
+Write-Host "[INFO] Run check-integrity.ps1 separately if necessary" -ForegroundColor Gray
 Write-Host ""
 
-# === INIZIO TRY GLOBALE PER GESTIONE ERRORI ===
+# === START GLOBAL TRY FOR ERROR MANAGEMENT ===
 try {
 
-# Crea cartella backup se non esiste
+# Create backup folder if it does not exist
 if (-not (Test-Path $LOCAL_BACKUP_BASE)) {
     New-Item -ItemType Directory -Path $LOCAL_BACKUP_BASE -Force | Out-Null
 }
 
-# Verifica che il repository esista
+# Verify that the repository exists
 if (-not (Test-Path $REPO_PATH)) {
-    Write-Host "[ERRORE] Repository non trovato: $REPO_PATH" -ForegroundColor Red
+    Write-Host "[ERROR] Repository not found: $REPO_PATH" -ForegroundColor Red
     throw "Repository non trovato: $REPO_PATH"
 }
 
-# Conta tutti i file per il backup (con filtri di esclusione)
+# Count all files for backup (with exclusion filters)
 $allFiles = Get-ChildItem -Path $REPO_PATH -Recurse -File -ErrorAction SilentlyContinue | 
     Where-Object { 
         $_.FullName -notmatch '\\\.git\\' -and
@@ -64,39 +64,39 @@ $allFiles = Get-ChildItem -Path $REPO_PATH -Recurse -File -ErrorAction SilentlyC
 $totalFiles = $allFiles.Count
 
 if ($totalFiles -eq 0) {
-    Write-Host "[ERRORE] Nessun file trovato nel repository!" -ForegroundColor Red
+    Write-Host "[ERROR] No files found in the repository!" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "[INFO] Trovati $totalFiles file da backuppare" -ForegroundColor Cyan
+Write-Host "[INFO] $totalFiles files to backup found" -ForegroundColor Cyan
 Write-Host ""
 
 if (-not $Unattended) {
-    Write-Host "Premi un tasto per continuare con il backup..." -ForegroundColor Yellow
+    Write-Host "Press any key to continue with the backup..." -ForegroundColor Yellow
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
     Write-Host ""
 }
 
-# === BACKUP LOCALE ===
+# === LOCAL BACKUP ===
 Write-Host "================================================================"
-Write-Host "    BACKUP LOCALE"
+Write-Host "LOCAL BACKUP"
 Write-Host "================================================================"
 Write-Host ""
 Write-Host "[INFO] Destinazione: $LOCAL_BACKUP_PATH" -ForegroundColor Gray
 Write-Host ""
 
-# Crea cartella backup
+# Create backup folder
 try {
     New-Item -ItemType Directory -Path $LOCAL_BACKUP_PATH -Force | Out-Null
-    Write-Host "[OK] Cartella backup creata" -ForegroundColor Green
+    Write-Host "[OK] Backup folder created" -ForegroundColor Green
 } catch {
-    Write-Host "[ERRORE] Impossibile creare cartella backup: $_" -ForegroundColor Red
+    Write-Host "[ERROR] Failed to create backup folder: $_" -ForegroundColor Red
     exit 1
 }
 
-# Copia file
+# Copy files
 Write-Host ""
-Write-Host "[INFO] Copia file in corso..." -ForegroundColor Cyan
+Write-Host "[INFO] Copying files..." -ForegroundColor Cyan
 
 $copiedFiles = 0
 $errorCount = 0
@@ -115,45 +115,45 @@ foreach ($file in $allFiles) {
         $copiedFiles++
         
         if ($copiedFiles % 50 -eq 0) {
-            Write-Host "  Copiati $copiedFiles / $totalFiles file..." -ForegroundColor Gray
+            Write-Host "Copied $copiedFiles / $totalFiles file..." -ForegroundColor Gray
         }
     } catch {
         $errorCount++
-        Write-Host "[WARN] Errore copia file $relativePath" -ForegroundColor Yellow
+        Write-Host "[WARN] $relativePath file copy error" -ForegroundColor Yellow
     }
 }
 
-Write-Host "[OK] Completato: $copiedFiles file copiati" -ForegroundColor Green
+Write-Host "[OK] Completed: $copiedFiles copied files" -ForegroundColor Green
 
 if ($errorCount -gt 0) {
-    Write-Host "[WARN] $errorCount file non copiati" -ForegroundColor Yellow
+    Write-Host "[WARN] $errorCount files not copied" -ForegroundColor Yellow
 }
 
-# Calcola dimensione backup locale
+# Calculate local backup size
 $backupSize = (Get-ChildItem -Path $LOCAL_BACKUP_PATH -Recurse -File | Measure-Object -Property Length -Sum).Sum / 1MB
 
-# === BACKUP SU RETE ===
+# === NETWORK BACKUP ===
 Write-Host ""
 Write-Host "================================================================"
-Write-Host "    BACKUP SU RETE"
+Write-Host "NETWORK BACKUP"
 Write-Host "================================================================"
 Write-Host ""
 
 $networkCopied = 0
 $networkSuccess = $false
 
-# Verifica connessione rete
+# Check network connection
 if (Test-Path $NETWORK_BACKUP_BASE) {
-    Write-Host "[INFO] Share di rete raggiungibile" -ForegroundColor Green
+    Write-Host "[INFO] Reachable network share" -ForegroundColor Green
     Write-Host "[INFO] Destinazione: $NETWORK_BACKUP_PATH" -ForegroundColor Gray
     Write-Host ""
     
     try {
-        # Crea cartella backup di rete
+        # Create network backup folder
         New-Item -ItemType Directory -Path $NETWORK_BACKUP_PATH -Force -ErrorAction Stop | Out-Null
-        Write-Host "[OK] Cartella backup rete creata" -ForegroundColor Green
+        Write-Host "[OK] Network backup folder created" -ForegroundColor Green
         Write-Host ""
-        Write-Host "[INFO] Copia file su rete in corso..." -ForegroundColor Cyan
+        Write-Host "[INFO] Copying files to network..." -ForegroundColor Cyan
         
         # Copia ricorsiva
         foreach ($file in $allFiles) {
@@ -170,42 +170,42 @@ if (Test-Path $NETWORK_BACKUP_BASE) {
                 $networkCopied++
                 
                 if ($networkCopied % 50 -eq 0) {
-                    Write-Host "  Copiati $networkCopied / $totalFiles file..." -ForegroundColor Gray
+                    Write-Host "Copied $networkCopied / $totalFiles files..." -ForegroundColor Gray
                 }
             } catch {
-                Write-Host "[WARN] Errore copia file $relativePath su rete" -ForegroundColor Yellow
+                Write-Host "[WARN] Error copying $relativePath file over network" -ForegroundColor Yellow
             }
         }
         
-        Write-Host "[OK] Backup rete completato: $networkCopied file copiati" -ForegroundColor Green
+        Write-Host "[OK] Network backup complete: $networkCopied files copied" -ForegroundColor Green
         $networkSuccess = $true
         
     } catch {
-        Write-Host "[ERRORE] Backup su rete fallito: $_" -ForegroundColor Red
-        Write-Host "[INFO] Il backup locale e comunque disponibile" -ForegroundColor Yellow
+        Write-Host "[ERROR] Network backup failed: $_" -ForegroundColor Red
+        Write-Host "[INFO] Local backup is still available" -ForegroundColor Yellow
     }
 } else {
-    Write-Host "[WARN] Share di rete non raggiungibile: $NETWORK_BACKUP_BASE" -ForegroundColor Yellow
-    Write-Host "[INFO] Continuo solo con backup locale" -ForegroundColor Yellow
+    Write-Host "[WARN] Network share unreachable: $NETWORK_BACKUP_BASE" -ForegroundColor Yellow
+    Write-Host "[INFO] I continue only with local backup" -ForegroundColor Yellow
 }
 
 # === STATISTICHE ===
 Write-Host ""
 Write-Host "================================================================"
-Write-Host "    STATISTICHE BACKUP"
+Write-Host "BACKUP STATISTICS"
 Write-Host "================================================================"
 Write-Host ""
 Write-Host "  LOCALE:" -ForegroundColor Cyan
-Write-Host "    File copiati:     $copiedFiles" -ForegroundColor Gray
-Write-Host "    Dimensione:       $([math]::Round($backupSize, 2)) MB" -ForegroundColor Gray
-Write-Host "    Percorso:         $LOCAL_BACKUP_PATH" -ForegroundColor Gray
+Write-Host "Copied files: $copiedFiles" -ForegroundColor Gray
+Write-Host "Size: $([math]::Round($backupSize, 2)) MB" -ForegroundColor Gray
+Write-Host "Path: $LOCAL_BACKUP_PATH" -ForegroundColor Gray
 Write-Host ""
 if ($networkSuccess) {
-    Write-Host "  RETE:" -ForegroundColor Cyan
-    Write-Host "    File copiati:     $networkCopied" -ForegroundColor Gray
-    Write-Host "    Percorso:         $NETWORK_BACKUP_PATH" -ForegroundColor Gray
+    Write-Host "NET:" -ForegroundColor Cyan
+    Write-Host "Files copied: $networkCopied" -ForegroundColor Gray
+    Write-Host "Path: $NETWORK_BACKUP_PATH" -ForegroundColor Gray
 } else {
-    Write-Host "  RETE: Non disponibile" -ForegroundColor Yellow
+    Write-Host "NETWORK: Not available" -ForegroundColor Yellow
 }
 Write-Host ""
 Write-Host "  Timestamp:        $TIMESTAMP" -ForegroundColor Gray
@@ -213,7 +213,7 @@ Write-Host ""
 
 # === RETENTION POLICY ===
 Write-Host "================================================================"
-Write-Host "    PULIZIA BACKUP VECCHI (Retention)"
+Write-Host "CLEANING OLD BACKUPS (Retention)"
 Write-Host "================================================================"
 Write-Host ""
 
@@ -222,34 +222,34 @@ $existingBackups = Get-ChildItem -Path $LOCAL_BACKUP_BASE -Directory |
     Sort-Object Name -Descending
 
 $backupCount = $existingBackups.Count
-Write-Host "[INFO] Backup totali: $backupCount (retention: $RETENTION_COUNT)" -ForegroundColor Cyan
+Write-Host "[INFO] Total backups: $backupCount (retention: $RETENTION_COUNT)" -ForegroundColor Cyan
 
 if ($backupCount -gt $RETENTION_COUNT) {
     $toDelete = $backupCount - $RETENTION_COUNT
-    Write-Host "[INFO] Verranno eliminati $toDelete backup piu vecchi..." -ForegroundColor Yellow
+    Write-Host "[INFO] $toDelete older backups will be deleted..." -ForegroundColor Yellow
     Write-Host ""
     
     $backupsToDelete = $existingBackups | Select-Object -Skip $RETENTION_COUNT
     
     foreach ($backup in $backupsToDelete) {
         try {
-            Write-Host "  [DELETE] $($backup.Name)" -ForegroundColor Gray
+            Write-Host "[DELETE] $($backup.Name)" -ForegroundColor Gray
             Remove-Item -Path $backup.FullName -Recurse -Force -ErrorAction Stop
-            Write-Host "     [OK] Eliminato" -ForegroundColor Green
+            Write-Host "[OK] Deleted" -ForegroundColor Green
         } catch {
-            Write-Host "     [ERRORE] $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "[ERROR] $($_.Exception.Message)" -ForegroundColor Red
         }
     }
     
     Write-Host ""
-    Write-Host "[OK] Pulizia completata: mantenuti gli ultimi $RETENTION_COUNT backup" -ForegroundColor Green
+    Write-Host "[OK] Cleanup complete: Keep latest $RETENTION_COUNT backups" -ForegroundColor Green
 } else {
-    Write-Host "[INFO] Nessun backup da eliminare" -ForegroundColor Green
+    Write-Host "[INFO] No backups to delete" -ForegroundColor Green
 }
 
 Write-Host ""
 Write-Host "================================================================"
-Write-Host "    BACKUP COMPLETATO CON SUCCESSO"
+Write-Host "BACKUP COMPLETED SUCCESSFULLY"
 Write-Host "================================================================"
 Write-Host ""
 
@@ -327,7 +327,7 @@ Nota: Questo backup e stato eseguito in modalita QUICK
 Questo e un messaggio automatico generato dal sistema di backup.
 "@
         
-        # Prepara credenziali se necessarie
+        # Prepare credentials if necessary
         $smtpParams = @{
             SmtpServer = $SMTP_SERVER
             Port = $SMTP_PORT
@@ -342,13 +342,13 @@ Questo e un messaggio automatico generato dal sistema di backup.
             $smtpParams.UseSsl = $true
         }
         
-        # Carica credenziali crittografate se esistono
+        # Upload encrypted credentials if they exist
         if (Test-Path $EMAIL_CREDENTIAL_FILE) {
             $credential = Import-Clixml -Path $EMAIL_CREDENTIAL_FILE
             $smtpParams.Credential = $credential
         } else {
-            Write-Host "[WARN] File credenziali non trovato: $EMAIL_CREDENTIAL_FILE" -ForegroundColor Yellow
-            Write-Host "[INFO] Esegui: .\setup-smtp-credentials.ps1 per configurare" -ForegroundColor Cyan
+            Write-Host "[WARN] Credential file not found: $EMAIL_CREDENTIAL_FILE" -ForegroundColor Yellow
+            Write-Host "[INFO] Run: .\setup-smtp-credentials.ps1 to configure" -ForegroundColor Cyan
             throw "Credenziali SMTP mancanti"
         }
         
@@ -357,8 +357,8 @@ Questo e un messaggio automatico generato dal sistema di backup.
         Write-Host "[OK] Email inviata a: $EMAIL_TO" -ForegroundColor Green
         
     } catch {
-        Write-Host "[WARN] Impossibile inviare email: $_" -ForegroundColor Yellow
-        Write-Host "[INFO] Il backup e comunque completato correttamente" -ForegroundColor Cyan
+        Write-Host "[WARN] Unable to send email: $_" -ForegroundColor Yellow
+        Write-Host "[INFO] The backup completed correctly" -ForegroundColor Cyan
     }
     
     Write-Host ""
@@ -367,19 +367,19 @@ Questo e un messaggio automatico generato dal sistema di backup.
 exit 0
 
 } catch {
-    # === GESTIONE ERRORE GLOBALE CON INVIO EMAIL ===
+    # === GLOBAL ERROR MANAGEMENT WITH EMAIL SENDING ===
     $GLOBAL_ERROR_MESSAGE = $_.Exception.Message
     $errorDetails = $_.Exception | Out-String
     
     Write-Host ""
     Write-Host "================================================================" -ForegroundColor Red
-    Write-Host "    BACKUP FALLITO - ERRORE CRITICO" -ForegroundColor Red
+    Write-Host "BACKUP FAILED - CRITICAL ERROR" -ForegroundColor Red
     Write-Host "================================================================" -ForegroundColor Red
     Write-Host ""
-    Write-Host "[ERRORE] $GLOBAL_ERROR_MESSAGE" -ForegroundColor Red
+    Write-Host "[ERROR] $GLOBAL_ERROR_MESSAGE" -ForegroundColor Red
     Write-Host ""
     
-    # Invia email di errore
+    # Send error email
     if ($SEND_EMAIL) {
         try {
             $emailSubject = "[CheckMK Backup] ERRORE Quick Backup - $TIMESTAMP"
@@ -436,13 +436,13 @@ Questo e un messaggio automatico generato dal sistema di backup.
                 $smtpParams.Credential = $credential
                 
                 Send-MailMessage @smtpParams -WarningAction SilentlyContinue
-                Write-Host "[OK] Email di errore inviata a: $EMAIL_TO" -ForegroundColor Green
+                Write-Host "[OK] Error email sent to: $EMAIL_TO" -ForegroundColor Green
             } else {
-                Write-Host "[WARN] Impossibile inviare email: credenziali mancanti" -ForegroundColor Yellow
+                Write-Host "[WARN] Unable to send email: missing credentials" -ForegroundColor Yellow
             }
             
         } catch {
-            Write-Host "[WARN] Impossibile inviare email di errore: $_" -ForegroundColor Yellow
+            Write-Host "[WARN] Failed to send error email: $_" -ForegroundColor Yellow
         }
     }
     

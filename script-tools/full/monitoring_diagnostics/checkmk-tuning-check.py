@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
-"""
-checkmk-tuning-check.py - Verifica lo stato del tuning Nagios/CheckMK RAW
-e applica automaticamente il fix se necessario.
+"""checkmk-tuning-check.py - Checks the status of Nagios/CheckMK RAW tuning
+and automatically applies the fix if necessary.
 
-Logica di diagnosi:
-  - Legge tuning.cfg e raccoglie CPU, numero servizi, load
-  - Calcola il valore ottimale di max_concurrent_checks (CPU * 25)
-  - Se il valore attuale supera la soglia sicura (> CPU * 50) → FIX necessario
-  - Con --fix: riscrive tuning.cfg e riavvia omd
+Diagnosis logic:
+  - Reads tuning.cfg and collects CPU, number of services, load
+  - Calculate the optimal value of max_concurrent_checks (CPU * 25)
+  - If current value exceeds safe threshold (> CPU * 50) → FIX needed
+  - With --fix: rewrite tuning.cfg and restart omd
 
-Uso:
-    python3 checkmk-tuning-check.py              # solo diagnosi
-    python3 checkmk-tuning-check.py --fix        # diagnosi + fix automatico se serve
-    python3 checkmk-tuning-check.py --fix --yes  # fix senza conferma interattiva
+Usage:
+    python3 checkmk-tuning-check.py # diagnosis only
+    python3 checkmk-tuning-check.py --fix # diagnosis + automatic fix if needed
+    python3 checkmk-tuning-check.py --fix --yes # fix without interactive confirmation
 
-Ambiente:
-    SITE=monitoring  (default)
+Environment:
+    SITE=monitoring (default)
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import argparse
 import datetime as dt
@@ -34,7 +32,7 @@ VERSION = "1.0.0"
 
 # ── Soglie ──────────────────────────────────────────────────────────────────
 # max_concurrent_checks ottimale = CPU * 25
-# max_concurrent_checks troppo alto = CPU * 50 → FLAG per fix
+# max_concurrent_checks too high = CPU * 50 → FLAG for fix
 OPTIMAL_RATIO = 25
 WARN_RATIO = 50
 
@@ -117,7 +115,7 @@ def backup_file(path: Path) -> Path:
     ts = dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     backup = path.parent / f"{path.name}.backup_{ts}"
     shutil.copy2(path, backup)
-    # permessi monitoring:monitoring 660
+    # monitoring:monitoring 660 permissions
     try:
         uid = pwd.getpwnam("monitoring").pw_uid
         gid = grp.getgrnam("monitoring").gr_gid
@@ -241,7 +239,7 @@ def main() -> int:
         backup = backup_file(nagios_cfg)
         log(f"Backup: {backup}")
 
-    # scrivi nuovo tuning.cfg
+    # write new tuning.cfg
     write_tuning_cfg(
         path=nagios_cfg,
         cpu=cpu, services=services, load=load,
@@ -253,7 +251,7 @@ def main() -> int:
     )
     log(f"tuning.cfg riscritto con max_concurrent_checks={optimal}")
 
-    # riavvio omd
+    # omd reboot
     log(f"Riavvio sito OMD: {site}")
     result = run(["omd", "restart", site])
     if result.stdout:

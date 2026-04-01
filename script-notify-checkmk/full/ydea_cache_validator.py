@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-ydea_cache_validator.py - Cache Integrity Validator for Ydea Integration
+"""ydea_cache_validator.py - Cache Integrity Validator for Ydea Integration
 
 Periodically checks if tickets in the local JSON cache actually exist on Ydea.
 Removes "orphan" entries (tickets present in cache but deleted on Ydea).
 Prevents cache misalignment issues.
 
-Usage: python3 ydea_cache_validator.py [--dry-run]
-"""
+Usage: python3 ydea_cache_validator.py [--dry-run]"""
 
 import os
 import sys

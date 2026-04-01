@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""
-ns8-biweekly-audit-report.py - Report Quindicinale NS8 (Monolithic)
+"""ns8-biweekly-audit-report.py - NS8 Biweekly Report (Monolithic)
 
-Report completo ambiente NethServer 8:
-  1) Utenti Active Directory (Samba)
-  2) Scadenze password utenti AD
-  3) Permessi share di rete (Samba)
-  4) Condivisioni account posta WebTop (se disponibile)
+Complete NethServer 8 environment report:
+  1) Active Directory Users (Samba)
+  2) AD user password expiration dates
+  3) Network share permissions (Samba)
+  4) WebTop mail account shares (if available)
 
 Output: Directory /var/tmp/ns8-audit-YYYYMMDD-HHMMSS/
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -52,16 +50,14 @@ def log_error(msg: str) -> None:
 
 
 def run_command(cmd: List[str], timeout: int = 30) -> Tuple[int, str, str]:
-    """
-    Execute command with timeout.
+    """Execute command with timeout.
     
     Args:
         cmd: Command as list
         timeout: Timeout in seconds
         
     Returns:
-        Tuple of (exit_code, stdout, stderr)
-    """
+        Tuple of (exit_code, stdout, stderr)"""
     try:
         result = subprocess.run(
             cmd,
@@ -80,12 +76,10 @@ def run_command(cmd: List[str], timeout: int = 30) -> Tuple[int, str, str]:
 
 
 def check_prerequisites() -> Tuple[Optional[str], Optional[str]]:
-    """
-    Check prerequisites and find modules.
+    """Check prerequisites and find modules.
     
     Returns:
-        Tuple of (samba_module, webtop_module) or raises SystemExit
-    """
+        Tuple of (samba_module, webtop_module) or raises SystemExit"""
     log_info("Verifica prerequisiti...")
     
     # Check runagent
@@ -118,16 +112,14 @@ def check_prerequisites() -> Tuple[Optional[str], Optional[str]]:
 
 
 def collect_ad_users(samba_module: str, output_dir: Path) -> bool:
-    """
-    Collect Active Directory users.
+    """Collect Active Directory users.
     
     Args:
         samba_module: Samba module name
         output_dir: Output directory
         
     Returns:
-        True on success, False on error
-    """
+        True on success, False on error"""
     log_info("Raccolta utenti Active Directory...")
     
     output_file = output_dir / "01_users.txt"
@@ -152,29 +144,25 @@ def collect_ad_users(samba_module: str, output_dir: Path) -> bool:
 
 
 def filetime_to_unix(filetime: int) -> int:
-    """
-    Convert Windows FILETIME to Unix epoch.
+    """Convert Windows FILETIME to Unix epoch.
     
     Args:
         filetime: Windows FILETIME value
         
     Returns:
-        Unix epoch timestamp
-    """
+        Unix epoch timestamp"""
     return int((filetime - 116444736000000000) / 10000000)
 
 
 def collect_password_expiry(samba_module: str, output_dir: Path) -> bool:
-    """
-    Collect password expiry information.
+    """Collect password expiry information.
     
     Args:
         samba_module: Samba module name
         output_dir: Output directory
         
     Returns:
-        True on success, False on error
-    """
+        True on success, False on error"""
     log_info("Raccolta scadenze password AD...")
     
     output_file = output_dir / "02_password_expiry.tsv"
@@ -264,16 +252,14 @@ def collect_password_expiry(samba_module: str, output_dir: Path) -> bool:
 
 
 def collect_samba_shares(samba_module: str, output_dir: Path) -> bool:
-    """
-    Collect Samba shares and permissions.
+    """Collect Samba shares and permissions.
     
     Args:
         samba_module: Samba module name
         output_dir: Output directory
         
     Returns:
-        True on success, False on error
-    """
+        True on success, False on error"""
     log_info("Raccolta share e permessi Samba...")
     
     shares_dir = output_dir / "03_shares"
@@ -328,16 +314,14 @@ def collect_samba_shares(samba_module: str, output_dir: Path) -> bool:
 
 
 def collect_webtop_sharing(webtop_module: Optional[str], output_dir: Path) -> bool:
-    """
-    Collect WebTop sharing data.
+    """Collect WebTop sharing data.
     
     Args:
         webtop_module: WebTop module name (optional)
         output_dir: Output directory
         
     Returns:
-        True on success, False on error
-    """
+        True on success, False on error"""
     log_info("Raccolta condivisioni email (WebTop e Dovecot)...")
     
     mail_dir = output_dir / "04_mail_sharing"
@@ -356,15 +340,13 @@ def collect_webtop_sharing(webtop_module: Optional[str], output_dir: Path) -> bo
 
 
 def generate_summary_report(output_dir: Path) -> bool:
-    """
-    Generate summary report.
+    """Generate summary reports.
     
     Args:
         output_dir: Output directory
         
     Returns:
-        True on success
-    """
+        True on success"""
     log_info("Generazione report di riepilogo...")
     
     summary_file = output_dir / "SUMMARY.txt"
@@ -382,7 +364,7 @@ def generate_summary_report(output_dir: Path) -> bool:
             user_count = len([l for l in users_file.read_text().splitlines() if l.strip()])
             f.write(f"AD Users collected: {user_count}\n")
         
-        # Count password data
+        # Count password given
         pwd_file = output_dir / "02_password_expiry.tsv"
         if pwd_file.exists():
             pwd_count = len(pwd_file.read_text().splitlines()) - 1  # Exclude header
@@ -395,12 +377,10 @@ def generate_summary_report(output_dir: Path) -> bool:
 
 
 def main() -> int:
-    """
-    Main entry point.
+    """Main entry point.
     
     Returns:
-        Exit code
-    """
+        Exit code"""
     print("=" * 80)
     print("NS8 Biweekly Audit Report - Collector & Analyzer")
     print("=" * 80)

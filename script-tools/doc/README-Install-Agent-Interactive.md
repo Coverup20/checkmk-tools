@@ -1,383 +1,382 @@
-#  Install Agent Interactive - Guida Utente
-> **Categoria:** Operativo
+# Install Agent Interactive - User Guide
+> **Category:** Operational
 
-Script interattivo per l'installazione/disinstallazione automatizzata di CheckMK Agent con opzione FRPC client.
+Interactive script for automated installation/uninstallation of CheckMK Agent with FRPC client option.
 
-##  Caratteristiche
+## Features
 
--  **Installazione guidata** CheckMK Agent (plain TCP 6556)
--  **Supporto multi-distro**: Ubuntu, Debian, Rocky Linux, CentOS, RHEL, AlmaLinux, NethServer Enterprise, **OpenWrt/NethSec8**
--  **Installazione opzionale FRPC** con configurazione interattiva
--  **Disinstallazione completa** con opzioni separate per Agent e FRPC
--  **Rilevamento automatico** del sistema operativo
--  **Configurazione systemd/init.d** completa
--  **Output colorato** e user-friendly
+- **Installation Wizard** CheckMK Agent (plain TCP 6556)
+- **Multi-distro support**: Ubuntu, Debian, Rocky Linux, CentOS, RHEL, AlmaLinux, NethServer Enterprise, **OpenWrt/NethSec8**
+- **Optional FRPC installation** with interactive configuration
+- **Full Uninstall** with separate options for Agent and FRPC
+- **Automatic detection** of the operating system
+- **systemd/init.d** configuration complete
+- **Colorful output** and user-friendly
 
-##  Cosa fa lo script
+## What the script does
 
-### Parte 1: CheckMK Agent (sempre installato)
-1. Rileva automaticamente il sistema operativo
-2. Scarica il pacchetto CheckMK Agent corretto (DEB o RPM)
-3. Installa l'agent
-4. Disabilita TLS e configurazione standard
-5. Crea socket systemd plain su porta 6556
-6. Avvia e testa l'agent
+### Part 1: CheckMK Agent (always installed)
+1. Automatically detect your operating system
+2. Download the correct CheckMK Agent package (DEB or RPM)
+3. Install the agent
+4. Disable TLS and standard configuration
+5. Create plain systemd socket on port 6556
+6. Launch and test the agent
 
-### Parte 2: FRPC Client (opzionale)
-1. Chiede se si vuole installare FRPC
-2. Scarica e installa FRPC v0.64.0
-3. Configurazione interattiva con richiesta di:
-   - **Nome host** (default: hostname corrente)
-   - **Server FRP remoto** (default: monitor.nethlab.it)
-   - **Porta remota** (obbligatorio, es: 20001)
-   - **Token di sicurezza** (default: conduit-reenact-talon-macarena-demotion-vaguely)
-4. Genera file `/etc/frp/frpc.toml` con la configurazione
-5. Crea servizio systemd per FRPC
-6. Avvia e verifica il tunnel
+### Part 2: FRPC Client (optional)
+1. Asks if you want to install FRPC
+2. Download and install FRPC v0.64.0
+3. Interactive configuration with request for:
+   - **Hostname** (default: current hostname)
+   - **Remote FRP server** (default: monitor.nethlab.it)
+   - **Remote port** (mandatory, e.g.: 20001)
+   - **Security token** (default: conduit-reenact-talon-macarena-demotion-vaguely)
+4. Generate `/etc/frp/frpc.toml` file with the configuration
+5. Create systemd service for FRPC
+6. Start and test the tunnel
 
-##  Requisiti
+## Requirements
 
-- Sistema operativo supportato: 
+- Supported operating system: 
   - **Debian-based**: Ubuntu, Debian
   - **RHEL-based**: Rocky Linux, CentOS, RHEL, AlmaLinux
-  - **NethServer**: NethServer Enterprise (rilevato automaticamente)
+  - **NethServer**: NethServer Enterprise (automatically detected)
   - **OpenWrt**: OpenWrt 23.05+, NethServer 8 Core (NethSec8)
-- Accesso root o sudo
-- Connessione internet
-- CheckMK Server raggiungibile (per download pacchetti)
+- Root or sudo access
+- Internet connection
+- CheckMK Server reachable (for package downloads)
 
-###  Nota su NethServer Enterprise
-NethServer Enterprise viene **rilevato automaticamente** tramite il file `/etc/nethserver-release`. Lo script utilizzerà automaticamente i pacchetti RPM appropriati per l'installazione.
+### Note on NethServer Enterprise
+NethServer Enterprise is **automatically detected** via the `/etc/nethserver-release` file. The script will automatically use the appropriate RPM packages for installation.
 
-###  Nota su OpenWrt/NethSec8
-OpenWrt e NethServer 8 Core vengono rilevati tramite `/etc/openwrt_release`. Lo script:
-- Usa **opkg** come package manager
-- Estrae manualmente il pacchetto DEB
-- Configura **socat** come listener sulla porta 6556
-- Crea servizio **init.d** con procd (non systemd)
-- Supporta FRPC con servizio init.d dedicato
+### Note on OpenWrt/NethSec8
+OpenWrt and NethServer 8 Core are discovered via `/etc/openwrt_release`. The script:
+- Use **opkg** as package manager
+- Manually extract the DEB package
+- Configure **socat** as a listener on port 6556
+- Create **init.d** service with procd (not systemd)
+- Supports FRPC with dedicated init.d service
 
-##  Utilizzo
+## Usage
 
-###  Installazione
+### Installation
 
-#### Metodo 1: Esecuzione diretta
+#### Method 1: Direct execution
 ```bash
 sudo bash install-agent-interactive.sh
 ```
 
-#### Metodo 2: Con permessi di esecuzione
+#### Method 2: With execute permissions
 ```bash
 chmod +x install-agent-interactive.sh
 sudo ./install-agent-interactive.sh
 ```
 
-###  Disinstallazione
+### Uninstall
 
-#### Rimuovi solo FRPC Client
+#### Remove FRPC Client only
 ```bash
 sudo ./install-agent-interactive.sh --uninstall-frpc
 ```
 
-#### Rimuovi solo CheckMK Agent
+#### Remove CheckMK Agent only
 ```bash
 sudo ./install-agent-interactive.sh --uninstall-agent
 ```
 
-#### Rimuovi tutto (Agent + FRPC)
+#### Remove All (Agent + FRPC)
 ```bash
 sudo ./install-agent-interactive.sh --uninstall
 ```
 
-#### Mostra help
+#### Show help
 ```bash
 ./install-agent-interactive.sh --help
 ```
 
-###  Opzioni disponibili
+### Options available
 
-| Opzione | Descrizione |
+| Option | Description |
 |---------|-------------|
-| _(nessuna)_ | Installazione interattiva completa |
-| `--uninstall-frpc` | Disinstalla solo FRPC client |
-| `--uninstall-agent` | Disinstalla solo CheckMK Agent |
-| `--uninstall` | Disinstalla tutto (con conferma) |
-| `--help` o `-h` | Mostra messaggio di aiuto |
+| _(none)_ | Complete interactive installation |
+| `--uninstall-frpc` | Uninstall FRPC client only |
+| `--uninstall-agent` | Uninstall CheckMK Agent | only
+| `--uninstall` | Uninstall everything (with confirmation) |
+| `--help` or `-h` | Show help message |
 
-##  Esempio di Sessione Interattiva
+## Example of Interactive Session
 
 ```
-╔════════════════════════════════════════════════════════════╗
-║  Installazione Interattiva CheckMK Agent + FRPC          ║
-║  Version: 1.0 - 2025-11-06                                ║
-╚════════════════════════════════════════════════════════════╝
+╔══════════════════════════════ ══════════════════════════════╗
+║ Interactive Installation CheckMK Agent + FRPC ║
+║ Version: 1.0 - 2025-11-06 ║
+╚══════════════════════════════ ══════════════════════════════╝
 
- Sistema rilevato: ubuntu 22.04 (deb)
+ System detected: Ubuntu 22.04 (deb)
 
-═══ INSTALLAZIONE CHECKMK AGENT ═══
- Download agent da: https://monitoring.nethlab.it/monitoring/...
- Installazione pacchetto...
- Agent CheckMK installato
+═══ CHECKMK AGENT INSTALLATION ═══
+ Download agent from: https://monitoring.nethlab.it/monitoring/...
+ Package installation...
+ CheckMK Agent installed
 
-═══ CONFIGURAZIONE AGENT PLAIN ═══
- Disabilito TLS e socket standard...
- Creo unit systemd per agent plain...
- Ricarico systemd e avvio socket...
- Agent plain configurato su porta 6556
+═══ PLAIN AGENT CONFIGURATION ═══
+ Disable TLS and standard sockets...
+ I create systemd unit for plain agent...
+ Reloading systemd and starting socket...
+ Plain agent configured on port 6556
 
- Test agent locale:
+ Local test agent:
 <<<check_mk>>>
 Version: 2.4.0p12
 Hostname: myserver
 AgentOS: linux
 
-════════════════════════════════════════
-Vuoi installare anche FRPC? [s/N]: s
-════════════════════════════════════════
+════════════════════ ════════════════════
+Do you want to install FRPC too? [y/N]: yes
+════════════════════ ════════════════════
 
-═══ INSTALLAZIONE FRPC CLIENT ═══
+═══ FRPC CLIENT INSTALLATION ═══
  Download FRPC v0.64.0...
- Estrazione...
- FRPC installato in /usr/local/bin/frpc
+ Extraction...
+ FRPC installed in /usr/local/bin/frpc
 
-═══ CONFIGURAZIONE FRPC ═══
-Inserisci le informazioni per la configurazione FRPC:
+═══ FRPC CONFIGURATION ═══
+Enter information for FRPC configuration:
+Hostname [default: myserver]: 
+Remote FRP server [default: monitor.nethlab.it]: 
+Remote port [ex: 20001]: 20001
+Security token [default: conduit-reenact-talon-macarena-demotion-vaguely]: 
 
-Nome host [default: myserver]: 
-Server FRP remoto [default: monitor.nethlab.it]: 
-Porta remota [es: 20001]: 20001
-Token di sicurezza [default: conduit-reenact-talon-macarena-demotion-vaguely]: 
+ Creating file /etc/frp/frpc.toml...
+ Configuration file created
 
- Creazione file /etc/frp/frpc.toml...
- File di configurazione creato
+ FRPC Configuration:
+   Server: monitor.nethlab.it:7000
+   Tunnel: myserver
+   Remote port: 20001
+   Local port: 6556
 
- Configurazione FRPC:
-   Server:       monitor.nethlab.it:7000
-   Tunnel:       myserver
-   Porta remota: 20001
-   Porta locale: 6556
+ Creating systemd service...
+ FRPC started successfully
 
- Creazione servizio systemd...
- FRPC avviato con successo
+╔══════════════════════════════ ══════════════════════════════╗
+║ INSTALLATION COMPLETE ║
+╚══════════════════════════════ ══════════════════════════════╝
 
-╔════════════════════════════════════════════════════════════╗
-║              INSTALLAZIONE COMPLETATA                     ║
-╚════════════════════════════════════════════════════════════╝
+ SUMMARY:
+    CheckMK Agent installed (plain TCP 6556)
+    Active systemd socket: check-mk-agent-plain.socket
+    FRPC Client installed and configured
+    Active tunnel: monitor.nethlab.it:20001 → localhost:6556
 
- RIEPILOGO:
-    CheckMK Agent installato (plain TCP 6556)
-    Socket systemd attivo: check-mk-agent-plain.socket
-    FRPC Client installato e configurato
-    Tunnel attivo: monitor.nethlab.it:20001 → localhost:6556
+ USEFUL COMMANDS:
+   Local test agent: /usr/bin/check_mk_agent
+   Status socket: systemctl status check-mk-agent-plain.socket
+   Status FRPC: systemctl status frpc
+   FRPC log: journalctl -u frpc -f
+   FRPC Config: /etc/frp/frpc.toml
 
- COMANDI UTILI:
-   Test agent locale:    /usr/bin/check_mk_agent
-   Status socket:        systemctl status check-mk-agent-plain.socket
-   Status FRPC:          systemctl status frpc
-   Log FRPC:             journalctl -u frpc -f
-   Config FRPC:          /etc/frp/frpc.toml
-
- Installazione terminata con successo!
+ Installation completed successfully!
 ```
 
-##  Configurazione FRPC Generata
+## FRPC Configuration Generated
 
-Il file `/etc/frp/frpc.toml` viene creato automaticamente con questa struttura:
+The `/etc/frp/frpc.toml` file is automatically created with this structure:
 
 ```toml
-# Configurazione FRPC Client
-# Generato il 2025-11-06
+# FRPC Client configuration
+# Generated on 2025-11-06
 
 [common]
 server_addr = "monitor.nethlab.it"
 server_port = 7000
 auth.method = "token"
-auth.token  = "conduit-reenact-talon-macarena-demotion-vaguely"
+auth.token = "conduit-reenact-talon-macarena-demotion-vaguely"
 tls.enable = true
 log.to = "/var/log/frpc.log"
 log.level = "debug"
 
 [myserver]
-type        = "tcp"
-local_ip    = "127.0.0.1"
-local_port  = 6556
+type = "tcp"
+local_ip = "127.0.0.1"
+local_port = 6556
 remote_port = 20001
 ```
 
-**Note sul formato:**
-- Sezione `[common]` con parametri globali
-- Sezione `[hostname]` per ogni tunnel
-- Log level `debug` per troubleshooting completo
-- Log salvato in `/var/log/frpc.log`
+**Format Notes:**
+- `[common]` section with global parameters
+- `[hostname]` section for each tunnel
+- Log level `debug` for complete troubleshooting
+- Log saved in `/var/log/frpc.log`
 
-##  Verifica Post-Installazione
+## Post-Installation Verification
 
 ### CheckMK Agent
 ```bash
-# Test locale dell'agent
+# Local test of the agent
 /usr/bin/check_mk_agent
 
-# Verifica socket systemd
+# Check systemd socket
 systemctl status check-mk-agent-plain.socket
 
-# Test da remoto (dal server CheckMK)
-telnet <IP_HOST> 6556
+# Remote testing (from CheckMK server)
+telnet <HOST_IP> 6556
 ```
 
-### FRPC (se installato)
+### FRPC (if installed)
 ```bash
-# Status servizio
+# Service status
 systemctl status frpc
 
-# Visualizza log in tempo reale
+# View real-time logs
 journalctl -u frpc -f
 
-# Verifica file di configurazione
+# Check configuration file
 cat /etc/frp/frpc.toml
 
-# Riavvio servizio
+# Restarting service
 systemctl restart frpc
 ```
 
-##  Gestione Servizi
+## Services Management
 
-### Riavvio Agent
+### Restarting Agent
 ```bash
 systemctl restart check-mk-agent-plain.socket
 ```
 
-### Riavvio FRPC
+### Restarting FRPC
 ```bash
 systemctl restart frpc
 ```
 
-### Modifica configurazione FRPC
+### Edit FRPC configuration
 ```bash
-# Edita il file
+# Edit the file
 nano /etc/frp/frpc.toml
 
-# Riavvia per applicare modifiche
+# Reboot to apply changes
 systemctl restart frpc
 ```
 
-##  Esempi Disinstallazione
+## Examples Uninstallation
 
-### Disinstalla solo FRPC (mantieni Agent)
+### Uninstall FRPC only (keep Agent)
 ```bash
 sudo ./install-agent-interactive.sh --uninstall-frpc
 ```
 **Output:**
 ```
-╔════════════════════════════════════════════════════════════╗
-║           DISINSTALLAZIONE FRPC CLIENT                    ║
-╚════════════════════════════════════════════════════════════╝
+╔══════════════════════════════ ══════════════════════════════╗
+║ UNINSTALLING FRPC CLIENT ║
+╚══════════════════════════════ ══════════════════════════════╝
 
-  Rimozione FRPC in corso...
+  FRPC removal in progress...
 
-  Arresto servizio FRPC...
-  Disabilito servizio FRPC...
-  Rimozione file systemd...
-  Rimozione eseguibile...
-  Rimozione directory configurazione...
-  Rimozione file log...
+  FRPC service stop...
+  Disable FRPC service...
+  Removing systemd files...
+  Removal executable...
+  Removing configuration directory...
+  Removing log files...
 
- FRPC disinstallato completamente
- File rimossi:
+ Uninstalled FRPC completely
+ Files removed:
    • /usr/local/bin/frpc
    • /etc/frp/
    • /etc/systemd/system/frpc.service
    • /var/log/frpc.log
 ```
 
-### Disinstalla solo Agent (mantieni FRPC)
+### Uninstall Agent only (keep FRPC)
 ```bash
 sudo ./install-agent-interactive.sh --uninstall-agent
 ```
-**Rimuove:**
-- Pacchetto check-mk-agent
+**Removes:**
+- Check-mk-agent package
 - Socket systemd plain
 - Directory /etc/check_mk
-- Plugin agent
+- Plugin agents
 
-### Disinstalla tutto
+### Uninstall everything
 ```bash
 sudo ./install-agent-interactive.sh --uninstall
 ```
-**Chiede conferma** prima di procedere con la rimozione completa di Agent e FRPC.
+**Prompts for confirmation** before proceeding with complete removal of Agent and FRPC.
 
-##  File di Configurazione
+## Configuration File
 
-| File | Descrizione |
+| Files | Description |
 |------|-------------|
 | `/etc/systemd/system/check-mk-agent-plain.socket` | Socket systemd agent plain |
 | `/etc/systemd/system/check-mk-agent-plain@.service` | Service systemd agent plain |
-| `/etc/frp/frpc.toml` | Configurazione FRPC client |
+| `/etc/frp/frpc.toml` | Client FRPC Configuration |
 | `/etc/systemd/system/frpc.service` | Service systemd FRPC |
-| `/var/log/frpc.log` | Log FRPC client |
+| `/var/log/frpc.log` | FRPC client log |
 
-##  Note Importanti
+## Important Notes
 
-1. **Porta 6556**: L'agent CheckMK ascolta su questa porta (plain TCP, no TLS)
-2. **Firewall**: Assicurati che la porta 6556 sia aperta se accedi da remoto direttamente
-3. **FRPC Tunnel**: Se usi FRPC, il traffico passa attraverso il tunnel sicuro
-4. **Token FRPC**: Il token di default è condiviso, usa un token personalizzato in produzione
-5. **Aggiornamenti**: Lo script installa CheckMK Agent v2.4.0p12 e FRPC v0.64.0
+1. **Port 6556**: The CheckMK agent listens on this port (plain TCP, no TLS)
+2. **Firewall**: Make sure port 6556 is open if you log in remotely directly
+3. **FRPC Tunnel**: If you use FRPC, traffic goes through the secure tunnel
+4. **FRPC Token**: Default token is shared, use custom token in production
+5. **Updates**: The script installs CheckMK Agent v2.4.0p12 and FRPC v0.64.0
 
-##  Troubleshooting
+## Troubleshooting
 
-### Agent non risponde
+### Agent not responding
 ```bash
-# Verifica socket attivo
+# Check active socket
 systemctl status check-mk-agent-plain.socket
 
-# Riavvia socket
+# Restart socket
 systemctl restart check-mk-agent-plain.socket
 
-# Test locale
+# Local test
 /usr/bin/check_mk_agent
 ```
 
-### FRPC non si connette
+### FRPC does not connect
 ```bash
-# Verifica log
+# Check log
 journalctl -u frpc -n 50
 
-# Testa connessione al server
+# Test connection to server
 telnet monitor.nethlab.it 7000
 
-# Verifica configurazione
+# Check configuration
 cat /etc/frp/frpc.toml
 
-# Riavvia servizio
+# Restart service
 systemctl restart frpc
 ```
 
-### Porta già in uso
+### Port already in use
 ```bash
-# Verifica chi usa la porta 6556
+# Check who uses port 6556
 ss -tulpn | grep 6556
 
-# Ferma eventuale servizio conflittuale
+# Stop any conflicting service
 systemctl stop check-mk-agent.socket
 systemctl disable check-mk-agent.socket
 ```
 
-##  Link Utili
+## Useful Links
 
-- [Documentazione CheckMK Agent](https://docs.checkmk.com/latest/en/agent_linux.html)
+- [CheckMK Agent Documentation](https://docs.checkmk.com/latest/en/agent_linux.html)
 - [FRP GitHub Repository](https://github.com/fatedier/frp)
 - [FRP Documentation](https://gofrp.org/en/)
 
-##  Autore
+## Author
 
-Script creato per semplificare il deployment di CheckMK Agent con supporto FRPC.
+Script created to simplify the deployment of CheckMK Agent with FRPC support.
 
-##  Licenza
+## License
 
-Uso libero per scopi di monitoraggio CheckMK.
+Free to use for CheckMK monitoring purposes.
 
 ---
 
-**Versione**: 1.2  
-**Data**: 2025-11-07  
-**Compatibilità**: Ubuntu, Debian, Rocky Linux, CentOS, RHEL, AlmaLinux, NethServer Enterprise, OpenWrt 23.05+, NethSec8
+**Version**: 1.2  
+**Date**: 2025-11-07  
+**Compatibility**: Ubuntu, Debian, Rocky Linux, CentOS, RHEL, AlmaLinux, NethServer Enterprise, OpenWrt 23.05+, NethSec8

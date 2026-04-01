@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # install-ydea-checkmk-integration.sh
-# Script di installazione rapida integrazione CheckMK → Ydea
+# Quick installation script CheckMK integration → Ydea
 set -euo pipefail
 
-# Colori output
+# Output colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Configurazione
+# Configuration
 CHECKMK_SITE="${CHECKMK_SITE:-monitoring}"
 CHECKMK_NOTIFY_DIR="/omd/sites/${CHECKMK_SITE}/local/share/check_mk/notifications"
 YDEA_TOOLKIT_DIR="${YDEA_TOOLKIT_DIR:-/opt/ydea-toolkit}"
@@ -39,7 +39,7 @@ check_root() {
 check_checkmk() {
   if [[ ! -d "/omd/sites/${CHECKMK_SITE}" ]]; then
     error "Sito CheckMK '${CHECKMK_SITE}' non trovato"
-    echo "  Verifica nome sito o usa: export CHECKMK_SITE='nome_sito'"
+    echo "Check site name or use: export CHECKMK_SITE='site_name'"
     exit 1
   fi
   success "CheckMK sito '${CHECKMK_SITE}' trovato"
@@ -65,7 +65,7 @@ check_ydea_toolkit() {
 install_scripts() {
   info "Installazione script di notifica CheckMK..."
   
-  # Determina percorso script-notify-checkmk (supporta sia struttura normale che sparse-checkout)
+  # Determine script-notify-checkmk path (supports both normal and sparse-checkout structure)
   local NOTIFY_SCRIPT_DIR
   if [[ -d "${SCRIPT_DIR}/script-notify-checkmk" ]]; then
     NOTIFY_SCRIPT_DIR="${SCRIPT_DIR}/script-notify-checkmk"
@@ -80,7 +80,7 @@ install_scripts() {
   
   info "Usando script da: ${NOTIFY_SCRIPT_DIR}"
   
-  # Copia notifier Ydea principali (con ID persona dedicato)
+  # Copy of main Ydea notifiers (with dedicated person ID)
   for notifier in ydea_la ydea_ag; do
     if [[ -f "${NOTIFY_SCRIPT_DIR}/${notifier}" ]]; then
       cp "${NOTIFY_SCRIPT_DIR}/${notifier}" "$CHECKMK_NOTIFY_DIR/"
@@ -124,7 +124,7 @@ install_scripts() {
   chmod +x "${NOTIFY_BIN_DIR}/ydea_cache_validator.py"
   success "ydea_cache_validator.py installato in ${NOTIFY_BIN_DIR}"
   
-  # Copia health monitor (supporta sia percorso relativo che assoluto)
+  # Copy health monitor (supports both relative and absolute path)
   info "Installazione health monitor..."
   local HEALTH_MONITOR
   if [[ -f "${SCRIPT_DIR}/ydea-health-monitor.sh" ]]; then
@@ -178,8 +178,8 @@ setup_env() {
     : > "$env_file"
   fi
 
-  # Permessi e ownership corretti per tutti i file .env
-  # Il site CheckMK (utente monitoring) deve poterli leggere
+  # Correct permissions and ownership for all .env files
+  # The CheckMK site (user monitoring) must be able to read them
   for env_f in "${YDEA_TOOLKIT_DIR}/.env" "${YDEA_TOOLKIT_DIR}/.env.la" "${YDEA_TOOLKIT_DIR}/.env.ag"; do
     if [[ -f "$env_f" ]]; then
       chmod 640 "$env_f"
@@ -193,7 +193,7 @@ setup_env() {
   warn "  IMPORTANTE: Configura le credenziali Ydea in:"
   echo "  $env_file"
   echo ""
-  echo "Modifica le righe:"
+  echo "Edit lines:"
   echo "  export YDEA_ID=\"il_tuo_id\""
   echo "  export YDEA_API_KEY=\"la_tua_api_key\""
   echo "  export YDEA_ALERT_EMAIL=\"massimo.palazzetti@nethesis.it\""
@@ -259,7 +259,7 @@ setup_cron() {
     printf "%s\n" "$new_crontab" | crontab -
   fi
   
-  # Crea file log
+  # Create log files
   touch /var/log/ydea_health.log
   chmod 666 /var/log/ydea_health.log
   success "Log file creato: /var/log/ydea_health.log"
@@ -296,11 +296,11 @@ show_next_steps() {
   echo ""
   echo -e "${BLUE} PROSSIMI PASSI:${NC}"
   echo ""
-  echo "1⃣  Configura notification rule in CheckMK:"
+  echo "1⃣ Configure notification rule in CheckMK:"
   echo "   → Setup → Notifications → Add rule"
   echo "   → Script: ydea_la / ydea_ag"
   echo ""
-  echo "2⃣  Verifica credenziali Ydea:"
+  echo "2⃣ Check Ydea credentials:"
   echo "   → ${YDEA_TOOLKIT_DIR}/.env"
   echo ""
   echo "3⃣  Test manuale:"

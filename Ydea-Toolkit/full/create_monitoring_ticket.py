@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""
-create_monitoring_ticket.py - Crea ticket Ydea da allarme CheckMK
+"""create_monitoring_ticket.py - Create Ydea ticket from CheckMK alarm
 
-Converte allarmi CheckMK in ticket Ydea con:
-- Determinazione automatica tipologia da config
-- Aggiunta nota privata con dettagli allarme
-- Tracking ticket per monitoraggio
+Convert CheckMK alarms to Ydea tickets with:
+- Automatic determination of type from config
+- Added private note with alarm details
+- Ticket tracking for monitoring
 
 Usage:
     create_monitoring_ticket.py <HOST> <SERVICE> <STATE> <OUTPUT> [HOST_IP]
@@ -13,8 +12,7 @@ Usage:
 Example:
     create_monitoring_ticket.py 'mail.example.com' 'HTTP' 'CRITICAL' 'Connection timeout' '1.2.3.4'
 
-Version: 1.0.0 (convertito da Bash)
-"""
+Version: 1.0.0 (ported from Bash)"""
 
 VERSION = "1.0.0"  # Versione script (aggiornare ad ogni modifica)
 
@@ -31,7 +29,7 @@ sys.path.insert(0, str(script_dir))
 
 from ydea_common import Logger, ConfigLoader  # type: ignore
 
-# Import ydea-toolkit.py (nome con trattino richiede importlib)
+# Import ydea-toolkit.py (hyphenated name requires importlib)
 ydea_toolkit_path = script_dir / "ydea-toolkit.py"
 spec = importlib.util.spec_from_file_location("ydea_toolkit", ydea_toolkit_path)
 if spec and spec.loader:
@@ -46,7 +44,7 @@ TicketOperations = ydea_toolkit.TicketOperations
 TrackingSystem = ydea_toolkit.TrackingSystem
 
 
-# ===== CONFIGURAZIONE =====
+# ===== CONFIGURATION =====
 
 CONFIG_FILE = script_dir.parent / "config" / "premium-mon-config.json"
 
@@ -54,46 +52,42 @@ CONFIG_FILE = script_dir.parent / "config" / "premium-mon-config.json"
 # ===== FUNZIONI UTILITY =====
 
 def determine_tipo(service: str, output: str, host: str, config: Dict[str, Any]) -> str:
-    """
-    Determina tipologia ticket in base a service/output/host
+    """Determine ticket type based on service/output/host
     
     Args:
-        service: Nome servizio CheckMK
-        output: Output allarme
-        host: Nome host
-        config: Configurazione caricata
+        service: CheckMK service name
+        output: Alarm output
+        host: Host name
+        config: Configuration loaded
     
     Returns:
-        Tipo Ydea determinato
-    """
-    # Combina tutti i campi in lowercase per matching
+        Ydea type determined"""
+    # Combine all fields in lowercase for matching
     search_text = f"{service} {output} {host}".lower()
     
-    # Controlla ogni tipologia definita in config
+    # Check each type defined in config
     tipologie = config.get('tipologie', {})
     
     for tipo_key, tipo_data in tipologie.items():
         keywords = tipo_data.get('keywords', [])
         
-        # Controlla se qualche keyword matcha
+        # Check if any keywords match
         for keyword in keywords:
             if keyword.lower() in search_text:
                 return tipo_data.get('tipo_ydea', config.get('default_tipo', 'Assistenza'))
     
-    # Default se non trovato match
+    # Default if no match found
     return config.get('default_tipo', 'Assistenza')
 
 
 def get_state_icon(state: str) -> str:
-    """
-    Ottieni emoji per stato CheckMK
+    """Get emoji for CheckMK status
     
     Args:
-        state: Stato CheckMK (DOWN, CRITICAL, WARNING, etc.)
+        state: CheckMK status (DOWN, CRITICAL, WARNING, etc.)
     
     Returns:
-        Emoji corrispondente
-    """
+        Matching emoji"""
     state_upper = state.upper()
     
     if state_upper in ('DOWN', 'CRITICAL'):
@@ -105,18 +99,16 @@ def get_state_icon(state: str) -> str:
 
 
 def build_ticket_title(host: str, service: str, state: str, host_ip: Optional[str] = None) -> str:
-    """
-    Costruisci titolo ticket
+    """Build ticket title
     
     Args:
-        host: Nome host
-        service: Nome servizio
-        state: Stato allarme
-        host_ip: IP host (opzionale)
+        host: Host name
+        service: Service name
+        state: Alarm state
+        host_ip: host IP (optional)
     
     Returns:
-        Titolo formattato
-    """
+        Formatted title"""
     title = f"[{state}] {host}"
     
     if service and service != "Host":
@@ -135,33 +127,31 @@ def build_private_note(
     output: str,
     host_ip: Optional[str] = None
 ) -> str:
-    """
-    Costruisci nota privata HTML con dettagli allarme
+    """Build HTML private note with alarm details
     
     Args:
-        host: Nome host
-        service: Nome servizio
-        state: Stato allarme
-        output: Output allarme
-        host_ip: IP host (opzionale)
+        host: Host name
+        service: Service name
+        state: Alarm state
+        output: Alarm output
+        host_ip: host IP (optional)
     
     Returns:
-        HTML nota privata
-    """
+        HTML private note"""
     state_icon = get_state_icon(state)
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    note = f"""<p><strong>{state_icon} Allarme da CheckMK Monitoring</strong></p>
+    note = f"""<p><strong>{state_icon} Alarm from CheckMK Monitoring</strong></p>
 <ul>
 <li><strong>Host:</strong> {host}</li>
 <li><strong>Service:</strong> {service or 'Host Check'}</li>
-<li><strong>Stato:</strong> {state}</li>
+<li><strong>State:</strong> {state}</li>
 <li><strong>IP:</strong> {host_ip or 'N/A'}</li>
-<li><strong>Data/Ora:</strong> {timestamp}</li>
+<li><strong>Date/Time:</strong> {timestamp}</li>
 </ul>
 <p><strong>Output:</strong></p>
 <pre>{output}</pre>
-<p><em>Ticket creato automaticamente dal sistema di monitoraggio CheckMK</em></p>"""
+<p><em>Ticket automatically created by the CheckMK monitoring system</em></p>"""
     
     return note
 
@@ -192,7 +182,7 @@ def main():
     Logger.info(f"Output: {cmk_output}")
     Logger.info(f"IP: {cmk_hostip or 'N/A'}")
     
-    # Carica configurazione
+    # Load configuration
     if not CONFIG_FILE.exists():
         Logger.error(f"File configurazione non trovato: {CONFIG_FILE}")
         sys.exit(1)
@@ -203,7 +193,7 @@ def main():
         Logger.error(f"Errore caricamento configurazione: {e}")
         sys.exit(1)
     
-    # Estrai parametri da config
+    # Extract parameters from config
     anagrafica_id = config.get('anagrafica_id')
     priorita_id = config.get('priorita_id')
     fonte = config.get('fonte', 'CheckMK')
@@ -249,13 +239,13 @@ def main():
     Logger.info("Creazione ticket in corso...")
     
     try:
-        # Assicura token valido
+        # Ensure valid token
         api.ensure_token()
         
-        # Chiamata API per creare ticket
+        # API call to create tickets
         response, status_code = api.api_call("POST", "/ticket", ticket_body)
         
-        # Estrai ID ticket creato
+        # Extract created ticket ID
         ticket_id = response.get('id') or response.get('ticket_id') or response.get('data', {}).get('id')
         ticket_code = response.get('codice') or response.get('code') or response.get('data', {}).get('codice')
         
@@ -265,7 +255,7 @@ def main():
             Logger.success(f"   Codice: {ticket_code or 'N/A'}")
             Logger.success(f"   Link: https://my.ydea.cloud/ticket/{ticket_id}")
             
-            # Aggiungi nota privata con dettagli allarme
+            # Add private note with alarm details
             Logger.info("Aggiunta nota privata con dettagli allarme...")
             
             nota_privata = build_private_note(cmk_host, cmk_service, cmk_state, cmk_output, cmk_hostip)
@@ -286,7 +276,7 @@ def main():
             except Exception as e:
                 Logger.warn(f"  Nota privata non aggiunta (ticket comunque creato): {e}")
             
-            # Traccia il ticket
+            # Track the ticket
             tracking.track_ticket(
                 ticket_id,
                 ticket_code or f"TK-{ticket_id}",
@@ -295,7 +285,7 @@ def main():
                 cmk_output
             )
             
-            # Output per CheckMK
+            # Output for CheckMK
             print(f"TICKET_ID={ticket_id}")
             print(f"TICKET_CODE={ticket_code}")
             

@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-check_ssh_all_sessions.py - CheckMK Local Check for SSH Sessions
+"""check_ssh_all_sessions.py - CheckMK Local Check for SSH Sessions
 
 Counts all active SSH sessions from all users and displays connected usernames.
 Compatible with CheckMK local check format.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -17,15 +15,13 @@ SERVICE = "SSH.All.Sessions"
 
 
 def run_command(cmd: List[str]) -> Tuple[int, str, str]:
-    """
-    Execute a shell command and return exit code, stdout, stderr.
+    """Execute a shell command and return exit code, stdout, stderr.
     
     Args:
         cmd: Command as list of strings
         
     Returns:
-        Tuple of (exit_code, stdout, stderr)
-    """
+        Tuple of (exit_code, stdout, stderr)"""
     try:
         result = subprocess.run(
             cmd,
@@ -44,12 +40,10 @@ def run_command(cmd: List[str]) -> Tuple[int, str, str]:
 
 
 def get_ssh_sessions() -> Tuple[int, Set[str]]:
-    """
-    Get count of active SSH sessions and list of unique users.
+    """Get count of active SSH sessions and list of unique users.
     
     Returns:
-        Tuple of (session_count, set_of_usernames)
-    """
+        Tuple of (session_count, set_of_usernames)"""
     exit_code, stdout, _ = run_command(["who"])
     
     if exit_code != 0 or not stdout:
@@ -71,12 +65,10 @@ def get_ssh_sessions() -> Tuple[int, Set[str]]:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     session_count, usernames = get_ssh_sessions()
     
     if session_count > 0:

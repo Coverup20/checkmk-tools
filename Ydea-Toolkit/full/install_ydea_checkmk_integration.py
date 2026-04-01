@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""
-install_ydea_checkmk_integration.py - Installer integrazione CheckMK → Ydea
+"""install_ydea_checkmk_integration.py - CheckMK integration installer → Ydea
 
-Script di installazione rapida per integrare CheckMK con Ydea Toolkit.
-Copia script di notifica, configura .env, setup cron job, test connessione.
+Quick installation script to integrate CheckMK with Ydea Toolkit.
+Copy notification script, configure .env, setup cron job, test connection.
 
 Usage:
     sudo python3 install_ydea_checkmk_integration.py
 
 Requirements:
     - Root privileges
-    - CheckMK installato
-    - Directory Ydea Toolkit
+    - CheckMK installed
+    - Ydea Toolkit Directory
 
-Version: 1.1.0 (fix cache path, OMD python3 deps, chown monitoring, cron per monitoring user)
-"""
+Version: 1.1.0 (fix cache path, OMD python3 deps, chown monitoring, cron for monitoring user)"""
 
 VERSION = "1.1.0"
 
@@ -29,7 +27,7 @@ from pathlib import Path
 from datetime import datetime
 
 
-# ===== CONFIGURAZIONE =====
+# ===== CONFIGURATION =====
 
 CHECKMK_SITE = os.getenv("CHECKMK_SITE", "monitoring")
 CHECKMK_NOTIFY_DIR = Path(f"/omd/sites/{CHECKMK_SITE}/local/share/check_mk/notifications")
@@ -39,7 +37,7 @@ CACHE_VALIDATOR_NAME = "ydea_cache_validator.py"
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 
-# ===== COLORI OUTPUT =====
+# ===== OUTPUT COLORS =====
 
 class Colors:
     RED = '\033[0;31m'
@@ -75,7 +73,7 @@ def print_header():
 # ===== FUNZIONI CONTROLLO =====
 
 def check_root():
-    """Verifica permessi root"""
+    """Check root permissions"""
     if os.geteuid() != 0:
         error("Questo script deve essere eseguito come root")
         print("  Usa: sudo python3 install_ydea_checkmk_integration.py")
@@ -83,7 +81,7 @@ def check_root():
 
 
 def check_checkmk():
-    """Verifica installazione CheckMK"""
+    """Verify CheckMK installation"""
     checkmk_site_dir = Path(f"/omd/sites/{CHECKMK_SITE}")
     if not checkmk_site_dir.exists():
         error(f"Sito CheckMK '{CHECKMK_SITE}' non trovato")
@@ -93,7 +91,7 @@ def check_checkmk():
 
 
 def check_ydea_toolkit():
-    """Verifica directory Ydea Toolkit"""
+    """Check Ydea Toolkit directory"""
     if not YDEA_TOOLKIT_DIR.exists():
         warn(f"Directory Ydea Toolkit non trovata: {YDEA_TOOLKIT_DIR}")
         response = input("Vuoi crearla? (y/n) ")
@@ -108,10 +106,10 @@ def check_ydea_toolkit():
 
 
 def ensure_python_dependencies():
-    """Verifica/installa dipendenze Python per sistema e per OMD python3"""
+    """Check/install Python dependencies for system and OMD python3"""
     info("Verifica dipendenze Python (requests, python-dotenv)...")
 
-    # 1. OMD python3 (priorità - è quello usato da monitoring user)
+    # 1. OMD python3 (priority - it is the one used by monitoring user)
     omd_python = Path(f"/omd/sites/{CHECKMK_SITE}/bin/python3")
     if omd_python.exists():
         info(f"Verifica dipendenze per OMD python3: {omd_python}")
@@ -136,7 +134,7 @@ def ensure_python_dependencies():
     else:
         warn(f"OMD python3 non trovato in {omd_python}, skip")
 
-    # 2. Python di sistema (fallback via apt)
+    # 2. System Python (fallback via apt)
     module_to_package = {
         "requests": "python3-requests",
         "dotenv": "python3-dotenv",
@@ -162,13 +160,13 @@ def ensure_python_dependencies():
         success("Dipendenze Python sistema già presenti")
 
 
-# ===== INSTALLAZIONE =====
+# ===== INSTALLATION =====
 
 def install_scripts():
-    """Installa script di notifica CheckMK"""
+    """Install CheckMK notification script"""
     info("Installazione script di notifica CheckMK...")
     
-    # Determina percorso script-notify-checkmk
+    # Determine script-notify-checkmk path
     notify_script_dir = None
     candidate_roots = [
         SCRIPT_DIR,
@@ -197,10 +195,10 @@ def install_scripts():
     
     info(f"Usando script da: {notify_script_dir}")
     
-    # Crea directory notifiche se non esiste
+    # Create notification directory if it does not exist
     CHECKMK_NOTIFY_DIR.mkdir(parents=True, exist_ok=True)
     
-    # Copia notifier Ydea principali (con ID persona dedicato)
+    # Copy of main Ydea notifiers (with dedicated person ID)
     required_notifiers = {
         "ydea_la": ["ydea_la.py", "ydea_la"],
         "ydea_ag": ["ydea_ag.py", "ydea_ag"],
@@ -262,7 +260,7 @@ def install_scripts():
     validator_destination.chmod(0o755)
     success(f"{CACHE_VALIDATOR_NAME} installato in {NOTIFY_BIN_DIR}")
     
-    # Copia health monitor (supporta sia .sh che .py)
+    # Copy health monitor (supports both .sh and .py)
     info("Installazione health monitor...")
     health_monitor = None
     possible_monitors = [
@@ -285,7 +283,7 @@ def install_scripts():
     (YDEA_TOOLKIT_DIR / health_monitor.name).chmod(0o755)
     success(f"{health_monitor.name} installato")
 
-    # Copia dipendenze Python del monitor/toolkit (se disponibili)
+    # Copy monitor/toolkit Python dependencies (if available)
     info("Installazione dipendenze toolkit Ydea...")
     dependency_candidates = {
         "ydea_common.py": [
@@ -309,7 +307,7 @@ def install_scripts():
         destination.chmod(0o755)
         success(f"{dependency_name} installato")
 
-    # Chown di tutti i file in YDEA_TOOLKIT_DIR a monitoring
+    # Chown all files in YDEA_TOOLKIT_DIR to monitoring
     monitoring_user = CHECKMK_SITE
     try:
         subprocess.run(
@@ -320,7 +318,7 @@ def install_scripts():
     except Exception as exc:
         warn(f"chown {YDEA_TOOLKIT_DIR} fallito: {exc}")
 
-    # Chown script di notifica a monitoring
+    # Chown monitoring notification script
     try:
         for notifier in CHECKMK_NOTIFY_DIR.iterdir():
             if notifier.name.startswith("ydea"):
@@ -334,7 +332,7 @@ def install_scripts():
 
 
 def read_env_exports(env_file: Path) -> dict:
-    """Legge variabili export da un file .env"""
+    """Reads export variables from an .env file"""
     values = {}
     if not env_file.exists():
         return values
@@ -349,7 +347,7 @@ def read_env_exports(env_file: Path) -> dict:
 
 
 def update_env_exports(env_file: Path, updates: dict):
-    """Aggiorna/aggiunge variabili export in un file .env"""
+    """Update/add export variables in an .env file"""
     existing_lines = env_file.read_text().splitlines() if env_file.exists() else []
     pending = dict(updates)
     new_lines = []
@@ -372,7 +370,7 @@ def update_env_exports(env_file: Path, updates: dict):
 
 
 def prompt_value(label: str, current_value: str = "", required: bool = False, secret: bool = False) -> str:
-    """Prompt interattivo con default e validazione"""
+    """Interactive prompt with default and validation"""
     while True:
         if secret:
             if current_value:
@@ -398,7 +396,7 @@ def prompt_value(label: str, current_value: str = "", required: bool = False, se
 
 
 def normalize_existing_value(key: str, value: str) -> str:
-    """Tratta placeholder come valori vuoti per forzare input reale quando richiesto."""
+    """Treat placeholders as empty values ​​to force real input when required."""
     if not value:
         return ""
     normalized = value.strip().strip('"').strip("'")
@@ -420,7 +418,7 @@ def normalize_existing_value(key: str, value: str) -> str:
 
 
 def prepare_env_profile_file(env_name: str, template_candidates: list) -> Path:
-    """Prepara il file env senza sovrascrivere configurazioni esistenti."""
+    """Prepare the env file without overwriting existing configurations."""
     env_file = YDEA_TOOLKIT_DIR / env_name
     if env_file.exists():
         success(f"Profilo esistente mantenuto: {env_file}")
@@ -438,7 +436,7 @@ def prepare_env_profile_file(env_name: str, template_candidates: list) -> Path:
 
 
 def configure_env_profile(env_file: Path, profile_label: str):
-    """Configura interattivamente un profilo env specifico."""
+    """Interactively configure a specific env profile."""
     if env_file.exists():
         backup_file = env_file.with_suffix(f".backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}")
         shutil.copy(env_file, backup_file)
@@ -503,7 +501,7 @@ def configure_env_profile(env_file: Path, profile_label: str):
 
 
 def setup_env():
-    """Configura file .env, .env.la e .env.ag"""
+    """Configure .env, .env.la and .env.ag files"""
     info("Configurazione file env Ydea (.env, .env.la, .env.ag)...")
 
     base_candidates = [
@@ -555,7 +553,7 @@ def setup_env():
 
 
 def test_connection():
-    """Test connessione Ydea API come utente monitoring"""
+    """Ydea API connection test as monitoring user"""
     info("Test connessione Ydea API (utente monitoring)...")
 
     omd_python = Path(f"/omd/sites/{CHECKMK_SITE}/bin/python3")
@@ -587,10 +585,10 @@ def test_connection():
 
 
 def setup_cron():
-    """Configura cron job per health monitor e cache validator (utente monitoring)"""
+    """Configure cron jobs for health monitor and cache validator (user monitoring)"""
     info("Configurazione cron job per health monitor (utente monitoring)...")
 
-    # Determina quale health monitor usare e il python corretto
+    # Determine which health monitor to use and the correct python
     omd_python = Path(f"/omd/sites/{CHECKMK_SITE}/bin/python3")
     health_monitor_path = YDEA_TOOLKIT_DIR / "ydea_health_monitor.py"
     health_monitor_sh = YDEA_TOOLKIT_DIR / "ydea-health-monitor.sh"
@@ -614,7 +612,7 @@ def setup_cron():
         validator_cmd = None
 
     try:
-        # Leggi crontab attuale dell'utente monitoring
+        # Read the user's current crontab monitoring
         result = subprocess.run(
             ["su", "-", CHECKMK_SITE, "-c", "crontab -l"],
             capture_output=True,
@@ -647,7 +645,7 @@ def setup_cron():
     except Exception as e:
         warn(f"Errore configurazione cron: {e}")
 
-    # Crea file log con permessi aperti
+    # Create log files with open permissions
     for log_path in [Path("/var/log/ydea_health.log"), Path("/var/log/ydea_cache_validator.log")]:
         log_path.touch(exist_ok=True)
         log_path.chmod(0o666)
@@ -655,7 +653,7 @@ def setup_cron():
 
 
 def create_cache_files():
-    """Inizializza directory e file cache in /opt/ydea-toolkit/cache/"""
+    """Initialize cache directories and files in /opt/ydea-toolkit/cache/"""
     info("Inizializzazione directory e file cache...")
 
     cache_dir = YDEA_TOOLKIT_DIR / "cache"
@@ -676,7 +674,7 @@ def create_cache_files():
                 cache_file.write_text("")
         cache_file.chmod(0o666)
 
-    # Chown cache dir e file a monitoring
+    # Chown cache dir and file to monitoring
     monitoring_user = CHECKMK_SITE
     try:
         subprocess.run(["chown", "-R", f"{monitoring_user}:{monitoring_user}", str(cache_dir)], check=True)
@@ -687,7 +685,7 @@ def create_cache_files():
 
 
 def backup_and_remove(path: Path, label: str):
-    """Backup e rimozione sicura di file/dir"""
+    """Backup and safely remove files/dirs"""
     if not path.exists():
         return
 

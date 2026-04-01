@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check_dovecot_maxuserconn.py - CheckMK Local Check for Dovecot max user connections
+"""check_dovecot_maxuserconn.py - CheckMK Local Check for Dovecot max user connections
 
 Extract mail_max_userip_connections setting from doveconf.
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -18,12 +16,10 @@ SERVICE_NAME = "Dovecot-maxuserconn"
 
 
 def get_max_user_connections() -> str:
-    """
-    Get mail_max_userip_connections from doveconf.
+    """Get mail_max_userip_connections from doveconf.
     
     Returns:
-        Max connections value or empty string if not set
-    """
+        Max connections value or empty string if not set"""
     try:
         result = subprocess.run(
             ["doveconf", "-a"],
@@ -51,12 +47,10 @@ def get_max_user_connections() -> str:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     maxconn = get_max_user_connections()
     
     if not maxconn:

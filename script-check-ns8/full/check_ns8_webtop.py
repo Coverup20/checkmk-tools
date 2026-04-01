@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-check_ns8_webtop.py - CheckMK Local Check per WebTop NS8
+"""check_ns8_webtop.py - CheckMK Local Check for WebTop NS8
 
-Monitora disponibilità WebTop su NethServer 8.
-Controlla presenza istanze WebTop e raggiungibilità interfaccia HTTP.
+Monitor WebTop availability on NethServer 8.
+Check presence of WebTop instances and HTTP interface reachability.
 
-Version: 1.0.1
-"""
+Version: 1.0.1"""
 
 import subprocess
 import sys
@@ -21,15 +19,13 @@ SERVICE = "Webtop5"
 
 
 def run_command(cmd: list) -> Tuple[int, str, str]:
-    """
-    Execute a shell command and return exit code, stdout, stderr.
+    """Execute a shell command and return exit code, stdout, stderr.
     
     Args:
         cmd: Command as list of strings
         
     Returns:
-        Tuple of (exit_code, stdout, stderr)
-    """
+        Tuple of (exit_code, stdout, stderr)"""
     try:
         result = subprocess.run(
             cmd,
@@ -48,12 +44,10 @@ def run_command(cmd: list) -> Tuple[int, str, str]:
 
 
 def get_domain_from_fqdn() -> Optional[str]:
-    """
-    Extract domain from host FQDN (everything after first dot).
+    """Extract domain from host FQDN (everything after first dot).
     
     Returns:
-        Domain string or None if cannot determine
-    """
+        Domain string or None if cannot determine"""
     try:
         fqdn = socket.getfqdn()
         parts = fqdn.split('.', 1)
@@ -67,12 +61,10 @@ def get_domain_from_fqdn() -> Optional[str]:
 
 
 def check_webtop_instances() -> bool:
-    """
-    Check if WebTop instances exist via runagent.
+    """Check if WebTop instances exist via runagent.
     
     Returns:
-        True if WebTop instances found, False otherwise
-    """
+        True if WebTop instances found, False otherwise"""
     exit_code, stdout, stderr = run_command(['runagent', '-l'])
     
     if exit_code != 0:
@@ -87,8 +79,7 @@ def check_webtop_instances() -> bool:
 
 
 def check_webtop_http(domain: str) -> Tuple[int, int]:
-    """
-    Check WebTop HTTP availability with SSL verification disabled.
+    """Check WebTop HTTP availability with SSL verification disabled.
     
     Args:
         domain: Domain name for constructing URL
@@ -96,8 +87,7 @@ def check_webtop_http(domain: str) -> Tuple[int, int]:
     Returns:
         Tuple of (state, http_code)
         state: 0=OK, 2=CRITICAL
-        http_code: HTTP response code or 0 if error
-    """
+        http_code: HTTP response code or 0 if error"""
     url = f"https://webtop.{domain}/webtop/"
     
     try:
@@ -123,12 +113,10 @@ def check_webtop_http(domain: str) -> Tuple[int, int]:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     # Get domain from FQDN
     domain = get_domain_from_fqdn()
     

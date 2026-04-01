@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check_fail2ban_status.py - CheckMK Local Check for fail2ban service
+"""check_fail2ban_status.py - CheckMK Local Check for fail2ban service
 
 Check fail2ban service status and count banned IPs across all jails.
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -18,12 +16,10 @@ SERVICE_NAME = "Fail2ban"
 
 
 def is_fail2ban_installed() -> bool:
-    """
-    Check if fail2ban-client is installed.
+    """Check if fail2ban-client is installed.
     
     Returns:
-        True if installed, False otherwise
-    """
+        True if installed, False otherwise"""
     try:
         result = subprocess.run(
             ["command", "-v", "fail2ban-client"],
@@ -38,12 +34,10 @@ def is_fail2ban_installed() -> bool:
 
 
 def is_fail2ban_running() -> bool:
-    """
-    Check if fail2ban service is running.
+    """Check if fail2ban service is running.
     
     Returns:
-        True if running, False otherwise
-    """
+        True if running, False otherwise"""
     try:
         result = subprocess.run(
             ["systemctl", "is-active", "--quiet", "fail2ban"],
@@ -57,12 +51,10 @@ def is_fail2ban_running() -> bool:
 
 
 def get_jails_and_banned() -> tuple:
-    """
-    Get list of jails and total banned IPs.
+    """Get list of jails and total banned IPs.
     
     Returns:
-        Tuple of (jails list, total_banned count)
-    """
+        Tuple of (jails list, total_banned count)"""
     try:
         result = subprocess.run(
             ["fail2ban-client", "status"],
@@ -112,12 +104,10 @@ def get_jails_and_banned() -> tuple:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     if not is_fail2ban_installed():
         print(f"3 {SERVICE_NAME} - fail2ban not installed")
         return 0

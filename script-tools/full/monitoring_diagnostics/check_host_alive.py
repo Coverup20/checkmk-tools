@@ -1,28 +1,27 @@
 #!/usr/bin/env python3
-"""
-check_host_alive.py - CheckMK/Nagios active check: host UP/DOWN via multi-layer probe
+"""check_host_alive.py - CheckMK/Nagios active check: host UP/DOWN via multi-layer probe
 
-Sostituisce check_icmp per host che bloccano il ping ICMP
-(NethSecurity, host dietro NAT/VPN, Windows con firewall, ecc.).
+Replaces check_icmp for hosts that block ICMP ping
+(NethSecurity, host behind NAT/VPN, Windows with firewall, etc.).
 
-Strategia multi-layer (si ferma al primo risultato positivo):
-  1. ICMP Ping 3x (1s timeout ciascuno)       → se risponde → OK
-  2. TCP fallback su porte configurabili       → se risponde (aperta o rifiutata) → OK
-  3. Tutto timeout → CRITICAL (host offline)
+Multi-layer strategy (stops at the first positive result):
+  1. ICMP Ping 3x (1s timeout each) → if responds → OK
+  2. TCP fallback on configurable ports → if it responds (open or rejected) → OK
+  3. All timeout → CRITICAL (host offline)
 
-Deploy su CheckMK server:
+Deploy on CheckMK server:
   cp check_host_alive.py /omd/sites/monitoring/local/lib/nagios/plugins/check_host_alive
   chmod +x /omd/sites/monitoring/local/lib/nagios/plugins/check_host_alive
 
-Configurazione WATO (Host Check Command):
+WATO (Host Check Command) configuration:
   Setup → Hosts → Host Check Command → "Use a custom check plugin"
-  Plugin:    check_host_alive
+  Plugin: check_host_alive
   Arguments: -H $HOSTADDRESS$
 
-  Per host senza CMK agent (solo SSH):
+  For hosts without CMK agent (SSH only):
   Arguments: -H $HOSTADDRESS$ --ports 22 443
 
-  Per host che bloccano anche ping (NethSecurity con regole restrittive):
+  For hosts that also block ping (NethSecurity with restrictive rules):
   Arguments: -H $HOSTADDRESS$ --no-ping
 
 Usage:
@@ -31,8 +30,7 @@ Usage:
   check_host_alive -H 10.0.0.50 --no-ping --ports 22 443 80
   check_host_alive -H 192.168.32.100 --timeout 3
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import argparse
 import errno
@@ -52,7 +50,7 @@ WARNING  = 1
 CRITICAL = 2
 UNKNOWN  = 3
 
-# Etichette porte per output leggibile
+# Port labels for readable output
 PORT_NAMES = {
     22:   "SSH",
     6556: "CMK-Agent",
@@ -68,7 +66,7 @@ PORT_NAMES = {
 
 
 def resolve_host(host: str) -> Optional[str]:
-    """Risolve hostname in IP. Ritorna None se DNS fallisce."""
+    """Resolve hostname to IP. Returns None if DNS fails."""
     try:
         return socket.gethostbyname(host)
     except socket.gaierror:
@@ -76,12 +74,10 @@ def resolve_host(host: str) -> Optional[str]:
 
 
 def ping_check(ip: str, count: int = 3, timeout_sec: int = 1) -> Tuple[bool, float]:
-    """
-    ICMP ping multiplo.
+    """ICMP multiple ping.
 
     Returns:
-        (is_up, avg_rtt_ms) — rtt_ms = -1 se non risponde o non misurabile
-    """
+        (is_up, avg_rtt_ms) — rtt_ms = -1 if unresponsive or unmeasurable"""
     try:
         result = subprocess.run(
             ["ping", "-c", str(count), "-W", str(timeout_sec), ip],
@@ -111,14 +107,12 @@ def ping_check(ip: str, count: int = 3, timeout_sec: int = 1) -> Tuple[bool, flo
 
 
 def tcp_check(ip: str, port: int, timeout_sec: float = 2.0) -> Tuple[bool, str, float]:
-    """
-    Test connettività TCP su una porta.
+    """Testing TCP connectivity on a port.
 
     Returns:
         (is_reachable, detail_msg, rtt_ms)
-        is_reachable = True se porta APERTA o RIFIUTATA
-                     (entrambe indicano host attivo)
-    """
+        is_reachable = True if port OPEN or REJECTED
+                     (both indicate active host)"""
     port_name = PORT_NAMES.get(port, f"port-{port}")
     t0 = time.monotonic()
     try:
@@ -131,7 +125,7 @@ def tcp_check(ip: str, port: int, timeout_sec: float = 2.0) -> Tuple[bool, str, 
         if err == 0:
             return True, f"TCP/{port_name} aperta", rtt
         elif err == errno.ECONNREFUSED:
-            # Host risponde con RST → è attivo, servizio non in ascolto
+            # Host responds with RST → is active, service not listening
             return True, f"TCP/{port_name} rifiutata (host attivo)", rtt
         else:
             return False, f"TCP/{port_name} timeout", -1
@@ -153,13 +147,11 @@ def main() -> int:
         prog=SCRIPT_NAME,
         description=f"CheckMK active check: host UP/DOWN multi-layer v{VERSION}",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Esempi:
+        epilog="""Examples:
   check_host_alive -H 192.168.10.100
   check_host_alive -H ns8.dominio.it --ports 22 6556 443
   check_host_alive -H 10.0.0.50 --no-ping --ports 22 443
-  check_host_alive -H 192.168.32.100 --timeout 5
-        """
+  check_host_alive -H 192.168.32.100 --timeout 5"""
     )
     parser.add_argument(
         "-H", "--host", required=True,
@@ -191,7 +183,7 @@ Esempi:
         print(f"CRITICAL - {host}: DNS non risolve (NXDOMAIN o timeout)")
         return CRITICAL
 
-    # Label per output: mostra hostname se diverso dall'IP
+    # Label for output: show hostname if different from IP
     label = host if host != ip else ip
 
     # ─── Step 1: ICMP Ping ───────────────────────────────────────────────────
@@ -202,7 +194,7 @@ Esempi:
             perf = build_perf_data(rtt, 0)
             print(f"OK - {label} raggiungibile (ping {rtt_str}) | {perf}")
             return OK
-        # Ping fallito → prova TCP fallback
+        # Ping failed → try TCP fallback
 
     # ─── Step 2: TCP fallback ────────────────────────────────────────────────
     tcp_results: List[Tuple[bool, str, float]] = []
@@ -215,7 +207,7 @@ Esempi:
             print(f"OK - {label} raggiungibile ({detail}{ping_note}) | {perf}")
             return OK
 
-    # ─── Tutto timeout → CRITICAL ────────────────────────────────────────────
+    # ─── All timeout → CRITICAL ────────────────────── ──────────────────────
     fail_details = []
     if not args.no_ping:
         fail_details.append("ping 100% loss")

@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-check_ns8_smoke_test.py - CheckMK local check minimale per test pipeline NS8
+"""check_ns8_smoke_test.py - Minimal CheckMK local check for NS8 test pipeline
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import socket
 import sys

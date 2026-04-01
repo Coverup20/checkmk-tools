@@ -1,3 +1,3 @@
 # backup_restore
 
-Script per backup, restore, compressione e retention.
+Scripts for backup, restore, compression and retention.

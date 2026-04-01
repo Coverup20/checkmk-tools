@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-install-backup-jobs.py - Installa systemd timers per backup automatici CheckMK
+"""install-backup-jobs.py - Install systemd timers for automatic CheckMK backups
 
-- job00: Giornaliero compresso (1.2MB), retention 90, ore 03:00
-- job01: Settimanale normale (362MB), retention 5, domenica 04:00
+- job00: Compressed daily (1.2MB), retention 90, 03:00
+- job01: Normal weekly (362MB), retention 5, Sunday 04:00
 
-Uso: python3 install-backup-jobs.py
+Usage: python3 install-backup-jobs.py
 
-Version: 1.1.0
-"""
+Version: 1.1.0"""
 
 import os
 import re
@@ -107,7 +105,7 @@ def main() -> int:
     mode = ask_mode()
     print()
 
-    # Installa units systemd
+    # Install units systemd
     print("  Installing systemd units...")
     for job, units in UNITS.items():
         for unit_name in (units["service"], units["timer"]):
@@ -122,7 +120,7 @@ def main() -> int:
     run(["systemctl", "daemon-reload"])
     print(" Systemd reloaded")
 
-    # Abilita e avvia timers
+    # Enable and start timers
     print("\n Enabling and starting timers...")
     for job, units in UNITS.items():
         timer = units["timer"]

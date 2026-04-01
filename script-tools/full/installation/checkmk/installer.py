@@ -3,8 +3,7 @@
 
 Re-implements the workflow in script-tools/full/installation/install-cmk8/install-cmk/scripts/*.sh in Python.
 
-Version: 1.0.30
-"""
+Version: 1.0.30"""
 
 from __future__ import annotations
 
@@ -149,7 +148,7 @@ def _menu_loop(env_file: Path) -> int:
     W = 42
 
     def row(text: str = "") -> str:
-        """Riga con bordi allineati: ║  testo.ljust(W-4)  ║"""
+        """Line with aligned edges: ║ text.ljust(W-4) ║"""
         return f"║  {text:<{W - 4}}  ║"
 
     sep_top = "╔" + "═" * W + "╗"

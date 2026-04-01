@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check-proxmox_services_status.py - CheckMK Local Check for Proxmox Services
+"""check-proxmox_services_status.py - CheckMK Local Check for Proxmox Services
 
 Monitor essential Proxmox services (pvedaemon, pveproxy, pve-cluster, etc).
 
 Proxmox VE
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys

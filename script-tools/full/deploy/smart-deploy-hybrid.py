@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-smart-deploy-hybrid.py
+"""smart-deploy-hybrid.py
 
 Python entrypoint that delegates to smart-deploy-hybrid.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

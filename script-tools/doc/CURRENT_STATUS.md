@@ -1,8 +1,8 @@
 # Windows Installer - Current Status Update
-> **Categoria:** Storico
+> **Category:** Historical
 
 **Date:** 2025-11-07 (Session Continuation)  
-**Status:**  URL Fix Applied & Ready for Testing
+**Status:** URL Fix Applied & Ready for Testing
 
 ---
 
@@ -12,7 +12,7 @@
 
 You ran the installer and encountered:
 ```
-[ERR] Errore durante download: Errore del server remoto: (404) Non trovato.
+[ERR] Error downloading: Remote server error: (404) Not found.
 ```
 
 **Cause:** The hardcoded URL for CheckMK Agent MSI was pointing to a non-existent location.
@@ -23,14 +23,14 @@ You ran the installer and encountered:
 
 **Before:**
 ```powershell
-$CHECKMK_MSI_URL = "https://monitoring.nethlab.it/..."  # Single URL, fails with 404
+$CHECKMK_MSI_URL = "https://monitoring.nethlab.it/..." # Single URL, fails with 404
 ```
 
 **After:**
 ```powershell
 $CHECKMK_MSI_URLS = @(
-    "https://download.checkmk.com/...",        # Primary (official)
-    "https://monitoring.nethlab.it/..."         # Fallback (local)
+    "https://download.checkmk.com/...", # Primary (official)
+    "https://monitoring.nethlab.it/..." # Fallback (local)
 )
 
 # Script tries each URL with automatic retry
@@ -53,7 +53,7 @@ foreach ($url in $CHECKMK_MSI_URLS) { ... }
 
 ---
 
-## How to Test Now
+##How to Test Now
 
 ### Quick Test
 
@@ -65,10 +65,10 @@ cd 'C:\Users\Marzio\Desktop\CheckMK\Script\script-tools'
 .\install-agent-interactive.ps1
 
 # The script will now:
-# 1. Try primary URL (https://download.checkmk.com/...)
-# 2. If that fails, try fallback URL
+#1. Try primary URL (https://download.checkmk.com/...)
+#2. If that fails, try fallback URL
 # 3. Display which URL it's trying
-# 4. Show download progress and size
+#4. Show download progress and size
 ```
 
 ### Expected Output
@@ -76,20 +76,20 @@ cd 'C:\Users\Marzio\Desktop\CheckMK\Script\script-tools'
 If primary URL succeeds:
 ```
 [*] Download CheckMK Agent v2.4.0p14...
-    Tentativo download da: https://download.checkmk.com/...
-    [OK] Download completato (X.XX MB)
+    Attempting download from: https://download.checkmk.com/...
+    [OK] Download completed (X.XX MB)
 
-[*] Installazione in corso...
-    [OK] Installazione completata
+[*] Installation in progress...
+    [OK] Installation complete
 ```
 
 If primary fails, then fallback:
 ```
 [*] Download CheckMK Agent v2.4.0p14...
-    Tentativo download da: https://download.checkmk.com/...
-    [WARN] URL fallito: (404) Non trovato
-    Tentativo download da: https://monitoring.nethlab.it/...
-    [OK] Download completato (X.XX MB)
+    Attempting download from: https://download.checkmk.com/...
+    [WARN] URL failed: (404) Not found
+    Attempted download from: https://monitoring.nethlab.it/...
+    [OK] Download completed (X.XX MB)
 ```
 
 ---
@@ -126,10 +126,10 @@ If primary fails, then fallback:
 
 When prompted:
 ```
-Nome host [default: COMPUTERNAME]: <your-hostname>
-Server FRP remoto [default: monitor.nethlab.it]: <your-server>
-Porta remota (es: 20001): 20001
-Token di sicurezza: <your-token>
+Hostname [default: COMPUTERNAME]: <your-hostname>
+Remote FRP server [default: monitor.nethlab.it]: <your-server>
+Remote port (e.g. 20001): 20001
+Security token: <your-token>
 ```
 
 ### 3. Uninstall Test
@@ -153,18 +153,18 @@ Token di sicurezza: <your-token>
 - **OS:** Windows 11
 - **Version:** 10.0.26220
 - **Architecture:** x86
-- **Status:**  Correctly identified
+- **Status:** Correctly identified
 
 ### Network
--  Can reach download servers (tries fallback)
--  PowerShell TLS 1.2 enabled
--  Web client functioning
+- Can reach download servers (tries fallback)
+- PowerShell TLS 1.2 enabled
+- Web client functioning
 
-### Script Status
--  Syntax: Valid
--  Functions: All present
--  Error Handling: Enhanced
--  Git History: Clean
+### ScriptStatus
+- Syntax: Valid
+- Functions: All present
+- Error Handling: Enhanced
+- Git History: Clean
 
 ---
 
@@ -177,7 +177,7 @@ Commit 30017b8: URL fallback implementation
 Total changes:
   - Added: URL array with 2 mirrors
   - Added: Retry loop with fallback
-  - Added: User feedback per URL attempt
+  - Added: User feedback for URL attempt
   - Removed: Single hardcoded URL
   - Improved: Error handling
 ```
@@ -190,7 +190,7 @@ Total changes:
 FUNCTIONALITY:
    OS Detection: WORKING
    System Validation: WORKING
-   URL Fallback: IMPLEMENTED
+   Fallback URL: IMPLEMENTED
    FRPC Configuration: READY
    Service Management: READY
    Uninstallation: READY
@@ -200,7 +200,7 @@ TESTING STATUS:
    OS Detection: VERIFIED (Win11)
    URL Fallback Logic: IMPLEMENTED
    Full Installation: PENDING (ready to test)
-   FRPC Configuration: READY TO TEST
+FRPC Configuration: READY TO TEST
    Service Creation: READY TO TEST
    Uninstall Cleanup: READY TO TEST
 
@@ -238,7 +238,7 @@ DOCUMENTATION:
 
 ---
 
-## Quick Reference
+## QuickReference
 
 | Action | Command |
 |--------|---------|
@@ -259,7 +259,7 @@ DOCUMENTATION:
 
 ---
 
-**Status:**  **READY FOR CONTINUED TESTING**  
+**Status:** **READY FOR CONTINUED TESTING**  
 **Last Update:** 2025-11-07 (URL fix applied)  
 **Next Action:** Run installer again with corrected download logic
 
@@ -267,4 +267,4 @@ The script is now ready with improved URL handling. The next test run should eit
 1. Successfully download from primary URL, or
 2. Automatically fallback and retry with secondary URL
 
-Ready to continue testing! 
+Ready to continue testing!

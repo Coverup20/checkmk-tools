@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check_dovecot_vsz.py - CheckMK Local Check for Dovecot VSZ memory limit
+"""check_dovecot_vsz.py - CheckMK Local Check for Dovecot VSZ memory limit
 
 Extract Dovecot VszLimit setting from system configuration.
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -18,12 +16,10 @@ SERVICE_NAME = "Dovecot-vsz-limit"
 
 
 def get_vsz_limit() -> str:
-    """
-    Get Dovecot VszLimit from config.
+    """Get Dovecot VszLimit from config.
     
     Returns:
-        VSZ limit value or empty string if not set
-    """
+        VSZ limit value or empty string if not set"""
     try:
         result = subprocess.run(
             ["config", "show", "dovecot"],
@@ -50,12 +46,10 @@ def get_vsz_limit() -> str:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     vsz_limit = get_vsz_limit()
     
     if not vsz_limit:

@@ -1,19 +1,19 @@
 # check_uptime.sh
 
-## Descrizione
-Monitora uptime del sistema e load average su NSecFirewall8, normalizzando il load per numero di CPU.
+## Description
+Monitor system uptime and load average on NSecFirewall8, normalizing load by number of CPUs.
 
-## Funzionalità
-- Legge uptime da `/proc/uptime` e converte in giorni/ore/minuti
-- Legge load average (1min, 5min, 15min) da `/proc/loadavg`
-- Conta CPU disponibili con `nproc`
-- Normalizza load per CPU (load / cpu_count)
-- Threshold: WARNING se load/cpu > 0.8, CRITICAL se > 1.5
+## Features
+- Read uptime from `/proc/uptime` and convert to days/hours/minutes
+- Read load average (1min, 5min, 15min) from `/proc/loadavg`
+- Count available CPUs with `nproc`
+- Normalize load per CPU (load / cpu_count)
+- Threshold: WARNING if load/cpu > 0.8, CRITICAL if > 1.5
 
-## Stati
-- **OK (0)**: Load normalizzato < 0.8 per CPU
-- **WARNING (1)**: Load normalizzato >= 0.8 per CPU
-- **CRITICAL (2)**: Load normalizzato >= 1.5 per CPU
+## States
+- **OK (0)**: Normalized load < 0.8 per CPU
+- **WARNING (1)**: Normalized load >= 0.8 per CPU
+- **CRITICAL (2)**: Normalized load >= 1.5 per CPU
 
 ## Output CheckMK
 ```
@@ -21,38 +21,38 @@ Monitora uptime del sistema e load average su NSecFirewall8, normalizzando il lo
 ```
 
 ## Performance Data
-- `uptime_seconds`: Uptime totale in secondi
-- `load1`: Load average 1 minuto
-- `load5`: Load average 5 minuti
-- `load15`: Load average 15 minuti
-- `cpu_count`: Numero di CPU/core
+- `uptime_seconds`: Total uptime in seconds
+- `load1`: Load average 1 minute
+- `load5`: Load average 5 minutes
+- `load15`: Load average 15 minutes
+- `cpu_count`: Number of CPUs/cores
 
-## Requisiti
-- File `/proc/uptime` e `/proc/loadavg`
-- Comando `nproc` per contare CPU
+## Requirements
+- `/proc/uptime` and `/proc/loadavg` files
+- `nproc` command to count CPU
 
-## Installazione
+## Installation
 ```bash
 cp check_uptime.sh /usr/lib/check_mk_agent/local/rcheck_uptime.sh
 chmod +x /usr/lib/check_mk_agent/local/rcheck_uptime.sh
 ```
 
-## Test manuale
+## Manual testing
 ```bash
 bash /opt/checkmk-tools/script-check-nsec8/full/check_uptime.sh
 ```
 
-## Interpretazione Load Average
-- **< 0.7 per CPU**: Sistema tranquillo
-- **0.7-1.0 per CPU**: Sistema carico ma gestibile
-- **1.0-1.5 per CPU**: Sistema molto carico, attenzione
-- **> 1.5 per CPU**: Sistema sovraccarico, processi in coda
+## Load Average Interpretation
+- **< 0.7 per CPU**: System quiet
+- **0.7-1.0 per CPU**: System loaded but manageable
+- **1.0-1.5 per CPU**: Highly loaded system, be careful
+- **> 1.5 per CPU**: System overloaded, queued processes
 
-## Note
-- Load normalizzato aiuta a confrontare sistemi con CPU diverse
-- Load alto su firewall può indicare:
-  - Molto traffico da processare
-  - Regole firewall inefficienti
-  - Attacco in corso
-  - Processi in background pesanti
-- Uptime molto lungo può richiedere reboot per aggiornamenti kernel
+## Notes
+- Normalized Load helps compare systems with different CPUs
+- High load on firewall may indicate:
+  - Lots of traffic to process
+  - Inefficient firewall rules
+  - Attack in progress
+  - Heavy background processes
+- Very long uptime may require reboots for kernel updates

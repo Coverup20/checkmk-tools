@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-checkmk_rclone_spaces.py
+"""checkmk_rclone_spaces.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import argparse
 import datetime as dt
@@ -326,8 +324,7 @@ Restart=on-failure
 RestartSec=5
 
 [Install]
-WantedBy=multi-user.target
-"""
+WantedBy=multi-user.target"""
 
     unit_path.write_text(unit, encoding="utf-8")
     if not unit_path.exists():

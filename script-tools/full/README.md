@@ -1,38 +1,38 @@
-# script-tools/full - Struttura parlante
+# script-tools/full - Speaking structure
 
-Questa cartella è organizzata per **uso funzionale**.
+This folder is organized for **functional use**.
 
-## Sottocartelle
+## Subfolders
 
 - `backup_restore/`  
-  Backup, restore, compressione backup, retention, rclone space.
+  Backup, restore, backup compression, retention, rclone space.
 
 - `deploy/`  
-  Deploy script/check, smart deploy, deploy monitoraggio.
+  Deploy script/check, smart deployment, deployment monitoring.
 
 - `installation/`  
-  Installazione agent, FRPC, componenti e setup correlati.
+  Installation of agents, FRPC, related components and setups.
 
 - `upgrade_maintenance/`  
-  Upgrade, pre-upgrade, rocksolid startup check, ottimizzazioni e maintenance.
+  Upgrade, pre-upgrade, rocksolid startup check, optimizations and maintenance.
 
 - `sync_update/`  
-  Auto-git-sync, update script, update crontab, sync da repo.
+  Auto-git-sync, update script, update crontab, sync from repo.
 
 - `monitoring_diagnostics/`  
-  Tuning, diagnostica, debug monitor, distributed monitoring setup.
+  Tuning, diagnostics, debug monitor, distributed monitoring setup.
 
 - `network_scan/`  
-  Script di scansione nmap.
+  nmap scan script.
 
 - `wrappers_templates/`  
-  Template e wrapper di esempio.
+  Example template and wrapper.
 
 - `misc/`  
-  Script non ancora riclassificati in un dominio più specifico.
+  Scripts not yet reclassified to a more specific domain.
 
-## Regola operativa
+## Operational rule
 
-- Gli script stanno nelle rispettive sottocartelle categoria.
-- In root `script-tools/full` non devono esserci script `.sh`/`.py`.
-- Niente wrapper legacy: i path da usare sono quelli delle cartelle categoria.
+- The scripts are in their respective category subfolders.
+- There must be no `.sh`/`.py` scripts in root `script-tools/full`.
+- No legacy wrappers: the paths to use are those of the category folders.

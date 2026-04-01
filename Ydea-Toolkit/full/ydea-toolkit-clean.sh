@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
-# ydea-toolkit.sh - Toolkit completo per Ydea API v2
+# ydea-toolkit.sh - Complete toolkit for Ydea API v2
 
-# Include login, gestione token e funzioni helper per ticket
+# Includes login, token management and ticket helper functions
 set -euo pipefail
 
 
-# ===== Caricamento configurazione da .env =====
+# ===== Loading configuration from .env =====
 
-# Carica .env solo se le variabili critiche non sono già impostate
+# Load .env only if critical variables are not already set
 if [[ -z "${YDEA_ID:-}" ]] || [[ -z "${YDEA_API_KEY:-}" ]]; then
   
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,16 +29,16 @@ fi
 : "${YDEA_LOGIN_PATH:=/login}"
 
 
-# Credenziali Login API
+# API Login Credentials
 : "${YDEA_ID:=}"
 : "${YDEA_API_KEY:=}"
 
 
-# ID Utente per operazioni
+# User ID for operations
 : "${YDEA_USER_ID_CREATE_TICKET:=4675}"      
-# ID utente per creazione ticket
+# User ID for ticket creation
 : "${YDEA_USER_ID_CREATE_NOTE:=4675}"        
-# ID utente per creazione note/commenti privati
+# User ID for creating private notes/comments
 
 : "${YDEA_TOKEN_FILE:=${HOME}/.ydea_token.json}"
 : "${YDEA_EXPIRY_SKEW:=60}"
@@ -50,7 +50,7 @@ fi
 # DEBUG, INFO, WARN, ERROR
 : "${YDEA_TRACKING_FILE:=/var/log/ydea-tickets-tracking.json}"
 : "${YDEA_TRACKING_RETENTION_DAYS:=365}"  
-# Mantieni ticket risolti per N giorni (1 anno)
+# Keep resolved tickets for N days (1 year)
 
 
 CURL_OPTS=(
@@ -131,7 +131,7 @@ success() { log_success "$@"; }
 error() { log_error "$@"; }
 
 
-# ===== Persistenza Token =====
+# ===== Token Persistence =====
 save_token() {
   local token="$1"
   local now exp
@@ -238,7 +238,7 @@ ydea_api() {
   log_debug "$method $url"
   
   
-# Log request body se presente
+# Log request body if present
   if [[ "$#" -gt 0 ]]; then
     log_write "REQUEST" "$method $url | Body: ${1:0:200}..."
   fi
@@ -246,7 +246,7 @@ ydea_api() {
   local resp http_body http_code
   
   
-# Funzione helper per fare la chiamata
+# Helper function to make the call
   make_request() {
     if [[ "$#" -gt 0 ]]; then
       curl "${CURL_OPTS[@]}" -w '\n%{http_code}' -X "$method" \
@@ -264,7 +264,7 @@ ydea_api() {
   }
 
   
-# Prima richiesta
+# First request
   if ! resp="$(make_request "$@")"; then
     log_error "API call fallita: $method $url"
     log_error "Errore curl: $resp"
@@ -278,13 +278,13 @@ ydea_api() {
   log_api_call "$method" "$url" "$http_code"
   
   
-# Mostra errore se non è 2xx
+# Show error if not 2xx
   if [[ ! "$http_code" =~ ^2[0-9][0-9]$ ]]; then
     log_error "HTTP $http_code: $(echo "$http_body" | jq -r '.message // .error // empty' 2>/dev/null || echo "$http_body" | head -c 200)"
   fi
 
   
-# Se 401, refresh token e retry
+# If 401, refresh token and retry
   if [[ "$http_code" == "401" ]]; then
     log_warn "Token scaduto (401), rinnovo e riprovo..."
     ydea_login
@@ -309,10 +309,10 @@ ydea_api() {
 }
 
 
-# ===== FUNZIONI HELPER PER TICKET =====
+# ===== HELPER FUNCTIONS FOR TICKETS =====
 
 
-# Lista tutti i ticket con filtri opzionali
+# List all tickets with optional filters
 list_tickets() {
   local limit="${1:-50}"
   local status="${2:-}"
@@ -324,7 +324,7 @@ list_tickets() {
 }
 
 
-# Dettagli di un singolo ticket
+# Details of a single ticket
 get_ticket() {
   local ticket_id="$1"
   [[ -n "$ticket_id" ]] || { log_error "Ticket ID richiesto"; return 2; }
@@ -335,7 +335,7 @@ get_ticket() {
 }
 
 
-# Crea un nuovo ticket
+# Create a new ticket
 create_ticket() {
   local title="$1"
   local description="$2"
@@ -349,7 +349,7 @@ create_ticket() {
   
 # Mappa priorità testuale a priority_id Ydea (30=bassa, 20=media, 10=alta)
   
-# Per monitoraggio: usa sempre priorità Bassa (30)
+# For monitoring: always use Low priority (30)
   local priority_num=30
   case "${priority,,}" in
     low|bassa)        priority_num=30 ;;
@@ -360,7 +360,7 @@ create_ticket() {
   esac
   
   
-# Valori predefiniti da variabili ambiente o fallback
+# Default values ​​from environment variables or fallbacks
   local azienda="${YDEA_AZIENDA:-2339268}"
   local contatto="${YDEA_CONTATTO:-773763}"
   
@@ -401,7 +401,7 @@ create_ticket() {
   fi
   
   
-# Aggiungi creatoda se fornito (campo opzionale per forzare il creatore)
+# Add createdby if provided (optional field to force creator)
   if [[ -n "$creatoda" ]]; then
     body=$(echo "$body" | jq --argjson uid "$creatoda" '. + {creatoda: $uid}')
   fi
@@ -411,7 +411,7 @@ create_ticket() {
 }
 
 
-# Aggiorna un ticket
+# Update a ticket
 update_ticket() {
   local ticket_id="$1"
   local json_updates="$2"
@@ -452,7 +452,7 @@ add_comment() {
   }
   
   
-# ID utente per campo creatoda (usa variabile esportata, SENZA fallback)
+# User ID for field created by (use exported variable, NO fallback)
   local user_id="${YDEA_USER_ID_CREATE_NOTE}"
   
   local body
@@ -469,7 +469,7 @@ add_comment() {
 }
 
 
-# Cerca ticket per testo
+# Search tickets by text
 search_tickets() {
   local query="$1"
   local limit="${2:-20}"
@@ -481,14 +481,14 @@ search_tickets() {
 }
 
 
-# Lista categorie disponibili
+# List of available categories
 list_categories() {
   log_info "Recupero categorie..."
   ydea_api GET "/categories"
 }
 
 
-# Lista utenti
+# User list
 list_users() {
   local limit="${1:-50}"
   log_info "Recupero utenti (limit: $limit)..."
@@ -499,7 +499,7 @@ list_users() {
 # ===== Tracking Ticket System =====
 
 
-# Inizializza il file di tracking se non esiste
+# Initialize the tracking file if it does not exist
 init_tracking_file() {
   if [[ ! -f "$YDEA_TRACKING_FILE" ]]; then
     echo '{"tickets":[],"last_update":""}' > "$YDEA_TRACKING_FILE"
@@ -523,7 +523,7 @@ local now
 now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   
   
-# Recupera dettagli ticket da API usando /tickets?limit=100 (endpoint /tickets/{id} non accessibile)
+# Retrieve ticket details from API using /tickets?limit=100 (endpoint /tickets/{id} not accessible)
   local ticket_data
   ticket_data=$(ydea_api GET "/tickets?limit=100" 2>/dev/null | jq --arg tid "$ticket_id" '.objs[] | select(.id == ($tid|tonumber))' || 
 echo "{}")
@@ -572,7 +572,7 @@ echo "{}")
     }')
   
   
-# Verifica se già tracciato
+# Check if already tracked
   local exists
   exists=$(jq --arg tid "$ticket_id" '.tickets[] | select(.ticket_id == ($tid|tonumber)) | .ticket_id' "$YDEA_TRACKING_FILE" 2>/dev/null || 
 echo "")
@@ -592,11 +592,11 @@ echo "")
   fi
   
   log_success "Ticket 
-#$ticket_id ($codice) tracciato - Host: $host, Service: $service"
+#$ticket_id ($code) plotted - Host: $host, Service: $service"
 }
 
 
-# Aggiorna stato ticket tracciati
+# Update tracked ticket status
 update_tracked_tickets() {
   init_tracking_file
   
@@ -610,7 +610,7 @@ now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   log_info "Aggiornamento stati ticket tracciati..."
   
   
-# Leggi tutti i ticket non risolti
+# Read all unresolved tickets
   local tickets
   tickets=$(jq -r '.tickets[] | select(.resolved_at == null) | .ticket_id' "$YDEA_TRACKING_FILE" 2>/dev/null || 
 echo "")
@@ -629,21 +629,21 @@ IFS= read -r ticket_id; do
 #$ticket_id..."
     
     
-# Recupera tutti i ticket e filtra per ID (l'API non supporta filtro ?id=X)
+# Retrieve all tickets and filter by ID (API does not support ?id=X filter)
     local ticket_data
     ticket_data=$(ydea_api GET "/tickets?limit=100" 2>/dev/null || 
 echo "{}")
     
     
-# Filtra per ticket_id specifico e prendi il primo match
+# Filter by specific ticket_id and get the first match
     local ticket_obj
     ticket_obj=$(
 echo "$ticket_data" | jq --arg tid "$ticket_id" '[.objs[] | select(.id == ($tid|tonumber))] | .[0] // {}' 2>/dev/null)
     
     if [[ "$ticket_obj" == "{}" ]] || [[ "$ticket_obj" == "null" ]]; then
       log_warn " Ticket 
-#$ticket_id non trovato, potrebbe essere stato eliminato - contrassegnato come risolto"
-      # Contrassegna il ticket come risolto per consentire la pulizia
+#$ticket_id not found, may have been deleted - marked as resolved"
+      # Mark the ticket as resolved for cleanup
       jq --arg tid "$ticket_id" --arg now "$now" \
         '.tickets |= map(if .ticket_id == ($tid|tonumber) then .stato = "Eliminato" | .resolved_at = $now | .last_update = $now else . end) | .last_update = $now' \
         "$YDEA_TRACKING_FILE" > "${YDEA_TRACKING_FILE}.tmp" && mv "${YDEA_TRACKING_FILE}.tmp" "$YDEA_TRACKING_FILE"
@@ -669,17 +669,17 @@ assegnato_a=$(
 echo "$ticket_obj" | jq -r 'if .assegnatoA | type == "object" then (if (.assegnatoA | length) > 0 then [.assegnatoA | to_entries[].value] | join(", ") else "Non assegnato" end) elif .assegnatoA then .assegnatoA else "Non assegnato" end')
     
     
-# Controlla se risolto
+# Check if resolved
     if [[ "$stato" =~ ^(Effettuato|Chiuso|Completato|Risolto)$ ]]; then
       log_success "├ö┬ú├á Ticket 
-#$ticket_id RISOLTO (stato: $stato)"
+#$ticket_id RESOLVED (status: $status)"
       jq --arg tid "$ticket_id" --arg stato "$stato" --arg desc "$descrizione_ticket" --arg prio "$priorita" --arg assegnato "$assegnato_a" --arg now "$now" \
         '.tickets |= map(if .ticket_id == ($tid|tonumber) then .stato = $stato | .descrizione_ticket = $desc | .priorita = $prio | .assegnatoA = $assegnato | .resolved_at = $now | .last_update = $now else . end) | .last_update = $now' \
         "$YDEA_TRACKING_FILE" > "${YDEA_TRACKING_FILE}.tmp" && mv "${YDEA_TRACKING_FILE}.tmp" "$YDEA_TRACKING_FILE"
       resolved=$((resolved + 1))
     else
       
-# Aggiorna stato, descrizione, priorita e assegnazione
+# Update status, description, priority and assignment
       jq --arg tid "$ticket_id" --arg stato "$stato" --arg desc "$descrizione_ticket" --arg prio "$priorita" --arg assegnato "$assegnato_a" --arg now "$now" \
         '.tickets |= map(if .ticket_id == ($tid|tonumber) then .stato = $stato | .descrizione_ticket = $desc | .priorita = $prio | .assegnatoA = $assegnato | .last_update = $now | .checks_count += 1 else . end) | .last_update = $now' \
         "$YDEA_TRACKING_FILE" > "${YDEA_TRACKING_FILE}.tmp" && mv "${YDEA_TRACKING_FILE}.tmp" "$YDEA_TRACKING_FILE"
@@ -751,7 +751,7 @@ echo ""
     
 echo "┬¡ãÆ├ÂÔöñ Ticket Aperti:"
     jq -r '.tickets[] | select(.resolved_at == null) | "  [
-#\(.ticket_id)] \(.codice) - \(.host)/\(.service) - Stato: \(.stato) - Creato: \(.created_at)"' "$YDEA_TRACKING_FILE"
+#\(.ticket_id)] ​​\(.code) - \(.host)/\(.service) - Status: \(.status) - Created: \(.created_at)"' "$YDEA_TRACKING_FILE"
     
 echo ""
   fi
@@ -760,17 +760,17 @@ echo ""
     
 echo "├ö┬ú├á Ultimi 5 Ticket Risolti:"
     jq -r '.tickets[] | select(.resolved_at != null) | "\(.resolved_at) | 
-#\(.ticket_id) | \(.codice) | \(.host)/\(.service)"' "$YDEA_TRACKING_FILE" | sort -r | head -5 | while 
+#\(.ticket_id) | \(.codice) | \(.host)/\(.service)"' "$YDEA_TRACKING_FILE" | sort -r | head -5 | while
 IFS='|' read -r date tid code host; do
       
-echo "  [$date] $tid $code - $host"
+echo "[$date] $tid $code - $host"
     done
     
 echo ""
   fi
   
   
-# Tempo medio di risoluzione
+# Average resolution time
   local avg_resolution
   avg_resolution=$(jq -r '[.tickets[] | select(.resolved_at != null) | 
     (((.resolved_at | fromdateiso8601) - (.created_at | fromdateiso8601)) / 3600)] | 
@@ -779,26 +779,26 @@ echo "0")
   
   if [[ "$avg_resolution" != "0" ]]; then
     
-echo "├ö├àÔûÆ┬┤┬®├à  Tempo medio risoluzione: ~$avg_resolution ore"
+echo "├ö├àÔûÆ┬┤┬®├à Average resolution time: ~$avg_resolution hours"
   fi
 }
 
 
-# Lista tutti i ticket tracciati
+# List all tracked tickets
 list_tracked_tickets() {
   init_tracking_file
   jq '.' "$YDEA_TRACKING_FILE"
 }
 
 
-# ===== Configurazione Interattiva =====
+# ===== Interactive Configuration =====
 interactive_config() {
   
-# Usa la directory dello script, non la working directory
+# Use the script directory, not the working directory
   local env_file="$SCRIPT_DIR/.env"
   
   
-echo "┬¡ãÆ├Â┬║ Configurazione Interattiva Ydea Toolkit"
+echo "┬¡ãÆ├Â┬║ Interactive Configuration Ydea Toolkit"
   
 echo "=========================================="
   
@@ -822,9 +822,9 @@ echo ""
   fi
   
   
-echo "┬¡ãÆ├┤├» CREDENZIALI API (obbligatorie)"
+echo "┬¡ãÆ├┤├» API CREDENTIALS (required)"
   
-echo "   Ottienile da: https://my.ydea.cloud ├ö├Ñ├å Impostazioni ├ö├Ñ├å La mia azienda ├ö├Ñ├å API"
+echo "Get them from: https://my.ydea.cloud ├ö├Ñ├å Settings ├ö├Ñ├å My Company ├ö├Ñ├å API"
   
 echo ""
   
@@ -859,9 +859,9 @@ echo "├ö├ÿ├« YDEA_API_KEY è obbligatoria!"
   
 echo ""
   
-echo "┬¡ãÆ├ª├▒ ID UTENTE PER OPERAZIONI (opzionali)"
+echo "┬¡ãÆ├ª├▒ USER ID FOR OPERATIONS (optional)"
   
-echo "   Usa gli ID degli utenti Ydea per attribuire creazioni"
+echo "Use Ydea user IDs to attribute creations"
   
 echo ""
   
@@ -880,7 +880,7 @@ echo ""
   
 echo "┬¡ãÆ├┤├ÿ GESTIONE LOG E TRACKING (opzionali)"
   
-echo "   Configurazione avanzata per logging e monitoraggio"
+echo "Advanced configuration for logging and monitoring"
   
 echo ""
   
@@ -906,7 +906,7 @@ echo ""
 echo "$new_log_level" | tr '[:lower:]' '[:upper:]')
   
   
-# Tracking file
+# Tracking files
   local current_tracking_file="${YDEA_TRACKING_FILE:-/var/log/ydea-tickets-tracking.json}"
   read -r -p "Percorso file tracking ticket [$current_tracking_file]: " new_tracking_file
   new_tracking_file="${new_tracking_file:-$current_tracking_file}"
@@ -920,33 +920,33 @@ echo "$new_log_level" | tr '[:lower:]' '[:upper:]')
   
 echo ""
   
-echo "┬¡ãÆ├å┬Ñ Salvataggio configurazione in: $env_file"
+echo "┬¡ãÆ├å┬Ñ Saving configuration in: $env_file"
   
   
-# Crea backup se esiste
+# Create backup if it exists
   if [[ -f "$env_file" ]]; then
     cp "$env_file" "${env_file}.backup.$(date +%Y%m%d_%H%M%S)"
     
-echo "   (backup creato: ${env_file}.backup.$(date +%Y%m%d_%H%M%S))"
+echo "(backup created: ${env_file}.backup.$(date +%Y%m%d_%H%M%S))"
   fi
   
   
-# Scrivi nuovo .env
+# Write new .env
   cat > "$env_file" <<EOF
 
 # ===== YDEA TOOLKIT CONFIGURATION =====
 
-# Generato il: $(date '+%Y-%m-%d %H:%M:%S')
+# Generated on: $(date '+%Y-%m-%d %H:%M:%S')
 
 
-# Credenziali API (OBBLIGATORIE)
+# API Credentials (MANDATORY)
 export 
 YDEA_ID="$new_id"
 export 
 YDEA_API_KEY="$new_key"
 
 
-# ID Utente per operazioni (opzionali)
+# User ID for operations (optional)
 export 
 YDEA_USER_ID_CREATE_TICKET=$new_ticket_id
 export 
@@ -986,7 +986,7 @@ EOF
   
 echo ""
   
-echo "├ö┬ú├á Configurazione salvata con successo!"
+echo "├ö┬ú├á Configuration saved successfully!"
   
 echo ""
   
@@ -1002,21 +1002,21 @@ echo "   ID creazione note: $new_note_id"
   
 echo ""
   
-echo " Configurazione Log & Tracking:"
+echo "Log & Tracking Configuration:"
   
-echo "   File log: $new_log_file"
+echo "Log file: $new_log_file"
   
-echo "   Dimensione max: ${new_log_size_mb}MB"
+echo "Max size: ${new_log_size_mb}MB"
   
 echo "   Livello log: $new_log_level"
   
-echo "   File tracking: $new_tracking_file"
+echo "Tracking file: $new_tracking_file"
   
-echo "   Retention giorni: $new_retention"
+echo "Retention days: $new_retention"
   
 echo ""
   
-echo "┬¡ãÆ┬║┬¼ Test configurazione:"
+echo "┬¡ãÆ┬║┬¼ Configuration test:"
   
 echo "   source $env_file"
   
@@ -1034,22 +1034,22 @@ show_usage() {
 SETUP:
   export 
 YDEA_ID="tuo_id"              
-# Da: Impostazioni ├ö├Ñ├å La mia azienda ├ö├Ñ├å API
+# From: Settings ├ö├Ñ├å My Company ├ö├Ñ├å API
   export 
 YDEA_API_KEY="tua_chiave_api"
   
   
-# ID Utente per operazioni (opzionali)
+# User ID for operations (optional)
   export 
 YDEA_USER_ID_CREATE_TICKET=4675    
-# ID per creazione ticket
+# ID for ticket creation
   export 
 YDEA_USER_ID_CREATE_NOTE=4675      
-# ID per creazione note/commenti
+# ID for creating notes/comments
   
   export 
 YDEA_DEBUG=1                  
-# (opzionale) per debug verboso
+# (optional) for verbose debugging
   export 
 YDEA_LOG_FILE=/path/log.log   
 # (default: /var/log/ydea-toolkit.log)
@@ -1095,7 +1095,7 @@ COMANDI:
 ESEMPI:
 
   
-# Configurazione iniziale interattiva
+# Interactive initial setup
   ./ydea-toolkit.sh config
   
   
@@ -1103,11 +1103,11 @@ ESEMPI:
   ./ydea-toolkit.sh login
 
   
-# Lista ultimi 10 ticket aperti
+# List of last 10 open tickets
   ./ydea-toolkit.sh list 10 open | jq .
 
   
-# Crea nuovo ticket
+# Create new ticket
   ./ydea-toolkit.sh create "Server down" "Il server web non risponde" high
 
   
@@ -1123,7 +1123,7 @@ ESEMPI:
   ./ydea-toolkit.sh close 12345 "Risolto con riavvio"
 
   
-# Tracking ticket da CheckMK
+# Ticket tracking from CheckMK
   ./ydea-toolkit.sh track 12345 "TK25/003376" "server-web" "Apache Status" "Alert da CheckMK"
   
   
@@ -1131,7 +1131,7 @@ ESEMPI:
   ./ydea-toolkit.sh stats
   
   
-# Aggiorna tutti i ticket tracciati
+# Update all tracked tickets
   ./ydea-toolkit.sh update-tracking
   
   
@@ -1144,12 +1144,12 @@ ESEMPI:
 
 VARIABILI AMBIENTE:
   
-# Credenziali API (OBBLIGATORIE)
+# API Credentials (MANDATORY)
   YDEA_ID                    ID account API Ydea
   YDEA_API_KEY               Chiave API Ydea
   
   
-# ID Utente per operazioni (opzionali)
+# User ID for operations (optional)
   YDEA_USER_ID_CREATE_TICKET (default: 4675) ID per creazione ticket
   YDEA_USER_ID_CREATE_NOTE   (default: 4675) ID per creazione note/commenti
   
@@ -1187,7 +1187,7 @@ show_logs() {
     tail -n "$lines" "$YDEA_LOG_FILE"
   else
     
-echo "File di log non trovato: $YDEA_LOG_FILE" >&2
+echo "Log file not found: $YDEA_LOG_FILE" >&2
     return 1
   fi
 }
@@ -1206,7 +1206,7 @@ clear_log() {
 
 # ===== Main Execution =====
 
-# Esegui solo se lo script è chiamato direttamente (non con source)
+# Run only if script is called directly (not with source)
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
 case "${1:-}" in
@@ -1249,4 +1249,4 @@ case "${1:-}" in
   *)           show_usage; exit 1 ;;
 esac
 fi  
-# Fine check esecuzione diretta
+# End check direct execution

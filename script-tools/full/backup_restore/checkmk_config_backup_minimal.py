@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-checkmk_config_backup_minimal.py - Backup minimale configurazione CheckMK.
+"""checkmk_config_backup_minimal.py - CheckMK configuration minimal backup.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import argparse
 import datetime as dt
@@ -101,8 +99,8 @@ def collect_metadata(site: str, site_base: Path, metadata_path: Path) -> None:
     edition_match = re.search(r'CMK_VERSION="([^"]+)"', version_text)
     edition = edition_match.group(1) if edition_match else "N/A"
 
-    metadata = f"""=== CHECKMK BACKUP MINIMALE (SOLO CONFIG) ===
-Data backup: {dt.datetime.now()}
+    metadata = f"""=== CHECKMK MINIMAL BACKUP (CONFIG ONLY) ===
+Backup date: {dt.datetime.now()}
 Hostname: {safe_cmd(['hostname', '-f'])}
 Site: {site}
 CheckMK Version: {safe_cmd(['bash', '-lc', f"cat {site_base}/version 2>/dev/null || echo N/A"])}
@@ -110,13 +108,12 @@ CheckMK Edition: {edition}
 OMD Version: {safe_cmd(['omd', 'version'])}
 Python Version: {safe_site(site, 'python3 --version')}
 
-=== HOSTS MONITORATI ===
+=== MONITORED HOSTS ===
 Host count: {safe_site(site, 'cmk --list-hosts 2>/dev/null | wc -l')}
 
 === BACKUP STRATEGY ===
-Tipo: MINIMALE (solo configurazione)
-Escluso: RRD, inventory, bakery, MKP
-"""
+Type: MINIMAL (configuration only)
+Excluded: RRD, inventory, bakery, MKP"""
     metadata_path.write_text(metadata, encoding="utf-8")
     log("[OK] Metadati raccolti")
 
@@ -172,17 +169,16 @@ def create_archive(site_base: Path, archive_path: Path) -> Tuple[str, int]:
 
 def create_restore_instructions(path: Path) -> None:
     path.write_text(
-        """=== ISTRUZIONI RESTORE BACKUP MINIMALE ===
+        """=== MINIMAL RESTORE BACKUP INSTRUCTIONS ===
 
 1) omd stop <SITE_NAME>
 2) tar xzf checkmk-MINIMAL-<SITE_NAME>-<DATE>.tgz -C /opt/omd/sites/<SITE_NAME>/
 3) chown -R <SITE_NAME>:<SITE_NAME> /opt/omd/sites/<SITE_NAME>
 4) omd start <SITE_NAME>
-5) su - <SITE_NAME> -c 'cmk -R && cmk -O'
-6) Rigenerare Agent Bakery (cmk --bake-agents)
+5) on - <SITE_NAME> -c 'cmk -R && cmk -O'
+6) Regenerate Agent Bakery (cmk --bake-agents)
 
-Nota: grafici storici non inclusi (RRD esclusi).
-""",
+Note: Historical charts not included (RRD excluded).""",
         encoding="utf-8",
     )
 

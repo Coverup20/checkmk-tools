@@ -1,43 +1,41 @@
 #!/usr/bin/env python3
-"""
-check_host_down_confidence.py - Diagnosi affidabilità HOST OFFLINE
+"""check_host_down_confidence.py - OFFLINE HOST reliability diagnosis
 
-Esegue diagnosi multi-layer per determinare con alta confidenza
-se un host è realmente spento vs. problema di rete transitorio.
+Performs multi-layer diagnosis to determine with high confidence
+if a host is really turned off vs. transient network problem.
 
-Checks eseguiti (con peso sul punteggio "offline"):
-  - Risoluzione DNS          +5%   (se risolve, esclude causa DNS)
-  - ICMP Ping (5x)          +25%   (se 100% loss)
-  - TCP 6556 (CMK Agent)    +20%   (se timeout)
-  - TCP 22 (SSH)            +15%   (se timeout)
-  - TCP 443 (HTTPS)         +10%   (se timeout)
-  - TCP 80 (HTTP)            +5%   (se timeout)
-  - ARP entry assente       +15%   (solo se stesso segmento L2)
-  - Traceroute timeout      +10%   (solo se traceroute disponibile)
+Checks performed (with weight on the "offline" score):
+  - DNS resolution +5% (if resolved, exclude DNS cause)
+  - ICMP Ping (5x) +25% (if 100% loss)
+  - TCP 6556 (CMK Agent) +20% (if timeout)
+  - TCP 22 (SSH) +15% (if timeout)
+  - TCP 443 (HTTPS) +10% (if timeout)
+  - TCP 80 (HTTP) +5% (if timeout)
+  - ARP entry absent +15% (only same L2 segment)
+  - Traceroute timeout +10% (only if traceroute available)
 
-Se qualsiasi check risponde (porta aperta/rifiutata, ping risponde):
-  il punteggio viene ridotto → confidenza scende verso 0%.
+If any check responds (port open/rejected, ping responds):
+  the score is reduced → confidence drops towards 0%.
 
-Soglie interpretazione:
-  >= 90%  →  OFFLINE CONFERMATO
-  >= 80%  →  Molto probabilmente offline
-  >= 60%  →  Probabilmente offline
-  >= 30%  →  Incerto (rete vs host)
-  <  30%  →  Host probabilmente attivo
+Interpretation thresholds:
+  >= 90% → OFFLINE CONFIRMED
+  >= 80% → Most likely offline
+  >= 60% → Probably offline
+  >= 30% → Uncertain (network vs host)
+  < 30% → Host probably active
 
 Exit codes:
-  0 = host probabilmente attivo (confidence < 60%)
-  1 = incerto / probabilmente offline (60% ≤ confidence < threshold)
-  2 = offline confermato (confidence ≥ threshold)
+  0 = host probably active (confidence < 60%)
+  1 = uncertain / probably offline (60% ≤ confidence < threshold)
+  2 = offline confirmed (confidence ≥ threshold)
 
-Uso:
+Usage:
   python3 check_host_down_confidence.py 192.168.10.100
   python3 check_host_down_confidence.py ns8.dominio.it --ports 22 6556 443
   python3 check_host_down_confidence.py 10.0.0.50 --no-arp --no-traceroute
   python3 check_host_down_confidence.py 10.0.0.50 --checkmk
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import socket
@@ -50,9 +48,9 @@ from typing import List, Tuple
 VERSION = "1.0.0"
 SCRIPT_NAME = "check_host_down_confidence"
 
-# ─── Pesi per ciascun check ──────────────────────────────────────────────────
+# ─── Weights for each check ───────────────────────── ─────────────────────────
 
-# Contributi positivi (score += X → host probabilmente offline)
+# Positive contributions (score += X → host probably offline)
 PING_DOWN_WEIGHT    = 25   # Ping 100% loss
 TCP_PORT_WEIGHTS    = {    # Timeout su porta TCP
     6556: 20,              # CheckMK agent
@@ -66,14 +64,14 @@ DNS_OK_WEIGHT       = 5    # DNS risolve → non è un problema DNS
 ARP_MISSING_WEIGHT  = 15   # ARP assente/incompleto → host non visto su L2
 TRACE_TIMEOUT_WEIGHT = 10  # Traceroute: tutti * → destinazione irraggiungibile
 
-# Penalità (score -= X → host probabilmente attivo)
+# Penalty (score -= X → host probably active)
 PING_UP_PENALTY     = -50  # Ping risponde → host sicuramente attivo
 TCP_UP_PENALTY      = -20  # Porta aperta o rifiutata → host risponde
 DNS_FAIL_PENALTY    = -10  # DNS non risolve → forse è problema DNS, non host
 ARP_PRESENT_PENALTY = -10  # ARP presente → host visto di recente su L2
 TRACE_UP_PENALTY    = -5   # Traceroute raggiunge destinazione → host attivo
 
-# Nomi porte per report
+# Port names for reports
 PORT_NAMES = {
     22:   "SSH",
     6556: "CMK-Agent",
@@ -90,10 +88,10 @@ PORT_NAMES = {
 }
 
 
-# ─── Classe risultato check ──────────────────────────────────────────────────
+# ─── Check result class ───────────────────────── ─────────────────────────
 
 class DiagResult:
-    """Risultato di un singolo check diagnostico."""
+    """Result of a single diagnostic check."""
 
     STATUS_DOWN    = "down"
     STATUS_UP      = "up"
@@ -125,7 +123,7 @@ class DiagResult:
 # ─── Funzioni diagnostiche ───────────────────────────────────────────────────
 
 def diag_dns(host):
-    """Verifica risoluzione DNS dell'hostname."""
+    """Check DNS resolution of the hostname."""
     try:
         ip = socket.gethostbyname(host)
         return DiagResult(
@@ -142,7 +140,7 @@ def diag_dns(host):
 
 
 def diag_ping(host, count=5, timeout_sec=2):
-    """ICMP ping multiplo con analisi packet loss."""
+    """ICMP multiple ping with packet loss analysis."""
     desc = "ICMP Ping ({}x, {}s timeout)".format(count, timeout_sec)
     try:
         result = subprocess.run(
@@ -200,7 +198,7 @@ def diag_ping(host, count=5, timeout_sec=2):
 
 
 def diag_tcp(host, port, timeout_sec=3):
-    """Test connettività TCP su porta specifica."""
+    """TCP connectivity test on specific port."""
     port_label = PORT_NAMES.get(port, "port-{}".format(port))
     desc = "TCP {}/{}".format(port, port_label)
     weight_down = TCP_PORT_WEIGHTS.get(port, 5)
@@ -212,21 +210,21 @@ def diag_tcp(host, port, timeout_sec=3):
         sock.close()
 
         if err == 0:
-            # Connessione riuscita → host risponde
+            # Connection successful → host responds
             return DiagResult(
                 "tcp_{}".format(port), desc, DiagResult.STATUS_UP,
                 "Connessione riuscita → host attivo e servizio in ascolto",
                 TCP_UP_PENALTY
             )
         elif err == errno.ECONNREFUSED:
-            # Host attivo ma porta chiusa
+            # Host active but port closed
             return DiagResult(
                 "tcp_{}".format(port), desc, DiagResult.STATUS_UP,
                 "Porta rifiutata (ECONNREFUSED) → host attivo, servizio non in ascolto",
                 TCP_UP_PENALTY
             )
         else:
-            # Timeout o altro errore di rete → host probabilmente offline
+            # Timeout or other network error → host probably offline
             return DiagResult(
                 "tcp_{}".format(port), desc, DiagResult.STATUS_DOWN,
                 "Nessuna risposta (errno {}) — timeout TCP".format(err),
@@ -248,7 +246,7 @@ def diag_tcp(host, port, timeout_sec=3):
 
 
 def diag_arp(host_ip):
-    """Verifica presenza entry ARP (solo se stesso segmento L2)."""
+    """Check presence of ARP entry (same L2 segment only)."""
     try:
         result = subprocess.run(
             ["arp", "-n", host_ip],
@@ -295,7 +293,7 @@ def diag_arp(host_ip):
 
 
 def diag_traceroute(host, max_hops=15):
-    """Traceroute: verifica se la destinazione è raggiungibile."""
+    """Traceroute: Check if the destination is reachable."""
     try:
         result = subprocess.run(
             ["traceroute", "-n", "-w", "2", "-m", str(max_hops), host],
@@ -305,7 +303,7 @@ def diag_traceroute(host, max_hops=15):
         )
         output = result.stdout.decode("utf-8", errors="replace")
 
-        # Filtra solo le righe con hop numerati
+        # Filter only rows with numbered hops
         hop_lines = []
         for line in output.strip().split("\n"):
             line = line.strip()
@@ -321,7 +319,7 @@ def diag_traceroute(host, max_hops=15):
 
         last = hop_lines[-1]
         parts = last.split()
-        # parts[0] è numero hop, parts[1:] sono risposte (IP o *)
+        # parts[0] is hop number, parts[1:] are replies (IP or *)
         hop_responses = parts[1:4] if len(parts) >= 4 else parts[1:]
         all_stars = all(p == "*" for p in hop_responses)
 
@@ -362,15 +360,13 @@ def diag_traceroute(host, max_hops=15):
 # ─── Motore diagnosi principale ──────────────────────────────────────────────
 
 def run_all_checks(host, ports, skip_arp, skip_trace):
-    """
-    Esegue tutti i check diagnostici e calcola il punteggio di confidenza.
+    """Performs all diagnostic checks and calculates the confidence score.
 
     Returns:
-        (confidence_percentage, list_of_DiagResult)
-    """
+        (confidence_percentage, list_of_DiagResult)"""
     results = []
 
-    # 1. DNS check — anche per risolvere l'IP per i check successivi
+    # 1. DNS check — also to resolve the IP for subsequent checks
     dns_result = diag_dns(host)
     results.append(dns_result)
 
@@ -383,7 +379,7 @@ def run_all_checks(host, ports, skip_arp, skip_trace):
     ping_result = diag_ping(resolved_ip)
     results.append(ping_result)
 
-    # Ottimizzazione: se ping risponde chiaramente → host è UP, skip TCP
+    # Optimization: if ping responds clearly → host is UP, skip TCP
     if ping_result.status == DiagResult.STATUS_UP:
         raw = sum(r.score for r in results)
         return max(0, min(100, raw)), results
@@ -392,7 +388,7 @@ def run_all_checks(host, ports, skip_arp, skip_trace):
     for port in ports:
         results.append(diag_tcp(resolved_ip, port))
 
-    # 4. ARP (opzionale, solo stesso L2)
+    # 4. ARP (optional, same L2 only)
     if not skip_arp:
         results.append(diag_arp(resolved_ip))
 
@@ -407,7 +403,7 @@ def run_all_checks(host, ports, skip_arp, skip_trace):
     return confidence, results
 
 
-# ─── Formattazione output ────────────────────────────────────────────────────
+# ─── Output formatting ────────────────────────── ──────────────────────────
 
 def get_verdict(confidence):
     """Restituisce (label_verdetto, testo_dettaglio)."""
@@ -424,7 +420,7 @@ def get_verdict(confidence):
 
 
 def format_human(host, confidence, results):
-    """Output leggibile per operatori."""
+    """Readable output for operators."""
     SEP  = "=" * 64
     SEP2 = "─" * 64
 
@@ -466,12 +462,12 @@ def format_human(host, confidence, results):
 
 
 def format_checkmk(host, confidence, results):
-    """Output in formato CheckMK local check per integrazione OMD."""
+    """Output in CheckMK local check format for OMD integration."""
     state = 2 if confidence >= 90 else (1 if confidence >= 60 else 0)
     metric = "confidence={}%;60;90".format(confidence)
     safe_host = re.sub(r"[^a-zA-Z0-9_]", "_", host)
     verdict, _ = get_verdict(confidence)
-    # Include dettagli check come parte del testo performance
+    # Includes check details as part of the performance text
     check_summary = ", ".join(
         "{}:{}".format(r.name, r.status) for r in results
     )
@@ -487,19 +483,17 @@ def main():
         prog=SCRIPT_NAME,
         description="{} v{} — Diagnosi affidabilita HOST OFFLINE".format(SCRIPT_NAME, VERSION),
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Esempi:
+        epilog="""Examples:
   %(prog)s 192.168.10.100
   %(prog)s ns8.dominio.it --ports 22 6556 443 3389
   %(prog)s 10.0.0.50 --no-arp --no-traceroute --threshold 80
   %(prog)s 10.0.0.50 --checkmk
 
-Note sui pesi massimi raggiungibili:
-  Senza --no-arp e --no-traceroute  → max 105% (capped 100%)
-  Con solo --no-traceroute          → max  95%
-  Con solo --no-arp                 → max  90%
-  Con --no-arp --no-traceroute      → max  80% (usa --threshold 80)
-        """
+Notes on maximum achievable weights:
+  Without --no-arp and --no-traceroute → max 105% (capped 100%)
+  With just --no-traceroute → max 95%
+  With just --no-arp → max 90%
+  With --no-arp --no-traceroute → max 80% (use --threshold 80)"""
     )
     parser.add_argument(
         "host",

@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check-proxmox_lxc_status.py - CheckMK Local Check for Proxmox LXC Containers
+"""check-proxmox_lxc_status.py - CheckMK Local Check for Proxmox LXC Containers
 
 Monitor LXC container status with summary and per-container checks.
 
 Proxmox VE
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys

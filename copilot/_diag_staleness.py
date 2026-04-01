@@ -13,19 +13,19 @@ print("=" * 70)
 print("DIAGNOSTICA STALENESS (campo reale CheckMK)")
 print("=" * 70)
 
-# ===== CONTA STALE per soglia =====
+# ===== STALE COUNT for threshold =====
 for thr in [1.0, 1.5, 2.0, 5.0]:
     r = live(f"GET services\nFilter: staleness > {thr}\nStats: state >= 0\n").strip()
     print(f"  staleness > {thr}: {r} servizi")
 
-# ===== TUTTI GLI STALE (staleness > 1.5) =====
+# ===== ALL STALE (staleness > 1.5) =====
 r = live("GET services\nFilter: staleness > 1.5\nColumns: host_name description staleness state last_check active_checks_enabled\n").strip()
 print(f"\n[STALE reali staleness>1.5]")
 if r:
     lines = r.split("\n")
     print(f"  Totale: {len(lines)}")
 
-    # Raggruppa per host
+    # Group by host
     by_host = {}
     for line in lines:
         p = line.split(";")
@@ -49,7 +49,7 @@ if r:
 else:
     print("  Nessuno stale! ")
 
-# ===== CHECK_MK SERVICE PER HOST — verifica active + staleness =====
+# ===== CHECK_MK SERVICE FOR HOST — check active + staleness =====
 r = live("GET services\nFilter: description ~ Check_MK\nColumns: host_name description staleness active_checks_enabled last_check\n").strip()
 print(f"\n[Check_MK* services - stato attuale]")
 if r:

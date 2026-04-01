@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-deploy-plain-agent.py
+"""deploy-plain-agent.py
 
 Python entrypoint that delegates to deploy-plain-agent.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

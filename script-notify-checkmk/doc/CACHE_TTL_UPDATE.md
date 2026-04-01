@@ -1,52 +1,52 @@
-# Cache TTL e Risoluzione Ticket - Aggiornamento
+# TTL Cache and Ticket Resolution - Update
 
-## Riepilogo Modifiche
+## Summary of Changes
 
-Implementata gestione corretta del ciclo di vita dei ticket in cache con TTL differenziati per ticket risolti e attivi.
+Correct management of the life cycle of cached tickets implemented with differentiated TTLs for resolved and active tickets.
 
-## Workflow Completo
+## Complete Workflow
 
 ### 1. Alert CRITICAL/DOWN
 ```
-1. Controlla cache: ticket presente?
-   ├─ SÌ → Verifica via API se ancora aperto
-   │   ├─ Aperto → Aggiungi nota
-   │   ├─ Chiuso dall'operatore → Aggiungi nota finale (se possibile), mantieni cache
-   │   └─ Cancellato (404) → Rimuovi da cache
-   └─ NO → Verifica via API se esiste già
-       ├─ Esiste → Aggiungi nota + salva in cache
-       └─ Non esiste → Crea ticket + salva in cache
+1. Check cache: ticket present?
+   ├─ YES → Check via API if still open
+   │ ├─ Open → Add Note
+   │ ├─ Closed by operator → Add endnote (if possible), keep cache
+   │ └─ Deleted (404) → Remove from cache
+   └─ NO → Check via API if it already exists
+       ├─ Exists → Add note + save to cache
+       └─ Does not exist → Create ticket + save in cache
 ```
 
-### 2. Alert OK/UP (Rientro)
+### 2. Alert OK/UP (Return)
 ```
-1. Verifica ticket in cache
-   ├─ SÌ → Aggiungi nota "Allarme rientrato"
-   │       + marca ticket.resolved_at = timestamp corrente
-   │       + parte timer 5 giorni
-   └─ NO → Nessuna azione
-```
-
-### 3. Pulizia Automatica Cache
-```
-clean_old_cache_entries() esegue check:
-├─ Ticket risolti (resolved_at != null)
-│   └─ Se (now - resolved_at) > 5 giorni → RIMUOVI
-└─ Ticket attivi (resolved_at == null)
-    └─ Se (now - last_update) > 30 giorni → RIMUOVI
+1. Check cached tickets
+   ├─ YES → Add note "Alarm cleared"
+   │ + brand ticket.resolved_at = current timestamp
+   │ + part timer 5 days
+   └─ NO → No action
 ```
 
-## Configurazione
+### 3. Automatic Cache Cleanup
+```
+clean_old_cache_entries() runs check:
+├─ Resolved Tickets (resolved_at != null)
+│ └─ If (now - resolved_at) > 5 days → REMOVE
+└─ Active tickets (resolved_at == null)
+    └─ If (now - last_update) > 30 days → REMOVE
+```
+
+## Configuration
 
 ```bash
-# Tempo di ritenzione per ticket risolti: 5 giorni
+# Retention time for resolved tickets: 5 days
 RESOLVED_TICKET_TTL=$((5*24*3600))
 
-# Tempo di ritenzione per ticket attivi: 30 giorni (fallback)
+# Retention time for active tickets: 30 days (fallback)
 CACHE_MAX_AGE=$((30*24*3600))
 ```
 
-## Struttura Cache JSON
+## JSON Cache Structure
 
 ```json
 {
@@ -55,106 +55,105 @@ CACHE_MAX_AGE=$((30*24*3600))
     "state": "OK",
     "created_at": 1735040400,
     "last_update": 1735126800,
-    "resolved_at": 1735126800  // timestamp quando passa a OK/UP (null se attivo)
+    "resolved_at": 1735126800 // timestamp when switching to OK/UP (null if active)
   }
 }
 ```
 
-## Funzioni Modificate
+## Modified functions
 
 ### 1. `save_ticket_cache()`
-- **Modifica**: Aggiunto campo `resolved_at: null` nella creazione iniziale
-- **Motivo**: Tutti i ticket nuovi partono come attivi (non risolti)
+- **Change**: Added `resolved_at: null` field in initial creation
+- **Reason**: All new tickets start as active (unresolved)
 
 ### 2. `mark_ticket_resolved()`
-- **Nuova funzione**: Imposta timestamp `resolved_at` quando alert passa a OK/UP
-- **Uso**: Chiamata automaticamente dopo aggiunta nota di rientro
-- **Effetto**: Parte il timer di 5 giorni per cleanup
+- **New feature**: Set timestamp `resolved_at` when alert goes OK/UP
+- **Usage**: Automatically called after adding indent note
+- **Effect**: The 5-day cleanup timer starts
 
 ### 3. `clean_old_cache_entries()`
-- **Modifica**: Logica differenziata per ticket risolti vs attivi
-- **Logica**: 
-  - `resolved_at != null` → TTL 5 giorni
-  - `resolved_at == null` → TTL 30 giorni
-- **Usa**: `atomic_cache_write()` per sicurezza concorrenza
+- **Change**: Different logic for resolved vs active tickets
+- **Logic**: 
+  - `resolved_at != null` → TTL 5 days
+  - `resolved_at == null` → TTL 30 days
+- **Use**: `atomic_cache_write()` for concurrency safety
 
-### 4. Gestione Alert SERVICE (linee 434-467)
-- **Modifica**: Aggiunto blocco dopo `update_ticket_state()`
+### 4. Alert SERVICE management (lines 434-467)
+- **Change**: Added block after `update_ticket_state()`
   ```bash
   if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
     mark_ticket_resolved "$TICKET_KEY"
-    log "Ticket #$TICKET_ID marcato come risolto, cleanup automatico tra 5 giorni"
+    log "Ticket #$TICKET_ID marked as resolved, automatic cleanup in 5 days"
   fi
   ```
 
-### 5. Gestione Alert HOST (linee 599-622)
-- **Modifica**: Stessa logica applicata per alert host
-- **Simmetria**: Comportamento identico tra SERVICE e HOST alerts
+### 5. HOST Alert Management (lines 599-622)
+- **Change**: Same logic applied for alert host
+- **Symmetry**: Identical behavior between SERVICE and HOST alerts
 
-## Casistiche Gestite
+## Case Studies Managed
 
-| Scenario | Comportamento Cache | Note |
-|----------|-------------------|------|
-| Alert CRIT → crea ticket | Salva con `resolved_at: null` | Ticket attivo, TTL 30gg |
-| Alert CRIT → OK | Imposta `resolved_at: timestamp` | Parte timer 5gg |
-| Operatore chiude ticket su Ydea | Cache rimane invariata | Cleanup dopo 30gg se mai risolto |
-| Alert OK dopo chiusura operatore | Aggiorna `resolved_at` | Cleanup dopo 5gg dal rientro |
-| Ticket cancellato (404) | Rimozione immediata | Unico caso di rimozione sincrona |
-| Alert CRIT → OK → CRIT di nuovo | Reset `resolved_at: null` | Ticket torna attivo, TTL 30gg |
+| Scenario | Cache Behavior | Notes |
+|----------|---------------|------|
+| Alert CRIT → create ticket | Save with `resolved_at: null` | Ticket active, TTL 30 days |
+| Alert CRIT → OK | Set `resolved_at: timestamp` | 5 day timer part |
+| Operator closes ticket on Ydea | Cache remains unchanged | Cleanup after 30 days if never resolved |
+| Alert OK after operator closure | Update `resolved_at` | Cleanup 5 days after return |
+| Ticket canceled (404) | Immediate removal | Unique case of synchronous removal |
+| Alert CRIT → OK → CRIT again | Reset `resolved_at: null` | Ticket active again, TTL 30 days |
 
-## Vantaggi Implementazione
+## Benefits Implementation
 
-1. **Persistenza Ticket**: Cache non perde tracking anche se operatore chiude ticket
-2. **Cleanup Intelligente**: TTL breve (5gg) per risolti, lungo (30gg) per attivi
-3. **Anti-Duplicazione**: Verifica API prima di creare nuovo ticket
-4. **Tracciabilità**: `resolved_at` permette audit del momento esatto di risoluzione
-5. **Race-Safe**: Usa `atomic_cache_write()` con flock in tutte le modifiche
+1. **Ticket Persistence**: Cache does not lose tracking even if operator closes ticket
+2. **Intelligent Cleanup**: short TTL (5 days) for resolved, long (30 days) for active
+3. **Anti-Duplication**: Verify API before creating new ticket
+4. **Traceability**: `resolved_at` allows auditing of the exact moment of resolution
+5. **Race-Safe**: Use `atomic_cache_write()` with flock in all changes
 
-## Testing Raccomandato
+## Testing Recommended
 
 ```bash
-# 1. Crea alert CRITICAL
-# Verifica: cat /tmp/ydea_checkmk_tickets.json | jq '.["IP:SERVICE"].resolved_at'
-# Output atteso: null
+# 1. Create CRITICAL alerts
+# Check: cat /tmp/ydea_checkmk_tickets.json | jq '.["IP:SERVICE"].resolved_at'
+# Expected output: null
 
-# 2. Passa alert a OK
-# Verifica: cat /tmp/ydea_checkmk_tickets.json | jq '.["IP:SERVICE"].resolved_at'
-# Output atteso: 1735126800 (timestamp corrente)
+#2. Switch alert to OK
+# Check: cat /tmp/ydea_checkmk_tickets.json | jq '.["IP:SERVICE"].resolved_at'
+# Expected output: 1735126800 (current timestamp)
 
-# 3. Simula cleanup dopo 5+ giorni
-# Modifica manualmente resolved_at a 6 giorni fa
-# Esegui: clean_old_cache_entries
-# Verifica: ticket rimosso
+#3. Simulate cleanup after 5+ days
+# Manually change resolved_at to 6 days ago
+# Run: clean_old_cache_entries
+# Verify: ticket removed
 
-# 4. Verifica operatore chiude ticket
-# Chiudi ticket su Ydea
-# Alert CRIT di nuovo
-# Verifica: nota aggiunta, no creazione duplicato
+# 4. Verify operator closes ticket
+# Close ticket on Ydea
+# Alert CRIT again
+# Verification: Note added, no duplicate creation
 ```
 
-## File Modificati
-
-- `script-notify-checkmk/ydea_realip` (linee 13-14, 70-100, 145-189, 434-467, 599-622)
+## Files Modified
+- `script-notify-checkmk/ydea_realip` (lines 13-14, 70-100, 145-189, 434-467, 599-622)
 
 ## Deploy
 
 ```bash
-# Backup cache esistente
+# Backup existing cache
 ssh monitoring@monitor.nethlab.it "cp /tmp/ydea_checkmk_tickets.json /tmp/ydea_checkmk_tickets.json.pre-ttl"
 
-# Deploy script aggiornato
+# Deploy script updated
 scp script-notify-checkmk/ydea_realip monitoring@monitor.nethlab.it:/opt/omd/sites/monitoring/local/share/check_mk/notifications/
 
-# Verifica deployment
+# Check deployment
 ssh monitoring@monitor.nethlab.it "grep -A5 'mark_ticket_resolved' /opt/omd/sites/monitoring/local/share/check_mk/notifications/ydea_realip"
 ```
 
-## Monitoraggio Post-Deploy
+## Post-Deploy Monitoring
 
 ```bash
-# Watch logs per verifiche risoluzione
-tail -f /opt/omd/sites/monitoring/var/log/notify.log | grep -E "marcato come risolto|cleanup automatico"
+# Watch logs for resolution checks
+tail -f /opt/omd/sites/monitoring/var/log/notify.log | grep -E "marked as resolved|automatic cleanup"
 
-# Check cache periodico
+# Check cache periodically
 watch -n 300 'cat /tmp/ydea_checkmk_tickets.json | jq "to_entries | map({key: .key, resolved: (.value.resolved_at != null), age_days: ((now - .value.created_at) / 86400 | floor)})"'
 ```

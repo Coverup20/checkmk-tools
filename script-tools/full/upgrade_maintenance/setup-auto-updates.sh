@@ -2,21 +2,21 @@
 
 ###############################################################################
 # Script: setup-auto-updates.sh
-# Descrizione: Configura aggiornamenti automatici del sistema tramite crontab
-# Autore: Generato per checkmk-tools
+# Description: Configure automatic system updates via crontab
+# Author: Generated for checkmk-tools
 # Data: 2026-01-12
 ###############################################################################
 
 set -euo pipefail
 
-# Colori per output
+# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Funzione per stampare messaggi colorati
+# Function to print colorful messages
 print_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
@@ -33,7 +33,7 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Verifica permessi root
+# Check root permissions
 if [ "$EUID" -ne 0 ]; then
     print_error "Questo script deve essere eseguito come root o con sudo"
     exit 1
@@ -45,7 +45,7 @@ echo -e "${BLUE}║    Configurazione Aggiornamenti Automatici Sistema          
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-# Comando da eseguire
+# Command to execute
 UPDATE_COMMAND="sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y"
 LOG_FILE="/var/log/auto-updates.log"
 
@@ -53,12 +53,12 @@ print_info "Comando che verrà eseguito:"
 echo -e "${GREEN}${UPDATE_COMMAND}${NC}"
 echo ""
 
-# Menu interattivo per la frequenza
+# Interactive menu for frequency
 echo -e "${YELLOW}Seleziona la frequenza degli aggiornamenti automatici:${NC}"
 echo ""
-echo "  1) Giornaliero  - Ogni giorno alle 03:00"
-echo "  2) Settimanale  - Ogni domenica alle 03:00"
-echo "  3) Mensile      - Il primo giorno del mese alle 03:00"
+echo "1) Daily - Every day at 03:00"
+echo "2) Weekly - Every Sunday at 03:00"
+echo "3) Monthly - The first day of the month at 03:00"
 echo "  4) Personalizzato - Specifica orario e frequenza custom"
 echo "  5) Annulla"
 echo ""
@@ -81,14 +81,14 @@ case $choice in
     4)
         echo ""
         print_info "Inserisci la pianificazione cron personalizzata"
-        echo "Formato: minuto ora giorno mese giornosettimana"
-        echo "Esempio: 0 3 * * * (ogni giorno alle 3:00)"
-        echo "Esempio: 30 2 * * 1 (ogni lunedì alle 2:30)"
+        echo "Format: minute hour day month dayweek"
+        echo "Example: 0 3 * * * (every day at 3:00)"
+        echo "Example: 30 2 * * 1 (every Monday at 2.30am)"
         echo ""
         read -p "Inserisci la pianificazione cron: " CRON_SCHEDULE
         DESCRIPTION="Personalizzato: $CRON_SCHEDULE"
         
-        # Validazione base della sintassi cron
+        # Basic validation of cron syntax
         if ! [[ $CRON_SCHEDULE =~ ^[0-9\*\,\-\/]+[[:space:]]+[0-9\*\,\-\/]+[[:space:]]+[0-9\*\,\-\/]+[[:space:]]+[0-9\*\,\-\/]+[[:space:]]+[0-9\*\,\-\/]+$ ]]; then
             print_error "Formato cron non valido"
             exit 1
@@ -125,12 +125,12 @@ if [[ $modify_time =~ ^[Ss]$ ]]; then
         exit 1
     fi
     
-    # Sostituisci minuto e ora nella pianificazione
+    # Replace minute and hour in the schedule
     CRON_SCHEDULE="$minute $hour $(echo $CRON_SCHEDULE | cut -d' ' -f3-)"
     print_info "Nuova pianificazione: $CRON_SCHEDULE"
 fi
 
-# Crea il comando completo con logging
+# Create the complete command with logging
 CRON_COMMAND="$CRON_SCHEDULE $UPDATE_COMMAND >> $LOG_FILE 2>&1"
 CRON_ENTRY="$CRON_SCHEDULE (echo \"[\$(date)] Starting system updates\" && $UPDATE_COMMAND && echo \"[\$(date)] Updates completed successfully\") >> $LOG_FILE 2>&1"
 
@@ -146,21 +146,21 @@ if [[ ! $confirm =~ ^[Ss]$ ]]; then
     exit 0
 fi
 
-# Backup del crontab corrente
+# Backup the current crontab
 print_info "Creazione backup del crontab corrente..."
 BACKUP_DIR="/root/crontab_backups"
 mkdir -p "$BACKUP_DIR"
 BACKUP_FILE="$BACKUP_DIR/crontab_backup_$(date +%Y%m%d_%H%M%S).txt"
-crontab -l > "$BACKUP_FILE" 2>/dev/null || echo "# Nuovo crontab" > "$BACKUP_FILE"
+crontab -l > "$BACKUP_FILE" 2>/dev/null || echo "# New chrontab" > "$BACKUP_FILE"
 print_success "Backup salvato in: $BACKUP_FILE"
 
-# Verifica se l'entry esiste già
+# Check if the entry already exists
 if crontab -l 2>/dev/null | grep -q "apt update.*apt full-upgrade.*apt autoremove"; then
     print_warning "Trovata entry simile già presente nel crontab"
     read -p "Vuoi rimuovere le entry esistenti e aggiungerne una nuova? [s/N]: " remove_old
     
     if [[ $remove_old =~ ^[Ss]$ ]]; then
-        # Rimuovi le vecchie entry
+        # Remove old entries
         crontab -l 2>/dev/null | grep -v "apt update.*apt full-upgrade.*apt autoremove" | crontab -
         print_success "Vecchie entry rimosse"
     else
@@ -168,17 +168,17 @@ if crontab -l 2>/dev/null | grep -q "apt update.*apt full-upgrade.*apt autoremov
     fi
 fi
 
-# Aggiungi la nuova entry al crontab
+# Add the new entry to the crontab
 print_info "Aggiunta nuova entry al crontab..."
 (crontab -l 2>/dev/null; echo "# Auto-updates: $DESCRIPTION"; echo "$CRON_ENTRY") | crontab -
 print_success "Entry aggiunta con successo!"
 
-# Crea il file di log se non esiste
+# Create log file if it does not exist
 touch "$LOG_FILE"
 chmod 644 "$LOG_FILE"
 print_info "File di log creato: $LOG_FILE"
 
-# Mostra il crontab corrente
+# Show the current crontab
 echo ""
 print_info "Crontab corrente:"
 echo -e "${BLUE}----------------------------------------${NC}"

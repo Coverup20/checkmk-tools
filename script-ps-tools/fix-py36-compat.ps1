@@ -1,4 +1,4 @@
-# Fix Python 3.6 compatibility - rimuove reconfigure() non supportato
+# Fix Python 3.6 compatibility - remove unsupported reconfigure()
 
 $scriptDir = "C:\Users\Marzio\Desktop\CheckMK\checkmk-tools\script-check-ns7\remote"
 $files = Get-ChildItem "$scriptDir\*.py" -File
@@ -6,7 +6,7 @@ $files = Get-ChildItem "$scriptDir\*.py" -File
 foreach ($file in $files) {
     $content = Get-Content $file.FullName -Raw
     
-    # Rimuove le righe reconfigure() che non funzionano su Python 3.6
+    # Removes reconfigure() lines that don't work on Python 3.6
     $newContent = $content -replace "if sys\.stdout\.encoding != 'utf-8':\r?\n\s+sys\.stdout\.reconfigure\(encoding='utf-8', errors='replace'\)\r?\n", ""
     $newContent = $newContent -replace "if sys\.stderr\.encoding != 'utf-8':\r?\n\s+sys\.stderr\.reconfigure\(encoding='utf-8', errors='replace'\)\r?\n", ""
     
@@ -16,5 +16,5 @@ foreach ($file in $files) {
     }
 }
 
-Write-Host "`n Completato: Fix compatibilità Python 3.6" -ForegroundColor Green
-Write-Host "  os.environ['PYTHONIOENCODING'] sufficiente per Python 3.6" -ForegroundColor Cyan
+Write-Host "`n Completed: Fix Python 3.6 compatibility" -ForegroundColor Green
+Write-Host "os.environ['PYTHONIOENCODING'] sufficient for Python 3.6" -ForegroundColor Cyan

@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-check_ssh_root_sessions.py - CheckMK Local Check for Root SSH Session Events
+"""check_ssh_root_sessions.py - CheckMK Local Check for Root SSH Session Events
 
 Tracks root SSH sessions and generates alerts for login/logout events.
 Maintains state file to detect changes between checks.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -28,15 +26,13 @@ THRESHOLD_CRITICAL = 6
 
 
 def run_command(cmd: List[str]) -> Tuple[int, str, str]:
-    """
-    Execute a shell command and return exit code, stdout, stderr.
+    """Execute a shell command and return exit code, stdout, stderr.
     
     Args:
         cmd: Command as list of strings
         
     Returns:
-        Tuple of (exit_code, stdout, stderr)
-    """
+        Tuple of (exit_code, stdout, stderr)"""
     try:
         result = subprocess.run(
             cmd,
@@ -55,12 +51,10 @@ def run_command(cmd: List[str]) -> Tuple[int, str, str]:
 
 
 def get_current_root_ips() -> Set[str]:
-    """
-    Get set of IP addresses for currently logged in root users.
+    """Get set of IP addresses for currently logged in root users.
     
     Returns:
-        Set of IP addresses
-    """
+        Set of IP addresses"""
     exit_code, stdout, _ = run_command(["who"])
     
     if exit_code != 0 or not stdout:
@@ -88,12 +82,10 @@ def get_current_root_ips() -> Set[str]:
 
 
 def load_previous_ips() -> Set[str]:
-    """
-    Load previous IP addresses from state file.
+    """Load previous IP addresses from state file.
     
     Returns:
-        Set of IP addresses from previous check
-    """
+        Set of IP addresses from previous check"""
     try:
         if STATE_FILE.exists():
             content = STATE_FILE.read_text().strip()
@@ -105,12 +97,10 @@ def load_previous_ips() -> Set[str]:
 
 
 def save_current_ips(ips: Set[str]) -> None:
-    """
-    Save current IP addresses to state file.
+    """Save current IP addresses to state file.
     
     Args:
-        ips: Set of IP addresses to save
-    """
+        ips: Set of IP addresses to save"""
     try:
         # Ensure state directory exists
         STATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -123,12 +113,10 @@ def save_current_ips(ips: Set[str]) -> None:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     # Get current and previous IPs

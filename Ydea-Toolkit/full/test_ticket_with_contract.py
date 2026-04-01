@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""
-test_ticket_with_contract.py - Test creazione ticket con contratto associato
+"""test_ticket_with_contract.py - Test ticket creation with associated contract
 
-Prerequisiti:
-1. Contratto creato in Ydea UI per anagrafica 2339268
-2. Contratto con SLA "Premium_Mon" configurato
-3. ID contratto passato come argomento
+Prerequisites:
+1. Contract created in Ydea UI for registry number 2339268
+2. Contract with "Premium_Mon" SLA configured
+3. Contract ID passed as argument
 
 Usage:
     test_ticket_with_contract.py <contract_id>
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import json
@@ -56,7 +54,7 @@ def main():
     try:
         api = YdeaAPI()
         
-        # Step 1: Verifica esistenza contratto
+        # Step 1: Check existence of contract
         print(f" Step 1: Verifica esistenza contratto ID {contract_id}...")
         contract_data, status = api.api_call("GET", f"/contratto/{contract_id}")
         
@@ -76,7 +74,7 @@ def main():
             
         print()
         
-        # Step 2: Crea ticket di test
+        # Step 2: Create test tickets
         print(" Step 2: Creazione ticket di test con contratto...")
         
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -102,7 +100,7 @@ def main():
         print(f"    Ticket creato: ID {ticket_id} - Codice {ticket_codice}")
         print()
         
-        # Step 3: Verifica associazione
+        # Step 3: Verify association
         print(" Step 3: Verifica dettagli ticket creato...")
         time.sleep(2)  # Attendi propagazione
         

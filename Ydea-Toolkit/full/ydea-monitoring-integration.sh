@@ -2,16 +2,16 @@
 set -euo pipefail
 
 # ydea-monitoring-integration.sh
-# Integrazione tra sistemi di monitoraggio e Ydea per creazione automatica ticket
+# Integration between monitoring systems and Ydea for automatic ticket creation
 
 TOOLKIT="./ydea-toolkit.sh"
 
-# Configurazione
+# Configuration
 ALERT_THRESHOLD_CPU=90
 ALERT_THRESHOLD_MEM=85
 ALERT_THRESHOLD_DISK=90
 
-# File per tracciare ticket già creati (evita duplicati)
+# Files to track tickets already created (avoids duplicates)
 TICKET_CACHE="/tmp/ydea_tickets_cache.json"
 
 # ===== UTILITY =====
@@ -37,14 +37,14 @@ init_cache() {
     [[ -f "$TICKET_CACHE" ]] || echo '{}' > "$TICKET_CACHE"
 }
 
-# Verifica se esiste già un ticket aperto per questo alert
+# Check if there is already an open ticket for this alert
 ticket_exists() {
     local alert_key="$1"
     init_cache
     jq -e --arg key "$alert_key" '.[$key] != null' "$TICKET_CACHE" >/dev/null 2>&1
 }
 
-# Salva ticket in cache
+# Save tickets in cache
 save_ticket_cache() {
     local alert_key="$1"
     local ticket_id="$2"
@@ -54,7 +54,7 @@ save_ticket_cache() {
         "$TICKET_CACHE" > "${TICKET_CACHE}.tmp" && mv "${TICKET_CACHE}.tmp" "$TICKET_CACHE"
 }
 
-# Rimuovi ticket dalla cache (quando viene chiuso)
+# Remove ticket from cache (when closed)
 remove_ticket_cache() {
     local alert_key="$1"
     init_cache
@@ -62,7 +62,7 @@ remove_ticket_cache() {
         "$TICKET_CACHE" > "${TICKET_CACHE}.tmp" && mv "${TICKET_CACHE}.tmp" "$TICKET_CACHE"
 }
 
-# Pulisci cache da ticket vecchi (>24h)
+# Clear cache from old tickets (>24h)
 cleanup_cache() {
     init_cache
     local now
@@ -76,14 +76,14 @@ cleanup_cache() {
     ' "$TICKET_CACHE" > "${TICKET_CACHE}.tmp" && mv "${TICKET_CACHE}.tmp" "$TICKET_CACHE"
 }
 
-# ===== FUNZIONI DI MONITORAGGIO =====
+# ===== MONITORING FUNCTIONS =====
 
 # Monitora CPU
 check_cpu_usage() {
     local hostname="${1:-$(hostname)}"
     local cpu_usage
     
-    # Ottieni uso CPU (media 1 minuto)
+    # Get CPU Usage (1 minute average)
     cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)
     cpu_usage=${cpu_usage%.*}  # Rimuovi decimali
     
@@ -124,12 +124,12 @@ EOF
     fi
 }
 
-# Monitora memoria
+# Monitor memory
 check_memory_usage() {
     local hostname="${1:-$(hostname)}"
     local mem_usage
     
-    # Ottieni uso memoria
+    # Get memory usage
     mem_usage=$(free | grep Mem | awk '{printf "%.0f", $3/$2 * 100.0}')
     
     if [[ $mem_usage -gt $ALERT_THRESHOLD_MEM ]]; then
@@ -160,7 +160,7 @@ EOF
             fi
         fi
     else
-        # Memoria OK
+        # Memory OK
         local alert_key="mem_${hostname}"
         if ticket_exists "$alert_key"; then
             log_info "Memoria tornata normale (${mem_usage}%), rimuovo ticket dalla cache"
@@ -169,7 +169,7 @@ EOF
     fi
 }
 
-# Monitora disco
+# Monitor disk
 check_disk_usage() {
     local hostname="${1:-$(hostname)}"
     local mount_point="${2:-/}"
@@ -197,7 +197,7 @@ check_disk_usage() {
             fi
         fi
     else
-        # Disco OK
+        # Disk OK
         local alert_key="disk_${hostname}_${mount_point//\//_}"
         if ticket_exists "$alert_key"; then
             log_info "Disco ${mount_point} tornato normale (${disk_usage}%), rimuovo ticket dalla cache"
@@ -206,7 +206,7 @@ check_disk_usage() {
     fi
 }
 
-# Monitora servizio systemd
+# Monitor systemd service
 check_service_status() {
     local service_name="$1"
     local hostname="${2:-$(hostname)}"
@@ -239,7 +239,7 @@ EOF
             fi
         fi
     else
-        # Servizio OK
+        # Service OK
         local alert_key="service_${hostname}_${service_name}"
         if ticket_exists "$alert_key"; then
             log_info "Servizio $service_name tornato attivo, rimuovo ticket dalla cache"
@@ -256,12 +256,12 @@ main() {
     # Pulizia cache
     cleanup_cache
     
-    # Controlli di default
+    # Default controls
     check_cpu_usage
     check_memory_usage
     check_disk_usage
     
-    # Controlli servizi critici (opzionali)
+    # Critical service checks (optional)
     # check_service_status "nginx"
     # check_service_status "mysql"
     # check_service_status "postgresql"

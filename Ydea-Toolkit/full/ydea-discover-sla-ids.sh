@@ -1,26 +1,26 @@
 #!/bin/bash
-# ydea-discover-sla-ids.sh — Scopri ID per categorie, sottocategorie e SLA personalizzata
-# Utilizzato per trovare gli ID necessari per la gestione ticket con SLA Premium_Mon
+# ydea-discover-sla-ids.sh — Discover IDs by categories, subcategories and custom SLA
+# Used to find IDs needed for ticket management with Premium_Mon SLA
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 YDEA_TOOLKIT="${SCRIPT_DIR}/ydea-toolkit.sh"
 
-# Verifica che ydea-toolkit esista
+# Verify that ydea-toolkit exists
 if [[ ! -f "$YDEA_TOOLKIT" ]]; then
-    echo " Errore: ydea-toolkit.sh non trovato in $SCRIPT_DIR"
+    echo "Error: ydea-toolkit.sh not found in $SCRIPT_DIR"
     exit 1
 fi
 
-# Carica le funzioni da ydea-toolkit
+# Load functions from ydea-toolkit
 # shellcheck disable=SC1090
 source "$YDEA_TOOLKIT"
 
-# ===== Configurazione =====
+# ===== Configuration =====
 OUTPUT_FILE="${SCRIPT_DIR}/sla-premium-mon-ids.json"
 
-# Categorie da cercare
+# Categories to search
 MACRO_CATEGORY="Premium_Mon"
 declare -a SUBCATEGORIES=(
   "Centrale telefonica NethVoice"
@@ -50,7 +50,7 @@ discover_categories() {
   
   log_info "Recupero lista categorie da Ydea API..."
   
-  # Chiama API per ottenere tutte le categorie
+  # Call API to get all categories
   local categories_data
   categories_data=$(ydea_api GET "/categories" 2>/dev/null || echo '{"objs":[]}')
   
@@ -59,11 +59,11 @@ discover_categories() {
     return 1
   fi
   
-  # Salva i dati completi per debug
+  # Save complete data for debugging
   echo "$categories_data" > "${SCRIPT_DIR}/categories-full-dump.json"
   log_debug "Dump completo categorie salvato in categories-full-dump.json"
   
-  # Cerca la macro categoria Premium_Mon
+  # Search for the Premium_Mon macro category
   local macro_cat_id
   macro_cat_id=$(echo "$categories_data" | jq -r --arg name "$MACRO_CATEGORY" '
     .objs[]? | select(.nome == $name) | .id
@@ -78,7 +78,7 @@ discover_categories() {
     log_success "Macro categoria '$MACRO_CATEGORY' trovata → ID: $macro_cat_id"
   fi
   
-  # Cerca le sottocategorie
+  # Look for subcategories
   declare -A subcategory_ids
   local found_count=0
   
@@ -97,14 +97,14 @@ discover_categories() {
       echo "   '$subcat' → ID: $subcat_id"
       ((found_count++))
     else
-      echo "   '$subcat' → NON TROVATA"
+      echo "'$subcat' → NOT FOUND"
     fi
   done
   
   echo ""
   log_info "Sottocategorie trovate: $found_count/${#SUBCATEGORIES[@]}"
   
-  # Costruisci JSON output per categorie
+  # Build JSON output by categories
   local json_output="{}"
   
   if [[ -n "$macro_cat_id" ]]; then
@@ -135,7 +135,7 @@ discover_sla() {
   
   log_info "Recupero lista SLA da Ydea API..."
   
-  # Chiama API per ottenere tutte le SLA
+  # Call API to get all SLAs
   local sla_data
   sla_data=$(ydea_api GET "/sla" 2>/dev/null || echo '{"objs":[]}')
   
@@ -145,11 +145,11 @@ discover_sla() {
     sla_data=$(ydea_api GET "/slas" 2>/dev/null || echo '{"objs":[]}')
   fi
   
-  # Salva i dati completi per debug
+  # Save complete data for debugging
   echo "$sla_data" > "${SCRIPT_DIR}/sla-full-dump.json"
   log_debug "Dump completo SLA salvato in sla-full-dump.json"
   
-  # Cerca la SLA specifica
+  # Search for the specific ALS
   local sla_id
   sla_id=$(echo "$sla_data" | jq -r --arg name "$SLA_NAME" '
     .objs[]? | select(.nome == $name or .name == $name or .title == $name) | .id
@@ -160,7 +160,7 @@ discover_sla() {
     log_info "Elenco tutte le SLA disponibili:"
     echo "$sla_data" | jq -r '.objs[]? | "\(.id) → \(.nome // .name // .title)"'
     
-    # Prova ricerca parziale su TK25/003209
+    # Try partial search on TK25/003209
     log_info "Tentativo ricerca per codice 'TK25/003209'..."
     sla_id=$(echo "$sla_data" | jq -r '
       .objs[]? | select(.nome // .name // .title | test("TK25/003209")) | .id
@@ -175,7 +175,7 @@ discover_sla() {
     log_success "SLA '$SLA_NAME' trovata → ID: $sla_id"
   fi
   
-  # Costruisci JSON output per SLA
+  # Build JSON output for SLA
   local json_output="{}"
   
   if [[ -n "$sla_id" ]]; then
@@ -193,7 +193,7 @@ discover_priorities() {
   
   log_info "Recupero lista priorità da Ydea API..."
   
-  # Chiama API per ottenere tutte le priorità
+  # Call API to get all priorities
   local priorities_data
   priorities_data=$(ydea_api GET "/priorities" 2>/dev/null || echo '{"objs":[]}')
   
@@ -202,7 +202,7 @@ discover_priorities() {
     return 0
   fi
   
-  # Salva i dati completi per debug
+  # Save complete data for debugging
   echo "$priorities_data" > "${SCRIPT_DIR}/priorities-full-dump.json"
   log_debug "Dump completo priorità salvato in priorities-full-dump.json"
   
@@ -221,7 +221,7 @@ discover_priorities() {
     log_success "Priorità 'Bassa' trovata → ID: $low_priority_id"
   fi
   
-  # Costruisci JSON output per priorità
+  # Build JSON output by priority
   local json_output="{}"
   
   if [[ -n "$low_priority_id" ]]; then
@@ -240,7 +240,7 @@ main() {
   log_info "Inizio discovery per SLA Premium_Mon..."
   log_info "Output verrà salvato in: $OUTPUT_FILE"
   
-  # Verifica autenticazione
+  # Verify authentication
   if ! ensure_token 2>&1; then
     log_error "Impossibile autenticarsi a Ydea API"
     log_error "Verifica YDEA_ID e YDEA_API_KEY nel file .env"
@@ -261,7 +261,7 @@ main() {
   local priorities_json
   priorities_json=$(discover_priorities)
   
-  # Combina tutti i risultati
+  # Combine all results
   print_header " GENERAZIONE FILE CONFIGURAZIONE"
   
   local final_json
@@ -278,7 +278,7 @@ main() {
       low_priority: $priorities.low_priority
     }')
   
-  # Salva il file
+  # Save the file
   echo "$final_json" > "$OUTPUT_FILE"
   
   print_header " DISCOVERY COMPLETATO"
@@ -289,7 +289,7 @@ main() {
   jq -C '.' "$OUTPUT_FILE" || cat "$OUTPUT_FILE"
   echo ""
   
-  # Verifica completezza
+  # Check completeness
   local missing_items=()
   
   if ! echo "$final_json" | jq -e '.macro_category.id' >/dev/null 2>&1; then
@@ -320,9 +320,9 @@ main() {
     log_success " Tutti gli elementi richiesti sono stati trovati!"
     echo ""
     log_info "Prossimi passi:"
-    echo "  1. Verifica il contenuto di: $OUTPUT_FILE"
-    echo "  2. Integra questi ID negli script di notifica CheckMK"
-    echo "  3. Implementa la logica di mapping sottocategoria → tipo allarme"
+    echo "1. Check the contents of: $OUTPUT_FILE"
+    echo "2. Integrate these IDs into your CheckMK notification scripts"
+    echo "3. Implement the subcategory → alarm type mapping logic"
   fi
 }
 

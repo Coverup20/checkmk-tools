@@ -1,21 +1,21 @@
 # Script Tools Documentation
-> **Categoria:** Operativo
+> **Category:** Operational
 
-Questa cartella contiene la documentazione operativa per gli script in `script-tools/full`.
+This folder contains operational documentation for the scripts in `script-tools/full`.
 
-## Punto di partenza consigliato
+## Recommended starting point
 
-1. `DOCUMENTATION_INDEX.md` → mappa rapida dei documenti davvero utili oggi
-2. `CONVERSION-STATUS-SCRIPT-TOOLS.md` → stato conversione Bash → Python
-3. README specifici (`README-*.md`) → guide operative per singolo script/workflow
+1. `DOCUMENTATION_INDEX.md` → quick map of really useful documents today
+2. `CONVERSION-STATUS-SCRIPT-TOOLS.md` → conversion status Bash → Python
+3. Specific READMEs (`README-*.md`) → operating guides for each script/workflow
 
-## Come usare la documentazione senza perdersi
+## How to use the documentation without getting lost
 
-- Se devi **eseguire** qualcosa: parti dal README specifico del task.
-- Se devi **capire stato progetto**: usa `CONVERSION-STATUS-SCRIPT-TOOLS.md`.
-- Se trovi file datati (2025 Windows installer), trattali come storico salvo necessità.
+- If you need to **execute** something: start from the task-specific README.
+- If you need to **understand project status**: use `CONVERSION-STATUS-SCRIPT-TOOLS.md`.
+- If you find old files (2025 Windows installer), treat them as historical unless necessary.
 
-## Nota importante
+## Important note
 
-Alcuni documenti in questa cartella sono storici o nati per sessioni passate.
-L'indice aggiornato in `DOCUMENTATION_INDEX.md` indica chiaramente cosa usare come riferimento corrente.
+Some documents in this folder are historical or created for past sessions.
+The updated index in `DOCUMENTATION_INDEX.md` clearly indicates what to use as the current reference.

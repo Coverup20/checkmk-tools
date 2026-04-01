@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-monitor_podman_events.py - Daemon per monitoraggio eventi Podman
+"""monitor_podman_events.py - Daemon for monitoring Podman events
 
-Ascolta eventi Podman in tempo reale e registra solo eventi
-create/start/stop/remove, escludendo container redis.
+Listen to Podman events in real time and only record events
+create/start/stop/remove, excluding redis containers.
 
-Scrive eventi su /var/log/podman_events.log
+Writes events to /var/log/podman_events.log
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -22,15 +20,13 @@ LOGFILE = Path("/var/log/podman_events.log")
 
 
 def should_log_event(event_line: str) -> bool:
-    """
-    Check if event should be logged.
+    """Check if event should be logged.
     
     Args:
         event_line: Event line from podman events
         
     Returns:
-        True if event should be logged, False otherwise
-    """
+        True if event should be logged, False otherwise"""
     # Exclude redis containers
     if "redis" in event_line.lower():
         return False
@@ -41,12 +37,10 @@ def should_log_event(event_line: str) -> bool:
 
 
 def run_podman_events_daemon() -> int:
-    """
-    Run podman events daemon and log filtered events.
+    """Run podman events daemon and log filtered events.
     
     Returns:
-        Exit code (0 on success, non-zero on error)
-    """
+        Exit code (0 on success, non-zero on error)"""
     # Create log directory if needed
     LOGFILE.parent.mkdir(parents=True, exist_ok=True)
     
@@ -72,7 +66,7 @@ def run_podman_events_daemon() -> int:
             print(f"[INFO] Podman events daemon started (PID: {process.pid})")
             print(f"[INFO] Logging to: {LOGFILE}")
             
-            # Process events in real-time
+            # Process events in real time
             for line in process.stdout:
                 line = line.strip()
                 if line and should_log_event(line):
@@ -100,12 +94,10 @@ def run_podman_events_daemon() -> int:
 
 
 def main() -> int:
-    """
-    Main daemon entry point.
+    """Main daemon entry point.
     
     Returns:
-        Exit code
-    """
+        Exit code"""
     print(f"monitor_podman_events.py v{VERSION}")
     print("Starting Podman events monitoring daemon...")
     print("Press Ctrl+C to stop\n")

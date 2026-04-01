@@ -6,7 +6,7 @@ from pathlib import Path
 WRAPPER = Path("/usr/local/sbin/checkmk_cloud_backup_push_run.sh")
 
 # OLD: double backslashes produced by raw-string bug in .py installer
-OLD = r"""    mapfile -t sorted_backups < <(
+OLD = r"""mapfile -t sorted_backups < <(
       printf '%s\\n' "${all_remote_backups[@]}" | \\
         sed 's/.*\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}-[0-9]\\{2\\}h[0-9]\\{2\\}\\).*/\\1 &/' | \\
         sort -r | \\
@@ -14,7 +14,7 @@ OLD = r"""    mapfile -t sorted_backups < <(
     )"""
 
 # NEW: single backslashes - correct bash line-continuation and sed BRE
-NEW = r"""    mapfile -t sorted_backups < <(
+NEW = r"""mapfile -t sorted_backups < <(
       printf '%s\n' "${all_remote_backups[@]}" | \
         sed 's/.*\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-[0-9]\{2\}h[0-9]\{2\}\).*/\1 &/' | \
         sort -r | \

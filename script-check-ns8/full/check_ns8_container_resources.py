@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-check_ns8_container_resources.py - Risorse container NS8 per CheckMK
+"""check_ns8_container_resources.py - NS8 container resources for CheckMK
 
-Version: 1.1.0
-"""
+Version: 1.1.0"""
 
 import subprocess
 import sys

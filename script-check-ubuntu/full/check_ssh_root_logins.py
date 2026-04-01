@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-check_ssh_root_logins.py - CheckMK Local Check for Root SSH Sessions
+"""check_ssh_root_logins.py - CheckMK Local Check for Root SSH Sessions
 
 Monitors active root SSH sessions and reports IP addresses.
 Alerts based on configurable thresholds.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -22,15 +20,13 @@ THRESHOLD_CRITICAL = 6  # CRITICAL if >= 6 root sessions
 
 
 def run_command(cmd: List[str]) -> Tuple[int, str, str]:
-    """
-    Execute a shell command and return exit code, stdout, stderr.
+    """Execute a shell command and return exit code, stdout, stderr.
     
     Args:
         cmd: Command as list of strings
         
     Returns:
-        Tuple of (exit_code, stdout, stderr)
-    """
+        Tuple of (exit_code, stdout, stderr)"""
     try:
         result = subprocess.run(
             cmd,
@@ -49,12 +45,10 @@ def run_command(cmd: List[str]) -> Tuple[int, str, str]:
 
 
 def get_root_sessions() -> Tuple[int, List[str]]:
-    """
-    Get count of root SSH sessions and list of IP addresses.
+    """Get count of root SSH sessions and list of IP addresses.
     
     Returns:
-        Tuple of (session_count, list_of_ips)
-    """
+        Tuple of (session_count, list_of_ips)"""
     exit_code, stdout, _ = run_command(["who"])
     
     if exit_code != 0 or not stdout:
@@ -89,12 +83,10 @@ def get_root_sessions() -> Tuple[int, List[str]]:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     session_count, ips = get_root_sessions()
     
     if session_count == 0:

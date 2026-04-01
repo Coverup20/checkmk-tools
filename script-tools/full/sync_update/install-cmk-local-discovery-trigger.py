@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""
-install-cmk-local-discovery-trigger.py
+"""install-cmk-local-discovery-trigger.py
 
-Installer systemd per cmk-local-discovery-trigger.py con guardrail di produzione.
+Systemd installer for cmk-local-discovery-trigger.py with production guardrails.
 
-Crea:
+Create:
 - /etc/systemd/system/checkmk-local-discovery-trigger.service
 - /etc/systemd/system/checkmk-local-discovery-trigger.timer
 
-Version: 1.3.0
-"""
+Version: 1.3.0"""
 
 import argparse
 import grp
@@ -157,8 +155,7 @@ RestartSec=15
 NoNewPrivileges=true
 
 [Install]
-WantedBy=multi-user.target
-"""
+WantedBy=multi-user.target"""
 
     service_path = SYSTEMD_DIR / AUTO_SYNC_SERVICE_NAME
     write_text(service_path, service_content)
@@ -229,7 +226,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def is_checkmk_server() -> bool:
-    """Verifica che questo sia un server CheckMK (omd + cmk presenti)."""
+    """Verify that this is a CheckMK server (omd + cmk present)."""
     return shutil.which("omd") is not None and shutil.which("cmk") is not None
 
 
@@ -237,7 +234,7 @@ def main() -> int:
     args = parse_args()
     require_root()
 
-    # Guardrail: questo script va eseguito SOLO su server CheckMK, non su host monitorati
+    # Guardrail: This script should ONLY be run on CheckMK servers, not monitored hosts
     if not is_checkmk_server():
         print("[ERROR] Questo non è un server CheckMK (omd/cmk non trovati).", file=sys.stderr)
         print("[ERROR] Il discovery trigger va installato SOLO sul server CheckMK, non sugli host monitorati.", file=sys.stderr)
@@ -299,8 +296,7 @@ Environment=CHECKMK_AUTOHEAL_LOG_FILE={log_file}
 ExecStart={' '.join(exec_cmd)}
 TimeoutStartSec={args.timeout_start_min}min
 RuntimeMaxSec={args.runtime_max_min}min
-NoNewPrivileges=true
-"""
+NoNewPrivileges=true"""
 
     timer_content = f"""[Unit]
 Description=Run CheckMK local services change detector every {args.interval_min} minutes
@@ -312,8 +308,7 @@ Persistent=true
 AccuracySec={args.accuracy_sec}s
 
 [Install]
-WantedBy=timers.target
-"""
+WantedBy=timers.target"""
 
     service_path = SYSTEMD_DIR / SERVICE_NAME
     timer_path = SYSTEMD_DIR / TIMER_NAME

@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-inspect_ticket.py - Ispeziona struttura completa ticket Ydea
+"""inspect_ticket.py - Inspect complete Ydea ticket structure
 
-Mostra tutti i campi e la struttura di un ticket per analisi.
+Shows all fields and structure of a ticket for analysis.
 
 Usage:
     inspect_ticket.py <ticket_id>
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import json
@@ -63,7 +61,7 @@ def main():
                 print(f"  {key}: {value_type}")
         print()
         
-        # Salva su file
+        # Save to file
         output_file = f"/tmp/ticket-{ticket_id}-inspect.json"
         Path(output_file).write_text(json.dumps(data, indent=2, ensure_ascii=False))
         print(f" Salvato in: {output_file}")

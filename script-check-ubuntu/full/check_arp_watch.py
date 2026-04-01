@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""
-check_arp_watch.py - CheckMK Local Check per monitoraggio ARP
+"""check_arp_watch.py - CheckMK Local Check for ARP monitoring
 
-Rileva:
-  - CRITICAL: ARP spoofing (stesso IP, MAC cambiato)
-  - WARNING:  Nuovo host mai visto prima
-  - OK:       Tutti gli host noti, nessuna anomalia
+Detect:
+  - CRITICAL: ARP spoofing (same IP, changed MAC)
+  - WARNING: New host never seen before
+  - OK: All known hosts, no anomalies
 
 Baseline: /var/lib/check_mk_agent/arp_watch_state.json
   {
@@ -13,8 +12,7 @@ Baseline: /var/lib/check_mk_agent/arp_watch_state.json
     ...
   }
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import json
 import os
@@ -28,15 +26,13 @@ VERSION = "1.0.0"
 SERVICE = "ARPWatch"
 
 STATE_FILE = "/var/lib/check_mk_agent/arp_watch_state.json"
-# Numero di check consecutivi prima di promuovere un host a "noto" (no più WARNING)
+# Number of consecutive checks before promoting a host to "known" (no more WARNING)
 LEARN_THRESHOLD = 3
 
 
 def get_arp_table() -> Dict[str, str]:
-    """
-    Legge la ARP table dal kernel via 'ip neigh show'.
-    Ritorna dict {ip: mac} solo per entry REACHABLE/STALE/DELAY/PROBE.
-    """
+    """Reads the ARP table from the kernel via 'ip neigh show'.
+    Return dict {ip: mac} only for entries REACHABLE/STALE/DELAY/PROBE."""
     result: Dict[str, str] = {}
     try:
         proc = subprocess.run(
@@ -63,7 +59,7 @@ def get_arp_table() -> Dict[str, str]:
 
 
 def load_state() -> dict:
-    """Carica la baseline dal file JSON."""
+    """Load the baseline from the JSON file."""
     if not os.path.exists(STATE_FILE):
         return {}
     try:
@@ -74,7 +70,7 @@ def load_state() -> dict:
 
 
 def save_state(state: dict) -> None:
-    """Salva la baseline su file JSON."""
+    """Save the baseline to JSON file."""
     try:
         os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
         with open(STATE_FILE, "w") as f:
@@ -99,7 +95,7 @@ def main() -> int:
 
     for ip, mac in arp_table.items():
         if ip not in state:
-            # Nuovo host mai visto
+            # New host never seen
             state[ip] = {"mac": mac, "seen": 1, "first_seen": now}
             new_hosts.append((ip, mac))
         else:
@@ -107,12 +103,12 @@ def main() -> int:
             if entry["mac"] != mac:
                 # MAC cambiato → spoofing
                 spoofed.append((ip, entry["mac"], mac))
-                # Aggiorna comunque il MAC (per non lanciare alert infiniti)
+                # Update your MAC anyway (so as not to launch endless alerts)
                 state[ip]["mac"] = mac
                 state[ip]["seen"] = 1
                 state[ip]["first_seen"] = now
             else:
-                # Host noto, incrementa contatore
+                # Known host, increment counter
                 entry["seen"] = entry.get("seen", 0) + 1
                 if entry["seen"] >= LEARN_THRESHOLD:
                     known += 1
@@ -123,7 +119,7 @@ def main() -> int:
 
     total = len(arp_table)
 
-    # Determina stato finale
+    # Determine final state
     if spoofed:
         details = "; ".join(
             f"SPOOFING {ip}: {old} -> {new}" for ip, old, new in spoofed

@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-mail_realip - HTML Mail Notification with Real IP Support
+"""mail_realip - HTML Mail Notification with Real IP Support
 Bulk: yes
 
 CheckMK notification script - sends HTML email with real IP and FRP tunnel detection.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import sys
@@ -79,12 +77,12 @@ def main():
         service = "Host Check"
         subject = f"Checkmk: {hostname} {new_state}"
     
-    # Replace IP in output
+    # Replace IP on output
     if host_address and host_address != real_ip:
         output = output.replace(host_address, real_ip)
         long_output = long_output.replace(host_address, real_ip)
     
-    # Combine output
+    # Combine outputs
     full_output = output
     if long_output:
         full_output += "<br>" + long_output.replace("\n", "<br>")
@@ -120,7 +118,7 @@ def main():
 From: {FROM_EMAIL}
 Subject: {subject}
 Content-Type: text/html; charset=UTF-8
-MIME-Version: 1.0
+MIME Version: 1.0
 
 <!DOCTYPE html>
 <html>
@@ -181,8 +179,7 @@ body{{padding:10px}}
 <div class="footer">Sent by Checkmk<div class="buttons"><a href="{srv_link}" class="btn">Service</a><a href="{host_link}" class="btn">Host</a></div></div>
 </div>
 </body>
-</html>
-"""
+</html>"""
     
     # Send via sendmail
     try:

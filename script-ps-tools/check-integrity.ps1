@@ -1,5 +1,5 @@
-# Script di Controllo Integrità Repository CheckMK-Tools
-# Verifica sintassi di tutti gli script senza eseguire il backup
+# CheckMK-Tools Repository Integrity Check Script
+# Verify syntax of all scripts without backing up
 
 param(
     [switch]$Detailed,      # Mostra lista completa errori
@@ -12,7 +12,7 @@ $ErrorActionPreference = "Continue"
 
 $REPO_PATH = "C:\Users\Marzio\Desktop\CheckMK\checkmk-tools"
 
-# === CONFIGURAZIONE EMAIL ===
+# === EMAIL CONFIGURATION ===
 $SMTP_SERVER = "smtp-relay.nethesis.it"
 $SMTP_PORT = 587
 $SMTP_USE_SSL = $true
@@ -26,9 +26,9 @@ Write-Host "      CONTROLLO INTEGRITÀ REPOSITORY CHECKMK-TOOLS" -ForegroundColo
 Write-Host "================================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Verifica esistenza repository
+# Check repository existence
 if (-not (Test-Path $REPO_PATH)) {
-    Write-Host "[ERRORE] Repository non trovato: $REPO_PATH" -ForegroundColor Red
+    Write-Host "[ERROR] Repository not found: $REPO_PATH" -ForegroundColor Red
     exit 1
 }
 
@@ -37,7 +37,7 @@ Write-Host "[INFO] Soglia corruzione: $Threshold%" -ForegroundColor Gray
 Write-Host ""
 
 # ═══════════════════════════════════════════════════════════════
-# VERIFICA DISPONIBILITÀ WSL
+# CHECK WSL AVAILABILITY
 # ═══════════════════════════════════════════════════════════════
 
 $wslAvailable = $false
@@ -49,9 +49,9 @@ try {
 }
 
 if ($wslAvailable) {
-    Write-Host "[INFO] WSL disponibile - verifica sintassi bash abilitata" -ForegroundColor Green
+    Write-Host "[INFO] WSL available - bash syntax checking enabled" -ForegroundColor Green
 } else {
-    Write-Host "[WARNING] WSL non disponibile - verifica bash limitata" -ForegroundColor Yellow
+    Write-Host "[WARNING] WSL unavailable - limited bash testing" -ForegroundColor Yellow
 }
 Write-Host ""
 
@@ -59,7 +59,7 @@ Write-Host ""
 # RACCOLTA SCRIPT
 # ═══════════════════════════════════════════════════════════════
 
-Write-Host "[INFO] Ricerca script nel repository..." -ForegroundColor Cyan
+Write-Host "[INFO] Search script in the repository..." -ForegroundColor Cyan
 
 $allScripts = Get-ChildItem -Path $REPO_PATH -Recurse -File -ErrorAction SilentlyContinue | 
     Where-Object { 
@@ -76,19 +76,19 @@ $allScripts = Get-ChildItem -Path $REPO_PATH -Recurse -File -ErrorAction Silentl
 $totalScripts = $allScripts.Count
 
 if ($totalScripts -eq 0) {
-    Write-Host "[ERRORE] Nessuno script trovato!" -ForegroundColor Red
+    Write-Host "[ERROR] No script found!" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "[INFO] Trovati $totalScripts script da verificare" -ForegroundColor White
+Write-Host "[INFO] Found $totalScripts script to check" -ForegroundColor White
 Write-Host ""
 
 # ═══════════════════════════════════════════════════════════════
-# VERIFICA INTEGRITÀ
+# CHECK INTEGRITY
 # ═══════════════════════════════════════════════════════════════
 
 Write-Host "================================================================" -ForegroundColor Yellow
-Write-Host "    VERIFICA INTEGRITÀ IN CORSO" -ForegroundColor White
+Write-Host "INTEGRITY VERIFICATION IN PROGRESS" -ForegroundColor White
 Write-Host "================================================================" -ForegroundColor Yellow
 Write-Host ""
 
@@ -105,7 +105,7 @@ $categoryStats = @{
 foreach ($script in $allScripts) {
     $relativePath = $script.FullName.Replace($REPO_PATH, "").TrimStart('\')
     
-    # Whitelist file che possono essere legittimamente vuoti
+    # Whitelist files that may be legitimately empty
     $allowedEmptyFiles = @(
         "corrupted-files-list.txt",
         ".gitkeep",
@@ -127,11 +127,11 @@ foreach ($script in $allScripts) {
             $scriptType = '.py'
             $category = 'Python'
         } elseif ($script.Extension -eq '') {
-            # File senza estensione e shebang non riconosciuto: salta
+            # File without extension and unrecognized shebang: skip
             $validScripts++
             continue
         } else {
-            # Categorizza per estensione
+            # Categorize by extension
             $category = switch ($script.Extension) {
                 '.ps1' { 'PowerShell' }
                 { $_ -in @('.sh', '.bash') } { 'Bash/Shell' }
@@ -141,7 +141,7 @@ foreach ($script in $allScripts) {
             }
         }
     } catch {
-        # Non può leggere il file, salta
+        # Cannot read file, skips
         $validScripts++
         continue
     }
@@ -150,7 +150,7 @@ foreach ($script in $allScripts) {
         $categoryStats[$category].Total++
     }
     
-    # Verifica PowerShell
+    # Check PowerShell
     if ($scriptType -eq ".ps1") {
         try {
             $errors = $null
@@ -172,13 +172,13 @@ foreach ($script in $allScripts) {
         }
     }
     
-    # Verifica Bash con WSL
+    # Check Bash with WSL
     if ($scriptType -in @(".sh", ".bash") -and $wslAvailable) {
         try {
-            # Converti path Windows in path WSL
+            # Convert Windows path to WSL path
             $wslPath = $script.FullName -replace '\\', '/' -replace '^([A-Z]):', { "/mnt/$($_.Groups[1].Value.ToLower())" }
             
-            # Usa bash -n per syntax check
+            # Use bash -n for syntax check
             $bashCheck = wsl bash -n "$wslPath" 2>&1
             $exitCode = $LASTEXITCODE
             if ($exitCode -ne 0) {
@@ -189,12 +189,12 @@ foreach ($script in $allScripts) {
                 continue
             }
             
-            # Verifica permessi eseguibili
+            # Check executable permissions
             $perms = wsl stat -c "%a" "$wslPath" 2>&1
             if ($LASTEXITCODE -eq 0 -and $perms -match '^\d{3}$') {
                 $execBit = [int]::Parse($perms.Substring(2, 1))
                 if (($execBit -band 1) -eq 0) {
-                    # Non eseguibile, correggi automaticamente
+                    # Not executable, fix automatically
                     wsl chmod +x "$wslPath" 2>&1 | Out-Null
                     if ($LASTEXITCODE -eq 0) {
                         Write-Host "  [FIX] Reso eseguibile: $relativePath" -ForegroundColor Yellow
@@ -202,7 +202,7 @@ foreach ($script in $allScripts) {
                 }
             }
         } catch {
-            # Fallback: verifica shebang
+            # Fallback: check shebang
             try {
                 $firstLine = Get-Content $script.FullName -First 1 -ErrorAction Stop
                 if (-not ($firstLine -match '^#!/')) {
@@ -217,11 +217,11 @@ foreach ($script in $allScripts) {
         }
     }
     
-    # Verifica Batch (controllo base)
+    # Batch verification (basic check)
     if ($scriptType -in @(".bat", ".cmd")) {
         try {
             $content = Get-Content $script.FullName -Raw -ErrorAction Stop
-            # Skip verifica vuoto per file nella whitelist
+            # Skip blank check for whitelisted files
             if ([string]::IsNullOrWhiteSpace($content) -and -not $canBeEmpty) {
                 $corruptedScripts++
                 $categoryStats[$category].Errors++
@@ -236,7 +236,7 @@ foreach ($script in $allScripts) {
         }
     }
     
-    # Verifica Python (controllo base sintassi)
+    # Python check (basic syntax check)
     if ($scriptType -eq ".py") {
         try {
             $pythonCheck = python -m py_compile "$($script.FullName)" 2>&1
@@ -248,7 +248,7 @@ foreach ($script in $allScripts) {
                 continue
             }
         } catch {
-            # Python non disponibile, skip
+            # Python not available, skip
         }
     }
     
@@ -273,25 +273,25 @@ $corruptionPercentage = if ($totalScripts -gt 0) {
 }
 
 # ═══════════════════════════════════════════════════════════════
-# REPORT RISULTATI
+# RESULTS REPORT
 # ═══════════════════════════════════════════════════════════════
 
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Cyan
-Write-Host "    RISULTATI VERIFICA INTEGRITÀ" -ForegroundColor White
+Write-Host "INTEGRITY CHECK RESULTS" -ForegroundColor White
 Write-Host "================================================================" -ForegroundColor Cyan
 Write-Host ""
 
 Write-Host "RIEPILOGO GENERALE:" -ForegroundColor White
 Write-Host "  Script verificati:    $totalScripts" -ForegroundColor Gray
 Write-Host "  Script validi:        $validScripts" -ForegroundColor Green
-Write-Host "  Script con errori:    $corruptedScripts" -ForegroundColor $(if ($corruptedScripts -eq 0) { "Green" } else { "Red" })
-Write-Host "  Percentuale errori:   $corruptionPercentage%" -ForegroundColor $(if ($corruptionPercentage -gt $Threshold) { "Red" } elseif ($corruptionPercentage -gt 5) { "Yellow" } else { "Green" })
+Write-Host "Corrupted Script: $corruptedScripts" -ForegroundColor $(if ($corruptedScripts -eq 0) { "Green" } else { "Red" })
+Write-Host "Error rate: $corruptionPercentage%" -ForegroundColor $(if ($corruptionPercentage -gt $Threshold) { "Red" } elseif ($corruptionPercentage -gt 5) { "Yellow" } else { "Green" })
 Write-Host "  Soglia corruzione:    $Threshold%" -ForegroundColor Gray
 Write-Host ""
 
-# Statistiche per categoria
-Write-Host "DETTAGLIO PER TIPO:" -ForegroundColor White
+# Statistics by category
+Write-Host "DETAIL BY TYPE:" -ForegroundColor White
 foreach ($cat in $categoryStats.Keys | Sort-Object) {
     $stats = $categoryStats[$cat]
     if ($stats.Total -gt 0) {
@@ -299,7 +299,7 @@ foreach ($cat in $categoryStats.Keys | Sort-Object) {
         Write-Host "  $cat" -ForegroundColor Cyan
         Write-Host "    Totale:      $($stats.Total)" -ForegroundColor Gray
         Write-Host "    Validi:      $($stats.Valid)" -ForegroundColor Green
-        Write-Host "    Errori:      $($stats.Errors) ($catPercent%)" -ForegroundColor $(if ($stats.Errors -eq 0) { "Green" } else { "Yellow" })
+        Write-Host "Errors: $($stats.Errors) ($catPercent%)" -ForegroundColor $(if ($stats.Errors -eq 0) { "Green" } else { "Yellow" })
     }
 }
 Write-Host ""
@@ -315,25 +315,25 @@ Write-Host ""
 
 if ($corruptionPercentage -gt $Threshold) {
     Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Red
-    Write-Host "║        CORRUZIONE MASSIVA RILEVATA               ║" -ForegroundColor White
+    Write-Host "║ MASSIVE CORRUPTION DETECTED ║" -ForegroundColor White
     Write-Host "╚═══════════════════════════════════════════════════════╝" -ForegroundColor Red
     Write-Host ""
-    Write-Host "[STATO] CRITICO - Corruzione sopra soglia!" -ForegroundColor Red
-    Write-Host "  • Il backup automatico verrebbe BLOCCATO" -ForegroundColor Red
+    Write-Host "[STATE] CRITICAL - Corruption above threshold!" -ForegroundColor Red
+    Write-Host "• Automatic backup would be BLOCKED" -ForegroundColor Red
     Write-Host "  • Necessaria azione immediata" -ForegroundColor Red
     Write-Host ""
     Write-Host "AZIONI CONSIGLIATE:" -ForegroundColor Yellow
-    Write-Host "  1. Verifica encoding dei file (UTF-8 vs ANSI)" -ForegroundColor Gray
-    Write-Host "  2. Controlla line endings (CRLF vs LF)" -ForegroundColor Gray
-    Write-Host "  3. Esegui 'git status' per vedere modifiche massive" -ForegroundColor Gray
-    Write-Host "  4. Considera ripristino da backup precedente" -ForegroundColor Gray
+    Write-Host "1. Check file encoding (UTF-8 vs ANSI)" -ForegroundColor Gray
+    Write-Host "2. Check line endings (CRLF vs LF)" -ForegroundColor Gray
+    Write-Host "3. Run 'git status' to see massive changes" -ForegroundColor Gray
+    Write-Host "4. Consider restoring from previous backup" -ForegroundColor Gray
     Write-Host ""
     $exitCode = 2
 } elseif ($corruptedScripts -gt 0) {
-    Write-Host "[STATO] WARNING - Errori rilevati ma sotto soglia" -ForegroundColor Yellow
-    Write-Host "  • Il backup automatico continuerebbe normalmente" -ForegroundColor Yellow
-    Write-Host "  • Errori presenti: $corruptedScripts ($corruptionPercentage%)" -ForegroundColor Yellow
-    Write-Host "  • Considerare la correzione quando possibile" -ForegroundColor Gray
+    Write-Host "[STATUS] WARNING - Errors detected but below threshold" -ForegroundColor Yellow
+    Write-Host "• Automatic backup would continue normally" -ForegroundColor Yellow
+    Write-Host "• Errors present: $corruptedScripts ($corruptionPercentage%)" -ForegroundColor Yellow
+    Write-Host "• Consider correction when possible" -ForegroundColor Gray
     Write-Host ""
     $exitCode = 1
 } else {
@@ -341,20 +341,20 @@ if ($corruptionPercentage -gt $Threshold) {
     Write-Host "║          REPOSITORY INTEGRO                       ║" -ForegroundColor White
     Write-Host "╚═══════════════════════════════════════════════════════╝" -ForegroundColor Green
     Write-Host ""
-    Write-Host "[STATO] OK - Nessun errore rilevato" -ForegroundColor Green
-    Write-Host "  • Tutti gli script sono validi" -ForegroundColor Green
-    Write-Host "  • Il backup automatico funziona correttamente" -ForegroundColor Green
+    Write-Host "[STATUS] OK - No errors detected" -ForegroundColor Green
+    Write-Host "• All scripts are valid" -ForegroundColor Green
+    Write-Host "• Automatic backup works correctly" -ForegroundColor Green
     Write-Host ""
     $exitCode = 0
 }
 
 # ═══════════════════════════════════════════════════════════════
-# LISTA DETTAGLIATA ERRORI
+# DETAILED ERROR LIST
 # ═══════════════════════════════════════════════════════════════
 
 if ($corruptedScripts -gt 0 -and ($Detailed -or $corruptionPercentage -gt $Threshold)) {
     Write-Host "================================================================" -ForegroundColor Yellow
-    Write-Host "    LISTA ERRORI DETTAGLIATA" -ForegroundColor White
+    Write-Host "DETAILED ERROR LIST" -ForegroundColor White
     Write-Host "================================================================" -ForegroundColor Yellow
     Write-Host ""
     
@@ -366,8 +366,8 @@ if ($corruptedScripts -gt 0 -and ($Detailed -or $corruptionPercentage -gt $Thres
     
     if ($corruptedList.Count -gt $maxToShow) {
         Write-Host ""
-        Write-Host "  ... e altri $($corruptedList.Count - $maxToShow) errori" -ForegroundColor DarkRed
-        Write-Host "  Usa -Detailed per vedere tutti gli errori" -ForegroundColor Gray
+        Write-Host "...and other $($corruptedList.Count - $maxToShow) errors" -ForegroundColor DarkRed
+        Write-Host "Use -Detailed to see all errors" -ForegroundColor Gray
     }
     Write-Host ""
 }
@@ -418,12 +418,12 @@ DETTAGLIO PER TIPO:
 }
 
 # ═══════════════════════════════════════════════════════════════
-# INVIO EMAIL SE RICHIESTO E ERRORI TROVATI
+# I WILL SEND EMAIL IF REQUESTED AND ERRORS FOUND
 # ═══════════════════════════════════════════════════════════════
 
 if ($SendEmail -and $corruptedScripts -gt 0) {
     Write-Host "================================================================" -ForegroundColor Cyan
-    Write-Host "    INVIO EMAIL NOTIFICA ERRORI" -ForegroundColor White
+    Write-Host "SEND EMAIL ERROR NOTIFICATION" -ForegroundColor White
     Write-Host "================================================================" -ForegroundColor Cyan
     Write-Host ""
     
@@ -514,12 +514,12 @@ Questo è un messaggio automatico generato dal sistema.
             Send-MailMessage @smtpParams -WarningAction SilentlyContinue
             Write-Host "[OK] Email inviata a: $EMAIL_TO" -ForegroundColor Green
         } else {
-            Write-Host "[WARN] Impossibile inviare email: credenziali mancanti" -ForegroundColor Yellow
-            Write-Host "[INFO] File richiesto: $EMAIL_CREDENTIAL_FILE" -ForegroundColor Gray
+            Write-Host "[WARN] Unable to send email: missing credentials" -ForegroundColor Yellow
+            Write-Host "[INFO] Required file: $EMAIL_CREDENTIAL_FILE" -ForegroundColor Gray
         }
         
     } catch {
-        Write-Host "[WARN] Impossibile inviare email: $_" -ForegroundColor Yellow
+        Write-Host "[WARN] Unable to send email: $_" -ForegroundColor Yellow
     }
     
     Write-Host ""
@@ -534,10 +534,10 @@ if ($corruptedScripts -gt 0) {
     Write-Host "    COMANDI UTILI" -ForegroundColor White
     Write-Host "================================================================" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "  .\check-integrity.ps1 -Detailed       # Mostra tutti gli errori" -ForegroundColor Gray
+    Write-Host ".\check-integrity.ps1 -Detailed # Show all errors" -ForegroundColor Gray
     Write-Host "  .\check-integrity.ps1 -ExportReport   # Esporta report completo" -ForegroundColor Gray
     Write-Host "  .\check-integrity.ps1 -Threshold 20   # Cambia soglia" -ForegroundColor Gray
-    Write-Host "  git status                             # Verifica modifiche" -ForegroundColor Gray
+    Write-Host "git status # Check changes" -ForegroundColor Gray
     Write-Host "  git diff                               # Mostra differenze" -ForegroundColor Gray
     Write-Host ""
 }

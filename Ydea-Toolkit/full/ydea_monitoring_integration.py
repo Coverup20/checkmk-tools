@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
-"""
-ydea_monitoring_integration.py - Integrazione monitoraggio sistema con Ydea
+"""ydea_monitoring_integration.py - System monitoring integration with Ydea
 
-Monitora CPU, memoria, disco e servizi systemd.
-Crea automaticamente ticket Ydea quando le soglie vengono superate.
-Gestisce cache per evitare duplicati e cleanup automatico.
+Monitor CPU, memory, disk and systemd services.
+Automatically create Ydea tickets when thresholds are exceeded.
+Manages cache to avoid duplicates and automatic cleanup.
 
 Usage:
     ydea_monitoring_integration.py [cpu|memory|disk|service|cleanup|main]
 
 Examples:
-    ydea_monitoring_integration.py              # Esegue tutti i controlli
-    ydea_monitoring_integration.py cpu          # Solo controllo CPU
-    ydea_monitoring_integration.py service nginx  # Controlla servizio nginx
+    ydea_monitoring_integration.py # Perform all checks
+    ydea_monitoring_integration.py cpu # CPU monitoring only
+    ydea_monitoring_integration.py service nginx # Monitor nginx service
 
-Version: 1.0.0 (convertito da Bash)
-"""
+Version: 1.0.0 (ported from Bash)"""
 
 VERSION = "1.0.0"  # Versione script (aggiornare ad ogni modifica)
 
@@ -28,7 +26,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 
-# Richiede psutil per metriche sistema
+# Requires psutil for system metrics
 try:
     import psutil
 except ImportError:
@@ -41,7 +39,7 @@ sys.path.insert(0, str(script_dir))
 
 from ydea_common import Logger, CacheManager  # type: ignore
 
-# Import ydea-toolkit.py (nome con trattino richiede importlib)
+# Import ydea-toolkit.py (hyphenated name requires importlib)
 ydea_toolkit_path = script_dir / "ydea-toolkit.py"
 spec = importlib.util.spec_from_file_location("ydea_toolkit", ydea_toolkit_path)
 if spec and spec.loader:
@@ -55,17 +53,17 @@ YdeaAPI = ydea_toolkit.YdeaAPI
 TicketOperations = ydea_toolkit.TicketOperations
 
 
-# ===== CONFIGURAZIONE =====
+# ===== CONFIGURATION =====
 
 # Soglie alert
 ALERT_THRESHOLD_CPU = int(os.getenv("ALERT_THRESHOLD_CPU", "90"))
 ALERT_THRESHOLD_MEM = int(os.getenv("ALERT_THRESHOLD_MEM", "85"))
 ALERT_THRESHOLD_DISK = int(os.getenv("ALERT_THRESHOLD_DISK", "90"))
 
-# File cache ticket
+# Ticket cache file
 TICKET_CACHE_FILE = Path("/tmp/ydea_tickets_cache.json")
 
-# Max age cache (24 ore)
+# Max age cache (24 hours)
 CACHE_MAX_AGE_HOURS = 24
 
 
@@ -75,26 +73,22 @@ cache = CacheManager(TICKET_CACHE_FILE)
 
 
 def ticket_exists(alert_key: str) -> bool:
-    """
-    Verifica se esiste già un ticket aperto per questo alert
+    """Check if there is already an open ticket for this alert
     
     Args:
-        alert_key: Chiave univoca alert (es: cpu_hostname)
+        alert_key: Unique alert key (e.g. cpu_hostname)
         
     Returns:
-        True se ticket esiste in cache
-    """
+        True if ticket exists in cache"""
     return cache.get(alert_key) is not None
 
 
 def save_ticket_cache(alert_key: str, ticket_id: int):
-    """
-    Salva ticket in cache
+    """Save tickets in cache
     
     Args:
-        alert_key: Chiave univoca alert
-        ticket_id: ID ticket creato
-    """
+        alert_key: Unique alert key
+        ticket_id: Created ticket ID"""
     cache.set(alert_key, {
         "ticket_id": ticket_id,
         "created_at": int(datetime.now().timestamp())
@@ -102,17 +96,15 @@ def save_ticket_cache(alert_key: str, ticket_id: int):
 
 
 def remove_ticket_cache(alert_key: str):
-    """
-    Rimuovi ticket dalla cache (quando viene chiuso o alert risolto)
+    """Remove ticket from cache (when closed or alert resolved)
     
     Args:
-        alert_key: Chiave univoca alert
-    """
+        alert_key: Unique alert key"""
     cache.delete(alert_key)
 
 
 def cleanup_cache():
-    """Pulisci cache da ticket vecchi (>24h)"""
+    """Clear cache from old tickets (>24h)"""
     now = int(datetime.now().timestamp())
     max_age_seconds = CACHE_MAX_AGE_HOURS * 3600
     
@@ -133,18 +125,16 @@ def cleanup_cache():
 # ===== FUNZIONI CREAZIONE TICKET =====
 
 def create_ticket(title: str, description: str, priority: str = "normal", tags: list = None) -> Optional[int]:
-    """
-    Crea ticket Ydea
+    """Create Ydea ticket
     
     Args:
-        title: Titolo ticket
-        description: Descrizione ticket
-        priority: Priorità (normal, high, critical)
-        tags: Lista tag
+        title: Ticket title
+        description: Ticket description
+        priority: Priority (normal, high, critical)
+        tags: Tag list
         
     Returns:
-        ID ticket creato, None se fallito
-    """
+        Ticket ID created, None if failed"""
     try:
         api = YdeaAPI()
         
@@ -173,19 +163,17 @@ def create_ticket(title: str, description: str, priority: str = "normal", tags: 
         return None
 
 
-# ===== FUNZIONI DI MONITORAGGIO =====
+# ===== MONITORING FUNCTIONS =====
 
 def check_cpu_usage(hostname: Optional[str] = None):
-    """
-    Monitora CPU
+    """Monitor CPU
     
     Args:
-        hostname: Nome host (default: hostname corrente)
-    """
+        hostname: Hostname (default: current hostname)"""
     if not hostname:
         hostname = socket.gethostname()
     
-    # Ottieni uso CPU (media 1 secondo)
+    # Get CPU Usage (average 1 second)
     cpu_usage = int(psutil.cpu_percent(interval=1))
     
     alert_key = f"cpu_{hostname}"
@@ -195,21 +183,21 @@ def check_cpu_usage(hostname: Optional[str] = None):
             Logger.warn(f"CPU usage elevato: {cpu_usage}%")
             
             title = f"[HIGH] CPU usage elevato su {hostname}"
-            description = f""" CPU Alert
+            description = f"""CPU Alert
 
-**Dettagli:**
+**Details:**
 - Hostname: {hostname}
 - CPU Usage: {cpu_usage}%
-- Soglia: {ALERT_THRESHOLD_CPU}%
-- Data/Ora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- Threshold: {ALERT_THRESHOLD_CPU}%
+- Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-**Azioni immediate:**
-1. Identificare processi che consumano più CPU
-2. Verificare se è un picco temporaneo o persistente
-3. Controllare se ci sono processi zombie
-4. Valutare scaling verticale
+**Immediate actions:**
+1. Identify processes that consume the most CPU
+2. Check if it is a temporary or persistent spike
+3. Check for zombie processes
+4. Evaluate vertical scaling
 
-**Diagnostica:**
+**Diagnostics:**
 ```bash
 top -bn1 | head -20
 ps auxf --sort=-%cpu | head -10
@@ -228,16 +216,14 @@ ps auxf --sort=-%cpu | head -10
 
 
 def check_memory_usage(hostname: Optional[str] = None):
-    """
-    Monitora memoria
+    """Monitor memory
     
     Args:
-        hostname: Nome host (default: hostname corrente)
-    """
+        hostname: Hostname (default: current hostname)"""
     if not hostname:
         hostname = socket.gethostname()
     
-    # Ottieni uso memoria
+    # Get memory usage
     mem = psutil.virtual_memory()
     mem_usage = int(mem.percent)
     
@@ -248,21 +234,21 @@ def check_memory_usage(hostname: Optional[str] = None):
             Logger.warn(f"Memory usage elevato: {mem_usage}%")
             
             title = f"[HIGH] Memory usage elevato su {hostname}"
-            description = f""" Memory Alert
+            description = f"""Memory Alert
 
-**Dettagli:**
+**Details:**
 - Hostname: {hostname}
 - Memory Usage: {mem_usage}%
-- Soglia: {ALERT_THRESHOLD_MEM}%
-- Data/Ora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- Threshold: {ALERT_THRESHOLD_MEM}%
+- Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-**Azioni immediate:**
-1. Identificare processi che consumano più memoria
-2. Verificare memory leaks
-3. Controllare cache e buffer
-4. Valutare se aumentare RAM
+**Immediate actions:**
+1. Identify processes that consume the most memory
+2. Check for memory leaks
+3. Check cache and buffers
+4. Consider increasing RAM
 
-**Diagnostica:**
+**Diagnostics:**
 ```bash
 free -h
 ps auxf --sort=-%mem | head -10
@@ -275,29 +261,27 @@ sudo slabtop
             if ticket_id:
                 save_ticket_cache(alert_key, ticket_id)
     else:
-        # Memoria OK
+        # Memory OK
         if ticket_exists(alert_key):
             Logger.info(f"Memoria tornata normale ({mem_usage}%), rimuovo ticket dalla cache")
             remove_ticket_cache(alert_key)
 
 
 def check_disk_usage(hostname: Optional[str] = None, mount_point: str = "/"):
-    """
-    Monitora disco
+    """Monitor disk
     
     Args:
-        hostname: Nome host (default: hostname corrente)
-        mount_point: Punto di mount da controllare (default: /)
-    """
+        hostname: Hostname (default: current hostname)
+        mount_point: Mount point to check (default: /)"""
     if not hostname:
         hostname = socket.gethostname()
     
     try:
-        # Ottieni uso disco
+        # Get disk usage
         disk = psutil.disk_usage(mount_point)
         disk_usage = int(disk.percent)
         
-        # Crea chiave alert (sostituisci / con _)
+        # Create alert key (replace / with _)
         mount_safe = mount_point.replace("/", "_")
         alert_key = f"disk_{hostname}_{mount_safe}"
         
@@ -306,22 +290,22 @@ def check_disk_usage(hostname: Optional[str] = None, mount_point: str = "/"):
                 Logger.warn(f"Disk usage elevato su {mount_point}: {disk_usage}%")
                 
                 title = f"[HIGH] Disk usage elevato su {hostname}:{mount_point}"
-                description = f""" Disk Alert
+                description = f"""Disk Alert
 
-**Dettagli:**
+**Details:**
 - Hostname: {hostname}
 - Mount Point: {mount_point}
 - Disk Usage: {disk_usage}%
-- Soglia: {ALERT_THRESHOLD_DISK}%
-- Data/Ora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- Threshold: {ALERT_THRESHOLD_DISK}%
+- Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-**Azioni immediate:**
-1. Identificare file/directory più grandi
-2. Pulire log vecchi
-3. Rimuovere file temporanei
-4. Valutare espansione storage
+**Immediate actions:**
+1. Identify larger files/directories
+2. Clean old logs
+3. Remove temporary files
+4. Consider storage expansion
 
-**Diagnostica:**
+**Diagnostics:**
 ```bash
 df -h {mount_point}
 du -sh {mount_point}/* | sort -rh | head -10
@@ -334,7 +318,7 @@ find {mount_point} -type f -size +100M
                 if ticket_id:
                     save_ticket_cache(alert_key, ticket_id)
         else:
-            # Disco OK
+            # Disk OK
             if ticket_exists(alert_key):
                 Logger.info(f"Disco {mount_point} tornato normale ({disk_usage}%), rimuovo ticket dalla cache")
                 remove_ticket_cache(alert_key)
@@ -344,18 +328,16 @@ find {mount_point} -type f -size +100M
 
 
 def check_service_status(service_name: str, hostname: Optional[str] = None):
-    """
-    Monitora servizio systemd
+    """Monitor systemd service
     
     Args:
-        service_name: Nome servizio systemd
-        hostname: Nome host (default: hostname corrente)
-    """
+        service_name: Systemd service name
+        hostname: Hostname (default: current hostname)"""
     if not hostname:
         hostname = socket.gethostname()
     
     try:
-        # Controlla stato servizio con systemctl
+        # Check service status with systemctl
         result = subprocess.run(
             ["systemctl", "is-active", service_name],
             capture_output=True,
@@ -373,21 +355,21 @@ def check_service_status(service_name: str, hostname: Optional[str] = None):
                 Logger.error(f"Servizio {service_name} non attivo")
                 
                 title = f"[CRITICAL] Servizio {service_name} non attivo su {hostname}"
-                description = f""" Service Down Alert
+                description = f"""Service Down Alert
 
-**Dettagli:**
+**Details:**
 - Hostname: {hostname}
-- Servizio: {service_name}
-- Stato: {service_status}
-- Data/Ora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- Service: {service_name}
+- Status: {service_status}
+- Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-**Azioni immediate:**
-1. Tentare restart servizio
-2. Controllare log servizio
-3. Verificare dipendenze
-4. Controllare configurazione
+**Immediate actions:**
+1. Attempt to restart service
+2. Check service log
+3. Check dependencies
+4. Check configuration
 
-**Diagnostica:**
+**Diagnostics:**
 ```bash
 systemctl status {service_name}
 journalctl -xeu {service_name} --since '10 minutes ago'
@@ -400,7 +382,7 @@ sudo systemctl restart {service_name}
                 if ticket_id:
                     save_ticket_cache(alert_key, ticket_id)
         else:
-            # Servizio OK
+            # Service OK
             if ticket_exists(alert_key):
                 Logger.info(f"Servizio {service_name} tornato attivo, rimuovo ticket dalla cache")
                 remove_ticket_cache(alert_key)
@@ -416,18 +398,18 @@ sudo systemctl restart {service_name}
 # ===== MAIN =====
 
 def main():
-    """Main function - esegue tutti i controlli"""
+    """Main function - performs all checks"""
     Logger.info("Inizio controlli monitoraggio")
     
     # Pulizia cache
     cleanup_cache()
     
-    # Controlli di default
+    # Default controls
     check_cpu_usage()
     check_memory_usage()
     check_disk_usage()
     
-    # Controlli servizi critici (opzionali - decommentare se necessario)
+    # Critical service checks (optional - uncomment if necessary)
     # check_service_status("nginx")
     # check_service_status("mysql")
     # check_service_status("postgresql")

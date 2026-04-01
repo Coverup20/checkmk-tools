@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""create_ticket_ita.py - Crea ticket test in italiano"""
+"""create_ticket_ita.py - Create test tickets in Italian"""
 import sys, json, importlib.util
 from pathlib import Path
 script_dir = Path(__file__).resolve().parent

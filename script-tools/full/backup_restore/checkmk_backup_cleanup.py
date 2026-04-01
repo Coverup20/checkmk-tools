@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-checkmk_backup_cleanup.py - CheckMK Backup Cleanup Tool
+"""checkmk_backup_cleanup.py - CheckMK Backup Cleanup Tool
 
 Manages CheckMK backup retention and renaming:
 - Renames completed backups with timestamps
@@ -8,12 +7,11 @@ Manages CheckMK backup retention and renaming:
 - Supports systemd timer setup for automatic cleanup
 
 Commands:
-  setup     - Setup automatic cleanup with systemd timer
-  run       - Run cleanup manually
-  remove    - Remove automatic cleanup
+  setup - Setup automatic cleanup with systemd timer
+  run - Run cleanup manually
+  remove - Remove automatic cleanup
   
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -32,12 +30,10 @@ LOGFILE = "/var/log/checkmk-backup-cleanup.log"
 
 
 def log(message: str) -> None:
-    """
-    Log message to stdout and logfile.
+    """Log message to stdout and logfile.
     
     Args:
-        message: Message to log
-    """
+        message: Message to log"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     formatted = f"[{timestamp}] {message}"
     print(formatted)
@@ -50,12 +46,10 @@ def log(message: str) -> None:
 
 
 def err(message: str) -> None:
-    """
-    Log error message to stderr and logfile.
+    """Log error message to stderr and logfile.
     
     Args:
-        message: Error message to log
-    """
+        message: Error message to log"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     formatted = f"[{timestamp}] ERROR: {message}"
     print(formatted, file=sys.stderr)
@@ -68,12 +62,10 @@ def err(message: str) -> None:
 
 
 def die(message: str) -> None:
-    """
-    Log error and exit.
+    """Log error and exit.
     
     Args:
-        message: Error message
-    """
+        message: Error message"""
     err(message)
     sys.exit(1)
 
@@ -85,16 +77,14 @@ def need_root() -> None:
 
 
 def prompt_default(prompt: str, default: str) -> str:
-    """
-    Prompt user for input with default value.
+    """Prompt user for input with default value.
     
     Args:
         prompt: Prompt message
         default: Default value if user enters nothing
         
     Returns:
-        User input or default value
-    """
+        User input or default value"""
     if default:
         user_input = input(f"{prompt} [{default}]: ").strip()
     else:
@@ -104,29 +94,25 @@ def prompt_default(prompt: str, default: str) -> str:
 
 
 def confirm_default_yes(prompt: str) -> bool:
-    """
-    Ask user for confirmation (default: yes).
+    """Ask user for confirmation (default: yes).
     
     Args:
         prompt: Confirmation prompt
         
     Returns:
-        True if user confirms, False otherwise
-    """
+        True if user confirms, False otherwise"""
     answer = input(f"{prompt} [Y/n]: ").strip().lower()
     return answer == "" or answer in ["y", "yes"]
 
 
 def get_backup_size(path: Path) -> int:
-    """
-    Get size of backup (file or directory).
+    """Get size of backup (file or directory).
     
     Args:
         path: Path to backup
         
     Returns:
-        Size in bytes
-    """
+        Size in bytes"""
     try:
         if path.is_dir():
             # Get directory size
@@ -145,13 +131,11 @@ def get_backup_size(path: Path) -> int:
 
 
 def cleanup_backups(backup_dir: str, retention_days: int) -> None:
-    """
-    Perform backup cleanup: rename complete backups and apply retention.
+    """Perform backup cleanup: rename complete backups and apply retention.
     
     Args:
         backup_dir: Directory containing backups
-        retention_days: Maximum number of backups to keep
-    """
+        retention_days: Maximum number of backups to keep"""
     log("Starting backup rename and retention check (local backup)")
     log(f"Backup directory: {backup_dir}")
     log(f"Max backups to keep: {retention_days}")
@@ -309,8 +293,7 @@ Nice=19
 IOSchedulingClass=idle
 
 [Install]
-WantedBy=multi-user.target
-"""
+WantedBy=multi-user.target"""
     
     try:
         with open(service_file, "w") as f:
@@ -330,8 +313,7 @@ OnCalendar=*:0/1
 Persistent=true
 
 [Install]
-WantedBy=timers.target
-"""
+WantedBy=timers.target"""
     
     try:
         with open(timer_file, "w") as f:
@@ -404,13 +386,11 @@ def run() -> None:
 
 
 def run_internal(backup_dir: str, retention_days: int) -> None:
-    """
-    Run cleanup internally (called by systemd service).
+    """Run cleanup internally (called by systemd service).
     
     Args:
         backup_dir: Backup directory path
-        retention_days: Number of backups to keep
-    """
+        retention_days: Number of backups to keep"""
     cleanup_backups(backup_dir, retention_days)
 
 
@@ -451,9 +431,9 @@ def print_usage() -> None:
     print(f"""CheckMK Backup Cleanup Tool - Version {VERSION}
 
 Usage:
-  {sys.argv[0]} setup     # Setup automatic cleanup
-  {sys.argv[0]} run       # Run cleanup manually
-  {sys.argv[0]} remove    # Remove automatic cleanup
+  {sys.argv[0]} setup # Setup automatic cleanup
+  {sys.argv[0]} run # Run cleanup manually
+  {sys.argv[0]} remove # Remove automatic cleanup
 
 Configuration:
   Default backup directory: {DEFAULT_BACKUP_DIR}
@@ -468,17 +448,14 @@ Examples:
   {sys.argv[0]} run
 
   # Remove automatic cleanup
-  {sys.argv[0]} remove
-""")
+  {sys.argv[0]} remove""")
 
 
 def main() -> int:
-    """
-    Main entry point.
+    """Main entry point.
     
     Returns:
-        Exit code (0=success, 1=error)
-    """
+        Exit code (0=success, 1=error)"""
     if len(sys.argv) < 2:
         print_usage()
         return 1

@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-distributed-monitoring-setup.py
+"""distributed-monitoring-setup.py
 
 Python entrypoint that delegates to distributed-monitoring-setup.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

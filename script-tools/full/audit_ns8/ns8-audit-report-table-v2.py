@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
-"""
-ns8-audit-report-table-v2.py - Report NS8 con Formato Tabelle Compatte
+"""ns8-audit-report-table-v2.py - NS8 Report with Compact Table Format
 
-Report completo ambiente NethServer 8 con visualizzazione tabellare:
-  1) Utenti Active Directory (Samba)
-  2) Stato account utenti AD (data creazione, abilitato/disabilitato)
-  3) Scadenze password utenti AD (tabella 4 colonne)
-  4) Gruppi AD con membri (tabella 2 colonne, una riga per membro)
-  5) Permessi share di rete con ACL completi (tabella 3 colonne)
-  6) Condivisioni WebTop (tabella 3 colonne)
+Complete NethServer 8 environment report with table view:
+  1) Active Directory Users (Samba)
+  2) AD user account status (creation date, enabled/disabled)
+  3) AD user password expiration dates (4 column table)
+  4) AD groups with members (2 column table, one row per member)
+  5) Network share permissions with complete ACLs (3 column table)
+  6) WebTop shares (3 column table)
 
 Output: Directory /tmp/ns8-audit-YYYYMMDD-HHMMSS/
 
-Version: 2.13.0
-"""
+Version: 2.13.0"""
 
 import subprocess
 import sys
@@ -122,8 +120,7 @@ def run_command(cmd: List[str], timeout: int = 30) -> Tuple[int, str, str]:
 
 
 def sid_to_name(sid: str, samba_module: str) -> Optional[str]:
-    """
-    Convert SID to username/groupname using wbinfo.
+    """Convert SID to username/groupname using wbinfo.
     Uses global SID_CACHE for performance.
     
     Args:
@@ -131,8 +128,7 @@ def sid_to_name(sid: str, samba_module: str) -> Optional[str]:
         samba_module: Samba module name
         
     Returns:
-        Entity name or None if system SID or error
-    """
+        Entity name or None if system SID or error"""
     global SID_CACHE
     
     # Skip system SIDs
@@ -167,15 +163,13 @@ def sid_to_name(sid: str, samba_module: str) -> Optional[str]:
 
 
 def decode_access_mask(mask_str: str) -> str:
-    """
-    Decode Windows access_mask to RW/RO.
+    """Decode Windows access_mask to RW/RO.
     
     Args:
         mask_str: Hex mask (e.g., "0x001f01ff")
         
     Returns:
-        "RW" or "RO"
-    """
+        "RW" or "RO""""
     try:
         mask = int(mask_str, 16) if mask_str.startswith("0x") else int(mask_str)
         
@@ -228,12 +222,10 @@ def check_prerequisites() -> Tuple[Optional[str], Optional[str]]:
 
 
 def collect_ad_users(samba_module: str, output_dir: Path) -> int:
-    """
-    Collect AD users and return count.
+    """Collect AD users and return count.
     
     Returns:
-        Number of users collected
-    """
+        Number of users collected"""
     log_info("Raccolta utenti AD...")
     
     users_dir = output_dir / "01_users"
@@ -260,16 +252,14 @@ def collect_ad_users(samba_module: str, output_dir: Path) -> int:
 
 
 def parse_ldap_timestamp(ts: str) -> Optional[str]:
-    """
-    Parse LDAP/AD timestamp to YYYY-MM-DD.
+    """Parse LDAP/AD timestamp to YYYY-MM-DD.
     
     Handles formats:
       - '20250115120000.0Z'  (whenCreated/whenChanged)
       - '20250115120000Z'
     
     Returns:
-        Date string or None if parsing fails
-    """
+        Date string or None if parsing fails"""
     ts = ts.strip()
     for fmt in ("%Y%m%d%H%M%S.%fZ", "%Y%m%d%H%M%SZ", "%Y%m%d%H%M%S.%f%z"):
         try:
@@ -280,8 +270,7 @@ def parse_ldap_timestamp(ts: str) -> Optional[str]:
 
 
 def collect_user_status_table(samba_module: str, output_dir: Path) -> int:
-    """
-    Collect AD user creation date and enabled/disabled status.
+    """Collect AD user creation date and enabled/disabled status.
     
     For each user, queries samba-tool user show to extract:
       - whenCreated: account creation date
@@ -289,8 +278,7 @@ def collect_user_status_table(samba_module: str, output_dir: Path) -> int:
       - whenChanged: last modification (approximate disabled-since if disabled)
     
     Returns:
-        Number of disabled users found
-    """
+        Number of disabled users found"""
     log_info("Raccolta stato account utenti AD...")
     
     users_file = output_dir / "01_users" / "users.txt"
@@ -411,7 +399,7 @@ def collect_user_status_table(samba_module: str, output_dir: Path) -> int:
 
 
 def collect_password_expiry_table(samba_module: str, output_dir: Path) -> None:
-    """Collect and display password expiry as table for ALL users."""
+    """Collect and display expiry password as table for ALL users."""
     log_info("Raccolta scadenze password (tabella)...")
     
     users_file = output_dir / "01_users" / "users.txt"
@@ -545,12 +533,10 @@ def collect_password_expiry_table(samba_module: str, output_dir: Path) -> None:
 
 
 def collect_ad_groups_table(samba_module: str, output_dir: Path) -> int:
-    """
-    Collect AD groups with members and display as table.
+    """Collect AD groups with members and display as table.
     
     Returns:
-        Number of groups collected
-    """
+        Number of groups collected"""
     log_info("Raccolta gruppi AD (tabella)...")
     
     # Get group list
@@ -598,7 +584,7 @@ def collect_ad_groups_table(samba_module: str, output_dir: Path) -> int:
                 else:
                     members.append(member)
         
-        # Store data for MD file
+        # Store data for MD files
         group_member_data.append((groupname, members, computers))
     
     # Print table header AFTER all data collected
@@ -679,7 +665,7 @@ def collect_ad_groups_table(samba_module: str, output_dir: Path) -> int:
     # Calculate total computers for global counter
     total_computers = sum(len(comps) for _, _, comps in group_member_data)
     
-    # Create separate Domain Computers MD file
+    # Create separate Domain Computers MD files
     if total_computers > 0:
         computers_md_file = output_dir / "05_domain_computers.md"
         with open(computers_md_file, 'w', encoding='utf-8') as f:
@@ -707,12 +693,10 @@ def collect_ad_groups_table(samba_module: str, output_dir: Path) -> int:
 
 
 def collect_shares_table(samba_module: str, output_dir: Path) -> int:
-    """
-    Collect Samba shares with real ACL permissions and display as table.
+    """Collect Samba shares with real ACL permissions and display as table.
     
     Returns:
-        Number of shares collected
-    """
+        Number of shares collected"""
     log_info("Raccolta share Samba (tabella)...")
     
     shares_dir = output_dir / "03_shares"
@@ -839,7 +823,7 @@ def collect_shares_table(samba_module: str, output_dir: Path) -> int:
     for share_name, share_path, users_rw, users_ro in share_data:
         path_display = str(share_path)[:39] if len(str(share_path)) > 39 else str(share_path)  # type: ignore[index]
         
-        # Display one row per permission
+        # Display one row for permission
         if users_rw:
             for user in users_rw:  # type: ignore[union-attr]
                 user_display = str(user)[:29] if len(str(user)) > 29 else str(user)  # type: ignore[index]
@@ -872,7 +856,7 @@ def collect_shares_table(samba_module: str, output_dir: Path) -> int:
         f.write(f"| {'Share':<30} | {'Utente/Gruppo':<35} | {'Permesso':<10} |\n")
         f.write(f"|{'-'*32}|{'-'*37}|{'-'*12}|\n")
         
-        # Write one row per permission
+        # Write one line for permission
         for share_name, share_path, users_rw, users_ro in share_data:
             has_perms = False
             
@@ -896,12 +880,10 @@ def collect_shares_table(samba_module: str, output_dir: Path) -> int:
 
 
 def collect_webtop_sharing(webtop_module: Optional[str], samba_module: str, output_dir: Path) -> int:
-    """
-    Collect WebTop email sharing information.
+    """Collect WebTop email sharing information.
     
     Returns:
-        Number of email shares collected
-    """
+        Number of email shares collected"""
     md_file = output_dir / "03_webtop_shares.md"
     
     if not webtop_module:
@@ -1109,15 +1091,13 @@ def generate_summary_table(output_dir: Path) -> None:
 
 
 def send_email_interactive(output_dir: Path) -> bool:
-    """
-    Send report via email with interactive prompts.
+    """Send report via email with interactive prompts.
     
     Args:
         output_dir: Report output directory
         
     Returns:
-        True if email sent successfully, False otherwise
-    """
+        True if email sent successfully, False otherwise"""
     print()
     print("=" * 80)
     
@@ -1151,14 +1131,14 @@ def send_email_interactive(output_dir: Path) -> bool:
         if not from_email:
             from_email = from_default
         
-        # Server SMTP
+        # SMTP server
         print()
         smtp_server = input("Server SMTP [smtp.example.com]: ").strip()
         if not smtp_server:
             log_error("Server SMTP obbligatorio")
             return False
         
-        # Porta SMTP
+        # SMTP port
         print()
         smtp_port_str = input("Porta SMTP [587]: ").strip()
         smtp_port = int(smtp_port_str) if smtp_port_str else 587
@@ -1170,7 +1150,7 @@ def send_email_interactive(output_dir: Path) -> bool:
             log_error("Username SMTP obbligatorio")
             return False
         
-        # Password SMTP (nascosta)
+        # SMTP password (hidden)
         print()
         smtp_pass = getpass.getpass("Password SMTP: ")
         if not smtp_pass:
@@ -1185,7 +1165,7 @@ def send_email_interactive(output_dir: Path) -> bool:
     print()
     log_info("Preparazione email...")
     
-    # Subject con hostname e data
+    # Subject with hostname and date
     subject = f"NS8 Audit Report - {hostname} - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
     
     # Costruisci email MIME multipart
@@ -1196,36 +1176,35 @@ def send_email_interactive(output_dir: Path) -> bool:
     
     # Body: riepilogo testuale senza emoji
     body_text = f"""NS8 Audit Report - {hostname}
-Data: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+Date: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
 
-================================================================================
-RIEPILOGO REPORT
-================================================================================
+========================================================================================
+REPORT SUMMARY
+========================================================================================
 
-Utenti AD:              {GLOBAL_USER_COUNT}
-Gruppi AD:              {GLOBAL_GROUP_COUNT}
-Computer A Dominio:     {GLOBAL_COMPUTER_COUNT}
-Share Samba:            {GLOBAL_SHARE_COUNT}
-Condivisioni WebTop:    {GLOBAL_WEBTOP_COUNT}
-Utenti Disabilitati:    {GLOBAL_DISABLED_COUNT}
+AD Users: {GLOBAL_USER_COUNT}
+AD Groups: {GLOBAL_GROUP_COUNT}
+Domain Computer: {GLOBAL_COMPUTER_COUNT}
+Share Samba: {GLOBAL_SHARE_COUNT}
+WebTop Shares: {GLOBAL_WEBTOP_COUNT}
+Disabled Users: {GLOBAL_DISABLED_COUNT}
 
-================================================================================
+========================================================================================
 
-I dettagli completi sono disponibili nei file allegati in formato Markdown.
+Full details are available in the attached files in Markdown format.
 
-File allegati:
-- 00_REPORT_SUMMARY.md (riepilogo generale)
-- 01_password_expiry.md (password in scadenza)
-- 02_gruppi_ad.md (gruppi e membri)
-- 03_webtop_shares.md (condivisioni WebTop)
-- 04_share_permissions.md (permessi share Samba)
-- 05_domain_computers.md (computer a dominio)
-- 06_user_status.md (stato account utenti)
-"""
+Attached files:
+- 00_REPORT_SUMMARY.md (general summary)
+- 01_password_expiry.md (password expiring)
+- 02_gruppi_ad.md (groups and members)
+- 03_webtop_shares.md (WebTop shares)
+- 04_share_permissions.md (Samba share permissions)
+- 05_domain_computers.md (domain computers)
+- 06_user_status.md (user account status)"""
     
     msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
     
-    # Allegati: tutti i file .md
+    # Attachments: all .md files
     md_files = [
         "00_REPORT_SUMMARY.md",
         "01_password_expiry.md",
@@ -1254,7 +1233,7 @@ File allegati:
     log_info(f"Invio email a {recipient} tramite {smtp_server}:{smtp_port}...")
     
     try:
-        # Connessione SMTP con STARTTLS
+        # SMTP connection with STARTTLS
         server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
         server.ehlo()
         server.starttls()

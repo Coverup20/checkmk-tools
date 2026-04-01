@@ -19,23 +19,23 @@ $WORKSPACE = $PSScriptRoot
 $TEMP_DIR = Join-Path $WORKSPACE "REPAIR_TEMP_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss')"
 $REPORT_FILE = Join-Path $TEMP_DIR "repair-report.txt"
 
-# Verifica WSL
+# Check WSL
 try {
     $null = wsl --version 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "WSL non disponibile"
     }
 } catch {
-    Write-Host "[ERROR] WSL non disponibile - necessario per validazione bash" -ForegroundColor Red
+    Write-Host "[ERROR] WSL not available - needed for bash validation" -ForegroundColor Red
     exit 1
 }
 
 Write-Host "`n================================================================" -ForegroundColor Cyan
-Write-Host "    RIPARAZIONE SCRIPT CORROTTI CON CONFERMA" -ForegroundColor Cyan
+Write-Host "REPAIR CORRUPT SCRIPTS WITH CONFIRMATION" -ForegroundColor Cyan
 Write-Host "================================================================`n" -ForegroundColor Cyan
 
-# FASE 1: Trova file corrotti
-Write-Host "[FASE 1] Ricerca file corrotti..." -ForegroundColor Yellow
+# STEP 1: Find corrupt files
+Write-Host "[STEP 1] Scan for corrupt files..." -ForegroundColor Yellow
 
 $corruptedFiles = @()
 $scriptExtensions = @(".sh", ".bash", ".ps1")
@@ -83,31 +83,31 @@ Get-ChildItem -Path $WORKSPACE -Recurse -File | Where-Object {
     }
 }
 
-Write-Host "Trovati $($corruptedFiles.Count) file corrotti`n" -ForegroundColor Yellow
+Write-Host "Found $($corruptedFiles.Count) corrupt files`n" -ForegroundColor Yellow
 
 if ($corruptedFiles.Count -eq 0) {
-    Write-Host "[SUCCESSO] Nessun file corrotto trovato!" -ForegroundColor Green
+    Write-Host "[SUCCESS] No corrupt files found!" -ForegroundColor Green
     exit 0
 }
 
-# Filtra solo Ydea-Toolkit/full e script-tools/full
+# Filter only Ydea-Toolkit/full and script-tools/full
 $targetFiles = $corruptedFiles | Where-Object { 
     $_.RelativePath -like "Ydea-Toolkit\full\*" -or 
     $_.RelativePath -like "script-tools\full\*" 
 }
 
 if ($targetFiles.Count -eq 0) {
-    Write-Host "[INFO] Nessun file da riparare in Ydea-Toolkit/full o script-tools/full" -ForegroundColor Cyan
-    Write-Host "[INFO] File corrotti rimanenti: $($corruptedFiles.Count)" -ForegroundColor Cyan
+    Write-Host "[INFO] No files to repair in Ydea-Toolkit/full or script-tools/full" -ForegroundColor Cyan
+    Write-Host "[INFO] Remaining corrupted files: $($corruptedFiles.Count)" -ForegroundColor Cyan
     $corruptedFiles | Format-Table RelativePath, @{L='Error';E={$_.Error.Substring(0,[Math]::Min(80,$_.Error.Length))}}
     exit 0
 }
 
-Write-Host "[INFO] File selezionati per riparazione: $($targetFiles.Count)" -ForegroundColor Cyan
+Write-Host "[INFO] Files selected for repair: $($targetFiles.Count)" -ForegroundColor Cyan
 $targetFiles | Format-Table RelativePath
 
-# FASE 2: Crea backup temporaneo
-Write-Host "`n[FASE 2] Creazione backup temporaneo..." -ForegroundColor Yellow
+# STEP 2: Create temporary backup
+Write-Host "`n[STEP 2] Creating temporary backup..." -ForegroundColor Yellow
 
 New-Item -ItemType Directory -Path $TEMP_DIR -Force | Out-Null
 $backupDir = Join-Path $TEMP_DIR "backup"
@@ -120,20 +120,20 @@ $targetFiles | ForEach-Object {
     $destBackup = Join-Path $backupDir $file.RelativePath
     $destWorking = Join-Path $workingDir $file.RelativePath
     
-    # Crea directory
+    # Create directory
     $null = New-Item -ItemType Directory -Path (Split-Path $destBackup) -Force
     $null = New-Item -ItemType Directory -Path (Split-Path $destWorking) -Force
     
-    # Copia file
+    # Copy files
     Copy-Item $file.FullPath -Destination $destBackup -Force
     Copy-Item $file.FullPath -Destination $destWorking -Force
 }
 
-Write-Host "Backup creato in: $backupDir" -ForegroundColor Green
-Write-Host "Directory lavoro: $workingDir`n" -ForegroundColor Green
+Write-Host "Backup created in: $backupDir" -ForegroundColor Green
+Write-Host "Work directory: $workingDir`n" -ForegroundColor Green
 
 # FASE 3: Analizza e ripara
-Write-Host "[FASE 3] Analisi e riparazione in corso..." -ForegroundColor Yellow
+Write-Host "[PHASE 3] Analysis and repair in progress..." -ForegroundColor Yellow
 
 $repairLog = @()
 $repairedCount = 0
@@ -141,7 +141,7 @@ $failedCount = 0
 
 foreach ($file in $targetFiles) {
     $workingFile = Join-Path $workingDir $file.RelativePath
-    Write-Host "`nAnalisi: $($file.Name)" -ForegroundColor Cyan
+    Write-Host "`nAnalysis: $($file.Name)" -ForegroundColor Cyan
     
     $content = Get-Content $workingFile -Raw
     $fixed = $false
@@ -150,13 +150,13 @@ foreach ($file in $targetFiles) {
     # Problema comune: righe concatenate senza newline
     if ($content -match '[a-z]\)[a-zA-Z]') {
 
-        # Fix: aggiungi newline dopo parentesi chiuse
+        # Fix: add newline after closing brackets
         $content = $content -replace '(\))([\$a-zA-Z_])', "`$1`n`$2"
         $changes += "- Aggiunte newline dopo parentesi chiuse"
         $fixed = $true
     }
     
-    # Problema: righe concatenate con 'fi' o 'done'
+    # Problem: Lines concatenated with 'fi' or 'done'
     if ($content -match '([a-z]+)(fi|done|then|else)([a-zA-Z])') {
         $content = $content -replace '([a-z]+)(fi)([a-zA-Z])', "`$1`n`$2`n`$3"
         $content = $content -replace '([a-z]+)(done)([a-zA-Z])', "`$1`n`$2`n`$3"
@@ -176,12 +176,12 @@ foreach ($file in $targetFiles) {
     if ($fixed) {
         Set-Content -Path $workingFile -Value $content -NoNewline -Encoding UTF8
         
-        # Verifica se riparato
+        # Check if repaired
         $wslPath = $workingFile -replace '\\', '/' -replace '^([A-Z]):', { "/mnt/$($_.Groups[1].Value.ToLower())" }
         $bashCheck = wsl bash -n "$wslPath" 2>&1
         
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "   RIPARATO CON SUCCESSO" -ForegroundColor Green
+            Write-Host "SUCCESSFULLY REPAIRED" -ForegroundColor Green
             $repairedCount++
             $repairLog += [PSCustomObject]@{
                 File = $file.RelativePath
@@ -189,7 +189,7 @@ foreach ($file in $targetFiles) {
                 Changes = ($changes -join "; ")
             }
         } else {
-            Write-Host "    Riparazione parziale (ancora errori)" -ForegroundColor Yellow
+            Write-Host "Partial repair (still errors)" -ForegroundColor Yellow
             $failedCount++
             $repairLog += [PSCustomObject]@{
                 File = $file.RelativePath
@@ -236,25 +236,25 @@ $report += "  File riparati:    $workingDir`n"
 Write-Host $report
 $report | Out-File -FilePath $REPORT_FILE -Encoding UTF8
 
-Write-Host "`nReport salvato in: $REPORT_FILE`n" -ForegroundColor Green
+Write-Host "`nReport saved in: $REPORT_FILE`n" -ForegroundColor Green
 
-# FASE 5: Conferma utente
+# STEP 5: Confirm user
 Write-Host "================================================================" -ForegroundColor Yellow
-Write-Host "Vuoi sostituire i file originali con quelli riparati?" -ForegroundColor Yellow
-Write-Host "  - Backup in: $backupDir" -ForegroundColor Gray
-Write-Host "  - File riparati: $repairedCount su $($targetFiles.Count)" -ForegroundColor Gray
+Write-Host "Do you want to replace the original files with the repaired ones?" -ForegroundColor Yellow
+Write-Host "- Backup to: $backupDir" -ForegroundColor Gray
+Write-Host "- Repaired files: $repairedCount to $($targetFiles.Count)" -ForegroundColor Gray
 Write-Host "================================================================`n" -ForegroundColor Yellow
 
 $response = Read-Host "Procedere con la sostituzione? (si/no)"
 
 if ($response -ne "si") {
-    Write-Host "`n[ANNULLATO] Nessun file modificato." -ForegroundColor Yellow
-    Write-Host "I file riparati sono disponibili in: $workingDir" -ForegroundColor Cyan
+    Write-Host "`n[CANCELED] No files modified." -ForegroundColor Yellow
+    Write-Host "The repaired files are available in: $workingDir" -ForegroundColor Cyan
     exit 0
 }
 
 # FASE 6: Sostituzione
-Write-Host "`n[FASE 6] Sostituzione file..." -ForegroundColor Yellow
+Write-Host "`n[STEP 6] Replacing files..." -ForegroundColor Yellow
 
 $successCount = 0
 $errorCount = 0
@@ -268,24 +268,24 @@ foreach ($file in $targetFiles) {
     if ($logEntry) {
         try {
             Copy-Item $workingFile -Destination $file.FullPath -Force
-            Write-Host "   $($file.Name)" -ForegroundColor Green
+            Write-Host "$($file.Name)" -ForegroundColor Green
             $successCount++
         } catch {
-            Write-Host "   $($file.Name): $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "$($file.Name): $($_.Exception.Message)" -ForegroundColor Red
             $errorCount++
         }
     }
 }
 
 Write-Host "`n================================================================" -ForegroundColor Cyan
-Write-Host "    COMPLETATO" -ForegroundColor Cyan
+Write-Host "COMPLETED" -ForegroundColor Cyan
 Write-Host "================================================================`n" -ForegroundColor Cyan
 
-Write-Host "File sostituiti con successo: $successCount" -ForegroundColor Green
-Write-Host "Errori durante sostituzione:  $errorCount" -ForegroundColor $(if($errorCount -gt 0){"Red"}else{"Green"})
-Write-Host "`nBackup permanente in: $backupDir" -ForegroundColor Cyan
-Write-Host "Report completo in: $REPORT_FILE`n" -ForegroundColor Cyan
+Write-Host "Files successfully replaced: $successCount" -ForegroundColor Green
+Write-Host "Errors during replacement: $errorCount" -ForegroundColor $(if($errorCount -gt 0){"Red"}else{"Green"})
+Write-Host "`nPermanent backup to: $backupDir" -ForegroundColor Cyan
+Write-Host "Complete report in: $REPORT_FILE`n" -ForegroundColor Cyan
 
 if ($successCount -gt 0) {
-    Write-Host "[CONSIGLIO] Esegui '.\check-integrity.ps1' per verificare lo stato finale`n" -ForegroundColor Yellow
+    Write-Host "[TIP] Run '.\check-integrity.ps1' to check final status`n" -ForegroundColor Yellow
 }

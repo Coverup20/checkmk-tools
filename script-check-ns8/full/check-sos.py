@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-check-sos.py - CheckMK Local Check per sessione SOS
+"""check-sos.py - CheckMK Local Check for SOS session
 
-Verifica se una sessione di supporto remoto (SOS) è attiva
-leggendo i log di sistema in /var/log/messages.
+Check if a remote support (SOS) session is active
+reading system logs in /var/log/messages.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import re
@@ -20,15 +18,13 @@ LOGFILE = Path("/var/log/messages")
 
 
 def parse_log_timestamp(log_line: str) -> Optional[int]:
-    """
-    Extract timestamp from syslog line and convert to epoch.
+    """Extract timestamp from syslog line and convert to epoch.
     
     Args:
         log_line: Syslog line (format: "Mon DD HH:MM:SS ...")
         
     Returns:
-        Unix epoch timestamp or None if parsing fails
-    """
+        Unix epoch timestamp or None if parsing fails"""
     try:
         # Extract date/time from syslog format (first 15 chars: "Jan  1 12:34:56")
         date_str = ' '.join(log_line.split()[:3])
@@ -42,15 +38,13 @@ def parse_log_timestamp(log_line: str) -> Optional[int]:
 
 
 def get_session_status() -> Tuple[str, str, int]:
-    """
-    Check SOS session status from system logs.
+    """Check SOS session status from system logs.
     
     Returns:
         Tuple of (status, session_id, state)
         status: "ACTIVE" or "INACTIVE"
         session_id: Session ID string or "N/A"
-        state: 0=OK (inactive), 1=WARNING (active)
-    """
+        state: 0=OK (inactive), 1=WARNING (active)"""
     if not LOGFILE.exists():
         return "INACTIVE", "N/A", 0
     
@@ -86,7 +80,7 @@ def get_session_status() -> Tuple[str, str, int]:
             status = "ACTIVE"
             state = 1
         else:
-            # Compare timestamps of last start and last stop
+            # Timestamps of last start and last stop appear
             last_stop = stop_lines[-1]
             
             start_epoch = parse_log_timestamp(last_start)
@@ -101,12 +95,10 @@ def get_session_status() -> Tuple[str, str, int]:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     status, session_id, state = get_session_status()
     
     print(f"{state} {SERVICE} - SOS Session: {status} (ID: {session_id})")

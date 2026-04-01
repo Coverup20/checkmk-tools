@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-telegram_get_chatid.py - Utility per ottenere CHAT_ID e verificare TOKEN
+"""telegram_get_chatid.py - Utility to get CHAT_ID and verify TOKEN
 
-Uso:
+Usage:
     python3 telegram_get_chatid.py
     python3 telegram_get_chatid.py --token 1234567890:AAxxxxxx
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import json
@@ -49,7 +47,7 @@ def main() -> int:
     print(f"  telegram_get_chatid v{VERSION}")
     print(f"{'='*55}\n")
 
-    # Verifica token via getMe
+    # Verify token via getMe
     try:
         me = get_me(token)
         if not me.get("ok"):
@@ -65,7 +63,7 @@ def main() -> int:
         print(f"ERROR: {e}")
         return 1
 
-    # Ottieni aggiornamenti per trovare CHAT_ID
+    # Get updates to find CHAT_ID
     try:
         updates = get_updates(token)
     except Exception as e:
@@ -86,7 +84,7 @@ def main() -> int:
             chat = msg["chat"]
             chats[chat["id"]] = chat
 
-        # my_chat_member (bot aggiunto a canale/gruppo)
+        # my_chat_member (bot added to channel/group)
         mcm = upd.get("my_chat_member")
         if mcm and "chat" in mcm:
             chat = mcm["chat"]

@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check-proxmox_qemu_runtime.py - CheckMK Local Check for QEMU Runtime Metrics
+"""check-proxmox_qemu_runtime.py - CheckMK Local Check for QEMU Runtime Metrics
 
 Monitor CPU, memory, and disk usage for running QEMU VMs.
 
 Proxmox VE
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import json
@@ -143,7 +141,7 @@ def main():
         elif cpu_pct >= CPU_WARN or mem_pct >= MEM_WARN or disk_pct >= DISK_WARN:
             state = 1
         
-        # Output
+        # Outputs
         metrics = f"cpu={cpu_pct}%;{CPU_WARN};{CPU_CRIT} mem={mem_pct}%;{MEM_WARN};{MEM_CRIT} disk={disk_pct}%;{DISK_WARN};{DISK_CRIT}"
         msg = f"CPU {cpu_pct}%, MEM {mem_pct}%, DISK {disk_pct}%"
         print(f"{state} {svc} {metrics} - {msg}")

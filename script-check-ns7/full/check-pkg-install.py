@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-check-pkg-install.py - CheckMK Local Check per installazioni pacchetti YUM
+"""check-pkg-install.py - CheckMK Local Check for YUM package installations
 
 Monitor recent YUM activity (Installed/Updated/Erased/Removed).
 Check /var/log/yum.log and track last event timestamp.
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import re
@@ -23,15 +21,13 @@ WARN_TIMEOUT_MINUTES = 5
 
 
 def parse_yum_date(date_str: str) -> Optional[int]:
-    """
-    Parse YUM log date string to Unix timestamp.
+    """Parse YUM log date string to Unix timestamp.
     
     Args:
         date_str: Date string from yum.log (e.g., "Jan 15 10:30:45")
         
     Returns:
-        Unix timestamp or None if parsing fails
-    """
+        Unix timestamp or None if parsing fails"""
     try:
         # Try current year first
         current_year = datetime.now().year
@@ -53,12 +49,10 @@ def parse_yum_date(date_str: str) -> Optional[int]:
 
 
 def get_last_yum_event() -> Optional[Tuple[str, str]]:
-    """
-    Get last YUM event from log file.
+    """Get last YUM event from log file.
     
     Returns:
-        Tuple of (date_string, event_description) or None if no events
-    """
+        Tuple of (date_string, event_description) or None if no events"""
     if not YUM_LOG.exists() or not YUM_LOG.is_file():
         return None
     
@@ -107,12 +101,10 @@ def load_timestamp() -> int:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     if not YUM_LOG.exists() or not YUM_LOG.is_file():
         print(f"2 PKG_INSTALL - CRITICAL: {YUM_LOG} non leggibile")
         return 0

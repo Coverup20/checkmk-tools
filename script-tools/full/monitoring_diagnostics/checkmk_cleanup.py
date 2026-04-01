@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
-"""
-checkmk_cleanup.py - CheckMK Backup Retention & Cleanup Tool
+"""checkmk_cleanup.py - CheckMK Backup Retention & Cleanup Tool
 
-Gestisce la rotazione dei backup locali di CheckMK.
-Caratteristiche:
-- Rinomina backup completati (aggiungendo timestamp)
-- Applica retention policy (numero massimo backup)
-- Setup automatico systemd timer
+Manages the rotation of CheckMK local backups.
+Features:
+- Rename completed backups (adding timestamps)
+- Apply retention policy (maximum number of backups)
+- Automatic systemd timer setup
 
 Usage:
     checkmk_cleanup.py [run|setup|remove] [options]
 
 Options:
-    --dir DIR         Directory backup (default: /var/backups/checkmk)
-    --count N         Numero max backup da mantenere (default: 30)
+    --dir DIR Backup directory (default: /var/backups/checkmk)
+    --count N Max number of backups to keep (default: 30)
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -29,7 +27,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Optional
 
-# --- Configurazione ---
+# --- Configuration ---
 DEFAULT_BACKUP_DIR = "/var/backups/checkmk"
 DEFAULT_RETENTION = 30
 LOG_FILE = "/var/log/checkmk-backup-cleanup.log"
@@ -68,8 +66,8 @@ def run_cleanup(backup_dir: str, retention: int):
     if not path.exists():
         error(f"Directory non trovata: {backup_dir}", fatal=True)
 
-    # 1. Rinomina backup completi
-    # Cerca directory che finiscono con -complete
+    # 1. Rename full backups
+    # Look for directories that end with -complete
     renamed = 0
     now = time.time()
     
@@ -80,24 +78,24 @@ def run_cleanup(backup_dir: str, retention: int):
         mtime = item.stat().st_mtime
         age = now - mtime
         
-        # Ignora backup troppo recenti (< 2 min)
+        # Ignore backups that are too recent (< 2 min)
         if age < 120:
             log(f"Backup troppo recente ({int(age)}s), skip: {item.name}")
             continue
             
-        # Ignora backup troppo piccoli (< 100KB)
+        # Ignore backups that are too small (< 100KB)
         size = sum(f.stat().st_size for f in item.rglob('*')) if item.is_dir() else item.stat().st_size
         if size < 102400:
             log(f"Backup troppo piccolo ({size} bytes), skip: {item.name}")
             continue
             
         # Ignora se ha già timestamp (Check_MK-YYYY-MM-DD-HHhMM-complete)
-        # Ma la logica bash era: rinomina SE NON ha timestamp E finisce con -complete
-        # Esempio bash: Backup che si chiama 'Check_MK-mysite-complete' -> 'Check_MK-mysite-complete-2023...'
+        # But the bash logic was: rename IF it has NO timestamp AND ends with -complete
+        # Bash example: Backup called 'Check_MK-mysite-complete' -> 'Check_MK-mysite-complete-2023...'
         if any(c.isdigit() for c in item.name[-15:]): # Check euristico
              # Se sembra già avere timestamp, skip?
              # Bash regex: -[0-9]{4}-[0-9]{2}-...
-             # Assumiamo che se finisce con -complete puro, va rinominato
+             # We assume that if it ends in pure -complete, it should be renamed
              pass
 
         timestamp = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d-%Hh%M")
@@ -114,14 +112,14 @@ def run_cleanup(backup_dir: str, retention: int):
     log(f"Rinominati {renamed} backup")
 
     # 2. Rotazione
-    # Trova tutti i backup validi Check_MK-*
+    # Find all valid backups Check_MK-*
     backups = []
     for item in path.glob("Check_MK-*"):
         if "incomplete" in item.name:
             continue
         backups.append(item)
     
-    # Ordina per mtime (più vecchi prima)
+    # Sort by mtime (oldest first)
     backups.sort(key=lambda x: x.stat().st_mtime)
     
     total = len(backups)
@@ -165,8 +163,7 @@ Nice=19
 IOSchedulingClass=idle
 
 [Install]
-WantedBy=multi-user.target
-"""
+WantedBy=multi-user.target"""
     
     timer_content = """[Unit]
 Description=CheckMK Backup Rename Timer (Every Minute)
@@ -176,8 +173,7 @@ OnCalendar=*:0/1
 Persistent=true
 
 [Install]
-WantedBy=timers.target
-"""
+WantedBy=timers.target"""
 
     with open(service_path, "w") as f:
         f.write(service_content)

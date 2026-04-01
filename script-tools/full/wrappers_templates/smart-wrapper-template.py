@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-smart-wrapper-template.py
+"""smart-wrapper-template.py
 
 Python entrypoint that delegates to smart-wrapper-template.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

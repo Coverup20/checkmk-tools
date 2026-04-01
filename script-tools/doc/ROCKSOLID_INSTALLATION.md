@@ -1,22 +1,22 @@
 # CheckMK Agent - ROCKSOLID Installation Guide
-> **Categoria:** Operativo
+> **Category:** Operational
 
-##  Problema Risolto
+## Problem Solved
 
-Durante un **major upgrade** di NethSecurity/OpenWrt (es. 8.7.0 → .8.7.1), il sistema ripristina il firmware e:
--  **Perde** file non protetti in `/usr/bin`, `/etc/init.d`
--  **Cancella** configurazioni non listate in `/etc/sysupgrade.conf`
--  **Rimuove** binari installati manualmente
+During a **major upgrade** of NethSecurity/OpenWrt (e.g. 8.7.0 → .8.7.1), the system restores the firmware and:
+- **Losses** unprotected files in `/usr/bin`, `/etc/init.d`
+- **Delete** unlisted configurations in `/etc/sysupgrade.conf`
+- **Remove** manually installed binaries
 
-**Risultato**: CheckMK Agent smette di funzionare dopo l'upgrade.
+**Result**: CheckMK Agent stops working after the upgrade.
 
-##  Soluzione ROCKSOLID
+## ROCKSOLID solution
 
-Lo script `install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh` implementa protezioni automatiche:
+The `install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh` script implements automatic protections:
 
-### 1⃣ Protezione File Critici
+### 1⃣ Critical File Protection
 
-Aggiunge automaticamente a `/etc/sysupgrade.conf`:
+Automatically adds to `/etc/sysupgrade.conf`:
 ```
 # CheckMK Agent - Binary
 /usr/bin/check_mk_agent
@@ -43,113 +43,113 @@ Aggiunge automaticamente a `/etc/sysupgrade.conf`:
 /etc/opkg/customfeeds.conf
 ```
 
-### 2⃣ Script Post-Upgrade Automatico
+### 2⃣ Automatic Post-Upgrade Script
 
-Crea `/etc/checkmk-post-upgrade.sh` che:
--  Verifica presenza file critici dopo upgrade
--  Riattiva servizi CheckMK e FRP
--  Controlla che socat sia in ascolto su porta 6556
+Create `/etc/checkmk-post-upgrade.sh` that:
+- Check for critical files after upgrade
+- Reactivate CheckMK and FRP services
+- Check that socat is listening on port 6556
 
-### 3⃣ Autocheck all'Avvio (NUOVO!)
+### 3⃣ Autocheck at Startup (NEW!)
 
-Lo script `rocksolid-startup-check.sh` esegue **automaticamente ad ogni riavvio**:
--  Verifica e riavvia CheckMK Agent se non attivo
--  Verifica e riavvia FRP Client se non attivo
--  **Reinstalla Git automaticamente** se mancante (dopo upgrade)
--  Verifica e ripristina cron job git-sync
--  Test sync del repository
--  Log completo in `/var/log/rocksolid-startup.log`
+The `rocksolid-startup-check.sh` script runs **automatically on every reboot**:
+- Check and restart CheckMK Agent if not active
+- Check and restart FRP Client if not active
+- **Reinstall Git automatically** if missing (after upgrade)
+- Check and restore git-sync cron jobs
+- Repository sync test
+- Full log in `/var/log/rocksolid-startup.log`
 
-**Configurazione**: Eseguito automaticamente da `/etc/rc.local` in background.
--  Logga tutti gli eventi in syslog
+**Configuration**: Run automatically by `/etc/rc.local` in the background.
+- Log all events in syslog
 
-### 3⃣ Differenze vs Script Originale
+### 3⃣ Differences vs Original Script
 
-| Feature | Originale | ROCKSOLID |
-|---------|-----------|-----------|
-| Installa agent |  |  |
-| Configura socat |  |  |
-| Installa FRP (opzionale) |  |  |
-| Protegge da upgrade |  |  |
-| Script post-upgrade |  |  |
-| Aggiunge a sysupgrade.conf |  |  Automatico |
+| Features | Original | ROCKSOLID |
+|---------|----------|----------|
+| Install agent |  |  |
+| Configure socat |  |  |
+| Install FRP (optional) |  |  |
+| Protects from upgrades |  |  |
+| Post-upgrade script |  |  |
+| Adds to sysupgrade.conf |  |  Automatic |
 | Logging upgrade |  |  Syslog |
 
-##  Installazione
+## Installation
 
-### Su NethSecurity/OpenWrt - Modalità Interattiva
+### About NethSecurity/OpenWrt - Interactive Mode
 
 ```bash
-# Da repository locale (se disponibile)
+# From local repository (if available)
 bash /opt/checkmk-tools/script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh
 
-# Da GitHub
+# From GitHub
 curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh | bash
 ```
 
-### Modalità Non-Interattiva (Boot Automatico)
+### Non-Interactive Mode (Automatic Boot)
 
-Per esecuzioni automatiche (es. boot, cron, automation):
+For automatic executions (e.g. boot, cron, automation):
 
 ```bash
-# Mantiene automaticamente configurazione FRP esistente (se presente)
-# Salta prompt interattivi
+# Automatically maintains existing FRP configuration (if any)
+# Skip interactive prompts
 NON_INTERACTIVE=1 bash /opt/checkmk-tools/script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh
 ```
 
-**Comportamento modalità non-interattiva:**
--  Se esiste `/etc/frp/frpc.toml` → **mantiene automaticamente** la configurazione
--  Non chiede conferma per mantenere config FRP
--  Se FRP non configurato → salta installazione FRP
--  Ideale per script di avvio, autocheck, automation
+**Non-interactive mode behavior:**
+- If `/etc/frp/frpc.toml` exists → **automatically** maintains the configuration
+- Does not ask for confirmation to maintain FRP config
+- If FRP not configured → skip FRP installation
+- Ideal for startup scripts, autocheck, automation
 
-### Output Installazione
+### Installation Output
 
 ```
-╔════════════════════════════════════════════════════════════════╗
-║  CheckMK Agent Installer - ROCKSOLID Edition                  ║
-║  Versione resistente ai major upgrade NethSecurity/OpenWrt    ║
-╚════════════════════════════════════════════════════════════════╝
+╔════════════════════════════════ ════════════════════════════════╗
+║ CheckMK Agent Installer - ROCKSOLID Edition ║
+║ Version resistant to NethSecurity/OpenWrt major upgrades ║
+╚════════════════════════════════ ════════════════════════════════╝
 
-[INFO] Configuro repository (customfeeds)
+[INFO] I configure repository (customfeeds)
 [INFO] opkg update
-[INFO] Installo tool necessari (binutils/tar/gzip/wget/socat/ca-certificates)
-[INFO] Installazione Checkmk agent
-[INFO] Download .deb agente
-[INFO] Estrazione .deb (ar + tar)
-[INFO] Copia binario agente
-[INFO] Agente installato: /usr/bin/check_mk_agent
-[INFO] Creo servizio procd (socat listener su 6556)
-[INFO] Checkmk agent in ascolto su TCP 6556 (socat)
-[INFO] ROCKSOLID: Proteggo installazione CheckMK da major upgrade
-[INFO] Aggiunto a sysupgrade.conf: /usr/bin/check_mk_agent
-[INFO] Aggiunto a sysupgrade.conf: /etc/init.d/check_mk_agent
-[INFO] Aggiunto a sysupgrade.conf: /etc/check_mk/
-[INFO] Creo script di ripristino post-upgrade: /etc/checkmk-post-upgrade.sh
-[INFO] Script post-upgrade creato e protetto
+[INFO] Installing necessary tools (binutils/tar/gzip/wget/socat/ca-certificates)
+[INFO] Checkmk agent installation
+[INFO] Download .deb agent
+[INFO] Extracting .deb (ar + tar)
+[INFO] Copy agent binary
+[INFO] Agent installed: /usr/bin/check_mk_agent
+[INFO] I create procd service (socat listener on 6556)
+[INFO] Checkmk agent listening on TCP 6556 (socat)
+[INFO] ROCKSOLID: Protecting CheckMK installation from major upgrades
+[INFO] Added to sysupgrade.conf: /usr/bin/check_mk_agent
+[INFO] Added to sysupgrade.conf: /etc/init.d/check_mk_agent
+[INFO] Added to sysupgrade.conf: /etc/check_mk/
+[INFO] I create post-upgrade recovery script: /etc/checkmk-post-upgrade.sh
+[INFO] Post-upgrade script created and secured
 
-╔════════════════════════════════════════════════════════════════╗
-║  INSTALLAZIONE COMPLETATA - ROCKSOLID MODE ATTIVO             ║
-╚════════════════════════════════════════════════════════════════╝
+╔════════════════════════════════ ════════════════════════════════╗
+║ INSTALLATION COMPLETE - ROCKSOLID MODE ACTIVATED ║
+╚════════════════════════════════ ════════════════════════════════╝
 
-Protezioni attivate:
-   File critici aggiunti a /etc/sysupgrade.conf
-   Script post-upgrade creato: /etc/checkmk-post-upgrade.sh
-   Installazione resistente ai major upgrade
+Protections activated:
+   Critical files added to /etc/sysupgrade.conf
+Created post-upgrade script: /etc/checkmk-post-upgrade.sh
+   Installation resistant to major upgrades
 
-Test agent locale: nc 127.0.0.1 6556 | head
+Local test agent: nc 127.0.0.1 6556 | head
 ```
 
-##  Procedura Major Upgrade
+## Major Upgrade Procedure
 
-### Prima dell'Upgrade
+### Before Upgrading
 
-1. Verifica file protetti:
+1. Check protected files:
 ```bash
 cat /etc/sysupgrade.conf | grep -E 'check_mk|frpc'
 ```
 
-2. Backup manuale (opzionale):
+2. Manual backup (optional):
 ```bash
 tar czf /tmp/checkmk-backup.tar.gz \
   /usr/bin/check_mk_agent \
@@ -160,201 +160,201 @@ tar czf /tmp/checkmk-backup.tar.gz \
   /etc/init.d/frpc
 ```
 
-### Dopo l'Upgrade
+### After the Upgrade
 
-1. **AUTOMATICO**: Lo script `rocksolid-startup-check.sh` si avvia automaticamente al boot e:
-   - Riattiva CheckMK Agent e FRP Client
-   - Reinstalla Git se mancante
-   - Ripristina cron job git-sync
-   - Logga tutto in `/var/log/rocksolid-startup.log`
+1. **AUTOMATIC**: The `rocksolid-startup-check.sh` script starts automatically at boot and:
+   - Reactivate CheckMK Agent and FRP Client
+   - Reinstall Git if missing
+   - Reset git-sync cron jobs
+   - Log everything to `/var/log/rocksolid-startup.log`
 
-2. **MANUALE (se serve)**: Esegui script post-upgrade:
+2. **MANUAL (if needed)**: Run post-upgrade script:
 ```bash
 /etc/checkmk-post-upgrade.sh
 /etc/git-sync-post-upgrade.sh
 ```
 
-3. **VERIFICA Git**: Se git è mancante, verrà reinstallato automaticamente al boot:
+3. **CHECK Git**: If git is missing, it will be automatically reinstalled at boot:
 ```bash
-# Lo script esegue automaticamente:
+# The script automatically runs:
 opkg update
 opkg install git git-http
 ```
 
-4. Verifica servizi attivi:
+4. Check active services:
 ```bash
-ps | grep -E 'socat|frpc'
+ps | grep -It's socat|frpc'
 netstat -tlnp | grep 6556
 ```
 
-5. Test agent:
+5. Test agents:
 ```bash
 nc 127.0.0.1 6556 | head -20
 ```
 
-6. Controlla log autocheck:
+6. Check autocheck log:
 ```bash
 tail -50 /var/log/rocksolid-startup.log
 ```
 
-##  Test Pre-Upgrade (Simulazione)
+## Pre-Upgrade Test (Simulation)
 
-Prima di un major upgrade, testa la persistenza:
+Before a major upgrade, test persistence:
 
 ```bash
-# 1. Simula perdita file
+#1. Simulate file loss
 mv /usr/bin/check_mk_agent /tmp/
 /etc/init.d/check_mk_agent stop
 
-# 2. Esegui script post-upgrade
+#2. Run post-upgrade scripts
 /etc/checkmk-post-upgrade.sh
 
-# 3. Dovrebbe rilevare il problema
-# Output atteso: "ERRORE: /usr/bin/check_mk_agent mancante dopo upgrade!"
+#3. It should detect the problem
+# Expected output: "ERROR: /usr/bin/check_mk_agent missing after upgrade!"
 
-# 4. Ripristina per continuare test
+#4. Reset to continue testing
 mv /tmp/check_mk_agent /usr/bin/
 /etc/checkmk-post-upgrade.sh
 ```
 
-##  Verifica Installazione ROCKSOLID
+## Check ROCKSOLID Installation
 
-### Metodo 1: Script Automatico (Consigliato)
+### Method 1: Automatic Script (Recommended)
 
 ```bash
-# Esegue verifica completa con autocheck
+# Performs full verification with autocheck
 /usr/local/bin/rocksolid-startup-check.sh
 
-# Visualizza log
+# View log
 tail -50 /var/log/rocksolid-startup.log
 ```
 
-### Metodo 2: Script di Verifica Manuale
+### Method 2: Manual Verification Script
 
 ```bash
 #!/bin/sh
-echo "=== VERIFICA INSTALLAZIONE ROCKSOLID ==="
+echo "=== CHECK ROCKSOLID INSTALLATION ==="
 echo ""
 
-echo "1. Binario CheckMK Agent:"
-ls -lh /usr/bin/check_mk_agent && echo "   OK" || echo "   MANCANTE"
+echo "1. CheckMK Agent Binary:"
+ls -lh /usr/bin/check_mk_agent && echo " OK" || echo "MISSING"
 
 echo "2. Init script CheckMK:"
-ls -lh /etc/init.d/check_mk_agent && echo "   OK" || echo "   MANCANTE"
+ls -lh /etc/init.d/check_mk_agent && echo " OK" || echo "MISSING"
 
-echo "3. Configurazione CheckMK:"
-ls -ld /etc/check_mk && echo "   OK" || echo "   MANCANTE"
+echo "3. CheckMK Configuration:"
+ls -ld /etc/check_mk && echo " OK" || echo "MISSING"
 
 echo "4. FRP client binary:"
-ls -lh /usr/local/bin/frpc 2>/dev/null && echo "   OK" || echo "   Non installato"
+ls -lh /usr/local/bin/frpc 2>/dev/null && echo " OK" || echo "Not installed"
 
-echo "5. FRP configurazione:"
-ls -ld /etc/frp 2>/dev/null && echo "   OK" || echo "   Non installato"
+echo "5. FRP configuration:"
+ls -ld /etc/frp 2>/dev/null && echo " OK" || echo "Not installed"
 
-echo "6. Script post-upgrade:"
-ls -lh /etc/checkmk-post-upgrade.sh && echo "   OK" || echo "   MANCANTE"
+echo "6. Post-upgrade script:"
+ls -lh /etc/checkmk-post-upgrade.sh && echo " OK" || echo "MISSING"
 
-echo "7. Script autocheck avvio:"
-ls -lh /usr/local/bin/rocksolid-startup-check.sh && echo "   OK" || echo "   MANCANTE"
+echo "7. Startup autocheck script:"
+ls -lh /usr/local/bin/rocksolid-startup-check.sh && echo " OK" || echo "MISSING"
 
-echo "8. Configurazione rc.local:"
-grep -q rocksolid-startup-check.sh /etc/rc.local && echo "   Autocheck attivo" || echo "   Autocheck non configurato"
+echo "8. rc.local configuration:"
+grep -q rocksolid-startup-check.sh /etc/rc.local && echo " Autocheck active" || echo "Autocheck not configured"
 
-echo "9. Protezione sysupgrade.conf:"
+echo "9. Security sysupgrade.conf:"
 if grep -q check_mk_agent /etc/sysupgrade.conf; then
-    echo "   CheckMK protetto"
+    echo "CheckMK protected"
 else
-    echo "   CheckMK NON protetto"
+    echo "CheckMK NOT protected"
 fi
 
-echo "10. Processo socat attivo:"
+echo "10. Active socat process:"
 if pgrep -f "socat TCP-LISTEN:6556" >/dev/null; then
-    echo "   Agent in ascolto"
+    echo "Agent listening"
 else
-    echo "   Agent non attivo"
+    echo "Agent down"
 fi
 
-echo "11. Porta 6556 in ascolto:"
-netstat -tlnp | grep -q 6556 && echo "   Porta aperta" || echo "   Porta chiusa"
+echo "11. Listening on port 6556:"
+netstat -tlnp | grep -q 6556 && echo " Door open" || echo "Door closed"
 
-echo "12. Git installato:"
-command -v git >/dev/null && echo "   Git presente: $(git --version)" || echo "   Git mancante"
+echo "12. Git installed:"
+command -v git >/dev/null && echo " Git present: $(git --version)" || echo "Git missing"
 
 echo ""
-echo "=== CONTENUTO sysupgrade.conf (ROCKSOLID) ==="
-grep -E 'check_mk|frpc|frp/|git-sync|rocksolid|rc.local' /etc/sysupgrade.conf || echo "Nessuna entry trovata"
+echo "=== CONTENTS sysupgrade.conf (ROCKSOLID) ==="
+grep -E 'check_mk|frpc|frp/|git-sync|rocksolid|rc.local' /etc/sysupgrade.conf || echo "No entries found"
 ```
 
-##  Troubleshooting
+## Troubleshooting
 
-### Agent non funziona dopo upgrade
+### Agent not working after upgrade
 
 ```bash
-# 1. Verifica file presenti
+# 1. Check existing files
 ls -la /usr/bin/check_mk_agent /etc/init.d/check_mk_agent
 
-# 2. Esegui script post-upgrade
+#2. Run post-upgrade scripts
 /etc/checkmk-post-upgrade.sh
 
-# 3. Riavvia manualmente
+#3. Reboot manually
 /etc/init.d/check_mk_agent enable
 /etc/init.d/check_mk_agent restart
 
-# 4. Verifica log
+#4. Check logs
 logread | tail -50
 ```
 
-### File persi dopo upgrade
+### Files lost after upgrade
 
-Se i file sono stati comunque persi:
-1. Re-esegui lo script di installazione ROCKSOLID
-2. I file verranno ricreati e protetti
-3. La configurazione FRP verrà preservata se in `/etc/frp/`
+If the files were still lost:
+1. Re-run the ROCKSOLID installation script
+2. The files will be recreated and protected
+3. FRP configuration will be preserved if in `/etc/frp/`
 
-### FRP non riconnette
+### FRP does not reconnect
 
 ```bash
-# Verifica configurazione preservata
+# Check preserved configuration
 cat /etc/frp/frpc.toml
 
-# Riavvia servizio
+# Restart service
 /etc/init.d/frpc restart
 
-# Controlla log
+# Check log
 tail -f /var/log/frpc.log
 ```
 
-##  Statistiche Protezione
+## Protection Statistics
 
-| Componente | Dimensione | Protetto | Critico |
-|------------|------------|----------|---------|
-| check_mk_agent | ~74 KB |  | Alta |
-| check_mk_agent init | ~552 B |  | Alta |
-| /etc/check_mk/ | ~8 KB |  | Media |
-| frpc binary | ~14.8 MB |  | Media |
-| frpc.toml | ~389 B |  | Alta |
-| frpc init | ~283 B |  | Media |
-| post-upgrade.sh | ~1.2 KB |  | Alta |
+| Component | Size | Protected | Critical |
+|------------|-----------|----------|---------|
+| check_mk_agent | ~74 KB |  | High |
+| check_mk_agent init | ~552 B |  | High |
+| /etc/check_mk/ | ~8 KB |  | Average |
+| frpc binary | ~14.8 MB |  | Average |
+| frpc.toml | ~389 B |  | High |
+| frpc init | ~283 B |  | Average |
+| post-upgrade.sh | ~1.2 KB |  | High |
 
-**Totale spazio protetto**: ~15 MB
+**Total protected space**: ~15 MB
 
-##  Best Practices
+## Best Practices
 
-1. **Sempre usare versione ROCKSOLID** per nuove installazioni su NethSecurity/OpenWrt
-2. **Testare script post-upgrade** prima di major upgrade reali
-3. **Verificare sysupgrade.conf** periodicamente con `cat /etc/sysupgrade.conf`
-4. **Backup manuale** prima di upgrade critici (anche se protetto)
-5. **Monitorare log syslog** dopo upgrade: `logread | grep checkmk`
+1. **Always use ROCKSOLID version** for new installations on NethSecurity/OpenWrt
+2. **Test post-upgrade scripts** before real major upgrades
+3. **Check sysupgrade.conf** periodically with `cat /etc/sysupgrade.conf`
+4. **Manual backup** before critical upgrades (even if protected)
+5. **Monitor syslog logs** after upgrade: `logread | grep checkmk`
 
-##  Riferimenti
+## References
 
-- Script originale: `install-checkmk-agent-debtools-frp-nsec8c.sh`
-- Script ROCKSOLID: `install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh`
+- Original script: `install-checkmk-agent-debtools-frp-nsec8c.sh`
+- ROCKSOLID script: `install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh`
 - OpenWrt sysupgrade: https://openwrt.org/docs/guide-user/installation/sysupgrade
 - NethSecurity Upgrade: https://github.com/nethserver/nethsecurity
 
 ---
 
-**Ultimo aggiornamento**: 2026-01-29  
-**Versione**: 1.0 ROCKSOLID  
-**Testato su**: NethSecurity 8.7.1 (OpenWrt 24.10.3)
+**Last update**: 2026-01-29  
+**Version**: 1.0 ROCKSOLID  
+**Tested on**: NethSecurity 8.7.1 (OpenWrt 24.10.3)

@@ -1,34 +1,34 @@
 # CheckMK Host Labels Configuration Template
-> **Categoria:** Operativo
+> **Category:** Operational
 
-# Template per configurare i label 'real_ip' negli host CheckMK
+# Template to configure 'real_ip' labels in CheckMK hosts
 
-##  OBIETTIVO
-Configurare il label 'real_ip' negli host CheckMK per abilitare 
-l'uso dell'IP reale nelle email invece di 127.0.0.1
+## OBJECTIVE
+Configure the 'real_ip' label in CheckMK hosts to enable 
+using real IP in emails instead of 127.0.0.1
 
-##  PREREQUISITI
-- Accesso amministrativo a CheckMK Web UI
-- Conoscere l'IP pubblico/reale del server CheckMK
-- Permessi per modificare configurazione host
+## PREREQUISITES
+- Administrative access to CheckMK Web UI
+- Know the public/real IP of the CheckMK server
+- Permissions to modify host configuration
 
-##  CONFIGURAZIONE VIA WEB UI
+## CONFIGURATION VIA WEB UI
 
-### Metodo 1: Configurazione Singolo Host
+### Method 1: Single Host Configuration
 
-1. **Accedere a CheckMK Web UI**
+1. **Log in to CheckMK Web UI**
    ```
    URL: https://YOUR_CHECKMK_SERVER/YOUR_SITE/
    ```
 
-2. **Navigare alla configurazione host**
+2. **Navigate to host configuration**
    ```
-   Setup → Hosts → [Selezionare host del server CheckMK]
+   Setup → Hosts → [Select CheckMK server host]
    ```
 
-3. **Aggiungere label 'real_ip'**
+3. **Add label 'real_ip'**
    ```
-   Sezione: Host tags
+   Section: Host tags
    → Effective host tags
    → Host labels
    → Add new label
@@ -37,50 +37,50 @@ l'uso dell'IP reale nelle email invece di 127.0.0.1
    Label value: YOUR_REAL_IP_ADDRESS
    ```
 
-4. **Esempi di configurazione**
+4. **Configuration examples**
    ```
    Label key: real_ip
-   Label value: 192.168.1.100    # IP LAN
+   Label value: 192.168.1.100 # IP LAN
    
    Label key: real_ip  
-   Label value: 203.0.113.50     # IP pubblico
+   Label value: 203.0.113.50 # Public IP
    
    Label key: real_ip
-   Label value: example.com      # FQDN (se risolve correttamente)
+   Label value: example.com # FQDN (if resolves correctly)
    ```
 
-5. **Salvare e attivare**
+5. **Save and activate**
    ```
    → Save & go to folder
    → Activate affected
    → Activate changes
    ```
 
-### Metodo 2: Configurazione via File (Avanzato)
+### Method 2: Configuration via File (Advanced)
 
-1. **Accedere al server CheckMK**
+1. **Log in to CheckMK server**
    ```bash
    ssh user@checkmk-server
-   su - SITENAME
+   on - SITENAME
    ```
 
-2. **Modificare configurazione host**
+2. **Change host configuration**
    ```bash
-   # Trovare il file di configurazione host
+   # Find the host configuration file
    find etc/check_mk/conf.d/ -name "*.mk" -exec grep -l "YOUR_HOSTNAME" {} \;
    
-   # Modificare il file trovato
+   # Edit the found file
    vi etc/check_mk/conf.d/wato/hosts.mk
    ```
 
-3. **Aggiungere label nella configurazione**
+3. **Add label in configuration**
    ```python
-   # Esempio di configurazione host con label
+   # Example of host configuration with label
    all_hosts += [
        "your-checkmk-server|host|wato|/",
    ]
    
-   # Aggiungere label
+   # Add label
    host_labels.update({
        "your-checkmk-server": {
            "real_ip": "192.168.1.100",
@@ -88,137 +88,137 @@ l'uso dell'IP reale nelle email invece di 127.0.0.1
    })
    ```
 
-4. **Attivare modifiche**
+4. **Activate changes**
    ```bash
    cmk -R
-   # Oppure via Web UI: Activate changes
+   # Or via Web UI: Activate changes
    ```
 
-##  VERIFICA CONFIGURAZIONE
+## CHECK CONFIGURATION
 
-### Test via Web UI
-1. **Verificare label applicato**
+### Testing via Web UI
+1. **Check applied label**
    ```
-   Monitoring → Hosts → [Selezionare host]
-   → Scheda "Properties"
-   → Verificare presenza label "real_ip"
+   Monitoring → Hosts → [Select host]
+   → "Properties" tab
+   → Check the presence of the "real_ip" label
    ```
 
 ### Test via Command Line
 ```bash
-# Su server CheckMK
-su - SITENAME
+# On CheckMK server
+on - SITENAME
 
-# Verificare label host
-cmk --debug -v YOUR_HOSTNAME | grep -i label
+# Check host label
+cmk --debug -v YOUR_HOSTNAME | grep -i labels
 
-# Test variabili notifica
+# Test notification variables
 export NOTIFY_HOSTLABEL_real_ip="192.168.1.100"
 echo $NOTIFY_HOSTLABEL_real_ip
 ```
 
-### Test Script Notifica
+### Test Script Notification
 ```bash
-# Test con script mail_realip_graphs
+# Test with mail_realip_graphs script
 export NOTIFY_CONTACTEMAIL="test@domain.com"
 export NOTIFY_HOSTNAME="your-server"
 export NOTIFY_HOSTLABEL_real_ip="192.168.1.100"
 export NOTIFY_WHAT="HOST"
 export NOTIFY_NOTIFICATIONTYPE="PROBLEM"
 
-# Eseguire script per test
+# Run scripts for testing
 ./local/share/check_mk/notifications/mail_realip_graphs
 ```
 
-##  ESEMPI CONFIGURAZIONE
+## CONFIGURATION EXAMPLES
 
-### Esempio 1: Server con IP Statico LAN
+### Example 1: Server with Static IP LAN
 ```
 Host: checkmk-prod
 Real IP: 192.168.10.50
 Label: real_ip = 192.168.10.50
 
-Risultato email:
+Email result:
 - Link: https://192.168.10.50/monitoring/check_mk/...
-- Grafici: Generati con IP 192.168.10.50
+- Graphs: Generated with IP 192.168.10.50
 ```
 
-### Esempio 2: Server con IP Pubblico
+### Example 2: Server with Public IP
 ```
 Host: monitoring.company.com  
 Real IP: 203.0.113.100
 Label: real_ip = 203.0.113.100
 
-Risultato email:
+Email result:
 - Link: https://203.0.113.100/monitoring/check_mk/...
-- Grafici: Accessibili pubblicamente
+- Charts: Publicly accessible
 ```
 
-### Esempio 3: Server con FQDN
+### Example 3: Server with FQDN
 ```
-Host: internal-monitoring
+Host: internal monitoring
 Real IP: monitoring.internal.company.com
 Label: real_ip = monitoring.internal.company.com
 
-Risultato email:
+Email result:
 - Link: https://monitoring.internal.company.com/site/check_mk/...
-- Grafici: Risoluzione DNS automatica
+- Charts: Automatic DNS resolution
 ```
 
-##  ATTENZIONE
+## ATTENTION
 
-### Considerazioni di Sicurezza
-- **IP Pubblici**: Assicurarsi che CheckMK sia accessibile pubblicamente solo se necessario
-- **Firewall**: Configurare adeguatamente le regole firewall
-- **SSL/TLS**: Usare sempre HTTPS per accesso pubblico
+### Security Considerations
+- **Public IPs**: Make sure CheckMK is only publicly accessible if necessary
+- **Firewall**: Configure firewall rules appropriately
+- **SSL/TLS**: Always use HTTPS for public access
 
-### Considerazioni di Rete
-- **Risoluzione DNS**: Se usi FQDN, assicurati che risolva correttamente
-- **Raggiungibilità**: L'IP/FQDN deve essere raggiungibile dai client email
-- **Certificati**: Per HTTPS, certificati devono essere validi per l'IP/FQDN usato
+### Network Considerations
+- **DNS Resolution**: If you use FQDN, make sure it resolves correctly
+- **Reachability**: The IP/FQDN must be reachable by email clients
+- **Certificates**: For HTTPS, certificates must be valid for the IP/FQDN used
 
-##  TROUBLESHOOTING
+## TROUBLESHOOTING
 
-### Problema: Label non applicato
+### Problem: Label not applied
 ```bash
-# Verificare syntax file configurazione
+# Check syntax configuration file
 cmk --check-config
 
-# Riavviare servizi CheckMK
+# Restart CheckMK services
 cmk -R
 systemctl restart checkmk-SITENAME
 ```
 
-### Problema: Script non trova real_ip
+### Problem: Script cannot find real_ip
 ```bash
-# Verificare variabili ambiente notifica
+# Check notification environment variables
 env | grep NOTIFY_HOSTLABEL
 
-# Debug script
+# Script debugging
 python3 -c "
 import os
 real_ip = os.environ.get('NOTIFY_HOSTLABEL_real_ip')
-print(f'Real IP trovato: {real_ip}')
+print(f'Real IP found: {real_ip}')
 "
 ```
 
-### Problema: Email ancora con 127.0.0.1
-- Verificare che script mail_realip_graphs sia utilizzato
-- Controllare regole notifica attive
-- Verificare label host configurato correttamente
+### Problem: Email still with 127.0.0.1
+- Verify that mail_realip_graphs script is used
+- Check active notification rules
+- Check host label configured correctly
 
-##  CHECKLIST CONFIGURAZIONE
+## CONFIGURATION CHECKLIST
 
-- [ ] Label 'real_ip' aggiunto all'host
-- [ ] Valore label corretto (IP/FQDN raggiungibile)
-- [ ] Modifiche attivate in CheckMK
-- [ ] Script mail_realip_graphs installato
-- [ ] Regola notifica configurata per usare nuovo script
-- [ ] Test notifica inviato e verificato
-- [ ] Email ricevute mostrano real IP invece di 127.0.0.1
-- [ ] Grafici funzionanti e accessibili tramite real IP
+- [ ] Label 'real_ip' added to host
+- [ ] Correct label value (reachable IP/FQDN)
+- [ ] Changes activated in CheckMK
+- [ ] mail_realip_graphs script installed
+- [ ] Notification rule configured to use new script
+- [ ] Notification test sent and verified
+- [ ] Received emails show real IP instead of 127.0.0.1
+- [ ] Graphics working and accessible via real IP
 
 ---
 
-** Note**: Questa configurazione è fondamentale per il corretto 
-funzionamento del sistema email con real IP e grafici abilitati.
+** Note **: This configuration is critical for correct 
+functioning of the email system with real IP and graphics enabled.

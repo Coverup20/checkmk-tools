@@ -1,11 +1,11 @@
 #!/bin/bash
-# ydea-ticket-monitor.sh - Monitoraggio automatico stato ticket tracciati
-# Aggiorna periodicamente lo stato dei ticket e rimuove quelli risolti vecchi
+# ydea-ticket-monitor.sh - Automatic tracking ticket status monitoring
+# Periodically updates the status of tickets and removes old resolved ones
 
 set -euo pipefail
 
 # ===== CONFIG =====
-# Usa path assoluto per supportare esecuzione via launcher remoto
+# Use absolute path to support execution via remote launcher
 TOOLKIT_DIR="${YDEA_TOOLKIT_DIR:-/opt/ydea-toolkit}"
 YDEA_TOOLKIT="${TOOLKIT_DIR}/ydea-toolkit.sh"
 YDEA_ENV="${TOOLKIT_DIR}/.env"
@@ -17,9 +17,9 @@ if [[ -f "$YDEA_ENV" ]]; then
     source "$YDEA_ENV"
 fi
 
-# Verifica che il toolkit esista
+# Verify that the toolkit exists
 if [[ ! -x "$YDEA_TOOLKIT" ]]; then
-    echo "ERRORE: ydea-toolkit.sh non trovato o non eseguibile: $YDEA_TOOLKIT"
+    echo "ERROR: ydea-toolkit.sh not found or not executable: $YDEA_TOOLKIT"
     exit 1
 fi
 
@@ -34,7 +34,7 @@ log_ticket_event() {
 # ===== MAIN =====
 main() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========================================"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')]  Avvio monitoraggio ticket tracciati"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Start tracking ticket tracking"
     
     # Mostra statistiche iniziali
     if [[ -f "$TRACKING_FILE" ]]; then
@@ -42,10 +42,10 @@ main() {
         total_tickets=$(jq '.tickets | length' "$TRACKING_FILE" 2>/dev/null || echo "0")
         open_tickets=$(jq '[.tickets[] | select(.resolved_at == null)] | length' "$TRACKING_FILE" 2>/dev/null || echo "0")
         resolved_tickets=$(jq '[.tickets[] | select(.resolved_at != null)] | length' "$TRACKING_FILE" 2>/dev/null || echo "0")
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')]  Stato: $total_tickets totali ($open_tickets aperti, $resolved_tickets risolti)"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Status: total $total_tickets ($open_tickets opened, $resolved_tickets resolved)"
     fi
     
-    # Salva stato precedente per rilevare cambiamenti
+    # Save previous state to detect changes
     declare -A previous_states
     declare -A previous_descrizioni
     declare -A previous_priorita
@@ -62,18 +62,18 @@ main() {
         done < <(jq -r '.tickets[] | select(.resolved_at == null) | "\(.ticket_id)|\(.stato)|\(.host)|\(.service)|\(.codice)|\(.descrizione_ticket // "")|\(.priorita // "Normale")|\(.assegnatoA // "Non assegnato")"' "$TRACKING_FILE" 2>/dev/null || true)
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')]  Aggiornamento stati ticket..."
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Updating ticket statuses..."
     
-    # Aggiorna stati ticket
+    # Update ticket statuses
     "$YDEA_TOOLKIT" update-tracking
     
-    # Rileva e logga cambiamenti leggendo CURRENT dall'API invece che dal tracking
+    # Detect and log changes by reading CURRENT from the API instead of tracking
     # Ottieni dati aggiornati dall'API
     local api_data
     api_data=$("$YDEA_TOOLKIT" api GET "/tickets?limit=100" 2>/dev/null || echo '{"objs":[]}')
     
     if [[ -f "$TRACKING_FILE" ]]; then
-        # Per ogni ticket tracciato, confronta con i dati API
+        # For each ticket tracked, compare to the API data
         while IFS='|' read -r tid stato host service codice; do
             if [[ -z "$tid" ]]; then continue; fi
             
@@ -88,7 +88,7 @@ main() {
             ticket_api_data=$(echo "$api_data" | jq --arg tid "$tid" '.objs[] | select(.id == ($tid|tonumber))')
             
             if [[ -z "$ticket_api_data" ]]; then
-                # Ticket non trovato in API, usa valori dal tracking
+                # Ticket not found in API, use values ​​from tracking
                 continue
             fi
             
@@ -115,16 +115,16 @@ main() {
             # Se ticket è diventato risolto
             if [[ "$current_stato" =~ ^(Effettuato|Chiuso|Completato|Risolto)$ ]] && [[ "$prev_stato" != "$current_stato" ]]; then
                 log_ticket_event "RISOLTO" "$tid" "[$codice] Host: $host, Service: $service, Stato: $prev_stato → $current_stato"
-            # Se lo stato è cambiato ma non è risolto
+            # If the state has changed but is not resolved
             elif [[ -n "$prev_stato" && "$prev_stato" != "NUOVO" && "$prev_stato" != "$current_stato" ]]; then
                 log_ticket_event "STATO-CAMBIATO" "$tid" "[$codice] $prev_stato → $current_stato (Host: $host, Service: $service)"
             fi
         done < <(jq -r '.tickets[] | select(.resolved_at == null) | "\(.ticket_id)|\(.stato)|\(.host)|\(.service)|\(.codice)"' "$TRACKING_FILE" 2>/dev/null || true)
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')]  Aggiornamento stati completato"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Status update complete"
     
-    # Pulisci ticket risolti vecchi (ogni 6 ore, controlla se ultima pulizia > 6h fa)
+    # Clean old resolved tickets (every 6 hours, check if last clean > 6h ago)
     local cleanup_marker="/tmp/ydea_last_cleanup"
     local now
     now=$(date +%s)
@@ -141,10 +141,10 @@ main() {
         "$YDEA_TOOLKIT" cleanup-tracking
         echo "$now" > "$cleanup_marker"
     else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')]   Cleanup non necessario (prossimo tra $((6 - hours_since_cleanup))h)"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cleanup not needed (next between $((6 - hours_since_cleanup))h)"
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')]  Monitoraggio completato"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Tracking completed"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========================================"
 }
 

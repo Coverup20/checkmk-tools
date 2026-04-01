@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # checkmk-optimize.sh
-# Ottimizzazioni "bilanciate" per host Checkmk (Ubuntu/Debian).
-# Output semplice (ASCII-only), con backup dei file toccati.
+# "Balanced" optimizations for Checkmk hosts (Ubuntu/Debian).
+# Simple output (ASCII-only), with backup of touched files.
 
 LOGFILE="/var/log/checkmk-optimize.log"
 TSLOG="/var/log/timeshift-rotation.log"
@@ -121,16 +121,16 @@ optimize_db() {
     log "DB: backup e applicazione tuning su $conf"
     backup_file "$conf"
 
-    # Rimuove eventuale blocco precedente gestito da questo script
+    # Removes any previous block handled by this script
     sed -i '/^# BEGIN CHECKMK_OPTIMIZE$/,/^# END CHECKMK_OPTIMIZE$/d' "$conf"
 
     cat >> "$conf" <<'EOF'
 
 # BEGIN CHECKMK_OPTIMIZE
-# Tuning "bilanciato" (verificare in base a RAM/uso).
+# "Balanced" tuning (check based on RAM/usage).
 innodb_buffer_pool_size = 512M
 innodb_log_file_size = 128M
-# NOTE: query_cache e' rimosso/ignorato su MySQL moderni; lasciato qui solo se supportato.
+# NOTE: query_cache is removed/ignored on modern MySQL; left here only if supported.
 query_cache_size = 32M
 query_cache_type = 1
 # END CHECKMK_OPTIMIZE

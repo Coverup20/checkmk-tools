@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-search_anagrafica.py - Cerca anagrafica per nome
+"""search_anagrafica.py - Search registry by name
 
 Usage:
     search_anagrafica.py <search_term>
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import json

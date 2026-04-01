@@ -1,18 +1,18 @@
 # check_firewall_rules.sh
 
-## Descrizione
-Monitora il numero di regole iptables attive per chain (INPUT, FORWARD, OUTPUT, NAT) su NSecFirewall8.
+## Description
+Monitor the number of active iptables rules per chain (INPUT, FORWARD, OUTPUT, NAT) on NSecFirewall8.
 
-## Funzionalità
-- Conta regole per chain tramite `iptables -L`
-- Conta regole NAT nella tabella nat
-- Verifica policy default per INPUT e FORWARD
-- Allarme se nessuna regola o poche regole attive
+## Features
+- Count rules per chain via `iptables -L`
+- Count NAT rules in the nat table
+- Check default policy for INPUT and FORWARD
+- Alarm if no rules or few active rules
 
-## Stati
-- **OK (0)**: Almeno 5 regole attive
-- **WARNING (1)**: Meno di 5 regole attive
-- **CRITICAL (2)**: Nessuna regola attiva
+## States
+- **OK (0)**: At least 5 active rules
+- **WARNING (1)**: Less than 5 active rules
+- **CRITICAL (2)**: No active rules
 
 ## Output CheckMK
 ```
@@ -20,34 +20,34 @@ Monitora il numero di regole iptables attive per chain (INPUT, FORWARD, OUTPUT, 
 ```
 
 ## Performance Data
-- `input`: Numero regole chain INPUT
-- `forward`: Numero regole chain FORWARD
-- `output`: Numero regole chain OUTPUT
-- `nat`: Numero regole tabella nat
-- `total`: Totale regole (INPUT+FORWARD+OUTPUT)
+- `input`: Number of INPUT chain rules
+- `forward`: Number of FORWARD chain rules
+- `output`: Number of OUTPUT chain rules
+- `nat`: Number of nat table rules
+- `total`: Total rules (INPUT+FORWARD+OUTPUT)
 
-## Requisiti
-- Comando `iptables` disponibile
-- Permessi per leggere regole firewall
+## Requirements
+- `iptables` command available
+- Permissions to read firewall rules
 
-## Installazione
+## Installation
 ```bash
 cp check_firewall_rules.sh /usr/lib/check_mk_agent/local/rcheck_firewall_rules.sh
 chmod +x /usr/lib/check_mk_agent/local/rcheck_firewall_rules.sh
 ```
 
-## Test manuale
+## Manual testing
 ```bash
 bash /opt/checkmk-tools/script-check-nsec8/full/check_firewall_rules.sh
 ```
 
-## Note
-- Il conteggio include tutte le regole attive, anche quelle di default di OpenWrt
-- Policy tipiche per firewall:
-  - INPUT: DROP (blocca traffico in ingresso non esplicitamente permesso)
-  - FORWARD: DROP (blocca routing non autorizzato)
-  - OUTPUT: ACCEPT (permetti traffico in uscita)
-- Poche regole possono indicare:
-  - Firewall non configurato
-  - Regole resettate per errore
-  - Firewall service non attivo
+## Notes
+- The count includes all active rules, even OpenWrt's default ones
+- Typical firewall policies:
+  - INPUT: DROP (blocks incoming traffic not explicitly allowed)
+  - FORWARD: DROP (block unauthorized routing)
+  - OUTPUT: ACCEPT (allow outgoing traffic)
+- A few rules can indicate:
+  - Firewall not configured
+  - Rules reset by mistake
+  - Firewall service not active

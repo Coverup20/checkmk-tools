@@ -1,13 +1,13 @@
-#  CheckMK Smart Deploy - Sistema Ibrido Migliorato
-> **Categoria:** Operativo
+# CheckMK Smart Deploy - Improved Hybrid System
+> **Category:** Operational
 
-##  **NOVITÀ: Pattern CheckMK Ufficiali Integrati**
+## **NEW: Official CheckMK Patterns Integrated**
 
-Dopo aver analizzato il **repository ufficiale CheckMK** (https://github.com/Checkmk/checkmk), abbiamo integrato i pattern professionali utilizzati da Checkmk GmbH nel nostro sistema:
+After analyzing the **official CheckMK repository** (https://github.com/Checkmk/checkmk), we have integrated the professional patterns used by Checkmk GmbH into our system:
 
 ### **1.  Version Tracking & Metadata**
 ```bash
-# Ogni script ora include metadata automatico (pattern CheckMK)
+# Every script now includes automatic metadata (CheckMK pattern)
 # CMK_VERSION="1.0.0"
 # Auto-deployed via smart-deploy-hybrid
 # Last-update: 2025-10-13 15:30:45
@@ -15,15 +15,15 @@ Dopo aver analizzato il **repository ufficiale CheckMK** (https://github.com/Che
 
 ### **2.  Configuration Management**
 ```bash
-# Variabili ambiente standard CheckMK
-MK_CONFDIR="/etc/check_mk"              # Configurazioni
-MK_VARDIR="/var/lib/check_mk_agent"     # Dati variabili
-CACHE_DIR="/var/cache/checkmk-scripts"  # Cache script
+# CheckMK standard environment variables
+MK_CONFDIR="/etc/check_mk" # Configurations
+MK_VARDIR="/var/lib/check_mk_agent" # Variable data
+CACHE_DIR="/var/cache/checkmk-scripts" # Script cache
 ```
 
-### **3.  Error Handling Robusto**
+### **3.  Robust Error Handling**
 ```bash
-# Report errori in formato CheckMK standard
+# Error reports in standard CheckMK format
 report_error() {
     if [ "$SCRIPT_TYPE" = "local" ]; then
         echo "<<<check_mk>>>"
@@ -32,9 +32,9 @@ report_error() {
 }
 ```
 
-### **4.  Timeout & Safety**
+### **4.  Timeouts & Safety**
 ```bash
-# Esecuzione con timeout (pattern CheckMK)
+# Execution with timeout (CheckMK pattern)
 if timeout 30 "$CACHE_FILE" 2>/dev/null; then
     log_info "Script executed successfully"
 else
@@ -42,56 +42,56 @@ else
 fi
 ```
 
-##  **Architettura Sistema**
+## **System Architecture**
 
 ```
 CheckMK Environment
-├──  /usr/lib/check_mk_agent/
-│   ├── local/          # ← Smart wrappers (auto-update)
-│   ├── plugins/        # ← Plugin scripts
-│   └── spool/          # ← Spool scripts (cache-based)
-├──  /var/cache/checkmk-scripts/
-│   ├── *.sh           # ← Script cache (GitHub download)
-│   ├── update-all.sh  # ← Manual update script
-│   ├── check-status.sh # ← Health check script
-│   └── deployment_status.json # ← Status tracking
-└──  /etc/check_mk/
-    └── *.cfg          # ← Configuration files
+├── /usr/lib/check_mk_agent/
+│ ├── local/ # ← Smart wrappers (auto-update)
+│ ├── plugins/ # ← Plugin scripts
+│ └── spool/ # ← Spool scripts (cache-based)
+├── /var/cache/checkmk-scripts/
+│ ├── *.sh # ← Script cache (GitHub download)
+│ ├── update-all.sh # ← Manual update script
+│ ├── check-status.sh # ← Health check script
+│ └── deployment_status.json # ← Status tracking
+└── /etc/check_mk/
+    └── *.cfg # ← Configuration files
 ```
 
-##  **Funzionalità Principali**
+## **Main Features**
 
-### **Auto-Update Intelligente**
--  Download automatico da GitHub (timeout 5s)
--  Validazione script (shebang check)
--  Fallback su cache locale
--  Error reporting in formato CheckMK
+### **Intelligent Auto-Update**
+- Automatic download from GitHub (timeout 5s)
+- Script validation (shebang check)
+- Fallback to local cache
+- Error reporting in CheckMK format
 
 ### **Health Monitoring**
--  Status check automatico post-deployment
--  Conteggio script funzionanti/falliti
--  JSON status per monitoring
--  Log debug configurabile
+- Automatic post-deployment status check
+- Count working/failed scripts
+- JSON status for monitoring
+- Configurable debug log
 
 ### **Maintenance Tools**
--  Script aggiornamento manuale (`update-all.sh`)
--  Health check script (`check-status.sh`)
--  Deployment status JSON
--  Version tracking per script
+- Manual update script (`update-all.sh`)
+- Health check script (`check-status.sh`)
+- Deployment status JSON
+- Version tracking for scripts
 
-##  **Utilizzo**
+## **Usage**
 
-### **Deploy Iniziale**
+### **Initial Deployment**
 ```bash
 sudo ./smart-deploy-hybrid.sh
 ```
 
-### **Verifica Status**
+### **Check Status**
 ```bash
 /var/cache/checkmk-scripts/check-status.sh
 ```
 
-### **Aggiornamento Manuale**
+### **Manual Update**
 ```bash
 /var/cache/checkmk-scripts/update-all.sh
 ```
@@ -101,18 +101,18 @@ sudo ./smart-deploy-hybrid.sh
 DEBUG=true ./smart-deploy-hybrid.sh
 ```
 
-##  **Output Esempio**
+## **Example Output**
 
 ```
- CheckMK Smart Deploy - Sistema Ibrido
+ CheckMK Smart Deploy - Hybrid System
   Environment: Agent Client
  Cache: /var/cache/checkmk-scripts
 
  Deploying scripts...
  Processing check_cockpit_sessions (type: local)...
- Cache iniziale per check_cockpit_sessions creata
- Creando wrapper smart per check_cockpit_sessions (local)...
- Wrapper check_cockpit_sessions creato in /usr/lib/check_mk_agent/local
+ Initial cache for check_cockpit_sessions created
+ Creating smart wrappers for check_cockpit_sessions (local)...
+ Check_cockpit_sessions wrapper created in /usr/lib/check_mk_agent/local
 
  Checking local plugins in /usr/lib/check_mk_agent/local...
  local: 5 total, 5 working, 0 errors
@@ -122,14 +122,14 @@ DEBUG=true ./smart-deploy-hybrid.sh
  Run '/var/cache/checkmk-scripts/update-all.sh' to manually update all scripts
 ```
 
-##  **Innovazioni dal Repository CheckMK**
+## **Innovations from the CheckMK Repository**
 
 ### **1. Plugin Detection Logic**
 ```bash
-# CheckMK usa questo pattern per rilevare plugin Python
+# CheckMK uses this pattern to detect Python plugins
 get_plugin_interpreter() {
     if [ "${extension}" != "py" ]; then
-        return 0  # Execute as shell script
+        return 0 # Execute as shell script
     fi
     
     if [ -n "${PYTHON3}" ]; then
@@ -140,40 +140,40 @@ get_plugin_interpreter() {
 
 ### **2. Section Output Format**
 ```bash
-# Format standard per output CheckMK
-echo "<<<section_name:sep(0)>>>"  # JSON data
-echo "<<<section_name>>>"         # Key-value data
+# Standard format for CheckMK output
+echo "<<<section_name:sep(0)>>>" # JSON data
+echo "<<<section_name>>>" # Key-value data
 ```
 
 ### **3. Version Management**
 ```bash
-# Pattern versioning automatico
+# Automatic pattern versioning
 script_version=$(grep -e '^__version__' -e '^CMK_VERSION' "${script}")
 ```
 
 ### **4. Error Reporting Standard**
 ```bash
-# Report errori in sezione check_mk
+# Error report in check_mk section
 echo "<<<check_mk>>>"
 echo "FailedPythonPlugins: $plugin_name"
 ```
 
-##  **Vantaggi del Sistema Migliorato**
+## **Advantages of the Improved System**
 
-1. ** Monitoring Integrato**: Status check automatico come CheckMK ufficiale
-2. ** Maintenance Tools**: Script di utilità per gestione quotidiana
-3. ** Error Handling**: Report errori in formato CheckMK standard
-4. ** Performance**: Timeout e validazione per evitare hang
-5. ** Tracking**: Version e deployment tracking completo
-6. ** Auto-Healing**: Fallback automatico su cache locale
-7. ** Debug Support**: Logging dettagliato configurabile
+1. **Integrated Monitoring**: Automatic status check like official CheckMK
+2. ** Maintenance Tools**: Utility scripts for daily management
+3. ** Error Handling**: Error reports in standard CheckMK format
+4. ** Performance**: Timeout and validation to avoid hangs
+5. **Tracking**: Full version and deployment tracking
+6. **Auto-Healing**: Automatic fallback to local cache
+7. ** Debug Support**: Configurable verbose logging
 
-##  **Conclusione**
+## **Conclusion**
 
-Il sistema ora segue **fedelmente i pattern dell'architettura CheckMK ufficiale**, garantendo:
--  Compatibilità totale con l'ecosistema CheckMK
--  Robustezza enterprise-grade
--  Facilità di manutenzione e debug
--  Scalabilità per ambienti complessi
+The system now **faithfully follows the patterns of the official CheckMK architecture**, guaranteeing:
+- Full compatibility with the CheckMK ecosystem
+- Enterprise-grade robustness
+- Easy maintenance and debugging
+- Scalability for complex environments
 
-**Il tuo sistema ibrido è ora allineato con gli standard professionali di Checkmk GmbH!** 
+**Your hybrid system is now aligned with the professional standards of Checkmk GmbH!**

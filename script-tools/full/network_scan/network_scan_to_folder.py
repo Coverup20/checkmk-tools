@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-"""
-network_scan_to_folder.py - Scansione rete e creazione folder CheckMK
+"""network_scan_to_folder.py - Network scan and CheckMK folder creation
 
-Fase 1: Ping sweep subnet → raccoglie IP attivi
-Fase 2: Reverse DNS per ogni IP → raccoglie nomi host
-Fase 3: Crea folder WATO con tutti gli host trovati (ping-only, IP hardcoded)
+Phase 1: Ping sweep subnet → collects active IPs
+Step 2: Reverse DNS for each IP → collect hostnames
+Step 3: Create WATO folder with all hosts found (ping-only, hardcoded IP)
 
 Usage:
   python3 network_scan_to_folder.py --subnet 192.168.32.0/23 --dry-run
-  python3 network_scan_to_folder.py --subnet 192.168.32.0/23 --folder scansione
-  python3 network_scan_to_folder.py --subnet 192.168.32.0/23 --subnet 10.0.0.0/24 --folder scansione
+  python3 network_scan_to_folder.py --subnet 192.168.32.0/23 --folder scan
+  python3 network_scan_to_folder.py --subnet 192.168.32.0/23 --subnet 10.0.0.0/24 --folder scan
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import argparse
 import ipaddress
@@ -39,10 +37,9 @@ def ping(ip: str) -> bool:
 
 
 def reverse_dns(ip: str) -> Optional[str]:
-    """Reverse DNS via resolvectl (usa systemd-resolved, funziona con AD).
+    """Reverse DNS via resolvectl (use systemd-resolved, works with AD).
     
-    Formato output resolvectl: "IP: HOSTNAME.domain  -- link: iface"
-    """
+    resolvectl output format: "IP: HOSTNAME.domain -- link: iface""""
     try:
         r = subprocess.run(
             ["resolvectl", "query", ip],
@@ -61,7 +58,7 @@ def reverse_dns(ip: str) -> Optional[str]:
 
 
 def scan_subnet(subnet: str, max_workers: int = 50) -> list:
-    """Ping sweep parallelo. Ritorna lista IP attivi."""
+    """Parallel ping sweep. Returns active IP list."""
     network = ipaddress.ip_network(subnet, strict=False)
     host_list = list(network.hosts())
     print(f"  Scansione {subnet}: {len(host_list)} IP...")
@@ -83,7 +80,7 @@ def scan_subnet(subnet: str, max_workers: int = 50) -> list:
 
 
 def resolve_all(live_ips: list) -> list:
-    """Per ogni IP attivo risolve hostname, torna lista di dict."""
+    """For each active IP resolves hostname, returns list of dicts."""
     results = []
     seen_names = {}  # name → count, per deduplicazione
 
@@ -91,7 +88,7 @@ def resolve_all(live_ips: list) -> list:
         hostname = reverse_dns(ip)
 
         if hostname:
-            # Deduplicazione: se nome già visto, aggiungi suffisso
+            # Deduplication: if name already seen, add suffix
             if hostname in seen_names:
                 seen_names[hostname] += 1
                 cmk_name = f"{hostname}-{seen_names[hostname]}"
@@ -100,7 +97,7 @@ def resolve_all(live_ips: list) -> list:
                 cmk_name = hostname
             src = "DNS"
         else:
-            # Nessun DNS → usa IP come nome (es: 192_168_32_105)
+            # No DNS → use IP as name (e.g. 192_168_32_105)
             cmk_name = "IP-" + ip.replace(".", "_")
             src = "IP "
 
@@ -115,23 +112,23 @@ def resolve_all(live_ips: list) -> list:
 # ---------------------------------------------------------------------------
 
 def sanitize(name: str) -> str:
-    """Caratteri validi per hostname CheckMK."""
+    """Valid characters for CheckMK hostname."""
     return re.sub(r'[^a-zA-Z0-9._-]', '-', name)
 
 
 def get_site_name() -> str:
-    """Rileva il nome del sito OMD dal WATO_BASE."""
+    """Get the OMD site name from the WATO_BASE."""
     m = re.match(r'/omd/sites/([^/]+)/', WATO_BASE)
     return m.group(1) if m else "monitoring"
 
 
 def create_wato_folder(folder_name: str, hosts: list, subnets: list, dry_run: bool = False):
-    """Crea directory + .wato + hosts.mk in formato CheckMK 2.x."""
+    """Create directory + .wato + hosts.mk in CheckMK 2.x format."""
     folder_path = os.path.join(WATO_BASE, folder_name)
     wato_file  = os.path.join(folder_path, ".wato")
     hosts_file = os.path.join(folder_path, "hosts.mk")
 
-    # Controlla se folder esiste già
+    # Check if folder already exists
     if os.path.exists(hosts_file) and not dry_run:
         backup = f"{hosts_file}.backup_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
         try:
@@ -139,7 +136,7 @@ def create_wato_folder(folder_name: str, hosts: list, subnets: list, dry_run: bo
             print(f"  Backup hosts.mk esistente → {backup}")
         except Exception:
             pass
-        # Pulisce backup vecchi: mantieni solo gli ultimi 3
+        # Cleans old backups: keep only the last 3
         try:
             import glob
             old_backups = sorted(glob.glob(f"{hosts_file}.backup_*"))
@@ -221,7 +218,7 @@ def create_wato_folder(folder_name: str, hosts: list, subnets: list, dry_run: bo
     with open(hosts_file, "w") as f:
         f.write(hosts_mk)
 
-    # Fix ownership: CheckMK deve girare come utente OMD, non root
+    # Fix ownership: CheckMK must run as OMD user, not root
     site = get_site_name()
     try:
         import pwd
@@ -271,7 +268,7 @@ def apply_checkmk(dry_run: bool = False):
 # ---------------------------------------------------------------------------
 
 def _prompt_subnet() -> list:
-    """Chiede le subnet interattivamente fino a riga vuota."""
+    """Queries subnets interactively until the line is empty."""
     print("Inserisci le subnet da scansionare (una per riga, INVIO vuoto per terminare):")
     subnets = []
     while True:
@@ -292,12 +289,12 @@ def _prompt_subnet() -> list:
 
 
 def _prompt_folder() -> str:
-    """Chiede il nome della folder WATO interattivamente."""
+    """Asks for the WATO folder name interactively."""
     while True:
         val = input("Nome folder WATO [scansione]: ").strip()
         if not val:
             return "scansione"
-        # Solo caratteri sicuri per nome directory
+        # Only safe characters for directory name
         if re.match(r'^[\w\-]+$', val):
             return val
         print("  Usa solo lettere, numeri, underscore e trattino.")
@@ -307,20 +304,18 @@ def main():
     parser = argparse.ArgumentParser(
         description=f"Network scan → CheckMK folder v{VERSION}",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Esempi:
-  # Modalità interattiva (chiede subnet e folder)
+        epilog="""Examples:
+  # Interactive mode (requires subnet and folder)
   python3 network_scan_to_folder.py
 
-  # Preview senza scrivere
+  # Preview without writing
   python3 network_scan_to_folder.py --subnet 192.168.32.0/23 --dry-run
 
-  # Crea folder "scansione" (default)
+  # Create "scan" folder (default)
   python3 network_scan_to_folder.py --subnet 192.168.32.0/23
 
-  # Più subnet, nome folder custom
-  python3 network_scan_to_folder.py --subnet 192.168.32.0/24 --subnet 192.168.33.0/24 --folder scansione_lab
-""")
+  # Multiple subnets, custom folder name
+  python3 network_scan_to_folder.py --subnet 192.168.32.0/24 --subnet 192.168.33.0/24 --folder scan_lab""")
     parser.add_argument("--subnet", action="append", default=None,
                         metavar="CIDR",
                         help="Subnet da scansionare (ripetibile: --subnet A --subnet B)")
@@ -335,7 +330,7 @@ Esempi:
     print(f"Network Scan → CheckMK Folder v{VERSION}")
     print("=" * 60)
 
-    # Input interattivo se non passato da CLI
+    # Interactive input if not passed by CLI
     if not args.subnet:
         args.subnet = _prompt_subnet()
     if args.folder is None:
@@ -346,7 +341,7 @@ Esempi:
     print(f"Dry-run: {args.dry_run}")
     print("=" * 60)
 
-    # Fase 1: Ping sweep su tutte le subnet
+    # Phase 1: Ping sweep across all subnets
     print("\n[Fase 1] Ping sweep...")
     all_live = []
     for subnet in args.subnet:

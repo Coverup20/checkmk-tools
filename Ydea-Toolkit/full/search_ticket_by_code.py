@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""
-search_ticket_by_code.py - Cerca ticket Ydea per codice
+"""search_ticket_by_code.py - Search Ydea tickets by code
 
-Cerca ticket Ydea utilizzando il codice ticket (es: TK26/000123).
+Search for Ydea tickets using the ticket code (e.g. TK26/000123).
 
 Usage:
     search_ticket_by_code.py <ticket_code>
@@ -10,8 +9,7 @@ Usage:
 Example:
     search_ticket_by_code.py TK26/000123
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import json

@@ -1,5 +1,5 @@
 #!/bin/bash
-# test-contract-variants.sh - Testa varianti campo contratto per SLA
+# test-contract-variants.sh - Test contract field variants for SLA
 
 set -euo pipefail
 
@@ -17,14 +17,14 @@ echo ""
 
 ensure_token
 
-# Contratto di test (configurato su UI con SLA Premium_Mon)
+# Test contract (configured on UI with Premium_Mon SLA)
 CONTRACT_ID=180437
 
 echo "Contratto test: ID=$CONTRACT_ID"
 echo "Anagrafica: ID=$ANAGRAFICA_ID"
 echo ""
 
-# Array di varianti da testare
+# Array of variants to test
 declare -a variants=(
   "contratto_id"
   "contratto"
@@ -64,14 +64,14 @@ for field in "${variants[@]}"; do
   TICKET_CODE=$(echo "$RESPONSE" | jq -r '.codice // .code // .data.codice // empty' 2>/dev/null || echo "")
   
   if [[ -n "$TICKET_ID" && "$TICKET_ID" != "null" && "$TICKET_ID" != "error" ]]; then
-    echo " Ticket creato: $TICKET_CODE (ID: $TICKET_ID)"
+    echo "Ticket created: $TICKET_CODE (ID: $TICKET_ID)"
     
-    # Aspetta e verifica SLA
+    # Wait and check SLA
     sleep 2
     
-    echo " Verifica SLA su UI: https://my.ydea.cloud/ticket/${TICKET_ID}"
+    echo "Check SLA on UI: https://my.ydea.cloud/ticket/${TICKET_ID}"
     
-    # Prova a recuperare via API (sappiamo che non espone SLA ma proviamo)
+    # Try to recover via API (we know it doesn't expose SLA but let's try)
     DETAIL=$(ydea_api GET "/tickets?id=${TICKET_ID}&limit=1" 2>/dev/null | jq '.objs[0] // {}' 2>/dev/null || echo '{}')
     
     # Cerca qualsiasi riferimento a SLA o contratto
@@ -79,21 +79,21 @@ for field in "${variants[@]}"; do
     HAS_CONTRACT=$(echo "$DETAIL" | jq 'has("contratto") or has("contratto_id") or has("contrattoId")' 2>/dev/null || echo "false")
     
     if [[ "$HAS_SLA" == "true" ]]; then
-      echo "    Campo SLA presente via API!"
+      echo "SLA field present via API!"
       echo "$DETAIL" | jq '{sla, sla_id, sla_nome}' 2>/dev/null
     else
-      echo "    Campo SLA NON presente via API (normale)"
+      echo "SLA field NOT present via API (normal)"
     fi
     
     if [[ "$HAS_CONTRACT" == "true" ]]; then
-      echo "    Campo contratto presente via API!"
+      echo "Contract field present via API!"
       echo "$DETAIL" | jq '{contratto, contratto_id, contrattoId}' 2>/dev/null
     else
-      echo "    Campo contratto NON presente via API"
+      echo "Contract field NOT present via API"
     fi
     
   else
-    echo " Creazione fallita"
+    echo "Creation failed"
     echo ""
     echo "Response:"
     echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
@@ -104,11 +104,11 @@ for field in "${variants[@]}"; do
 done
 
 echo "════════════════════════════════════════════════════════════════════"
-echo " Test completato!"
+echo "Test completed!"
 echo ""
-echo " VERIFICA MANUALMENTE su UI YDEA:"
-echo "   Controlla i ticket creati e vedi quale ha SLA 'Premium_Mon'"
-echo "   invece di 'Standard'"
+echo "CHECK MANUALLY on YDEA UI:"
+echo "Check the created tickets and see which one has 'Premium_Mon' SLA"
+echo "instead of 'Standard'"
 echo ""
 echo " https://my.ydea.cloud"
 echo "════════════════════════════════════════════════════════════════════"

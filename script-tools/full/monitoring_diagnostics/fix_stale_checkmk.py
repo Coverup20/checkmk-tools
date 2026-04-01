@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
-"""
-fix_stale_checkmk.py - Risolve servizi Check_MK* stale
+"""fix_stale_checkmk.py - Fixes Check_MK* stale services
 
-MECCANISMO:
-  1. Abilita passive_checks sul servizio Check_MK* (ENABLE_PASSIVE_SVC_CHECKS)
-     → NON tocca active_checks_enabled (rimane 0)
-  2. Inietta risultato passivo OK via PROCESS_SERVICE_CHECK_RESULT
-     → aggiorna last_check senza attivare schedulazione automatica
-  3. Esegue cmk --check <host> per aggiornare i sotto-servizi (CPU, Disk, etc.)
+MECHANISM:
+  1. Enable passive_checks on the Check_MK* service (ENABLE_PASSIVE_SVC_CHECKS)
+     → DO NOT touch active_checks_enabled (remains 0)
+  2. Inject passive result OK via PROCESS_SERVICE_CHECK_RESULT
+     → update last_check without activating automatic scheduling
+  3. Run cmk --check <host> to update the sub-services (CPU, Disk, etc.)
 
-USO:
-  python3 fix_stale_checkmk.py             # modalita campione (3 host)
-  python3 fix_stale_checkmk.py --all       # tutti gli host stale
+USE:
+  python3 fix_stale_checkmk.py # sample mode (3 hosts)
+  python3 fix_stale_checkmk.py --all # all stale hosts
   python3 fix_stale_checkmk.py --host DC01 fw.studiopaci.info ns8
 
-Version: 1.4.0
-"""
+Version: 1.4.0"""
 import subprocess, json, time, sys, os
 
 now = int(time.time())
@@ -23,7 +21,7 @@ SAMPLE_SIZE = 3
 CMD_PIPE = "/omd/sites/monitoring/tmp/run/nagios.cmd"
 CMK_BIN = "/omd/sites/monitoring/bin/cmk"
 
-# Servizi Check_MK* da trattare
+# Check_MK* services to be processed
 CMK_SERVICES = ["Check_MK", "Check_MK Discovery", "Check_MK Agent", "Check_MK HW/SW Inventory"]
 
 
@@ -42,7 +40,7 @@ def lq(query):
 
 
 def send_pipe_cmds(commands):
-    """Invia comandi al pipe Nagios direttamente (scrittura per-comando)."""
+    """Send commands to the Nagios pipe directly (per-command writing)."""
     ts = int(time.time())
     count = 0
     for cmd in commands:
@@ -57,7 +55,7 @@ def send_pipe_cmds(commands):
 
 
 def cmk_check(host):
-    """Esegue cmk --check <host> one-shot per aggiornare i sotto-servizi."""
+    """Run cmk --check <host> one-shot to update subservices."""
     if os.geteuid() == 0:
         # Root: deve girare come site user "monitoring"
         cmd = ['su', '-', 'monitoring', '-s', '/bin/bash', '-c', f'{CMK_BIN} --check {host}']
@@ -83,7 +81,7 @@ print("Metodo: ENABLE_PASSIVE + PROCESS_SERVICE_CHECK_RESULT + cmk --check")
 print(f"Modalita: {mode.upper()} | active_checks_enabled NON modificato")
 print("=" * 62)
 
-# --- Trova servizi Check_MK* stale ---
+# --- Find Check_MK* services stale ---
 stale_svcs = lq(
     "GET services\n"
     f"Filter: last_check < {now - 60}\n"
@@ -99,7 +97,7 @@ by_type = Counter(r[1] for r in stale_svcs)
 for t, c in sorted(by_type.items()):
     print(f"  {c:3d}x  {t}")
 
-# --- Seleziona host da processare ---
+# --- Select host to process ---
 if mode == "explicit":
     hosts_to_check = explicit_hosts
 elif mode == "all":
@@ -118,22 +116,22 @@ if not hosts_to_check:
 if mode == "sample" and len(stale_hosts) > SAMPLE_SIZE:
     print(f"\n  (Usa --all per processare tutti i {len(stale_hosts)} host stale)")
 
-# --- Step 1: abilita passive checks + inietta risultato OK ---
+# --- Step 1: enable passive checks + inject result OK ---
 print(f"\n[Step 1] Abilita passive checks + inject risultato OK su Check_MK*")
 cmds_step1 = []
 for r in stale_svcs:
     host, svc, state, last_chk, output = r
     if host not in hosts_to_check:
         continue
-    # Abilita passive checks su questo servizio (NON tocca active_checks_enabled)
+    # Enable passive checks on this service (DO NOT touch active_checks_enabled)
     cmds_step1.append(f"ENABLE_PASSIVE_SVC_CHECKS;{host};{svc}")
-    # Inietta risultato passivo con stato originale e output originale (o default)
+    # Inject passive result with original state and original (or default) output
     out = output.replace(';', ',').replace('\n', ' ').strip() if output else "OK - stale reset"
     cmds_step1.append(f"PROCESS_SERVICE_CHECK_RESULT;{host};{svc};{state};{out}")
 
 send_pipe_cmds(cmds_step1)
 
-# --- Step 2: cmk --check per aggiornare sotto-servizi ---
+# --- Step 2: cmk --check to update sub-services ---
 import time as tm
 tm.sleep(2)
 print(f"\n[Step 2] cmk --check per aggiornare sotto-servizi (CPU, Disk, Interface...)")
@@ -149,7 +147,7 @@ for host in hosts_to_check:
     except Exception as e:
         print(f"ERRORE: {e}")
 
-# --- Verifica ---
+# --- Verify ---
 tm.sleep(5)
 print(f"\n[Verifica post-fix]")
 now2 = int(tm.time())

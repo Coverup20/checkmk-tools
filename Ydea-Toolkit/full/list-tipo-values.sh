@@ -1,5 +1,5 @@
 #!/bin/bash
-# list-tipo-values.sh - Lista tutti i valori del campo 'tipo'
+# list-tipo-values.sh - List all values ​​of the 'type' field
 
 set -eo pipefail
 
@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/ydea-toolkit.sh"
 
 PAGES="${1:-30}"
 
-echo " Raccolta valori del campo 'tipo' da $PAGES pagine..."
+echo "Collecting 'type' field values ​​from $PAGES pages..."
 echo ""
 
 ensure_token
@@ -25,19 +25,19 @@ for PAGE in $(seq 1 $PAGES); do
     "${YDEA_BASE_URL}/tickets?limit=100&page=${PAGE}")
   
   if ! echo "$RESPONSE" | jq -e '.objs' >/dev/null 2>&1; then
-    echo " Errore"
+    echo "Mistake"
     break
   fi
   
   COUNT=$(echo "$RESPONSE" | jq -r '.objs | length')
   if [[ "$COUNT" -eq 0 ]]; then
-    echo "Fine"
+    echo "End"
     break
   fi
   
   echo "$COUNT ticket"
   
-  # Estrai tutti i valori 'tipo'
+  # Extract all 'type' values
   while IFS= read -r tipo; do
     [[ -z "$tipo" || "$tipo" == "null" ]] && continue
     TIPO_MAP["$tipo"]=1
@@ -46,7 +46,7 @@ done
 
 echo ""
 echo "════════════════════════════════════════════════════════════════════"
-echo "TUTTI I VALORI DEL CAMPO 'tipo' ($(printf '%s\n' "${!TIPO_MAP[@]}" | wc -l) valori unici)"
+echo "ALL VALUES OF THE 'type' FIELD ($(printf '%s\n'"${!TIPO_MAP[@]}" | wc -l) valori unici)"
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
 
@@ -56,13 +56,13 @@ done
 
 echo ""
 echo "════════════════════════════════════════════════════════════════════"
-echo "MAPPING CON LE SOTTOCATEGORIE RICHIESTE"
+echo "MAPPING WITH THE REQUIRED SUBCATEGORIES"
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
 echo "Sottocategorie richieste → Valori 'tipo' trovati:"
 echo ""
 
-# Array di sottocategorie richieste
+# Array of required subcategories
 declare -a REQUIRED=(
   "Centrale telefonica NethVoice"
   "Firewall UTM NethSecurity"
@@ -80,7 +80,7 @@ for required in "${REQUIRED[@]}"; do
   
   # Cerca tra i tipi trovati
   while IFS= read -r tipo; do
-    # Match case-insensitive con parole chiave
+    # Case-insensitive match with keywords
     keyword=$(echo "$required" | sed 's/ .*//' | tr '[:upper:]' '[:lower:]')
     if echo "$tipo" | tr '[:upper:]' '[:lower:]' | grep -q "$keyword"; then
       found="$tipo"
@@ -93,17 +93,17 @@ for required in "${REQUIRED[@]}"; do
     echo "     → '$found'"
   else
     echo "   $required"
-    echo "     → NON TROVATO"
+    echo "→ NOT FOUND"
   fi
   echo ""
 done
 
 echo "════════════════════════════════════════════════════════════════════"
-echo "RICERCA PRIORITA' (priorita_id)"
+echo "PRIORITY SEARCH (priorita_id)"
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
 
-# Raccogli anche priorità
+# Also collect priorities
 declare -A PRIO_MAP
 
 for PAGE in $(seq 1 5); do
@@ -118,7 +118,7 @@ for PAGE in $(seq 1 5); do
   done < <(echo "$RESPONSE" | jq -r '.objs[] | "\(.priorita_id // "")|\(.priorita // "")"')
 done
 
-echo "Mapping Priorità (ID → Nome):"
+echo "Priority Mapping (ID → Name):"
 for pid in $(printf '%s\n' "${!PRIO_MAP[@]}" | sort -n); do
   echo "  $pid → ${PRIO_MAP[$pid]}"
 done

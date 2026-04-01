@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-ydea_ag - Ydea Ticketing Integration with Smart Detection
+"""ydea_ag - Ydea Ticketing Integration with Smart Detection
 Bulk: no
 
 CheckMK notification script - integrates with Ydea ticketing system.
 Features: smart detection, flapping protection, host aggregation, cache management.
 
-Version: 1.0.3
-"""
+Version: 1.0.3"""
 
 import os
 import sys
@@ -441,14 +439,12 @@ def set_cache_field(key: str, field: str, value: Any) -> bool:
 
 
 def check_effettuato_grace(key: str) -> Optional[bool]:
-    """
-    Controlla se il ticket e' nella finestra grace 24h post-Effettuato.
+    """Check if the ticket is in the 24h post-Accomplished grace window.
     Returns:
-      None  -> ticket attivo (non in stato Effettuato, o gia' riaperto)
-      True  -> in finestra grace (< 24h da effettuato_at)
-      False -> fuori finestra grace (>= 24h)
-    """
-    # Se il ticket e' stato riaperto da un CRITICAL, trattalo come attivo
+      None -> active ticket (not in Fulfilled status, or already reopened)
+      True -> in grace window (< 24h from performed_at)
+      False -> out of grace window (>= 24h)"""
+    # If the ticket was reopened by a CRITICAL, treat it as active
     if get_cache_field(key, 'reopen_at') is not None:
         debug(f"Ticket {key}: reopen_at set -> attivo")
         return None
@@ -468,10 +464,8 @@ RESOLVED_STATES = {'effettuato', 'chiuso', 'completato', 'risolto'}
 
 
 def fetch_ticket_stato(ticket_id: int) -> Optional[str]:
-    """
-    Interroga Ydea per lo stato attuale del ticket.
-    Ritorna il valore di 'stato' (es. 'Effettuato') o None in caso di errore/404.
-    """
+    """Query Ydea for the current status of the ticket.
+    Returns the 'status' value (e.g. 'Successful') or None in case of error/404."""
     exitcode, stdout, stderr = toolkit_cmd(['get', str(ticket_id)], timeout=15)
     if exitcode != 0:
         output_lower = (stdout + stderr).lower()
@@ -681,8 +675,8 @@ def generate_smart_description(alert_type: str, hostname: str, ip: str,
     return f"""{title_line}
 
 Host: {hostname} ({ip})
-Servizio: {service}
-Stato: {state}
+Service: {service}
+State: {state}
 {output_block}
 
 [CMK HOST={hostname} IP={ip}]"""
@@ -726,12 +720,12 @@ def main():
     ticket_id = get_ticket_id(ticket_key)
 
     # === GRACE WINDOW: post-Effettuato 24h ===
-    # Quando un ticket e' in stato Effettuato, per le 24h successive:
+    # When a ticket is in the Fulfilled status, for the following 24 hours:
     #   - WARNING  -> scartato silenziosamente (nessun commento)
-    #   - CRITICAL -> riapertura con commento privato
+    # - CRITICAL -> reopening with private comment
     if ticket_id and state not in ["OK", "UP"]:
-        # Se effettuato_at non e' ancora in cache, interroga Ydea per rilevare
-        # se l'operatore ha chiuso il ticket manualmente (senza OK da CheckMK)
+        # If carried_at is not yet in cache, query Ydea to detect
+        # if the operator closed the ticket manually (without OK from CheckMK)
         if get_cache_field(ticket_key, 'effettuato_at') is None and \
                 get_cache_field(ticket_key, 'reopen_at') is None:
             ydea_stato = fetch_ticket_stato(ticket_id)
@@ -742,7 +736,7 @@ def main():
                 set_cache_field(ticket_key, 'reopen_at', None)
         grace = check_effettuato_grace(ticket_key)
         if grace is False:
-            # Fuori 24h - ticket scaduto, rimuovi da cache
+            # Out of 24 hours - ticket expired, remove from cache
             log(f"Ticket #{ticket_id} fuori finestra grace 24h (Effettuato) - rimozione cache")
             remove_ticket_from_cache(ticket_key)
             ticket_id = None

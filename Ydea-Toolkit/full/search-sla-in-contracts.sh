@@ -1,18 +1,18 @@
 #!/bin/bash
-# search-sla-in-contracts.sh - Cerca SLA Premium_Mon nei contratti
+# search-sla-in-contracts.sh - Search SLA Premium_Mon in contracts
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/ydea-toolkit.sh"
 
-echo " Ricerca 'Premium_Mon' nei contratti..."
+echo "Search for 'Premium_Mon' in contracts..."
 echo ""
 
 ensure_token
 TOKEN="$(load_token)"
 
-# Recupera tutti i contratti (paginati)
+# Retrieve all contracts (paged)
 echo " Recupero contratti..."
 ALL_CONTRACTS="/tmp/all-contracts.json"
 echo "[]" > "$ALL_CONTRACTS"
@@ -26,14 +26,14 @@ for PAGE in $(seq 1 10); do
     "${YDEA_BASE_URL}/contratti?limit=100&page=${PAGE}")
   
   if ! echo "$RESPONSE" | jq -e '.objs' >/dev/null 2>&1; then
-    echo "Fine"
+    echo "End"
     break
   fi
   
   COUNT=$(echo "$RESPONSE" | jq -r '.objs | length')
   
   if [[ "$COUNT" -eq 0 ]]; then
-    echo "Fine"
+    echo "End"
     break
   fi
   
@@ -42,7 +42,7 @@ for PAGE in $(seq 1 10); do
   echo "$RESPONSE" | jq '.objs' >> "$ALL_CONTRACTS.tmp"
 done
 
-# Combina tutti i risultati
+# Combine all results
 jq -s 'add' "$ALL_CONTRACTS.tmp" 2>/dev/null > "$ALL_CONTRACTS" || echo "[]" > "$ALL_CONTRACTS"
 rm -f "$ALL_CONTRACTS.tmp"
 
@@ -66,16 +66,16 @@ if [[ "$MATCHING_COUNT" -gt 0 ]]; then
     echo ""
     echo "$MATCHING" | jq '.[]'
 else
-    echo "   Nessun contratto trovato con 'Premium' o 'Mon'"
+    echo "No contracts found with 'Premium' or 'Mon'"
 fi
 
 echo ""
 echo "════════════════════════════════════════════════════════════════════"
-echo "DETTAGLIO DI UN CONTRATTO (per vedere struttura completa)"
+echo "DETAIL OF A CONTRACT (to see the complete structure)"
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
 
-# Prendi il primo contratto e fai GET dettagliato
+# Take the first contract and do detailed GET
 FIRST_ID=$(jq -r '.[0].id' "$ALL_CONTRACTS")
 
 if [[ -n "$FIRST_ID" && "$FIRST_ID" != "null" ]]; then
@@ -90,11 +90,11 @@ if [[ -n "$FIRST_ID" && "$FIRST_ID" != "null" ]]; then
     echo "$DETAIL" | jq '.'
     
     echo ""
-    echo "Tutte le chiavi disponibili in un contratto:"
+    echo "All keys available in a contract:"
     echo "$DETAIL" | jq 'keys[]' | sort
 fi
 
 echo ""
-echo " File salvato: $ALL_CONTRACTS"
+echo "Saved file: $ALL_CONTRACTS"
 echo ""
-echo " Ricerca completata!"
+echo "Search completed!"

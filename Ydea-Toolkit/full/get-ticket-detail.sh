@@ -8,4 +8,4 @@ TOKEN=$(load_token)
 echo ""
 echo "=== GET /ticket/${TICKET_ID} ==="curl -s "https://my.ydea.cloud/app_api_v2/ticket/${TICKET_ID}" \  -H "Authorization: Bearer $TOKEN" \  -H "Accept: application/json" | jq '.'
 echo ""
-echo "=== Cerco campi con 'sla' nel nome ==="curl -s "https://my.ydea.cloud/app_api_v2/ticket/${TICKET_ID}" \  -H "Authorization: Bearer $TOKEN" \  -H "Accept: application/json" | jq 'to_entries | .[] | select(.key | test("sla|SLA|Sla"))'
+echo "=== I'm looking for fields with 'sla' in the name ==="curl -s "https://my.ydea.cloud/app_api_v2/ticket/${TICKET_ID}" \  -H "Authorization: Bearer $TOKEN" \  -H "Accept: application/json" | jq 'to_entries | .[] | select(.key | test("sla|SLA|Sla"))'

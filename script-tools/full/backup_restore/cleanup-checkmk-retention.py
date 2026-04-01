@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-cleanup-checkmk-retention.py
+"""cleanup-checkmk-retention.py
 
 Python entrypoint that delegates to cleanup-checkmk-retention.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

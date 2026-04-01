@@ -1,27 +1,25 @@
 #!/usr/bin/env python3
-"""
-checkmk_compress.py - Compress Native CheckMK Backups
+"""checkmk_compress.py - Compress Native CheckMK Backups
 
-Ottimizza i backup nativi di CheckMK rimuovendo file pesanti (RRD, tmp, ecc.)
-e ricomprimendo l'archivio. Esegue anche l'upload su Rclone.
+Optimize CheckMK native backups by removing heavy files (RRD, tmp, etc.)
+and recompressing the archive. It also uploads to Rclone.
 
 Features:
-- Rileva automaticamente backup completati
-- Rimozione selettiva path (rrd, inventory, git) per risparmio spazio
-- Compressione GZIP
+- Automatically detect completed backups
+- Selective removal of paths (rrd, inventory, git) to save space
+- GZIP compression
 - Upload Rclone
-- Sostituzione in-place (opzionale)
+- In-place replacement (optional)
 
 Usage:
     checkmk_compress.py [site_name] [options]
 
 Options:
-    --backup-dir DIR  Directory backup (default: /var/backups/checkmk)
-    --rclone-remote   Remote rclone (default: do:testmonbck)
-    --keep-original   Non sovrascrivere l'originale
+    --backup-dir DIR Backup directory (default: /var/backups/checkmk)
+    --rclone-remote Remote rclone (default: do:testmonbck)
+    --keep-original Do not overwrite the original
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -33,7 +31,7 @@ import time
 from pathlib import Path
 from datetime import datetime
 
-# --- Configurazione ---
+# --- Configuration ---
 DEFAULT_BACKUP_DIR = "/var/backups/checkmk"
 DEFAULT_RCLONE_REMOTE = "do:testmonbck"
 
@@ -73,9 +71,9 @@ class Compressor:
 
     def find_backup(self):
         Console.log("Cerco backup 'complete'...")
-        # Cerca backup directory che finisce con -complete
+        # Look for backup directories that end in -complete
         candidates = list(self.backup_dir.glob("*-complete"))
-        # Se non trova, cerca quelli con timestamp
+        # If it doesn't find it, look for those with timestamps
         if not candidates:
             candidates = list(self.backup_dir.glob("Check_MK-*-complete-*"))
         
@@ -83,7 +81,7 @@ class Compressor:
             Console.log("Nessun backup trovato.")
             return None
             
-        # Prendi il più recente
+        # Get the latest one
         candidates.sort(key=lambda x: x.stat().st_mtime, reverse=True)
         return candidates[0]
 
@@ -119,7 +117,7 @@ class Compressor:
         
         # Remove heavy items
         Console.log("Rimozione file pesanti...")
-        # Usa system tar --delete perché python tarfile non supporta delete efficiente
+        # Use system tar --delete because python tarfile does not support efficient delete
         # The paths in tar are relative to site root, usually "monitoring/..." if site is monitoring
         # We need to construct arguments correctly
         

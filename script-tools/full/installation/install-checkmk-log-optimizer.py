@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-install-checkmk-log-optimizer.py
+"""install-checkmk-log-optimizer.py
 
 Python entrypoint that delegates to install-checkmk-log-optimizer.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

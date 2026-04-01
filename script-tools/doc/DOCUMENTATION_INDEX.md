@@ -1,57 +1,57 @@
 # Documentation Index - script-tools/doc
-> **Categoria:** Operativo
+> **Category:** Operational
 
-Ultimo aggiornamento: 2026-02-18
+Last update: 2026-02-18
 
-## Obiettivo
+## Objective
 
-Questa pagina è la mappa rapida per ricordare **cosa fa cosa** senza dover aprire 20 file.
+This page is the quick map to remember **what does what** without having to open 20 files.
 
-## Start Here (ordine consigliato)
+## Start Here (recommended order)
 
 1. `README.md`  
-   Panoramica rapida su come orientarsi nella cartella doc.
+   Quick overview of how to find your way around the doc folder.
 
 2. `CONVERSION-STATUS-SCRIPT-TOOLS.md`  
-   Stato reale conversione Bash → Python in `script-tools/full`.
+   Real state of Bash → Python conversion in `script-tools/full`.
 
-3. README specifici task (`README-*.md`)  
-   Guide operative per deploy/install/upgrade.
+3. Task-specific README (`README-*.md`)  
+   Operational guides for deploy/install/upgrade.
 
-## Documenti operativi principali
+## Main operational documents
 
 - `README-Install-Agent-Interactive.md`  
-  Installazione interattiva agent CheckMK (Linux).
+  Interactive installation of CheckMK agent (Linux).
 
 - `README-Install-Agent-Interactive-Windows.md`  
-  Installazione interattiva agent CheckMK su Windows.
+  Interactive installation of CheckMK agent on Windows.
 
 - `README-Setup-Auto-Upgrade-CheckMK.md`  
-  Setup aggiornamenti/upgrade automatici CheckMK.
+  CheckMK automatic updates/upgrade setup.
 
 - `README-Setup-Auto-Updates.md`  
-  Configurazioni update automatici e scheduling.
+  Automatic update and scheduling configurations.
 
 - `README-Smart-Deploy.md` / `README-Smart-Deploy-Enhanced.md`  
-  Deploy smart degli script e varianti avanzate.
+  Smart script deployment and advanced variants.
 
 - `cleanup-checkmk-retention.md`  
-  Retention e cleanup dati CheckMK.
+  CheckMK data retention and cleanup.
 
 - `DISTRIBUTED-MONITORING-GUIDE.md`  
   Setup distributed monitoring.
 
-## Documenti di supporto tecnico (validi ma specialistici)
+## Technical support documents (valid but specialized)
 
 - `install-checkmk-agent-debtools-frp-nsec8c-rocksolid.md`
 - `ROCKSOLID_INSTALLATION.md`
 - `checkmk-host-labels-config.md`
 - `ENHANCED-NOTIFICATIONS-DEPLOYMENT.md`
-- `INTEGRAZIONE-CHECKMK-YDEA-SUMMARY.md`
+- `INTEGRATION-CHECKMK-YDEA-SUMMARY.md`
 
-## Documenti storici/sessione (consulta solo se serve)
+## Historical documents/session (consult only if necessary)
 
-Questi file sono utili come storico, ma non sono il punto di partenza operativo:
+These files are useful as a history, but are not the operational starting point:
 
 - `CURRENT_STATUS.md`
 - `PROJECT_STATUS.md`
@@ -63,8 +63,8 @@ Questi file sono utili come storico, ma non sono il punto di partenza operativo:
 - `FRPC_SERVICE_STARTUP_FIX.md`
 - `SERVICE_CREATION_FIX.md`
 
-## Regola pratica per non confondersi
+## Practical rule to avoid getting confused
 
-- Prima cerca in `README-*` o nelle guide operative.
-- Se non trovi subito, usa questo indice per capire categoria e priorità.
-- Mantieni i file storici separati mentalmente: utili per contesto, non per runbook corrente.
+- First search in `README-*` or the how-to guides.
+- If you can't find it immediately, use this index to understand category and priority.
+- Keep history files mentally separated: useful for context, not for current runbook.

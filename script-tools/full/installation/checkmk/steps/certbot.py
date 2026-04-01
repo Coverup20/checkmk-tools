@@ -71,11 +71,9 @@ def auto(cfg: InstallerConfig) -> None:
 
 
 def bootstrap_step(cfg: InstallerConfig) -> None:
-    """
-    Called during bootstrap. Always installs certbot package.
+    """Called during bootstrap. Always installs certbot package.
     Then interactively prompts for domain/email if not configured, and obtains cert.
-    User can skip cert issuance and do it later with: ./installer.py certbot run
-    """
+    User can skip cert issuance and do it later with: ./installer.py certbot run"""
     install(cfg)
 
     email = cfg.letsencrypt_email.strip()

@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-"""
-ns8-audit-report-unified.py - Report NS8 Unified (Collector + Viewer)
+"""ns8-audit-report-unified.py - NS8 Unified Report (Collector + Viewer)
 
-Report completo ambiente NethServer 8 con visualizzazione ACL:
-  1) Utenti Active Directory (Samba)  
-  2) Scadenze password utenti AD
-  3) Permessi share di rete (Samba) con ACL dettagliati
-  4) Condivisioni account posta WebTop (se disponibile)
-  5) Visualizzazione formattata permessi ACL share
+Complete NethServer 8 environment report with ACL view:
+  1) Active Directory Users (Samba)  
+  2) AD user password expiration dates
+  3) Network share permissions (Samba) with detailed ACLs
+  4) WebTop mail account shares (if available)
+  5) Formatted display of ACL share permissions
 
 Output: Directory /tmp/ns8-audit-YYYYMMDD-HHMMSS/
 
-Version: 2.4.0
-"""
+Version: 2.4.0"""
 
 import subprocess
 import sys
@@ -95,16 +93,14 @@ def run_command(cmd: List[str], timeout: int = 30) -> Tuple[int, str, str]:
 
 
 def sid_to_name(sid: str, samba_module: str) -> str:
-    """
-    Convert SID to name using wbinfo with caching.
+    """Convert SID to name using wbinfo with caching.
     
     Args:
         sid: SID to convert
         samba_module: Samba module name
         
     Returns:
-        Username or original SID if conversion fails
-    """
+        Username or original SID if conversion fails"""
     # Check cache first
     if sid in SID_CACHE:
         return SID_CACHE[sid]

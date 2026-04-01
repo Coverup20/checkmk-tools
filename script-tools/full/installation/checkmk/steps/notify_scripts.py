@@ -27,7 +27,7 @@ def run_step(cfg: InstallerConfig) -> None:
     dest_dir = Path(f"/omd/sites/{cfg.site_name}/local/share/check_mk/notifications")
 
     if not dest_dir.exists():
-        # Se il sito OMD esiste, creiamo la directory (non è creata automaticamente da omd create)
+        # If the OMD site exists, we create the directory (it is not created automatically by omd create)
         site_dir = Path(f"/omd/sites/{cfg.site_name}")
         if not site_dir.exists():
             log_warn(f"Sito OMD non trovato: {site_dir}. CheckMK non installato? Skip.")

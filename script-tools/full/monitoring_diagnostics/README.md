@@ -1,3 +1,3 @@
 # monitoring_diagnostics
 
-Script per tuning e diagnostica monitoraggio.
+Script for tuning and monitoring diagnostics.

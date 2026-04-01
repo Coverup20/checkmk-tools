@@ -1,33 +1,33 @@
 #!/bin/bash
-# quick-test-ydea-api.sh — Test rapido connessione API Ydea
-# Verifica che le credenziali funzionino prima di eseguire la discovery completa
+# quick-test-ydea-api.sh — Ydea API connection quick test
+# Verify that your credentials work before running full discovery
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 YDEA_TOOLKIT="${SCRIPT_DIR}/ydea-toolkit.sh"
 
-# Carica le funzioni da ydea-toolkit
+# Load functions from ydea-toolkit
 # shellcheck disable=SC1090
 source "$YDEA_TOOLKIT"
 
 echo ""
-echo " Test Connessione Ydea API"
+echo "Ydea API Connection Test"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
 
-# Test 1: Verifica variabili ambiente
-echo " Test 1: Verifica configurazione..."
+# Test 1: Check environment variables
+echo "Test 1: Check configuration..."
 
 if [[ -z "${YDEA_ID:-}" || "${YDEA_ID}" == "ID" ]]; then
-  echo " YDEA_ID non configurato correttamente"
-  echo "   Edita il file .env e imposta YDEA_ID"
+  echo "YDEA_ID not configured correctly"
+  echo "Edit the .env file and set YDEA_ID"
   exit 1
 fi
 
 if [[ -z "${YDEA_API_KEY:-}" || "${YDEA_API_KEY}" == "TOKEN" ]]; then
-  echo " YDEA_API_KEY non configurato correttamente"
-  echo "   Edita il file .env e imposta YDEA_API_KEY"
+  echo "YDEA_API_KEY not configured correctly"
+  echo "Edit the .env file and set YDEA_API_KEY"
   exit 1
 fi
 
@@ -40,12 +40,12 @@ echo ""
 echo " Test 2: Autenticazione..."
 
 if ! ensure_token 2>&1; then
-  echo " Autenticazione fallita"
-  echo "   Verifica che YDEA_ID e YDEA_API_KEY siano corretti"
+  echo "Authentication failed"
+  echo "Verify that YDEA_ID and YDEA_API_KEY are correct"
   exit 1
 fi
 
-echo " Autenticazione riuscita"
+echo "Authentication successful"
 echo ""
 
 # Test 3: Test chiamata API categorie
@@ -57,30 +57,30 @@ exit_code=$?
 set -e  # Riabilita exit on error
 
 if [[ $exit_code -ne 0 ]]; then
-  echo " Errore nella chiamata API categorie (exit code: $exit_code)"
+  echo "Error in category API call (exit code: $exit_code)"
   echo ""
-  echo "Risposta/Errore:"
+  echo "Response/Error:"
   echo "$categories_data"
   echo ""
   echo "Possibili cause:"
-  echo "  - Endpoint /categories non esiste o non è accessibile"
-  echo "  - Problema di connessione o timeout"
-  echo "  - Token scaduto o non valido"
+  echo "- Endpoint /categories does not exist or is not accessible"
+  echo "- Connection problem or timeout"
+  echo "- Expired or invalid token"
   exit 1
 fi
 
-# Verifica se la risposta è JSON valido
+# Check if the response is valid JSON
 if ! echo "$categories_data" | jq empty 2>/dev/null; then
-  echo " Risposta non è JSON valido"
+  echo "Response is not valid JSON"
   echo ""
-  echo "Risposta ricevuta:"
+  echo "Response received:"
   echo "$categories_data" | head -30
   exit 1
 fi
 
-# Verifica se c'è un errore nella risposta
+# Check if there is an error in the answer
 if echo "$categories_data" | jq -e 'has("error")' >/dev/null 2>&1; then
-  echo " Errore nella risposta API"
+  echo "Error in API response"
   echo "$categories_data" | jq '.'
   exit 1
 fi
@@ -94,8 +94,8 @@ echo " Test 4: Test chiamata API tickets..."
 tickets_data=$(ydea_api GET "/tickets?limit=1" 2>&1)
 
 if [[ $? -ne 0 ]] || echo "$tickets_data" | jq -e '.error' >/dev/null 2>&1; then
-  echo " Errore nella chiamata API tickets"
-  echo "Risposta API:"
+  echo "Error in tickets API call"
+  echo "API Response:"
   echo "$tickets_data" | head -20
   exit 1
 fi
@@ -108,8 +108,8 @@ echo " Test 5: Test chiamata API users..."
 users_data=$(ydea_api GET "/users?limit=1" 2>&1)
 
 if [[ $? -ne 0 ]] || echo "$users_data" | jq -e '.error' >/dev/null 2>&1; then
-  echo " Errore nella chiamata API users"
-  echo "Risposta API:"
+  echo "Error calling API users"
+  echo "API Response:"
   echo "$users_data" | head -20
   exit 1
 fi
@@ -119,5 +119,5 @@ echo ""
 
 # Riepilogo
 echo "════════════════════════════════════════════════════════════════"
-echo " Tutti i test superati!"
+echo "All tests passed!"
 echo ""

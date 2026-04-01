@@ -1,58 +1,58 @@
 # install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh
-> **Categoria:** Operativo
+> **Category:** Operational
 
-## Descrizione
+## Description
 
-Script di installazione ROCKSOLID per CheckMK Agent e FRP Client su sistemi NethSecurity/OpenWrt. 
+ROCKSOLID installation script for CheckMK Agent and FRP Client on NethSecurity/OpenWrt systems. 
 
-**ROCKSOLID Edition**: Garantisce la sopravvivenza e il ripristino automatico dei servizi dopo major upgrade del sistema operativo.
-
----
-
-## Caratteristiche
-
-- **Auto-recovery**: Ripristino automatico servizi dopo major upgrade
-- **Protezione filesystem**: File critici preservati in `/etc/sysupgrade.conf`
-- **Backup binari**: Binari essenziali (`tar`, `ar`, `gzip`) salvati e ripristinati
-- **Autocheck boot**: Verifica e riavvio automatico servizi ad ogni boot
-- **Curl-based execution**: Script autocheck eseguito da GitHub (mai corrotto)
-- **Repository cleanup**: Rimozione automatica repository conflittuali
-- **Zero configuration**: Rileva automaticamente versione CheckMK server
-- **FRP tunnel**: Configurazione opzionale tunnel reverse proxy
+**ROCKSOLID Edition**: Guarantees survival and automatic restoration of services after major operating system upgrades.
 
 ---
 
-## Requisiti
+## Features
 
-### Sistema Operativo
+- **Auto-recovery**: Automatic restoration of services after major upgrades
+- **Filesystem Protection**: Critical files preserved in `/etc/sysupgrade.conf`
+- **Binary backups**: Essential binaries (`tar`, `ar`, `gzip`) saved and restored
+- **Autocheck boot**: Automatically checks and restarts services at each boot
+- **Curl-based execution**: Autocheck script executed by GitHub (never corrupted)
+- **Repository cleanup**: Automatic removal of conflicting repositories
+- **Zero configuration**: Automatically detect CheckMK server version
+- **FRP tunnel**: Optional reverse proxy tunnel configuration
+
+---
+
+## Requirements
+
+### Operating System
 - NethSecurity 8.x
-- OpenWrt 23.05.x o superiore
-- Architettura: x86_64
+- OpenWrt 23.05.x or higher
+- Architecture: x86_64
 
 ### Network
-- Connessione internet attiva
-- Accesso al CheckMK server (configurabile)
-- (Opzionale) Accesso al server FRP per tunnel
+- Active internet connection
+- Access to CheckMK server (configurable)
+- (Optional) Access to FRP server for tunnels
 
-### Permessi
-- Esecuzione come `root`
+### Permissions
+- Running as `root`
 
 ---
 
-## Installazione
+## Installation
 
-### Installazione Standard
+### Standard installation
 
 ```bash
-# Download e installazione in un comando
+# Download and install in one command
 curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh -o /tmp/install-rocksolid.sh
 bash /tmp/install-rocksolid.sh
 ```
 
-### Installazione con Configurazione Custom
+### Installation with Custom Configuration
 
 ```bash
-# Specifica server CheckMK custom
+# Specify custom CheckMK server
 export CMK_SERVER="monitor.example.com"
 export CMK_SITE="production"
 export CMK_PROTOCOL="https"
@@ -60,7 +60,7 @@ export CMK_PROTOCOL="https"
 bash install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh
 ```
 
-### Disinstallazione
+### Uninstall
 
 ```bash
 bash install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh --uninstall
@@ -68,48 +68,48 @@ bash install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh --uninstall
 
 ---
 
-## Variabili d'Ambiente
+## Environment Variables
 
-| Variabile | Default | Descrizione |
+| Variable | Default | Description |
 |-----------|---------|-------------|
 | `CMK_SERVER` | `monitor.nethlab.it` | Hostname CheckMK server |
-| `CMK_SITE` | `monitoring` | Nome site CheckMK |
-| `CMK_PROTOCOL` | `https` | Protocollo (http/https) |
-| `DEB_URL` | (auto-detect) | URL diretto al .deb agent |
-| `FRP_VER` | `0.64.0` | Versione FRP client |
-| `FRPC_BIN` | `/usr/local/bin/frpc` | Path binario FRP |
+| `CMK_SITE` | `monitoring` | Site Name CheckMK |
+| `CMK_PROTOCOL` | `https` | Protocol (http/https) |
+| `DEB_URL` | (auto-detect) | Direct URL to the .deb agent |
+| `FRP_VER` | `0.64.0` | FRP Client Version |
+| `FRPC_BIN` | `/usr/local/bin/frpc` | FRP Binary Path |
 | `FRPC_CONF` | `/etc/frp/frpc.toml` | Path config FRP |
-| `NON_INTERACTIVE` | `0` | Modalità non interattiva (1=disabilita prompt) |
+| `NON_INTERACTIVE` | `0` | Non-interactive mode (1=disable prompts) |
 
 ---
 
-## Workflow Installazione
+## Installation workflow
 
-### Fase 1: CheckMK Agent
+### Step 1: CheckMK Agent
 
-1. **Installazione prerequisiti**
-   - Aggiunge repository OpenWrt (base, packages)
-   - Installa: `ca-bundle`, `ca-certificates`, `wget-ssl`, `socat`, `netcat`, `coreutils-realpath`
-   - Installa binari dpkg: `tar`, `ar`, `gzip`
+1. **Installation prerequisites**
+   - Adds OpenWrt repositories (base, packages)
+   - Install: `ca-bundle`, `ca-certificates`, `wget-ssl`, `socat`, `netcat`, `coreutils-realpath`
+   - Install dpkg binaries: `tar`, `ar`, `gzip`
 
-2. **Backup binari critici**
-   - Salva `tar`, `ar`, `gzip` in `/opt/checkmk-tools/BACKUP-BINARIES/`
-   - Necessari per reinstallazione post-upgrade
+2. **Critical binary backups**
+   - Save `tar`, `ar`, `gzip` to `/opt/checkmk-tools/BACKUP-BINARIES/`
+   - Required for post-upgrade reinstallation
 
-3. **Download e installazione agent**
-   - Rileva automaticamente versione CheckMK da server
-   - Scarica `.deb` corretto per architettura
-   - Estrae e installa con `dpkg`
-   - Copia agent in `/usr/bin/check_mk_agent`
+3. **Download and install agent**
+   - Automatically detect CheckMK version from server
+   - Download correct `.deb` for architecture
+   - Extract and install with `dpkg`
+   - Copy agent to `/usr/bin/check_mk_agent`
 
-4. **Configurazione servizio**
-   - Crea init script procd in `/etc/init.d/check_mk_agent`
-   - Configura `socat` per TCP-LISTEN:6556
-   - Abilita e avvia servizio
-   - Verifica connettività con `nc 127.0.0.1 6556`
+4. **Service configuration**
+   - Create init script procd in `/etc/init.d/check_mk_agent`
+   - Configure `socat` for TCP-LISTEN:6556
+   - Enable and start service
+   - Check connectivity with `nc 127.0.0.1 6556`
 
-5. **Protezione ROCKSOLID**
-   - Aggiunge file a `/etc/sysupgrade.conf`:
+5. **ROCKSOLID protection**
+   - Add files to `/etc/sysupgrade.conf`:
      ```
      /opt/checkmk-tools/BACKUP-BINARIES/tar
      /opt/checkmk-tools/BACKUP-BINARIES/ar
@@ -117,31 +117,31 @@ bash install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh --uninstall
      /etc/checkmk-post-upgrade.sh
      ```
 
-### Fase 2: FRP Client (Opzionale)
+### Phase 2: FRP Client (Optional)
 
-**NOTA**: FRP è completamente **OPZIONALE**. Se non necessiti di tunnel reverse proxy:
-- Rispondi **NO** al prompt "Vuoi configurare FRP?"
-- Lo script completerà l'installazione solo con CheckMK Agent
-- Nessun marker `/opt/checkmk-tools/.frp-installed` verrà creato
-- Autocheck non tenterà mai di avviare FRP
-- Sistema pienamente funzionante senza FRP
+**NOTE**: FRP is completely **OPTIONAL**. If you don't need reverse proxy tunnels:
+- Answer **NO** to the "Do you want to configure FRP?" prompt.
+- The script will complete the installation with CheckMK Agent only
+- No `/opt/checkmk-tools/.frp-installed` markers will be created
+- Autocheck will never attempt to start FRP
+- Fully functional system without FRP
 
-1. **Configurazione interattiva**
-   - Prompt per abilitazione FRP
-   - Se **NO**: salta tutta la fase FRP
-   - Se **SI**: richiede token autenticazione, porta remota, nome proxy
+1. **Interactive configuration**
+   - Prompt to enable FRP
+   - If **NO**: skip the entire FRP phase
+   - If **YES**: requires authentication token, remote port, proxy name
 
-2. **Download binario**
-   - Scarica `frp_${FRP_VER}_linux_amd64.tar.gz`
-   - Estrae in `/usr/local/bin/frpc`
-   - Imposta permessi esecuzione
+2. **Binary Download**
+   - Download `frp_${FRP_VER}_linux_amd64.tar.gz`
+   - Extract to `/usr/local/bin/frpc`
+   - Set execution permissions
 
-3. **Generazione configurazione**
-   - Crea `/etc/frp/frpc.toml` con token
-   - Formato config v0.x (sezione `[common]`)
-   - Configurazione proxy TCP:
+3. **Configuration generation**
+   - Create `/etc/frp/frpc.toml` with tokens
+   - Config format v0.x (`[common]` section)
+   - TCP proxy configuration:
      ```toml
-     [common]
+[common]
      serverAddr = "SERVER"
      serverPort = 7000
      auth.method = "token"
@@ -156,103 +156,103 @@ bash install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh --uninstall
      ```
 
 4. **Init script procd**
-   - Crea `/etc/init.d/frpc`
-   - Abilita avvio automatico
-   - Avvia servizio
-   - Verifica processo attivo
+   - Create `/etc/init.d/frpc`
+   - Enable autostart
+   - Start service
+   - Check active process
 
-5. **Protezione ROCKSOLID**
-   - Aggiunge a sysupgrade.conf:
+5. **ROCKSOLID protection**
+   - Adds to sysupgrade.conf:
      ```
      /usr/local/bin/frpc
      /etc/frp/frpc.toml
      /etc/init.d/frpc
      /opt/checkmk-tools/.frp-installed
      ```
-   - Crea marker file `/opt/checkmk-tools/.frp-installed`
+   - Create marker file `/opt/checkmk-tools/.frp-installed`
 
-### Fase 3: Autocheck Boot
+### Step 3: Autocheck Boot
 
-1. **Script autocheck**
-   - NON copia file locale (si corromperebbe)
-   - Configura `/etc/rc.local` per eseguire da GitHub:
+1. **Autocheck script**
+   - DO NOT copy local file (it would be corrupted)
+   - Configure `/etc/rc.local` to run from GitHub:
      ```bash
    curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/upgrade_maintenance/rocksolid-startup-check.sh | bash
      ```
 
-2. **Protezione rc.local**
-   - Aggiunge `/etc/rc.local` a sysupgrade.conf
-   - Garantisce esecuzione autocheck ad ogni boot
+2. **rc.local protection**
+   - Add `/etc/rc.local` to sysupgrade.conf
+   - Guarantees autocheck execution at every boot
 
 ---
 
 ## Post-Upgrade: Auto-Recovery
 
-Dopo un major upgrade, il sistema esegue automaticamente:
+After a major upgrade, the system automatically performs:
 
-### 1. Boot e rc.local
+### 1. Boot and rc.local
 
 ```
-Sistema riavvia
+System restarts
     |
     v
-/etc/rc.local eseguito
+/etc/rc.local executed
     |
     v
-curl scarica rocksolid-startup-check.sh da GitHub
+curl download rocksolid-startup-check.sh from GitHub
     |
     v
-Script autocheck eseguito
+Autocheck script executed
 ```
 
 ### 2. Autocheck Workflow
 
 ```
-Verifica CheckMK Agent (porta 6556)
+Check CheckMK Agent (port 6556)
     |
-    +-- Se attivo: OK
+    +-- If active: OK
     |
-    +-- Se NON attivo:
+    +-- If NOT active:
         |
-        +-- Ripristina tar/ar/gzip da backup
-        +-- Reinstalla agent da .deb
-        +-- Configura socat
-        +-- Avvia servizio
+        +-- Restore tar/ar/gzip from backup
+        +-- Reinstall agent from .deb
+        +-- Configure socat
+        +-- Start service
         
-Verifica marker FRP (.frp-installed)
+Verify FRP markers (.frp-installed)
     |
-    +-- Se NON esiste: Skip FRP
+    +-- If NOT exists: Skip FRP
     |
-    +-- Se esiste:
+    +-- If exists:
         |
-        +-- Verifica binario frpc
-        +-- Verifica config frpc.toml
-        +-- Verifica processo frpc
-        +-- Se NON attivo: /etc/init.d/frpc restart
+        +-- Verify frpc binary
+        +-- Check frpc.toml config
+        +-- Check frpc process
+        +-- If NOT active: /etc/init.d/frpc restart
 
-Pulizia repository custom
+Custom repository cleanup
     |
-    +-- Verifica /etc/opkg/customfeeds.conf
-    +-- Se contiene repo OpenWrt non autorizzati:
+    +-- Check /etc/opkg/customfeeds.conf
+    +-- If it contains unauthorized OpenWrt repos:
         |
-        +-- Crea backup .backup
-        +-- Svuota file (header only)
-        +-- Previene conflitti futuri
+        +-- Create backup .backup
+        +-- Empty file (header only)
+        +-- Prevents future conflicts
 ```
 
-### 3. Risultato
+### 3. Result
 
-- **Tempo recovery**: 20-30 secondi dal boot
-- **CheckMK Agent**: Operativo
-- **FRP Client**: Operativo (se configurato)
-- **Repository**: Puliti (no conflitti)
+- **Recovery time**: 20-30 seconds from boot
+- **CheckMK Agent**: Operational
+- **FRP Client**: Operational (if configured)
+- **Repository**: Clean (no conflicts)
 - **Log**: `/var/log/rocksolid-startup.log`
 
 ---
 
-## File Protetti in sysupgrade.conf
+## Protected Files in sysupgrade.conf
 
-Lo script aggiunge automaticamente questi file per sopravvivere ai major upgrade:
+The script automatically adds these files to survive major upgrades:
 
 ### CheckMK Agent
 ```
@@ -271,53 +271,53 @@ Lo script aggiunge automaticamente questi file per sopravvivere ai major upgrade
 /opt/checkmk-tools/.frp-installed
 ```
 
-### Sistema
+### System
 ```
 /etc/rc.local
 ```
 
 ---
 
-## Log e Verifica
+## Log and Check
 
-### Verifica Installazione
+### Check Installation
 
 ```bash
 # CheckMK Agent
 nc 127.0.0.1 6556 | head
 pgrep -fa "socat.*6556"
 
-# FRP Client (se configurato)
-pgrep -fa frpc
+# FRP Client (if configured)
+pgrep -does frpc
 cat /etc/frp/frpc.toml
 
-# Protezioni attive
+# Active protections
 grep -E "check_mk|frpc" /etc/sysupgrade.conf
 
-# Marker FRP
+# FRP markers
 ls -lh /opt/checkmk-tools/.frp-installed
 ```
 
 ### Log Autocheck
 
 ```bash
-# Log completo
+# Log complete
 cat /var/log/rocksolid-startup.log
 
-# Ultimi 30 righe
+# Last 30 lines
 tail -30 /var/log/rocksolid-startup.log
 
-# Solo errori
+# Only errors
 grep -i "error\|fail\|warn" /var/log/rocksolid-startup.log
 ```
 
 ### Test CheckMK Agent
 
 ```bash
-# Test locale
+# Local test
 echo "<<<check_mk>>>" | nc 127.0.0.1 6556 -w 3
 
-# Test da CheckMK server
+# Test from CheckMK server
 ssh monitoring@checkmk-server "cmk-agent-ctl dump"
 ```
 
@@ -325,80 +325,79 @@ ssh monitoring@checkmk-server "cmk-agent-ctl dump"
 
 ## Troubleshooting
 
-### CheckMK Agent non risponde
+### CheckMK Agent is not responding
 
 ```bash
-# Verifica processo
-pgrep -fa socat
+# Check process
+pgrep -do socat
 
-# Se non attivo, riavvia
+# If not active, restart
 /etc/init.d/check_mk_agent restart
 
-# Verifica connettività
+# Check connectivity
 nc 127.0.0.1 6556
 
-# Log errori
+# Error log
 logread | grep -i checkmk
 ```
 
-### FRP Client non connette
+### FRP Client does not connect
 
 ```bash
-# Verifica processo
-pgrep -fa frpc
+# Check process
+pgrep -does frpc
 
-# Se non attivo, riavvia
+# If not active, restart
 /etc/init.d/frpc restart
 
-# Log FRP
+# FRP logs
 tail -50 /var/log/frpc.log
 
-# Test connettività server
+# Server connectivity test
 nc -zv FRPC_SERVER 7000
 
-# Verifica config
+# Check config
 cat /etc/frp/frpc.toml
 ```
 
-### Post-upgrade servizi non ripartono
+### Post-upgrade services do not restart
 
 ```bash
-# Esegui manualmente autocheck
+# Run autocheck manually
 curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/upgrade_maintenance/rocksolid-startup-check.sh | bash
 
-# Verifica log
+# Check log
 tail -50 /var/log/rocksolid-startup.log
 
-# Esegui script post-upgrade manuale
+# Run manual post-upgrade script
 bash /etc/checkmk-post-upgrade.sh
-
-# Verifica file protetti sopravvissuti
+# Verify surviving protected files
 ls -lh /opt/checkmk-tools/BACKUP-BINARIES/
 ls -lh /usr/local/bin/frpc
 ls -lh /etc/frp/frpc.toml
 ```
 
-### Binari corrotti dopo upgrade
+### Corrupt binaries after upgrade
 
 ```bash
-# Verifica backup binari
+# Verify binary backups
 ls -lh /opt/checkmk-tools/BACKUP-BINARIES/
 
-# Ripristina manualmente
+# Restore manually
 cp /opt/checkmk-tools/BACKUP-BINARIES/tar /bin/tar
 cp /opt/checkmk-tools/BACKUP-BINARIES/ar /usr/bin/ar
 cp /opt/checkmk-tools/BACKUP-BINARIES/gzip /bin/gzip
 chmod +x /bin/tar /usr/bin/ar /bin/gzip
 
-# Reinstalla agent
+# Reinstall agent
 bash /etc/checkmk-post-upgrade.sh
 ```
 
 ---
 
-## Comandi Utili
+## Useful Commands
 
-### Gestione Servizi
+### Services Management
 
 ```bash
 # CheckMK Agent
@@ -407,14 +406,14 @@ bash /etc/checkmk-post-upgrade.sh
 # FRP Client
 /etc/init.d/frpc start|stop|restart|status
 
-# Verifica processi
+# Check processes
 ps | grep -E "socat|frpc"
 ```
 
-### Backup Manuale
+### Manual Backup
 
 ```bash
-# Backup completo configurazione
+# Complete configuration backup
 tar -czf /tmp/checkmk-backup.tar.gz \
   /opt/checkmk-tools/BACKUP-BINARIES/ \
   /usr/local/bin/frpc \
@@ -424,27 +423,27 @@ tar -czf /tmp/checkmk-backup.tar.gz \
   /etc/rc.local \
   /etc/sysupgrade.conf
 
-# Copia backup su server remoto
+# Copy backup to remote server
 scp /tmp/checkmk-backup.tar.gz user@server:/backup/
 ```
 
 ### Test Major Upgrade
 
 ```bash
-# 1. Pre-upgrade: verifica stato
+#1. Pre-upgrade: Check status
 echo "=== PRE-UPGRADE ===" > /tmp/pre-upgrade.log
 pgrep -fa "socat|frpc" >> /tmp/pre-upgrade.log
 grep -c checkmk /etc/sysupgrade.conf >> /tmp/pre-upgrade.log
 
-# 2. Esegui major upgrade via web interface
+# 2. Perform major upgrade via web interface
 
-# 3. Post-upgrade: verifica stato
-sleep 60  # Attendi boot completo
+#3. Post-upgrade: Check status
+sleep 60 # Wait for complete boot
 echo "=== POST-UPGRADE ===" > /tmp/post-upgrade.log
 pgrep -fa "socat|frpc" >> /tmp/post-upgrade.log
 tail -30 /var/log/rocksolid-startup.log >> /tmp/post-upgrade.log
 
-# 4. Confronta
+#4. Compare
 cat /tmp/pre-upgrade.log /tmp/post-upgrade.log
 ```
 
@@ -452,89 +451,88 @@ cat /tmp/pre-upgrade.log /tmp/post-upgrade.log
 
 ## FAQ
 
-### Q: Lo script funziona su architetture diverse da x86_64?
-**A**: Attualmente supporta solo x86_64. Per ARM/MIPS modificare `REPO_BASE` e `REPO_PACKAGES`.
+### Q: Does the script work on architectures other than x86_64?
+**A**: Currently only supports x86_64. For ARM/MIPS edit `REPO_BASE` and `REPO_PACKAGES`.
 
-### Q: Posso usare CheckMK server diverso da monitor.nethlab.it?
-**A**: Sì, imposta `export CMK_SERVER="tuo-server.com"` prima dell'esecuzione.
+### Q: Can I use CheckMK server other than monitor.nethlab.it?
+**A**: Yes, set `export CMK_SERVER="your-server.com"` before running.
 
-### Q: FRP è obbligatorio?
-**A**: No, è completamente opzionale. Durante l'installazione ti verrà chiesto se vuoi configurare FRP. Se rispondi NO:
-- Verrà installato solo CheckMK Agent (porta 6556)
-- Nessun marker FRP creato
-- Autocheck funziona normalmente (verifica solo CheckMK Agent)
-- Sistema pienamente operativo senza tunnel
-- Puoi sempre installare FRP successivamente rieseguendo lo script
+### Q: Is FRP mandatory?
+**A**: No, it's completely optional. During installation you will be asked if you want to configure FRP. If you answer NO:
+- Only CheckMK Agent (port 6556) will be installed
+- No FRP markers created
+- Autocheck works normally (only checks CheckMK Agent)
+- Fully operational system without tunnels
+- You can always install FRP later by re-running the script
 
-### Q: Cosa succede se disabilito FRP dopo l'installazione?
-**A**: Rimuovi il marker: `rm /opt/checkmk-tools/.frp-installed`. Autocheck non tenterà più di riavviarlo.
+### Q: What happens if I disable FRP after installation?
+**A**: Remove marker: `rm /opt/checkmk-tools/.frp-installed`. Autocheck will no longer attempt to restart it.
 
-### Q: Posso reinstallare senza disinstallare?
-**A**: Sì, lo script rileva installazioni esistenti e aggiorna i file.
+### Q: Can I reinstall without uninstalling?
+**A**: Yes, the script detects existing installations and updates the files.
 
-### Q: Come aggiorno la versione FRP?
-**A**: Modifica `FRP_VER` e riesegui lo script, oppure scarica manualmente e sostituisci `/usr/local/bin/frpc`.
+### Q: How do I update the FRP version?
+**A**: Edit `FRP_VER` and rerun the script, or manually download and replace `/usr/local/bin/frpc`.
 
-### Q: Repository custom vengono rimossi ad ogni boot?
-**A**: No, solo se contengono repo OpenWrt. Repository NethSecurity ufficiali non vengono toccati.
+### Q: Are custom repositories removed on every boot?
+**A**: No, only if they contain OpenWrt repos. Official NethSecurity repositories are not touched.
 
-### Q: Posso eseguire autocheck manualmente?
-**A**: Sì: `curl -fsSL https://raw.githubusercontent.com/.../rocksolid-startup-check.sh | bash`
-
----
-
-## Sicurezza
-
-### Protezione Token FRP
-
-Il token FRP è memorizzato in `/etc/frp/frpc.toml` che è:
-- Protetto in sysupgrade.conf (sopravvive a upgrade)
-- Leggibile solo da root (chmod 600 consigliato)
-- Mai esposto in log o output
-
-### Curl da GitHub
-
-Script autocheck eseguito via curl da GitHub:
-- Usa HTTPS (TLS encryption)
-- Repository verificato (github.com/Coverup20/checkmk-tools)
-- Nessuna esecuzione locale (no file corrotti)
-
-Considerazioni:
-- Richiede fiducia nel repository GitHub
-- Alternativa: fork privato e modifica URL in rc.local
+### Q: Can I run autocheck manually?
+**A**: Yes: `curl -fsSL https://raw.githubusercontent.com/.../rocksolid-startup-check.sh | bash`
 
 ---
 
-## Architettura Tecnica
+## Security
 
-### Perché dpkg su OpenWrt?
+### FRP Token Protection
 
-CheckMK fornisce agent come pacchetto `.deb` (Debian). OpenWrt usa `opkg` (non compatibile con .deb). Soluzione:
+The FRP token is stored in `/etc/frp/frpc.toml` which is:
+- Protected in sysupgrade.conf (survives upgrade)
+- Readable only by root (chmod 600 recommended)
+- Never exposed in log or output
 
-1. Installa binari dpkg essenziali: `tar`, `ar`, `gzip`
-2. Usa script personalizzato per estrarre .deb
-3. Installa contenuto manualmente
-4. Bypassa dependency resolution di dpkg
+### Curl from GitHub
 
-### Perché socat invece di xinetd?
+Autocheck script run via curl from GitHub:
+- Use HTTPS (TLS encryption)
+- Checked repository (github.com/Coverup20/checkmk-tools)
+- No local execution (no corrupt files)
 
-- OpenWrt non include xinetd
-- `socat` è più leggero e flessibile
-- Configurazione più semplice via procd
-- Nessuna dipendenza aggiuntiva
-
-### Perché FRP invece di SSH tunnel?
-
-- FRP più leggero di OpenSSH server
-- Configurazione semplificata (un file TOML)
-- Supporto multiplex (più tunnel su una connessione)
-- Reconnect automatico
-- Non richiede account SSH sul firewall
+Considerations:
+- Requires trust in the GitHub repository
+- Alternative: Private fork and change URL to rc.local
 
 ---
 
-## Riferimenti
+## Technical Architecture
 
+### Why dpkg on OpenWrt?
+
+CheckMK provides agents as a `.deb` package (Debian). OpenWrt uses `opkg` (not compatible with .deb). Solution:
+
+1. Install essential dpkg binaries: `tar`, `ar`, `gzip`
+2. Use custom script to extract .deb
+3. Install content manually
+4. Bypass dependency resolution of dpkg
+
+### Why socat instead of xinetd?
+
+- OpenWrt does not include xinetd
+- `socat` is lighter and more flexible
+- Easier configuration via procedure
+- No additional dependencies
+
+### Why FRP instead of SSH tunnel?
+
+- Lighter FRP than OpenSSH server
+- Simplified configuration (one TOML file)
+- Multiplex support (multiple tunnels on one connection)
+- Automatic reconnect
+- Does not require SSH accounts on the firewall
+
+---
+
+## References
 - **CheckMK**: https://checkmk.com/
 - **FRP**: https://github.com/fatedier/frp
 - **OpenWrt**: https://openwrt.org/
@@ -543,25 +541,25 @@ CheckMK fornisce agent come pacchetto `.deb` (Debian). OpenWrt usa `opkg` (non c
 
 ---
 
-## Licenza
+## License
 
-Script parte del progetto checkmk-tools.
-Uso interno Nethesis / laboratorio.
+Script part of the checkmk-tools project.
+Internal use Nethesis / laboratory.
 
 ---
 
 ## Changelog
 
 ### v2.0 - ROCKSOLID Edition (2026-01-29)
-- Aggiunta protezione file in sysupgrade.conf
-- Backup automatico binari critici
-- Auto-recovery post-upgrade
-- Autocheck eseguito da GitHub (curl-based)
-- Pulizia automatica repository conflittuali
-- Protezione esplicita file config FRP (frpc.toml)
+- Added file protection in sysupgrade.conf
+- Automatic backup of critical binaries
+- Post-upgrade auto-recovery
+- Autocheck run by GitHub (curl-based)
+- Automatic cleanup of conflicting repositories
+- Explicit FRP config file protection (frpc.toml)
 - Marker-based FRP detection
 
 ### v1.0 - Initial Release
-- Installazione base CheckMK Agent
-- Supporto FRP tunnel
-- Configurazione procd/socat
+- Basic CheckMK Agent installation
+- Support FRP tunnel
+- Procd/socat configuration

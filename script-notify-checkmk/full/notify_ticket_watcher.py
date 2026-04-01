@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-"""
-notify_ticket_watcher.py - Watcher log CheckMK per notifiche Telegram ticket
-Legge notify.log, intercetta [TICKET-EVENT] [CREATO] e manda messaggio Telegram.
-Completamente indipendente dal sistema di notifica CheckMK.
+"""notify_ticket_watcher.py - CheckMK log watcher for Telegram ticket notifications
+Reads notify.log, intercepts [TICKET-EVENT] [CREATED] and sends Telegram message.
+Completely independent of the CheckMK notification system.
 
-Version: 1.3.0
-"""
+Version: 1.3.0"""
 
 import os
 import re
@@ -24,7 +22,7 @@ TOKEN    = os.environ.get("TELEGRAM_TOKEN", "")
 CHAT_ID  = "-1003770828164"
 CMK_URL  = "https://monitor.nethlab.it/monitoring"
 
-# Matcha solo le righe [cmk.base.notify] Output: per evitare duplicati
+# Match only lines [cmk.base.notify] Output: to avoid duplicates
 PATTERN = re.compile(
     r'\[cmk\.base\.notify\].*Output:.*\[TICKET-EVENT\] \[CREATO\] #(\d+) ([^/\n]+)/(.+?) (CRIT\w*|DOWN\w*|CRITICAL)'
 )
@@ -47,7 +45,7 @@ LIVESTATUS_SOCK = "/omd/sites/monitoring/tmp/run/live"
 
 
 def get_service_info(hostname: str, service: str) -> tuple[str, str]:
-    """Interroga Livestatus per ottenere (host_address, plugin_output)."""
+    """Query Livestatus to get (host_address, plugin_output)."""
     try:
         query = (
             f"GET services\n"
@@ -75,10 +73,10 @@ def send_telegram(ticket_id: str, hostname: str, service: str, state_str: str,
     emoji = "\U0001f534" if "CRIT" in state_str.upper() else "\U0001f7e0"
     host_enc = urllib.parse.quote(hostname, safe="")
 
-    # Riga host: «Hostname (IP)» se l'IP è disponibile
+    # Host line: «Hostname (IP)» if the IP is available
     host_line = f"{hostname} ({host_address})" if host_address else hostname
 
-    # Output: tronca a 300 caratteri
+    # Output: truncate to 300 characters
     output_line = ""
     if svc_output:
         truncated = svc_output[:300]
@@ -111,13 +109,13 @@ def main():
     pos = state.get("pos", 0)
     sent = set(state.get("sent", []))
 
-    # Pulisci sent vecchi (tieni solo ultimi 500)
+    # Clear old sent (only keep last 500)
     if len(sent) > 500:
         sent = set(list(sent)[-500:])
 
     file_size = os.path.getsize(LOG_FILE)
 
-    # Log ruotato (file piu piccolo di pos)
+    # Log rotated (file smaller than pos)
     if file_size < pos:
         pos = 0
 

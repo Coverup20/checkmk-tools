@@ -1,5 +1,5 @@
-# Verifica Stato Backup Automatico
-# Mostra risultati ultima esecuzione e log
+# Check Automatic Backup Status
+# Show last run results and log
 
 $ErrorActionPreference = "Stop"
 
@@ -7,23 +7,23 @@ $TASK_NAME = "CheckMK-Backup-Auto"
 $LOG_PATH = "C:\CheckMK-Backups\logs"
 
 Write-Host "`n╔═══════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║         STATO BACKUP AUTOMATICO                     ║" -ForegroundColor White
+Write-Host "║ AUTOMATIC BACKUP STATUS ║" -ForegroundColor White
 Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
 
-# Verifica che il task esista
+# Verify that the task exists
 $task = Get-ScheduledTask -TaskName $TASK_NAME -ErrorAction SilentlyContinue
 if (-not $task) {
-    Write-Host " Task '$TASK_NAME' non trovato!" -ForegroundColor Red
-    Write-Host "  Esegui 'setup-backup-task.ps1' per configurarlo." -ForegroundColor Yellow
+    Write-Host "Task '$TASK_NAME' not found!" -ForegroundColor Red
+    Write-Host "Run 'setup-backup-task.ps1' to set it up." -ForegroundColor Yellow
     exit 1
 }
 
 # Ottieni info task
 $taskInfo = Get-ScheduledTaskInfo -TaskName $TASK_NAME
 
-Write-Host " Stato Task:" -ForegroundColor Yellow
-Write-Host "   Nome: $TASK_NAME" -ForegroundColor Gray
-Write-Host "   Stato: $($task.State)" -ForegroundColor $(if ($task.State -eq "Ready") { "Green" } else { "Yellow" })
+Write-Host "Task Status:" -ForegroundColor Yellow
+Write-Host "Name: $TASK_NAME" -ForegroundColor Gray
+Write-Host "State: $($task.State)" -ForegroundColor $(if ($task.State -eq "Ready") { "Green" } else { "Yellow" })
 
 # Ultima esecuzione
 if ($taskInfo.LastRunTime) {
@@ -40,14 +40,14 @@ if ($taskInfo.LastRunTime) {
     
     Write-Host "   Ultima esecuzione: $($taskInfo.LastRunTime.ToString('yyyy-MM-dd HH:mm:ss')) ($tempoTestoDa)" -ForegroundColor Gray
     
-    # Risultato ultima esecuzione
+    # Last execution result
     if ($taskInfo.LastTaskResult -eq 0) {
-        Write-Host "   Risultato:  Successo (0x0)" -ForegroundColor Green
+        Write-Host "Result: Success (0x0)" -ForegroundColor Green
     } else {
-        Write-Host "   Risultato:  Errore (0x$($taskInfo.LastTaskResult.ToString('X')))" -ForegroundColor Red
+        Write-Host "Result: Error (0x$($taskInfo.LastTaskResult.ToString('X')))" -ForegroundColor Red
     }
 } else {
-    Write-Host "   Ultima esecuzione: Mai eseguito" -ForegroundColor Yellow
+    Write-Host "Last run: Never run" -ForegroundColor Yellow
 }
 
 # Prossima esecuzione
@@ -66,7 +66,7 @@ if ($taskInfo.NextRunTime) {
     Write-Host "   Prossima esecuzione: $($taskInfo.NextRunTime.ToString('yyyy-MM-dd HH:mm:ss')) (tra $tempoTestoTra)" -ForegroundColor Gray
 }
 
-# Numero di esecuzioni
+# Number of executions
 Write-Host "   Totale esecuzioni: $($taskInfo.NumberOfMissedRuns)" -ForegroundColor Gray
 
 Write-Host ""
@@ -89,19 +89,19 @@ if (Test-Path $logFile) {
     $successi = $logContent | Select-String -Pattern "|SUCCESS|COMPLETATO|Backup completato" -SimpleMatch
     
     if ($errori) {
-        Write-Host "  Trovati $($errori.Count) errori nel log:" -ForegroundColor Red
+        Write-Host "Found $($errori.Count) errors in the log:" -ForegroundColor Red
         foreach ($errore in $errori | Select-Object -First 5) {
-            Write-Host "   $errore" -ForegroundColor Red
+            Write-Host "$error" -ForegroundColor Red
         }
         Write-Host ""
     }
     
     if ($successi) {
-        Write-Host " Trovati $($successi.Count) messaggi di successo" -ForegroundColor Green
+        Write-Host "$($successes.Count) success messages found" -ForegroundColor Green
         Write-Host ""
     }
     
-    Write-Host " Ultime 20 righe del log:" -ForegroundColor Cyan
+    Write-Host "Last 20 lines of the log:" -ForegroundColor Cyan
     Write-Host "─────────────────────────────────────────────────────────" -ForegroundColor Gray
     $logContent | Select-Object -Last 20 | ForEach-Object {
         $color = if ($_ -match "|ERROR|ERRORE") {
@@ -119,16 +119,16 @@ if (Test-Path $logFile) {
     Write-Host ""
     Write-Host " Log completo: $logFile" -ForegroundColor Gray
 } else {
-    Write-Host " Nessun log trovato per oggi." -ForegroundColor Yellow
-    Write-Host "   Il task potrebbe non essere ancora stato eseguito oggi." -ForegroundColor Gray
+    Write-Host "No logs found for today." -ForegroundColor Yellow
+    Write-Host "The task may not have run yet today." -ForegroundColor Gray
 }
 
 # ═══════════════════════════════════════════════════════════════════
-# BACKUP RECENTI
+# RECENT BACKUPS
 # ═══════════════════════════════════════════════════════════════════
 
 Write-Host "`n╔═══════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║            BACKUP RECENTI (Locale)                  ║" -ForegroundColor White
+Write-Host "║ RECENT BACKUPS (Local) ║" -ForegroundColor White
 Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
 
 $backupPath = "C:\CheckMK-Backups"
@@ -139,7 +139,7 @@ if (Test-Path $backupPath) {
         Select-Object -First 10
     
     if ($backups) {
-        Write-Host "Ultimi 10 backup:" -ForegroundColor Yellow
+        Write-Host "Last 10 backups:" -ForegroundColor Yellow
         foreach ($backup in $backups) {
             $size = (Get-ChildItem -Path $backup.FullName -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
             $age = (Get-Date) - $backup.CreationTime
@@ -147,28 +147,28 @@ if (Test-Path $backupPath) {
                       elseif ($age.Hours -gt 0) { "$($age.Hours)h" }
                       else { "$($age.Minutes)m" }
             
-            Write-Host "    $($backup.Name) - $([math]::Round($size, 2)) MB - $ageText fa" -ForegroundColor Gray
+            Write-Host "$($backup.Name) - $([math]::Round($size, 2)) MB - $ageText ago" -ForegroundColor Gray
         }
         
         $totalSize = ($backups | ForEach-Object { 
             (Get-ChildItem -Path $_.FullName -Recurse | Measure-Object -Property Length -Sum).Sum 
         } | Measure-Object -Sum).Sum / 1GB
         
-        Write-Host "`n   Totale spazio occupato: $([math]::Round($totalSize, 2)) GB" -ForegroundColor Cyan
+        Write-Host "`n Total occupied space: $([math]::Round($totalSize, 2)) GB" -ForegroundColor Cyan
     } else {
-        Write-Host "Nessun backup trovato." -ForegroundColor Yellow
+        Write-Host "No backups found." -ForegroundColor Yellow
     }
 } else {
-    Write-Host "Cartella backup non trovata: $backupPath" -ForegroundColor Red
+    Write-Host "Backup folder not found: $backupPath" -ForegroundColor Red
 }
 
 Write-Host "`n╔═══════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║                   REPORT COMPLETATO                  ║" -ForegroundColor White
+Write-Host "║ REPORT COMPLETED ║" -ForegroundColor White
 Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Green
 
 Write-Host " Comandi rapidi:" -ForegroundColor Yellow
-Write-Host "   Esegui backup ora:        Start-ScheduledTask -TaskName '$TASK_NAME'" -ForegroundColor White
-Write-Host "   Disabilita backup:        Disable-ScheduledTask -TaskName '$TASK_NAME'" -ForegroundColor White
-Write-Host "   Riabilita backup:         Enable-ScheduledTask -TaskName '$TASK_NAME'" -ForegroundColor White
-Write-Host "   Ricontrolla stato:        .\check-backup-status.ps1" -ForegroundColor White
+Write-Host "Back up now: Start-ScheduledTask -TaskName '$TASK_NAME'" -ForegroundColor White
+Write-Host "Disable backup: Disable-ScheduledTask -TaskName '$TASK_NAME'" -ForegroundColor White
+Write-Host "Re-enable backup: Enable-ScheduledTask -TaskName '$TASK_NAME'" -ForegroundColor White
+Write-Host "Recheck status: .\check-backup-status.ps1" -ForegroundColor White
 Write-Host ""

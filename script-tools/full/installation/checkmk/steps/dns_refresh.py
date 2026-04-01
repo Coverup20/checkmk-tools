@@ -11,8 +11,7 @@ _CRON_CONTENT = """\
 # Needed for DHCP hosts that can change IP address.
 * * * * * cmk --update-dns-cache > /dev/null 2>&1
 * * * * * sleep 30 && cmk --update-dns-cache > /dev/null 2>&1
-*/5 * * * * cmk -R > /dev/null 2>&1
-"""
+*/5 * * * * cmk -R > /dev/null 2>&1"""
 
 
 def run(cfg: InstallerConfig) -> None:

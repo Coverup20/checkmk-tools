@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check_ssh_root_sessions.py - CheckMK Local Check for SSH root session events
+"""check_ssh_root_sessions.py - CheckMK Local Check for SSH root session events
 
 Generate notification for every SSH root login and logout, using state file tracking.
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -21,12 +19,10 @@ STATE_FILE = "/var/lib/check_mk_agent/ssh_root_sessions.state"
 
 
 def get_current_root_ips() -> Set[str]:
-    """
-    Get set of currently active root SSH session IPs.
+    """Get set of currently active root SSH session IPs.
     
     Returns:
-        Set of IP addresses with active root sessions
-    """
+        Set of IP addresses with active root sessions"""
     try:
         result = subprocess.run(
             ["who"],
@@ -55,12 +51,10 @@ def get_current_root_ips() -> Set[str]:
 
 
 def load_previous_ips() -> Set[str]:
-    """
-    Load previous root IPs from state file.
+    """Load previous root IPs from state file.
     
     Returns:
-        Set of previously active IPs
-    """
+        Set of previously active IPs"""
     if not os.path.exists(STATE_FILE):
         return set()
     
@@ -75,12 +69,10 @@ def load_previous_ips() -> Set[str]:
 
 
 def save_current_ips(ips: Set[str]) -> None:
-    """
-    Save current IPs to state file.
+    """Save current IPs to state file.
     
     Args:
-        ips: Set of current IPs
-    """
+        ips: Set of current IPs"""
     os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
     try:
         with open(STATE_FILE, 'w') as f:
@@ -90,12 +82,10 @@ def save_current_ips(ips: Set[str]) -> None:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     current_ips = get_current_root_ips()

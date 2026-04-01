@@ -98,7 +98,7 @@ function Read-Int($Prompt) {
 }
 
 function Stop-And-Remove-Task {
-  # Ferma processo frpc esistente
+  # Stop existing frpc process
   $frpcProcess = Get-Process -Name "frpc" -ErrorAction SilentlyContinue
   if ($frpcProcess) {
     Write-Log "Chiusura processo frpc esistente (PID: $($frpcProcess.Id))" "WARN"
@@ -119,19 +119,19 @@ function Add-DefenderExclusion {
   Write-Log "Configurazione esclusioni Windows Defender..." "INFO"
   
   try {
-    # Aggiungi esclusione per directory
+    # Add exclusion for directory
     Add-MpPreference -ExclusionPath $InstallPath -ErrorAction Stop
     Write-Log "Esclusione path aggiunta: $InstallPath" "OK"
     
-    # Aggiungi esclusione per eseguibile
+    # Add exclusion for executable
     Add-MpPreference -ExclusionPath $FrpcExePath -ErrorAction Stop
     Write-Log "Esclusione exe aggiunta: $FrpcExePath" "OK"
     
-    # Aggiungi esclusione per processo
+    # Add exclusion for process
     Add-MpPreference -ExclusionProcess "frpc.exe" -ErrorAction Stop
     Write-Log "Esclusione processo aggiunta: frpc.exe" "OK"
     
-    # CRITICO: Whitelist ThreatID specifico per frpc (Trojan:Win32/Kepavll!rfn)
+    # CRITICAL: frpc-specific ThreatID Whitelist (Trojan:Win32/Kepavll!rfn)
     try {
       Add-MpPreference -ThreatIDDefaultAction_Ids 2147939874 -ThreatIDDefaultAction_Actions Allow -Force -ErrorAction Stop
       Write-Log "ThreatID 2147939874 (frpc) whitelisted" "OK"
@@ -151,7 +151,7 @@ function Test-FrpcExecution {
   Write-Log "Test esecuzione frpc.exe per verificare Defender..." "INFO"
   
   try {
-    # Testa frpc.exe manualmente con --version
+    # Test frpc.exe manually with --version
     $result = & $FrpcExePath --version 2>&1
     Write-Log "Test OK: $result" "OK"
     return $true
@@ -192,7 +192,7 @@ function Test-DefenderBlocked {
 }
 
 # ===============================
-# Installazione FRP
+# FRP installation
 # ===============================
 function Install-Frpc {
   Write-Log "Download frpc v$FrpVersion" "INFO"
@@ -216,10 +216,10 @@ function Install-Frpc {
   Copy-Item -Path $frpc.FullName -Destination $FrpcExePath -Force
   Write-Log "frpc.exe copiato, attendo verifica Defender..." "INFO"
   
-  # Attendi che Defender analizzi il file
+  # Wait for Defender to analyze the file
   Start-Sleep -Seconds 2
   
-  # Verifica multipla se Defender ha bloccato
+  # Multiple check if Defender has blocked
   $attempts = 0
   $maxAttempts = 5
   while ($attempts -lt $maxAttempts) {
@@ -250,7 +250,7 @@ function Write-FrpcConfig {
     [int]$RemotePort
   )
 
-  # Formato TOML corretto per FRP v0.64.0+
+  # Fixed TOML format for FRP v0.64.0+
   $content = @"
 [common]
 server_addr = "$ServerAddr"
@@ -284,16 +284,16 @@ function Install-And-Start-Task {
   
   Write-Log "Creazione Task Scheduler '$TaskName'" "INFO"
   
-  # Crea action: esegui frpc.exe con config
+  # Create action: Run frpc.exe with config
   $action = New-ScheduledTaskAction -Execute $FrpcExePath -Argument "-c `"$ConfigPath`"" -WorkingDirectory $InstallPath
   
-  # Crea trigger: all'avvio sistema
+  # Create trigger: at system startup
   $trigger = New-ScheduledTaskTrigger -AtStartup
   
-  # Crea principal: esegui come SYSTEM con privilegi massimi
+  # Create principal: Run as SYSTEM with maximum privileges
   $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
   
-  # Impostazioni task
+  # Task settings
   $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
@@ -319,18 +319,18 @@ function Install-And-Start-Task {
     throw "Creazione Task Scheduler fallita: $($_.Exception.Message)"
   }
   
-  # Avvia task immediatamente
+  # Start tasks immediately
   Write-Log "Avvio task '$TaskName'..." "INFO"
   try {
     Start-ScheduledTask -TaskName $TaskName -ErrorAction Stop
     Start-Sleep -Seconds 2
     
-    # Verifica processo avviato
+    # Check process started
     $frpcProcess = Get-Process -Name "frpc" -ErrorAction SilentlyContinue
     if ($frpcProcess) {
       Write-Log "frpc avviato con successo (PID: $($frpcProcess.Id))" "OK"
       
-      # Verifica log per conferma connessione
+      # Check log for connection confirmation
       Start-Sleep -Seconds 2
       if (Test-Path "$InstallPath\frpc.log") {
         $lastLog = Get-Content "$InstallPath\frpc.log" -Tail 5 | Out-String
@@ -368,7 +368,7 @@ try {
 
   $token = Read-NonEmpty "Token FRP"
 
-  # Configura esclusioni Defender PRIMA di installare
+  # Configure Defender exclusions BEFORE installing
   Write-Log "" "INFO"
   Add-DefenderExclusion
   Write-Log "" "INFO"
@@ -376,12 +376,12 @@ try {
   Stop-And-Remove-Task
   Install-Frpc
   
-  # Verifica che Defender non abbia bloccato
+  # Check that Defender hasn't blocked you
   if (-not (Test-DefenderBlocked)) {
     throw "Installazione bloccata da Windows Defender"
   }
   
-  # Test esecuzione PRIMA di creare task
+  # Test execution BEFORE creating tasks
   Write-Log "" "INFO"
   if (-not (Test-FrpcExecution)) {
     Write-Log "" "ERROR"

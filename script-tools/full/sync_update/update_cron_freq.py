@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""
-update_cron_freq.py - Update Cron Job Frequency
+"""update_cron_freq.py - Update Cron Job Frequency
 
-Script interattivo per modificare la frequenza di esecuzione di job specifici nel crontab.
-Target: rcheck-ticket-monitor.sh (o simili configurati)
+Interactive script to change the execution frequency of specific jobs in the crontab.
+Target: rcheck-ticket-monitor.sh (or similar configured)
 
 Usage:
     update_cron_freq.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -19,7 +17,7 @@ from datetime import datetime
 
 VERSION = "1.0.0"
 
-# --- Configurazione ---
+# --- Configuration ---
 TARGET_CMD = "rcheck-ticket-monitor.sh" # Keyword to search in crontab
 
 class Console:
@@ -122,7 +120,7 @@ def main():
         new_lines.append(new_line)
         print(f"Aggiunto: {new_line}")
         
-    # Backup
+    # Backups
     backup_file = f"/tmp/crontab.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     with open(backup_file, "w") as f: f.write(current)
     Console.log(f"Backup crontab: {backup_file}")

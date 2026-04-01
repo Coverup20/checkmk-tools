@@ -1,38 +1,36 @@
 #!/usr/bin/env python3
-"""
-check_nv8_status_extensions.py - CheckMK Local Check per stato registrazione interni NethVoice NS8
+"""check_nv8_status_extensions.py - CheckMK Local Check for NethVoice NS8 extension recording status
 
-Monitora la registrazione PJSIP degli interni (endpoint) su tutti i moduli NethVoice
-installati su NethServer 8 (NS8).
+Monitor PJSIP registration of extensions (endpoints) on all NethVoice modules
+installed on NethServer 8 (NS8).
 
-Usa runagent + podman exec per eseguire `asterisk -rx "pjsip show endpoints"` nel
-container FreePBX/Asterisk di ogni modulo NethVoice trovato.
+Use runagent + podman exec to run `asterisk -rx "pjsip show endpoints"` in
+FreePBX/Asterisk container of each NethVoice module found.
 
-Output CheckMK:
-  - Una riga per interno NON registrato (per drilldown granulare in CheckMK)
-  - Una riga di sommario NV8.Status.Extensions con conteggi totali
+CheckMK Output:
+  - One row per NOT registered extension (for granular drilldown in CheckMK)
+  - An NV8.Status.Extensions summary line with total counts
 
-Stati endpoint PJSIP:
-  Not in use   → registrato, nessuna chiamata attiva   (OK)
-  In use       → registrato, chiamata in corso         (OK)
-  Ringing      → registrato, squillo                   (OK)
-  Busy         → registrato, occupato                  (OK)
-  On Hold      → registrato, in attesa                 (OK)
-  Unavailable  → NON registrato (nessun contatto)      (WARN/CRIT)
-  Invalid      → errore configurazione                 (WARN)
-  Unknown      → stato sconosciuto                     (WARN)
+PJSIP endpoint states:
+  Not in use → registered, no active calls (OK)
+  In use → registered, call in progress (OK)
+  Ringing → recorded, ringing (OK)
+  Busy → registered, busy (OK)
+  On Hold → registered, waiting (OK)
+  Unavailable → NOT registered (no contact) (WARN/CRIT)
+  Invalid → configuration error (WARN)
+  Unknown → unknown status (WARN)
 
-Soglie (configurabili):
-  WARN  se >WARN_PCT% degli interni non registrati  (default: 10%)
-  CRIT  se >CRIT_PCT% degli interni non registrati  (default: 30%)
+Thresholds (configurable):
+  WARN if >WARN_PCT% of extensions not registered (default: 10%)
+  CRIT if >CRIT_PCT% of extensions not registered (default: 30%)
 
-Deployment (NS8 host):
+Deployment (NS8 hosts):
   cd /opt/checkmk-tools && git pull
   cp script-check-ns8/full/check_nv8_status_extensions.py /usr/lib/check_mk_agent/local/check_nv8_status_extensions
   chmod +x /usr/lib/check_mk_agent/local/check_nv8_status_extensions
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import re
 import subprocess
@@ -50,7 +48,7 @@ CRIT_PCT       = 30       # % interni non registrati → CRITICAL
 
 _START = time.monotonic()
 
-# Endpoint states che indicano registrazione attiva
+# Endpoint states indicating active registration
 REGISTERED_STATES = {
     "not in use",
     "in use",
@@ -60,9 +58,9 @@ REGISTERED_STATES = {
     "on hold",
 }
 
-# Regex per riga Endpoint nell'output di `pjsip show endpoints`
+# Regex for Endpoint line in the output of `pjsip show endpoints`
 # Formato: "  Endpoint:  <name/cid>  <state>  <N of M>"
-# Esempio: "  Endpoint:  100                  Not in use    0 of inf"
+# Example: "Endpoint: 100 Not in use 0 of inf"
 #          "  Endpoint:  200/200              Unavailable   0 of inf"
 ENDPOINT_RE = re.compile(
     r"^\s+Endpoint:\s+(\S+)\s+(.*?)\s+\d+\s+of\s+",
@@ -79,7 +77,7 @@ def elapsed() -> float:
 
 
 def run_command(cmd: List[str], timeout: int = 8) -> Tuple[int, str, str]:
-    """Esegue un comando rispettando il budget temporale globale."""
+    """Executes a command within the global time budget."""
     try:
         remaining = max(1, int(SCRIPT_TIMEOUT - elapsed()))
         effective = min(timeout, remaining)
@@ -100,7 +98,7 @@ def run_command(cmd: List[str], timeout: int = 8) -> Tuple[int, str, str]:
 
 
 def sanitize_name(name: str) -> str:
-    """Converte il nome di un interno in service name CheckMK formato dot."""
+    """Converts an extension name to CheckMK service name dot format."""
     # Rimuove suffisso /CID (es: "200/200" → "200")
     name = name.split("/")[0]
     name = re.sub(r"[^a-zA-Z0-9]", ".", name)
@@ -124,7 +122,7 @@ def get_modules() -> List[str]:
 
 
 def get_containers(module: str) -> List[str]:
-    """Ritorna i nomi dei container in running nel modulo."""
+    """Returns the names of the containers running in the module."""
     code, out, _ = run_command(
         ["runagent", "-m", module, "podman", "ps", "--format", "{{.Names}}"]
     )
@@ -134,10 +132,8 @@ def get_containers(module: str) -> List[str]:
 
 
 def find_nethvoice_containers() -> List[Tuple[str, str]]:
-    """
-    Trova tutti i container FreePBX/Asterisk nei moduli NethVoice.
-    Ritorna lista di (module_name, container_name).
-    """
+    """Find all FreePBX/Asterisk containers in NethVoice modules.
+    Returns list of (module_name, container_name)."""
     results = []
     for module in get_modules():
         if elapsed() >= SCRIPT_TIMEOUT - 5:
@@ -155,7 +151,7 @@ def find_nethvoice_containers() -> List[Tuple[str, str]]:
 # ---------------------------------------------------------------------------
 
 def run_asterisk_cmd(module: str, container: str, asterisk_cmd: str) -> Optional[str]:
-    """Esegue un comando Asterisk CLI. Ritorna stdout o None su errore grave."""
+    """Executes an Asterisk CLI command. Return stdout or None on serious error."""
     code, out, _ = run_command(
         ["runagent", "-m", module, "podman", "exec",
          container, "asterisk", "-rx", asterisk_cmd],
@@ -167,17 +163,15 @@ def run_asterisk_cmd(module: str, container: str, asterisk_cmd: str) -> Optional
 
 
 # ---------------------------------------------------------------------------
-# Parsing di `pjsip show endpoints`
+# Parsing `pjsip show endpoints`
 # ---------------------------------------------------------------------------
 
 def parse_endpoints(output: str) -> List[Dict[str, str]]:
-    """
-    Analizza l'output di `pjsip show endpoints`.
-    Restituisce lista di dict con:
-      name       - nome endpoint (senza CID)
-      state      - stato raw (lowercase)
-      registered - True se registrato con contatto attivo
-    """
+    """Parse the output of `pjsip show endpoints`.
+    Returns list of dicts with:
+      name - endpoint name (without CID)
+      state - raw state (lowercase)
+      registered - True if registered with active contact"""
     endpoints = []
     for line in output.splitlines():
         m = ENDPOINT_RE.match(line)
@@ -188,12 +182,12 @@ def parse_endpoints(output: str) -> List[Dict[str, str]]:
         raw_state = m.group(2).strip()
         state_lc  = raw_state.lower()
 
-        # Salta endpoint che sembrano trunk o endpoint di sistema
+        # Skip endpoints that appear to be trunk or system endpoints
         base_name = raw_name.split("/")[0]
         if any(kw in base_name.lower() for kw in ("trunk", "reg-", "reg_", "sip:", "anonymous")):
             continue
 
-        # Salta entry non-endpoint (header, separatori, conteggi)
+        # Skip non-endpoint entries (headers, separators, counts)
         if not re.match(r"^[a-zA-Z0-9]", base_name):
             continue
 
@@ -256,12 +250,12 @@ def main() -> int:
     unreg_count = len(unreg)
     unreg_pct   = (unreg_count / total * 100) if total > 0 else 0.0
 
-    # Una riga CRIT per ogni interno non registrato → servizio separato → notifica individuale
+    # One CRIT line for each unregistered extension → separate service → individual notification
     for ep in unreg:
         svc = f"{SERVICE_EXT}.{sanitize_name(ep['name'])}"
         print(f"2 {svc} - Unregistered | name={ep['name']} state={ep['state']} module={ep['module']}")
 
-    # Sommario sintetico (solo conteggi)
+    # Concise summary (counts only)
     if unreg_count == 0:
         overall = 0
         msg = f"OK: tutti {total} interni registrati"

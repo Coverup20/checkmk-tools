@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check-proxmox_qemu_status.py - CheckMK Local Check for Proxmox QEMU VMs
+"""check-proxmox_qemu_status.py - CheckMK Local Check for Proxmox QEMU VMs
 
 Monitor QEMU VM status with summary and per-VM checks.
 
 Proxmox VE
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys

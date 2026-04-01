@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-"""
-sync-checks.py - Download leggero degli script check da GitHub.
+"""sync-checks.py - Lightweight download of check scripts from GitHub.
 
-Sostituisce git clone/pull: scarica solo i 13 file .py necessari
-da script-check-nsec8/full/ senza installare git o clonare il repository.
+Replaces git clone/pull: only downloads the 13 necessary .py files
+from script-check-nsec8/full/ without installing git or cloning the repository.
 
-Logica:
-  1. Ottieni SHA dell'ultimo commit di main (1 chiamata API)
-  2. Confronta con SHA salvato localmente
-  3. Se diverso: scarica file listing + file modificati
-  4. Salva nuovo SHA
+Logic:
+  1. Get SHA of latest commit of main (1 API call)
+  2. Compare with locally saved SHA
+  3. If different: download listing files + modified files
+  4. Save new SHA
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import json
 import sys
@@ -41,7 +39,7 @@ def _get_json(url: str) -> object:
 
 
 def main() -> int:
-    # 0. Self-update: scarica se stessa da GitHub e si sostituisce se cambiata
+    # 0. Self-update: downloads itself from GitHub and replaces itself if changed
     self_path = Path(__file__).resolve()
     try:
         url = f"{RAW_BASE}/{SELF_PATH}"
@@ -61,7 +59,7 @@ def main() -> int:
     except Exception as exc:
         print(f"[sync-checks] Self-update fallito (continuo con versione attuale): {exc}", file=sys.stderr)
 
-    # 1. Ottieni SHA HEAD del branch main (1 API call)
+    # 1. Get SHA HEAD of main branch (1 API call)
     try:
         ref = _get_json(f"{API_BASE}/git/ref/heads/{BRANCH}")
         remote_sha: str = ref["object"]["sha"]
@@ -69,7 +67,7 @@ def main() -> int:
         print(f"[sync-checks] ERRORE: impossibile ottenere SHA remoto: {exc}", file=sys.stderr)
         return 1
 
-    # 2. Confronta con SHA locale
+    # 2. Compare with local SHA
     try:
         local_sha = SHA_CACHE.read_text().strip()
     except FileNotFoundError:
@@ -78,14 +76,14 @@ def main() -> int:
     if remote_sha == local_sha:
         return 0  # Già aggiornato, uscita silenziosa
 
-    # 3. Ottieni lista file da GitHub API
+    # 3. Get file list from GitHub API
     try:
         files = _get_json(f"{API_BASE}/contents/{CHECKS_PATH}?ref={BRANCH}")
     except Exception as exc:
         print(f"[sync-checks] ERRORE: impossibile ottenere lista file: {exc}", file=sys.stderr)
         return 1
 
-    # 4. Scarica file .py in /opt/checkmk-checks/
+    # 4. Download .py file in /opt/checkmk-checks/
     CHECKS_DIR.mkdir(parents=True, exist_ok=True)
     count = 0
     for entry in files:
@@ -101,7 +99,7 @@ def main() -> int:
         except Exception as exc:
             print(f"[sync-checks] ERRORE: download {name}: {exc}", file=sys.stderr)
 
-    # 5. Deploy in local checks dir (senza estensione .py)
+    # 5. Deploy in local checks dir (without .py extension)
     LOCAL_DIR.mkdir(parents=True, exist_ok=True)
     deployed = 0
     for src in CHECKS_DIR.glob("*.py"):
@@ -114,7 +112,7 @@ def main() -> int:
         except Exception as exc:
             print(f"[sync-checks] ERRORE deploy {src.name}: {exc}", file=sys.stderr)
 
-    # 6. Salva nuovo SHA
+    # 6. Save new SHA
     SHA_CACHE.parent.mkdir(parents=True, exist_ok=True)
     SHA_CACHE.write_text(remote_sha + "\n")
     print(f"[sync-checks] {count} file aggiornati, {deployed} deployati (sha: {remote_sha[:8]})")

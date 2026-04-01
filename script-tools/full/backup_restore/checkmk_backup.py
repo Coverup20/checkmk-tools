@@ -1,33 +1,31 @@
 #!/usr/bin/env python3
-"""
-checkmk_backup.py - CheckMK Disaster Recovery Backup Tool
+"""checkmk_backup.py - CheckMK Disaster Recovery Backup Tool
 
-Esegue il backup completo di un site CheckMK per Disaster Recovery.
-Include configurazione, dati var e estensioni locali.
-Supporta upload su storage remoto via Rclone.
+Performs a complete backup of a CheckMK site for Disaster Recovery.
+Includes configuration, var data, and local extensions.
+Support upload to remote storage via Rclone.
 
 Features:
-- Auto-detect del site OMD
-- Raccolta metadati avanzati (JSON)
-- Esclusione intelligente file non necessari
-- Upload Rclone integrato con retention policy
-- Generazione istruzioni restore
+- OMD site auto-detect
+- Advanced metadata collection (JSON)
+- Smart exclusion of unnecessary files
+- Rclone upload integrated with retention policy
+- Generation of restore instructions
 
 Usage:
     checkmk_backup.py [site_name] [options]
 
 Options:
-    --no-upload     Salta upload rclone
-    --include-rrd   Include dati storici RRD (warning: dimensioni elevate)
-    --debug         Attiva log verbose
+    --no-upload Skip rclone uploads
+    --include-rrd Include historical RRD data (warning: large size)
+    --debug Enable verbose logging
 
 Env Vars:
-    RCLONE_REMOTE   Nome remote rclone (default: do:testmonbck)
-    RCLONE_PATH     Path remoto (default: checkmk-backups/monitoring)
-    RETENTION_DAYS  Giorni ritenzione (default: 30)
+    RCLONE_REMOTE rclone remote name (default: do:testmonbck)
+    RCLONE_PATH Remote path (default: checkmk-backups/monitoring)
+    RETENTION_DAYS Retention days (default: 30)
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -42,7 +40,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-# --- Configurazione Default ---
+# --- Default Configuration ---
 DEFAULT_RCLONE_REMOTE = "do:testmonbck"
 DEFAULT_RCLONE_PATH = "checkmk-backups/monitoring"
 DEFAULT_RETENTION_DAYS = 30
@@ -70,7 +68,7 @@ def log(msg: str, level: str = "INFO"):
 
 # --- Helper Functions ---
 def run_command(cmd: List[str], user: Optional[str] = None, check: bool = True, capture_output: bool = True) -> subprocess.CompletedProcess:
-    """Esegue un comando, opzionalmente come altro utente"""
+    """Run a command, optionally as another user"""
     if user:
         cmd = ["su", "-", user, "-c", " ".join(f"'{c}'" for c in cmd)]
     
@@ -87,7 +85,7 @@ def run_command(cmd: List[str], user: Optional[str] = None, check: bool = True, 
         raise
 
 def get_omd_site(arg_site: Optional[str] = None) -> str:
-    """Rileva il site OMD"""
+    """Detect the OMD site"""
     if arg_site:
         return arg_site
     
@@ -111,14 +109,14 @@ def get_omd_site(arg_site: Optional[str] = None) -> str:
         sys.exit(1)
 
 def check_rclone(site: str, remote: str) -> bool:
-    """Verifica configurazione rclone"""
+    """Check rclone configuration"""
     if not shutil.which("rclone"):
         log("Rclone non installato", "ERROR")
         return False
     
     remote_name = remote.split(':')[0]
     try:
-        # Verifica se il remote è configurato per l'utente del site
+        # Check if the remote is configured for the site user
         result = run_command(["rclone", "listremotes"], user=site, capture_output=True)
         if f"{remote_name}:" in result.stdout:
             log(f"Rclone remote '{remote_name}' configurato OK", "INFO")
@@ -131,7 +129,7 @@ def check_rclone(site: str, remote: str) -> bool:
         return False
 
 def collect_metadata(site: str, site_base: Path) -> Dict[str, Any]:
-    """Raccoglie metadati del sistema e del site"""
+    """Collects system and site metadata"""
     metadata = {
         "timestamp": datetime.now().isoformat(),
         "hostname": os.uname().nodename,
@@ -170,38 +168,37 @@ def collect_metadata(site: str, site_base: Path) -> Dict[str, Any]:
     return metadata
 
 def create_restore_instructions(backup_file: str, checksum: str, site: str):
-    """Genera file di istruzioni per il restore"""
-    content = f"""=== ISTRUZIONI DISASTER RECOVERY RESTORE ===
+    """Generate restore instruction files"""
+    content = f"""=== DISASTER RECOVERY RESTORE INSTRUCTIONS ===
 
-1. PREREQUISITI:
-   - CheckMK installato (stessa versione)
-   - Sito OMD creato: `omd create {site}`
-   - Sito fermo: `omd stop {site}`
+1. PREREQUISITES:
+   - CheckMK installed (same version)
+   - OMD site created: `omd create {site}`
+   - Site stopped: `omd stop {site}`
 
-2. PROCEDURA:
-   # Ferma il sito
+2. PROCEDURE:
+   # Stop the site
    omd stop {site}
 
-   # Estrai backup
+   # Extract backup
    tar xzf {backup_file} -C /opt/omd/sites/{site}/
 
-   # Ripristina permessi
+   # Reset permissions
    chown -R {site}:{site} /opt/omd/sites/{site}
 
-   # Verifica Checksum
-   # Atteso: {checksum}
+   # Verify Checksum
+   # Expected: {checksum}
    sha256sum {backup_file}
 
-   # Riavvia
+   # Restart
    omd start {site}
    
-   # Ricompila configurazione
+   # Recompile configuration
    su - {site} -c "cmk -R"
 
-3. NOTE:
-   - Configuare /opt/ydea-toolkit/.env se necessario
-   - Reinstallare eventuali cronjob persi
-"""
+3. NOTES:
+   - Configure /opt/ydea-toolkit/.env if necessary
+   - Reinstall any lost cronjobs"""
     return content
 
 class BackupManager:
@@ -235,7 +232,7 @@ class BackupManager:
         with open(metadata_file, "w") as f:
             json.dump(metadata, f, indent=2)
             
-        # 2. Selezione File
+        # 2. File Selection
         backup_items = [
             "etc/check_mk", "etc/omd", "etc/apache", "etc/ssl", 
             "etc/htpasswd", "etc/auth.secret", "etc/auth.serials", "etc/environment",
@@ -257,7 +254,7 @@ class BackupManager:
                 # Aggiungi metadata
                 tar.add(metadata_file, arcname="backup_metadata.json")
                 
-                # Aggiungi items del site
+                # Add site items
                 for item in backup_items:
                     full_path = self.site_base / item
                     if full_path.exists():

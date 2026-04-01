@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-fix_reenable_checkmk_all.py - Riabilita Check_MK (data collector) su tutti gli host stale.
-Usa query LiveStatus corretta (send + SHUT_WR) e manda ENABLE_SVC_CHECK direttamente.
-Version: 1.0.0
-"""
+"""fix_reenable_checkmk_all.py - Reenable Check_MK (data collector) on all stale hosts.
+Use correct LiveStatus query (send + SHUT_WR) and send ENABLE_SVC_CHECK directly.
+Version: 1.0.0"""
 import socket
 import time
 import subprocess
@@ -13,7 +11,7 @@ NAGIOS_CMD  = "/omd/sites/monitoring/tmp/run/nagios.cmd"
 
 
 def live(q):
-    """Query LiveStatus - metodo corretto con SHUT_WR"""
+    """LiveStatus Query - fixed method with SHUT_WR"""
     s = socket.socket(socket.AF_UNIX)
     s.connect(LIVE_SOCKET)
     s.send((q + "\n").encode())
@@ -33,7 +31,7 @@ print("=" * 65)
 print("FIX DEFINITIVO: ENABLE Check_MK data collector su tutti gli host")
 print("=" * 65)
 
-# Prendi TUTTI gli host monitorati (non quelli con problemi, proprio TUTTI)
+# Get ALL monitored hosts (not the ones with problems, just ALL)
 hosts_rows = live(
     "GET hosts\n"
     "Columns: name\n"
@@ -41,7 +39,7 @@ hosts_rows = live(
 all_hosts = [r.strip() for r in hosts_rows if r.strip()]
 print(f"\nHost totali nel sistema: {len(all_hosts)}")
 
-# Prendi solo gli host che hanno un servizio Check_MK con staleness alta
+# Only take hosts that have Check_MK service with high staleness
 stale_rows = live(
     "GET services\n"
     "Filter: description = Check_MK\n"
@@ -68,7 +66,7 @@ print(f"\nHost da fixare: {len(hosts_to_fix)}")
 
 if not hosts_to_fix:
     print("\nNessun host stale. Provo comunque enable su tutti (force mode)...")
-    # Leggi tutti gli host con Check_MK service
+    # Read all hosts with Check_MK service
     hosts_to_fix = [r.split(";")[0].strip() for r in stale_rows if r.strip()]
     print(f"Force mode: {len(hosts_to_fix)} host")
 
@@ -81,7 +79,7 @@ for host in hosts_to_fix:
     send_cmd(f"ENABLE_SVC_CHECK;{host};Check_MK")
     print(f"  ENABLE_SVC_CHECK: {host}")
 
-# Aspetta che Nagios processi i comandi
+# Wait for Nagios to process the commands
 time.sleep(3)
 
 print(f"\n[STEP 2] Eseguo cmk --check su tutti gli host...")
@@ -107,7 +105,7 @@ for host in hosts_to_fix:
 
 print(f"\n  cmk --check: {ok} OK, {err} errori/timeout")
 
-# Attendi e verifica
+# Please wait and check
 print(f"\n[STEP 3] Attendo 10s e verifico staleness...")
 time.sleep(10)
 

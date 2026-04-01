@@ -1,19 +1,19 @@
 #!/bin/bash
 # tmate-receive-token.sh
-# Forced command su server vps-02: riceve token tmate dai client via SSH
+# Forced command on vps-02 server: receives tmate tokens from clients via SSH
 #
-# Chiamato da: authorized_keys con command="/opt/tmate-receive-token.sh"
-# Stdin: token tmate (es: "ssh -p10022 AbCdEf@monitor01.nethlab.it")
-# SSH_ORIGINAL_COMMAND: hostname del client (es: "checkmk-z1plus")
-# SSH_CONNECTION: IP del client in campo 1
+# Called from: authorized_keys with command="/opt/tmate-receive-token.sh"
+# Stdin: tmate token (e.g. "ssh -p10022 AbCdEf@monitor01.nethlab.it")
+# SSH_ORIGINAL_COMMAND: client hostname (e.g. "checkmk-z1plus")
+# SSH_CONNECTION: Client IP in field 1
 #
 # Funzionalita':
-#   1. Salva token in /opt/tmate-tokens/<nodename>.txt
-#   2. Cleanup automatico: rimuove file con nome IP stale se nodename diverso dall'IP
+# 1. Save tokens in /opt/tmate-tokens/<nodename>.txt
+# 2. Automatic cleanup: remove files with stale IP name if nodename different from IP
 
 CLIENT_IP=$(echo $SSH_CONNECTION | awk '{print $1}')
 
-# Metodo 1: client passa hostname come argomento SSH (es: ssh ... "checkmk-z1plus")
+# Method 1: Client passes hostname as SSH argument (ex: ssh ... "checkmk-z1plus")
 NODENAME=$(echo "$SSH_ORIGINAL_COMMAND" | tr -cd 'a-zA-Z0-9._-')
 
 # Metodo 2: fallback journal lookup (1000 righe)
@@ -32,8 +32,8 @@ if [ -n "$TOKEN" ]; then
   chmod 644 "/opt/tmate-tokens/${NODENAME}.txt"
   logger -t tmate-receiver "Token salvato per ${NODENAME} (ip=${CLIENT_IP})"
 
-  # Cleanup: rimuovi file stale con nome IP se il nodename e' diverso dall'IP
-  # (succede quando client configurato vecchio stile senza passaggio hostname)
+  # Cleanup: remove stale file with IP name if nodename is different from IP
+  # (happens when client configured old style without hostname passing)
   if [ "$NODENAME" != "$CLIENT_IP" ] && [ -f "/opt/tmate-tokens/${CLIENT_IP}.txt" ]; then
     rm -f "/opt/tmate-tokens/${CLIENT_IP}.txt"
     logger -t tmate-receiver "Rimosso file stale ${CLIENT_IP}.txt (sostituito da ${NODENAME}.txt)"

@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-update-all-scripts.py
+"""update-all-scripts.py
 
 Python entrypoint that delegates to update-all-scripts.sh.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

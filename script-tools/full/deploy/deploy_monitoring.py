@@ -1,26 +1,24 @@
 #!/usr/bin/env python3
-"""
-deploy_monitoring.py - Deploy CheckMK Local Checks
+"""deploy_monitoring.py - Deploy CheckMK Local Checks
 
-Distribuzione interattiva di script di controllo (r*.sh) dal repository
-alla cartella locale dell'agente CheckMK.
+Interactive deployment of control scripts (r*.sh) from the repository
+to the local CheckMK agent folder.
 
 Features:
-- Rilevamento automatico tipo sistema (ns7, ns8, proxmox, ubuntu)
-- Selezione sorgente corretta nel repo
-- Menu interattivo selezione script
-- Installazione in /usr/lib/check_mk_agent/local
+- Automatic system type detection (ns7, ns8, proxmox, ubuntu)
+- Correct source selection in the repo
+- Interactive script selection menu
+- Installation in /usr/lib/check_mk_agent/local
 
 Usage:
     deploy_monitoring.py [options]
 
 Options:
-    --repo DIR        Path repository (auto-detect)
-    --all             Installa tutti gli script senza chiedere
-    --system TYPE     Forza tipo sistema (ns7, ns8, proxmox, ubuntu)
+    --repo DIR Path repository (auto-detect)
+    --all Install all scripts without asking
+    --system TYPE Force system type (ns7, ns8, proxmox, ubuntu)
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -29,7 +27,7 @@ import glob
 import argparse
 from pathlib import Path
 
-# --- Configurazione ---
+# --- Configuration ---
 TARGET_DIR = Path("/usr/lib/check_mk_agent/local")
 DEFAULT_REPO_PATHS = [
     Path("/opt/checkmk-tools"),

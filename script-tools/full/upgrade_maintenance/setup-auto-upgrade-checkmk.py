@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-setup-auto-upgrade-checkmk.py
+"""setup-auto-upgrade-checkmk.py
 
-Configura cron auto-upgrade usando upgrade-checkmk.py (non shell).
-Version: 1.1.0
-"""
+Configure cron auto-upgrade using upgrade-checkmk.py (not shell).
+Version: 1.1.0"""
 
 from __future__ import annotations
 

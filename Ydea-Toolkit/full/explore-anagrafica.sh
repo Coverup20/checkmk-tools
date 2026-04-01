@@ -1,5 +1,5 @@
 #!/bin/bash
-# explore-anagrafica.sh - Esplora i dati dell'anagrafica per trovare la SLA
+# explore-anagrafica.sh - Explore the registry data to find the ALS
 
 set -euo pipefail
 
@@ -14,7 +14,7 @@ echo ""
 ensure_token
 TOKEN="$(load_token)"
 
-# Prova vari endpoint per l'anagrafica
+# Test various registry endpoints
 declare -a ENDPOINTS=(
   "/anagrafica/$ANAGRAFICA_ID"
   "/anagrafiche/$ANAGRAFICA_ID"
@@ -28,7 +28,7 @@ declare -a ENDPOINTS=(
   "/contratti?anagrafica_id=$ANAGRAFICA_ID"
 )
 
-echo " Tentativo di recupero dati anagrafica..."
+echo "Attempt to recover personal data..."
 echo ""
 
 for ENDPOINT in "${ENDPOINTS[@]}"; do
@@ -42,13 +42,13 @@ for ENDPOINT in "${ENDPOINTS[@]}"; do
   HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
   
   if [[ "$HTTP_CODE" == "200" ]]; then
-    echo " HTTP $HTTP_CODE - TROVATO!"
+    echo "HTTP $HTTP_CODE - FOUND!"
     
     HTTP_BODY=$(echo "$RESPONSE" | sed '$d')
     
     echo ""
     echo "════════════════════════════════════════════════════════════════════════"
-    echo "RISPOSTA DA: $ENDPOINT"
+    echo "REPLY FROM: $ENDPOINT"
     echo "════════════════════════════════════════════════════════════════════════"
     echo ""
     
@@ -58,18 +58,18 @@ for ENDPOINT in "${ENDPOINTS[@]}"; do
     
     # Cerca campi contenenti "sla", "premium", "mon"
     echo " Campi contenenti 'SLA', 'Premium' o 'Mon':"
-    echo "$HTTP_BODY" | jq 'walk(if type == "object" then with_entries(select(.key | test("sla|premium|mon|contract|contratt"; "i"))) else . end)' 2>/dev/null || echo "   Nessuno trovato"
+    echo "$HTTP_BODY" | jq 'walk(if type == "object" then with_entries(select(.key | test("sla|premium|mon|contract|contratt"; "i"))) else . end)' 2>/dev/null || echo "None found"
     
     echo ""
     
-    # Salva il risultato
+    # Save the result
     echo "$HTTP_BODY" | jq '.' > "/tmp/anagrafica-${ANAGRAFICA_ID}.json"
-    echo " Salvato in: /tmp/anagrafica-${ANAGRAFICA_ID}.json"
+    echo "Saved in: /tmp/anagrafica-${ANAGRAFICA_ID}.json"
     echo ""
   elif [[ "$HTTP_CODE" == "404" ]]; then
-    echo " HTTP $HTTP_CODE - Non trovato"
+    echo "HTTP $HTTP_CODE - Not found"
   elif [[ "$HTTP_CODE" == "401" ]]; then
-    echo " HTTP $HTTP_CODE - Non autorizzato"
+    echo "HTTP $HTTP_CODE - Unauthorized"
   elif [[ "$HTTP_CODE" == "403" ]]; then
     echo " HTTP $HTTP_CODE - Accesso negato"
   else
@@ -79,11 +79,11 @@ done
 
 echo ""
 echo "════════════════════════════════════════════════════════════════════════"
-echo "RICERCA NEI TICKET CON QUESTA ANAGRAFICA"
+echo "SEARCH TICKETS WITH THIS PERSONAL GRAPHIC"
 echo "════════════════════════════════════════════════════════════════════════"
 echo ""
 
-echo "Cerco ticket con anagrafica_id=$ANAGRAFICA_ID per vedere tutti i campi disponibili..."
+echo "I am looking for tickets with anagrafica_id=$ANAGRAFICA_ID to see all the available fields..."
 echo ""
 
 RESPONSE=$(curl -s \
@@ -94,20 +94,20 @@ RESPONSE=$(curl -s \
 MATCHING_TICKETS=$(echo "$RESPONSE" | jq --arg aid "$ANAGRAFICA_ID" '[.objs[] | select(.anagrafica_id == ($aid|tonumber))]')
 COUNT=$(echo "$MATCHING_TICKETS" | jq 'length')
 
-echo "Trovati $COUNT ticket con questa anagrafica"
+echo "$COUNT ticket found with this registry"
 
 if [[ "$COUNT" -gt 0 ]]; then
     echo ""
-    echo "Primo ticket trovato (per analisi campi):"
+    echo "First ticket found (for field analysis):"
     echo "$MATCHING_TICKETS" | jq '.[0]'
     echo ""
     
-    echo "Tutte le chiavi disponibili nei ticket di questa anagrafica:"
+    echo "All the keys available in the tickets of this registry:"
     echo "$MATCHING_TICKETS" | jq '[.[].keys[]] | unique | sort[]'
     echo ""
     
     # Cerca campi custom o sla
-    echo "Valori customAttributes nei ticket di questa anagrafica:"
+    echo "customAttributes values ​​in the tickets of this registry:"
     echo "$MATCHING_TICKETS" | jq '[.[].customAttributes // {}] | unique'
 fi
 

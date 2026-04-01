@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-check_efivars.py - CheckMK Local Check per /sys/firmware/efi/efivars
+"""check_efivars.py - CheckMK Local Check for /sys/firmware/efi/efivars
 
-Monitora il riempimento del filesystem efivarfs.
-WARNING a 80%, CRITICAL a 95%.
+Monitor the filling of the efivarfs filesystem.
+WARNING at 80%, CRITICAL at 95%.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -32,7 +30,7 @@ def main() -> int:
         return 0
 
     if result.returncode != 0:
-        # efivarfs non montato (sistema non UEFI)
+        # efivarfs not mounted (non-UEFI system)
         print(f"0 {SERVICE} - OK: efivarfs non presente (sistema non UEFI)")
         return 0
 

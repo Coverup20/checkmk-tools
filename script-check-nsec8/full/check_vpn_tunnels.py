@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""check_vpn_tunnels.py - CheckMK local check VPN tunnels (Python puro)."""
+"""check_vpn_tunnels.py - CheckMK local check VPN tunnels (pure Python)."""
 
 VERSION = "1.1.0"
 

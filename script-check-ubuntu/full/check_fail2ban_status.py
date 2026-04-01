@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-check_fail2ban_status.py - CheckMK Local Check for Fail2ban Status
+"""check_fail2ban_status.py - CheckMK Local Check for Fail2ban Status
 
 Monitors fail2ban service status and counts banned IPs across all jails.
 Compatible with CheckMK local check format.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -18,15 +16,13 @@ SERVICE = "Fail2ban"
 
 
 def run_command(cmd: List[str]) -> Tuple[int, str, str]:
-    """
-    Execute a shell command and return exit code, stdout, stderr.
+    """Execute a shell command and return exit code, stdout, stderr.
     
     Args:
         cmd: Command as list of strings
         
     Returns:
-        Tuple of (exit_code, stdout, stderr)
-    """
+        Tuple of (exit_code, stdout, stderr)"""
     try:
         result = subprocess.run(
             cmd,
@@ -63,12 +59,10 @@ def is_fail2ban_running() -> bool:
 
 
 def get_active_jails() -> Optional[List[str]]:
-    """
-    Get list of active fail2ban jails.
+    """Get list of active fail2ban jails.
     
     Returns:
-        List of jail names or None if error
-    """
+        List of jail names or None if error"""
     exit_code, stdout, _ = run_command(["fail2ban-client", "status"])
     if exit_code != 0:
         return None
@@ -87,15 +81,13 @@ def get_active_jails() -> Optional[List[str]]:
 
 
 def get_banned_count(jail: str) -> int:
-    """
-    Get number of currently banned IPs for a specific jail.
+    """Get number of currently banned IPs for a specific jail.
     
     Args:
         jail: Name of the fail2ban jail
         
     Returns:
-        Number of banned IPs (0 if error)
-    """
+        Number of banned IPs (0 if error)"""
     exit_code, stdout, _ = run_command(["fail2ban-client", "status", jail])
     if exit_code != 0:
         return 0
@@ -112,12 +104,10 @@ def get_banned_count(jail: str) -> int:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     # Check if fail2ban is installed
     if not is_fail2ban_installed():
         print(f"3 {SERVICE} - fail2ban not installed")

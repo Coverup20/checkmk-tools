@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check_webtop_maxmemory.py - CheckMK Local Check for WebTop MaxMemory setting
+"""check_webtop_maxmemory.py - CheckMK Local Check for WebTop MaxMemory setting
 
 Extract WebTop MaxMemory configuration value.
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -18,12 +16,10 @@ SERVICE_NAME = "WebTop-maxmemory"
 
 
 def get_maxmemory():
-    """
-    Get WebTop MaxMemory setting from config database.
+    """Get WebTop MaxMemory setting from config database.
     
     Returns:
-        MaxMemory value or empty string if unset
-    """
+        MaxMemory value or empty string if unset"""
     try:
         result = subprocess.run(
             ["config", "show", "webtop"],
@@ -49,12 +45,10 @@ def get_maxmemory():
 
 
 def main():
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     maxmem = get_maxmemory()
     
     if maxmem:

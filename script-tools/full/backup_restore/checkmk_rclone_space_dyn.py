@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-checkmk_rclone_space_dyn.py
+"""checkmk_rclone_space_dyn.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import argparse
 import datetime as dt
@@ -311,7 +309,7 @@ if [[ "$RETENTION_DAYS_LOCAL" -gt 0 ]]; then
   kept=0
   for backup in "${all_backups[@]}"; do
     kept=$((kept + 1))
-    if [[ $kept -gt $RETENTION_DAYS_LOCAL ]]; then
+if [[ $kept -gt $RETENTION_DAYS_LOCAL ]]; then
       rm -rf "$backup" 2>/dev/null || true
     fi
   done
@@ -320,7 +318,7 @@ fi
 if [[ "$RETENTION_DAYS_REMOTE" -gt 0 ]]; then
   mapfile -t all_remote_backups < <(
     rclone lsf "$REMOTE_SITE_PATH" --dirs-only "${COMMON_OPTS[@]}" 2>/dev/null || true
-    rclone lsf "$REMOTE_SITE_PATH" --files-only "${COMMON_OPTS[@]}" 2>/dev/null | grep -E '\.(tgz|tar\.gz|tar|zip)$' || true
+    rclone lsf "$REMOTE_SITE_PATH" --files-only "${COMMON_OPTS[@]}" 2>/dev/null | grep -It's \.(tgz|tar\.gz|tar|zip)$' || true
   )
 
   if [[ ${#all_remote_backups[@]} -gt 0 ]]; then
@@ -346,8 +344,7 @@ if [[ "$RETENTION_DAYS_REMOTE" -gt 0 ]]; then
   fi
 fi
 
-log "All operations completed."
-'''
+log "All operations completed."'''
     WRAPPER_PATH.parent.mkdir(parents=True, exist_ok=True)
     WRAPPER_PATH.write_text(wrapper, encoding="utf-8")
     WRAPPER_PATH.chmod(0o755)
@@ -379,8 +376,7 @@ IOSchedulingClass=best-effort
 IOSchedulingPriority=7
 
 [Install]
-WantedBy=multi-user.target
-"""
+WantedBy=multi-user.target"""
 
     path_unit = """[Unit]
 Description=Monitor backup directory for Checkmk site %i
@@ -392,8 +388,7 @@ TriggerLimitBurst=5
 Unit=checkmk-cloud-backup-push@%i.service
 
 [Install]
-WantedBy=multi-user.target
-"""
+WantedBy=multi-user.target"""
 
     timer_unit = """[Unit]
 Description=Timer for Checkmk Cloud Backup Push (rclone) for site %i
@@ -404,8 +399,7 @@ Persistent=true
 Unit=checkmk-cloud-backup-push@%i.service
 
 [Install]
-WantedBy=timers.target
-"""
+WantedBy=timers.target"""
 
     (SYSTEMD_DIR / "checkmk-cloud-backup-push@.service").write_text(service_unit, encoding="utf-8")
     (SYSTEMD_DIR / "checkmk-cloud-backup-push@.path").write_text(path_unit, encoding="utf-8")
@@ -425,8 +419,7 @@ RCLONE_CONF=/opt/omd/sites/{site}/.config/rclone/rclone.conf
 RETRIES=3
 BWLIMIT=0
 RETENTION_DAYS_LOCAL={retention_local}
-RETENTION_DAYS_REMOTE={retention_remote}
-"""
+RETENTION_DAYS_REMOTE={retention_remote}"""
     defaults.write_text(text, encoding="utf-8")
     defaults.chmod(0o644)
     log(f"Created defaults file: {defaults}")
@@ -573,8 +566,7 @@ def usage() -> None:
         f"""Usage:
   {SCRIPT_NAME} setup
   {SCRIPT_NAME} run <site>
-  {SCRIPT_NAME} remove <site>
-"""
+  {SCRIPT_NAME} remove <site>"""
     )
 
 

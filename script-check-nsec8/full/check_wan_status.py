@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """check_wan_status.py - CheckMK local check WAN status (Python puro).
 
-Version: 1.1.1
-"""
+Version: 1.1.1"""
 
 import json
 import subprocess
@@ -17,11 +16,11 @@ def run(cmd: list[str]) -> str:
 
 
 def find_wan_interfaces() -> list[str]:
-    """Rileva interfacce WAN cercando quelle con default route (target 0.0.0.0).
-    Fallback su nomi che iniziano con wan/wwan/vwan."""
+    """Detects WAN interfaces by looking for those with default route (target 0.0.0.0).
+    Fallback on names starting with wan/wwan/vwan."""
     wan_ifaces: list[str] = []
 
-    # Metodo 1: dump di tutte le interfacce, cerca quelle con default route
+    # Method 1: Dump all interfaces, look for those with default route
     data = run(["ubus", "call", "network.interface", "dump"])
     if data:
         try:

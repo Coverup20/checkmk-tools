@@ -1,30 +1,30 @@
 #!/bin/bash
 /usr/bin/env bash
-# analyze-ticket-data.sh ÔÇö Analizza i ticket esistenti per estrarre categorie, priorit├á e SLA
-# Estrae gli ID unici dai ticket per capire la struttura datiset -euo pipefail
+# analyze-ticket-data.sh ÔÇö Analyze existing tickets to extract categories, priorities and SLA
+# Extracts unique IDs from tickets to understand the dataset -euo pipefail structure
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 YDEA_TOOLKIT="${SCRIPT_DIR}/ydea-toolkit.sh"
 echo "DEBUG: Script dir: $SCRIPT_DIR" >&2
 echo "DEBUG: Toolkit path: $YDEA_TOOLKIT" >&2
 if [[ ! -f "$YDEA_TOOLKIT" ]]; then
-    echo "Øî Errore: ydea-toolkit.sh non trovato in $SCRIPT_DIR" >&2  exit 1
+    echo "Øî Error: ydea-toolkit.sh not found in $SCRIPT_DIR" >&2  exit 1
 fi
 
-# Carica le funzioni da ydea-toolkit
+# Load functions from ydea-toolkit
 # shellcheck disable=SC1090
 source "$YDEA_TOOLKIT"
-echo "DEBUG: Toolkit caricato con successo" >&2
+echo "DEBUG: Toolkit loaded successfully" >&2
 echo ""
 echo "ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ"
 echo "  ­ƒôè ANALISI DATI TICKET YDEA"
 echo "ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ"
 echo ""
-# Verifica autenticazione
+# Verify authentication
 echo "­ƒôï Autenticazione..."set +eensure_token_output=$(ensure_token 2>&1)ensure_exit=$?set -e
 echo "DEBUG: ensure_token exit code: $ensure_exit" >&2
 echo "DEBUG: ensure_token output: $ensure_token_output" >&2
 if [[ $ensure_exit -ne 0 ]]; then
-    echo " Errore autenticazione"
+    echo "Authentication error"
     echo "$ensure_token_output"
     exit 1
 fi
@@ -40,7 +40,7 @@ set -e
 
 echo "DEBUG: ydea_api exit code: $api_exit" >&2
 if [[ $api_exit -ne 0 ]]; then
-    echo " Errore nel recupero ticket (exit: $api_exit)"
+    echo "Error retrieving ticket (exit: $api_exit)"
     echo "$tickets_data"
     exit 1
 fi
@@ -49,7 +49,7 @@ echo "DEBUG: Dati ricevuti, lunghezza: ${#tickets_data}" >&2
 
 # Salva dump completo
 echo "$tickets_data" > "${SCRIPT_DIR}/tickets-dump.json"
-echo " Dump salvato in: ${SCRIPT_DIR}/tickets-dump.json"
+echo "Dump saved in: ${SCRIPT_DIR}/tickets-dump.json"
 echo ""
 # Estrai priorit├á uniche
 echo "ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü"
@@ -77,20 +77,20 @@ echo "$tickets_data" | jq -r '.objs[0:5] | .[] | "Ticket \(.codice):\n\(.customA
 echo ""
 # Cerca nei custom attributes eventuali categorie o SLA
 echo "ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü"
-echo "­ƒöì RICERCA CATEGORIE/SLA NEI CUSTOM ATTRIBUTES:"
+echo "ƒöì SEARCH CATEGORIES/SLA IN CUSTOM ATTRIBUTES:"
 echo "ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü"
-# Cerca campi che contengono "categ", "sla", "premium"
+# Look for fields that contain "categ", "sla", "premium"
 echo "$tickets_data" | jq -r '  .objs[] |   select(.customAttributes != null and .customAttributes != {}) |   {    ticket: .codice,    custom: .customAttributes  }' | head -50
 echo ""
-# Analizza un ticket specifico per vedere tutti i campi
+# Analyze a specific ticket to see all fields
 echo "ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü"
 echo "­ƒöÄ STRUTTURA COMPLETA PRIMO TICKET:"
 echo "ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü"
 echo "$tickets_data" | jq '.objs[0]' | head -100
 echo ""
-# Cerca ticket con "Premium" nel codice o descrizione
+# Look for tickets with "Premium" in the code or description
 echo "ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü"
-echo "­ƒÄû´©Å  TICKET CON 'PREMIUM' O 'TK25/003209':"
+echo "ƒÄû´©Å TICKET WITH 'PREMIUM' OR 'TK25/003209':"
 echo "ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü"
 echo "$tickets_data" | jq -r '  .objs[] |   select(    (.codice // "" | test("TK25/003209"; "i")) or    (.titolo // "" | test("premium"; "i")) or    (.descrizione // "" | test("premium"; "i"))  ) |   "Ticket: \(.codice)\nTitolo: \(.titolo)\nCustom: \(.customAttributes)\n"' | head -50
 echo ""
@@ -98,14 +98,14 @@ echo "ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔ
 echo "  ­ƒÆí SUGGERIMENTI"
 echo "ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ"
 echo ""
-echo "Le informazioni su categorie e SLA potrebbero essere:"
-echo "  1. Nei customAttributes dei ticket"
-echo "  2. Recuperabili tramite endpoint specifico del singolo ticket"
-echo "  3. Accessibili solo dall'interfaccia web"
+echo "Category and SLA information could be:"
+echo "1. In the customAttributes of the tickets"
+echo "2. Recoverable via individual ticket specific endpoint"
+echo "3. Accessible only from the web interface"
 echo ""
 echo "Prossimi passi:"
-echo "  1. Controlla i customAttributes sopra per vedere se ci sono"
+echo "1. Check the customAttributes above to see if they are there"
 echo "     campi relativi a categoria/SLA"
-echo "  2. Prova a recuperare un ticket specifico con ID noto"
-echo "  3. Contatta il supporto Ydea per documentazione API completa"
+echo "2. Try to retrieve a specific ticket with known ID"
+echo "3. Contact Ydea support for complete API documentation"
 echo ""

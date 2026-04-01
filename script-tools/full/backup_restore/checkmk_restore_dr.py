@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-"""
-checkmk_restore_dr.py
+"""checkmk_restore_dr.py
 
 Python entrypoint for the interactive DR restore workflow.
 Delegates to the existing canonical shell implementation to preserve full behavior.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import subprocess

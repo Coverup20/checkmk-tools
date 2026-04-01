@@ -1,14 +1,14 @@
-#  QUICK START TESTING GUIDE
+# QUICK START TESTING GUIDE
 
-##  **Pre-Test Setup (5 minuti)**
+## **Pre-Test Setup (5 minutes)**
 
-### 1. Carica file su server CheckMK
+### 1. Upload files to CheckMK server
 ```bash
 # SCP/SFTP files to your CheckMK server
 scp mail_realip_hybrid backup_and_deploy.sh pre_test_checker.sh user@your-checkmk-server:/tmp/
 ```
 
-### 2. Connetti al server e prepara ambiente
+### 2. Connect to the server and prepare environment
 ```bash
 ssh user@your-checkmk-server
 sudo -i
@@ -16,37 +16,37 @@ cd /tmp
 chmod +x *.sh
 ```
 
-### 3. Controllo ambiente
+### 3. Environment control
 ```bash
-# Verifica compatibilità
+# Check compatibility
 ./pre_test_checker.sh
 ```
 
 ---
 
-##  **Fase Testing (10 minuti)**
+## **Testing Phase (10 minutes)**
 
-### Test 1: Dry Run (sicuro)
+### Test 1: Dry Run (safe)
 ```bash
-# Simula deployment senza modifiche
+# Simulate deployment without modifications
 ./backup_and_deploy.sh --dry-run
 ```
 
-### Test 2: Deploy con backup automatico
+### Test 2: Deploy with automatic backup
 ```bash
-# Deploy reale con rollback automatico
+# Real deployment with automatic rollback
 ./backup_and_deploy.sh
 ```
 
-### Test 3: Verifica detection FRP
+### Test 3: FRP detection check
 ```bash
 # Switch to CheckMK site user
-su - $(cat /etc/omd/site)
+up - $(cat /etc/omd/site)
 
-# Test detection manuale
+# Manual test detection
 python3 -c "
 import os, sys
-# Simula scenario FRP
+# Simulate FRP scenario
 os.environ['NOTIFY_HOSTADDRESS'] = '127.0.0.1:5000'  
 os.environ['NOTIFY_HOSTLABEL_real_ip'] = '192.168.1.100'
 os.environ['NOTIFY_HOSTNAME'] = 'test-host'
@@ -60,9 +60,9 @@ print('Detection OK!')
 
 ---
 
-##  **Test Notifica Reale (15 minuti)**
+## **Real Notification Test (15 minutes)**
 
-### 1. Configura host test con label real_ip
+### 1. Configure test host with label real_ip
 
 **Via WATO:**
 1. Setup → Hosts → [Your Host] → Properties  
@@ -71,66 +71,66 @@ print('Detection OK!')
 
 **Via config file:**
 ```bash
-# Aggiungi a /etc/check_mk/conf.d/hosts.mk
+# Add to /etc/check_mk/conf.d/hosts.mk
 extra_host_conf.setdefault("_real_ip", []).append(
     ("192.168.1.100", ["test-host"])
 )
 ```
 
-### 2. Configura regola notifica
+### 2. Configure notification rule
 
 **WATO:** Setup → Notifications → New Rule:
 - **Notification Method:** `mail_realip_hybrid`  
 - **Contact Selection:** Your email
 - **Host/Service Conditions:** Match your test host
 
-### 3. Test notifica
+### 3. Test notification
 ```bash
 # Force notification test
-su - $(cat /etc/omd/site)
+up - $(cat /etc/omd/site)
 cmk --notify-test test-host
 ```
 
-### 4. Monitor risultati
+### 4. Monitor results
 ```bash
 # Check logs
 tail -f /omd/sites/$(cat /etc/omd/site)/var/log/notify.log
 
-# Check email content per:
-#  Grafici funzionanti (localhost:PORT usato internamente)
-#  URL clickabili con real IP (192.168.1.100)
+# Check email content for:
+# Working graphs (localhost:PORT used internally)
+# Clickable URLs with real IP (192.168.1.100)
 ```
 
 ---
 
-##  **Rollback se necessario**
+## **Rollback if necessary**
 
 ```bash
-# Il deploy automatico crea script rollback
+# Automatic deployment creates rollback scripts
 ls /omd/sites/$(cat /etc/omd/site)/local/share/check_mk/notifications/backup_*/rollback.sh
 
-# Esegui rollback
+# Perform rollback
 /omd/sites/$(cat /etc/omd/site)/local/share/check_mk/notifications/backup_*/rollback.sh
 ```
 
 ---
 
-##  **Validation Checklist**
+## **Validation Checklist**
 
-**Dopo il test, verifica:**
+**After testing, check:**
 
-- [ ] **Detection FRP:** Log conferma "FRP scenario detected"
-- [ ] **Grafici:** Email contiene PNG allegati 
-- [ ] **URL Email:** Link puntano a real IP (192.168.1.100)
-- [ ] **URL Grafici:** Template interno usa localhost:PORT
-- [ ] **No Errori:** notify.log pulito
-- [ ] **Rollback:** Funziona se necessario
+- [ ] **Detection FRP:** Log confirmation "FRP scenario detected"
+- [ ] **Graphics:** Email contains PNG attachments 
+- [ ] **Email URL:** Links point to real IP (192.168.1.100)
+- [ ] **Graphics URL:** Internal template uses localhost:PORT
+- [ ] **No Errors:** clean notify.log
+- [ ] **Rollback:** Works if needed
 
 ---
 
-##  **Expected Results**
+## **Expected Results**
 
-** SUCCESS SCENARIO:**
+**SUCCESS SCENARIO:**
 ```
 EMAIL CONTENT:
 - Subject: CheckMK notification
@@ -144,16 +144,16 @@ LOGS:
 - "Email sent successfully"
 ```
 
-** SE FALLISCE:**
+**IF FAILS:**
 1. Check pre_test_checker.sh warnings
-2. Verifica label real_ip configurata
-3. Controlla logs notify.log
-4. Esegui rollback.sh
-5. Report issue con logs specifici
+2. Check configured real_ip label
+3. Check logs notify.log
+4. Run rollback.sh
+5. Report issues with specific logs
 
 ---
 
-##  **Troubleshooting Rapido**
+## **Quick Troubleshooting**
 
 ```bash
 # Check script permissions
@@ -172,4 +172,4 @@ export DEBUG=1
 
 ---
 
- **Ready to rock? Inizia con `pre_test_checker.sh`!**
+ **Ready to rock? Start with `pre_test_checker.sh`!**

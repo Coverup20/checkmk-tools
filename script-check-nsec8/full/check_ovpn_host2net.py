@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""check_ovpn_host2net.py - CheckMK local check OVPN host-to-net (Python puro)."""
+"""check_ovpn_host2net.py - CheckMK local check OVPN host-to-net (pure Python)."""
 
 VERSION = "1.1.0"
 

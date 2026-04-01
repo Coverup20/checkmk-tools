@@ -1,3 +1,3 @@
 # network_scan
 
-Script di scansione rete (nmap).
+Network scan script (nmap).

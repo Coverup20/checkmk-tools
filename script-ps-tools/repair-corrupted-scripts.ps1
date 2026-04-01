@@ -1,5 +1,5 @@
-# Script di Riparazione Script Corrotti
-# Ripara gli script corrotti in install/checkmk-installer/ usando le versioni corrette
+# Script Repair Corrupted Scripts
+# Repair corrupt scripts in install/checkmk-installer/ using the correct versions
 
 param(
     [switch]$DryRun,        # Simula senza modificare
@@ -17,17 +17,17 @@ Write-Host "================================================================" -F
 Write-Host ""
 
 # ═══════════════════════════════════════════════════════════════
-# FASE 1: RICERCA SCRIPT CORROTTI
+# STEP 1: SEARCH FOR CORRUPT SCRIPTS
 # ═══════════════════════════════════════════════════════════════
 
-Write-Host "[FASE 1] Ricerca script corrotti..." -ForegroundColor Cyan
+Write-Host "[STEP 1] Scan for corrupt scripts..." -ForegroundColor Cyan
 Write-Host ""
 
-# Esegui check integrità solo su install/checkmk-installer/
+# Run integrity check only on install/checkmk-installer/
 $corruptedScripts = @()
 $wslAvailable = $false
 
-# Verifica WSL
+# Check WSL
 try {
     $null = wsl --version 2>&1
     $wslAvailable = $LASTEXITCODE -eq 0
@@ -36,7 +36,7 @@ try {
 }
 
 if (-not $wslAvailable) {
-    Write-Host "[WARNING] WSL non disponibile - riparazione limitata" -ForegroundColor Yellow
+    Write-Host "[WARNING] WSL not available - limited repair" -ForegroundColor Yellow
     Write-Host ""
 }
 
@@ -47,14 +47,14 @@ $installerScripts = Get-ChildItem -Path "$REPO_PATH\install\checkmk-installer" -
         $_.FullName -notmatch '\\iso-output\\|\\\.git\\'
     }
 
-Write-Host "Trovati $($installerScripts.Count) script bash in install/checkmk-installer/" -ForegroundColor Gray
-Write-Host "Verifica integrità in corso..." -ForegroundColor Gray
+Write-Host "Found $($installerScripts.Count) bash script in install/checkmk-installer/" -ForegroundColor Gray
+Write-Host "Checking integrity..." -ForegroundColor Gray
 Write-Host ""
 
 foreach ($script in $installerScripts) {
     $relativePath = $script.FullName.Replace("$REPO_PATH\", "")
     
-    # Verifica con WSL bash -n
+    # Check with WSL bash -n
     if ($wslAvailable) {
         $wslPath = $script.FullName -replace '\\', '/' -replace '^([A-Z]):', { "/mnt/$($_.Groups[1].Value.ToLower())" }
         $bashCheck = wsl bash -n "$wslPath" 2>&1
@@ -77,16 +77,16 @@ Write-Host "Script corrotti trovati: $($corruptedScripts.Count)" -ForegroundColo
 Write-Host ""
 
 if ($corruptedScripts.Count -eq 0) {
-    Write-Host " Nessuno script corrotto trovato!" -ForegroundColor Green
+    Write-Host "No corrupt scripts found!" -ForegroundColor Green
     Write-Host ""
     exit 0
 }
 
 # ═══════════════════════════════════════════════════════════════
-# FASE 2: RICERCA VERSIONI CORRETTE
+# PHASE 2: SEARCH FOR CORRECT VERSIONS
 # ═══════════════════════════════════════════════════════════════
 
-Write-Host "[FASE 2] Ricerca versioni corrette..." -ForegroundColor Cyan
+Write-Host "[PHASE 2] Search for correct versions..." -ForegroundColor Cyan
 Write-Host ""
 
 $repairable = @()
@@ -95,7 +95,7 @@ $notFound = @()
 foreach ($corrupt in $corruptedScripts) {
     $fileName = $corrupt.FileName
     
-    # Pattern di ricerca:
+    # Search Pattern:
     # 1. script-check-ns7/full/
     # 2. script-check-ns8/full/
     # 3. script-check-proxmox/full/
@@ -130,7 +130,7 @@ foreach ($corrupt in $corruptedScripts) {
 }
 
 Write-Host "Script riparabili: $($repairable.Count)" -ForegroundColor Green
-Write-Host "Script non trovati: $($notFound.Count)" -ForegroundColor $(if ($notFound.Count -eq 0) { "Green" } else { "Yellow" })
+Write-Host "Scripts not found: $($notFound.Count)" -ForegroundColor $(if ($notFound.Count -eq 0) { "Green" } else { "Yellow" })
 Write-Host ""
 
 # ═══════════════════════════════════════════════════════════════
@@ -143,7 +143,7 @@ Write-Host "================================================================" -F
 Write-Host ""
 
 if ($repairable.Count -gt 0) {
-    Write-Host "SCRIPT CHE VERRANNO RIPARATI ($($repairable.Count)):" -ForegroundColor Green
+    Write-Host "SCRIPTS THAT WILL BE REPAIRED ($($repairable.Count)):" -ForegroundColor Green
     Write-Host ""
     
     $counter = 1
@@ -151,14 +151,14 @@ if ($repairable.Count -gt 0) {
         Write-Host "  $counter. $($item.FileName)" -ForegroundColor White
         Write-Host "     CORROTTO: $($item.CorruptedPath)" -ForegroundColor Red
         Write-Host "     SORGENTE:  $($item.SourcePath)" -ForegroundColor Green
-        Write-Host "     ERRORE:    $($item.Error.Substring(0, [Math]::Min(80, $item.Error.Length)))..." -ForegroundColor DarkYellow
+        Write-Host "ERROR: $($item.Error.Substring(0, [Math]::Min(80, $item.Error.Length)))..." -ForegroundColor DarkYellow
         Write-Host ""
         $counter++
     }
 }
 
 if ($notFound.Count -gt 0) {
-    Write-Host "SCRIPT NON RIPARABILI (sorgente non trovata):" -ForegroundColor Yellow
+    Write-Host "NOT REPAIRABLE SCRIPTS (source not found):" -ForegroundColor Yellow
     Write-Host ""
     
     foreach ($item in $notFound) {
@@ -176,15 +176,15 @@ Write-Host ""
 # ═══════════════════════════════════════════════════════════════
 
 if ($repairable.Count -eq 0) {
-    Write-Host " Nessuno script riparabile trovato!" -ForegroundColor Red
+    Write-Host "No repairable scripts found!" -ForegroundColor Red
     Write-Host ""
     exit 1
 }
 
-Write-Host "AZIONI CHE VERRANNO ESEGUITE:" -ForegroundColor Cyan
-Write-Host "  • $($repairable.Count) file verranno sovrascritti" -ForegroundColor White
-Write-Host "  • Le versioni corrotte verranno sostituite" -ForegroundColor White
-Write-Host "  • Verrà creato un backup prima della modifica" -ForegroundColor White
+Write-Host "ACTIONS THAT WILL BE CARRIED OUT:" -ForegroundColor Cyan
+Write-Host "• $($repairable.Count) files will be overwritten" -ForegroundColor White
+Write-Host "• Corrupted versions will be replaced" -ForegroundColor White
+Write-Host "• A backup will be created before editing" -ForegroundColor White
 Write-Host ""
 
 if ($DryRun) {
@@ -203,23 +203,23 @@ if (-not $AutoConfirm) {
     Write-Host ""
     
     if ($confirmation -ne "si" -and $confirmation -ne "s" -and $confirmation -ne "yes" -and $confirmation -ne "y") {
-        Write-Host " Operazione annullata dall'utente" -ForegroundColor Red
+        Write-Host "Operation canceled by user" -ForegroundColor Red
         Write-Host ""
         exit 0
     }
 }
 
 # ═══════════════════════════════════════════════════════════════
-# FASE 5: BACKUP
+# STEP 5: BACKUP
 # ═══════════════════════════════════════════════════════════════
 
-Write-Host "[FASE 5] Creazione backup..." -ForegroundColor Cyan
+Write-Host "[STEP 5] Creating backups..." -ForegroundColor Cyan
 Write-Host ""
 
 $backupDir = Join-Path $REPO_PATH "install\checkmk-installer.BACKUP_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss')"
 New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
 
-Write-Host "Directory backup: $backupDir" -ForegroundColor Gray
+Write-Host "Backup directory: $backupDir" -ForegroundColor Gray
 Write-Host ""
 
 foreach ($item in $repairable) {
@@ -233,14 +233,14 @@ foreach ($item in $repairable) {
     Copy-Item $item.FullPath -Destination $backupPath -Force
 }
 
-Write-Host " Backup completato: $($repairable.Count) file salvati" -ForegroundColor Green
+Write-Host "Backup completed: $($repairable.Count) files saved" -ForegroundColor Green
 Write-Host ""
 
 # ═══════════════════════════════════════════════════════════════
 # FASE 6: RIPARAZIONE
 # ═══════════════════════════════════════════════════════════════
 
-Write-Host "[FASE 6] Riparazione in corso..." -ForegroundColor Cyan
+Write-Host "[STEP 6] Repair in progress..." -ForegroundColor Cyan
 Write-Host ""
 
 $repaired = 0
@@ -254,7 +254,7 @@ foreach ($item in $repairable) {
         Write-Host "   $($item.FileName)" -ForegroundColor Green
         $repaired++
     } catch {
-        Write-Host "   $($item.FileName) - Errore: $_" -ForegroundColor Red
+        Write-Host "$($item.FileName) - Error: $_" -ForegroundColor Red
         $failed++
     }
 }
@@ -262,10 +262,10 @@ foreach ($item in $repairable) {
 Write-Host ""
 
 # ═══════════════════════════════════════════════════════════════
-# FASE 7: VERIFICA
+# STEP 7: VERIFICATION
 # ═══════════════════════════════════════════════════════════════
 
-Write-Host "[FASE 7] Verifica integrità post-riparazione..." -ForegroundColor Cyan
+Write-Host "[STEP 7] Check post-repair integrity..." -ForegroundColor Cyan
 Write-Host ""
 
 $stillCorrupted = 0
@@ -276,7 +276,7 @@ if ($wslAvailable) {
         $bashCheck = wsl bash -n "$wslPath" 2>&1
         
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "    $($item.FileName) - Ancora corrotto!" -ForegroundColor Yellow
+            Write-Host "$($item.FileName) - Still corrupt!" -ForegroundColor Yellow
             $stillCorrupted++
         }
     }
@@ -297,29 +297,29 @@ Write-Host "  Script analizzati:        $($installerScripts.Count)" -ForegroundC
 Write-Host "  Script corrotti trovati:  $($corruptedScripts.Count)" -ForegroundColor Yellow
 Write-Host "  Script riparati:          $repaired" -ForegroundColor Green
 Write-Host "  Script falliti:           $failed" -ForegroundColor $(if ($failed -eq 0) { "Green" } else { "Red" })
-Write-Host "  Ancora corrotti:          $stillCorrupted" -ForegroundColor $(if ($stillCorrupted -eq 0) { "Green" } else { "Yellow" })
+Write-Host "Still Corrupted: $stillCorrupted" -ForegroundColor $(if ($stillCorrupted -eq 0) { "Green" } else { "Yellow" })
 Write-Host ""
 
-Write-Host "BACKUP:" -ForegroundColor White
-Write-Host "  Percorso: $backupDir" -ForegroundColor Gray
+Write-Host "BACKUPS:" -ForegroundColor White
+Write-Host "Path: $backupDir" -ForegroundColor Gray
 Write-Host ""
 
 if ($stillCorrupted -gt 0) {
-    Write-Host "  ATTENZIONE: $stillCorrupted script risultano ancora corrotti" -ForegroundColor Yellow
+    Write-Host "WARNING: $stillCorrupted scripts are still corrupt" -ForegroundColor Yellow
     Write-Host "   Potrebbero richiedere riparazione manuale" -ForegroundColor Gray
     Write-Host ""
 }
 
 if ($notFound.Count -gt 0) {
-    Write-Host "ℹ  INFO: $($notFound.Count) script non hanno una versione corretta disponibile" -ForegroundColor Cyan
-    Write-Host "   Potrebbero richiedere ripristino da backup o riscrittura" -ForegroundColor Gray
+    Write-Host "ℹ INFO: $($notFound.Count) script does not have a correct version available" -ForegroundColor Cyan
+    Write-Host "May require restoring from backup or rewriting" -ForegroundColor Gray
     Write-Host ""
 }
 
 Write-Host "PROSSIMI PASSI CONSIGLIATI:" -ForegroundColor Cyan
-Write-Host "  1. Verifica funzionamento: .\check-integrity.ps1" -ForegroundColor Gray
+Write-Host "1. Check operation: .\check-integrity.ps1" -ForegroundColor Gray
 Write-Host "  2. Se OK, commit: git add . && git commit -m 'Fix: Riparati script corrotti'" -ForegroundColor Gray
-Write-Host "  3. Se problemi, ripristina: Copy-Item '$backupDir\*' -Destination 'install\checkmk-installer\' -Recurse -Force" -ForegroundColor Gray
+Write-Host "3. If problems, restore: Copy-Item '$backupDir\*' -Destination 'install\checkmk-installer\' -Recurse -Force" -ForegroundColor Gray
 Write-Host ""
 
 Write-Host "================================================================" -ForegroundColor Green

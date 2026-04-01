@@ -8,10 +8,10 @@ TOKEN=$(load_token)
 RESPONSE=$(curl -s "https://my.ydea.cloud/app_api_v2/tickets?limit=100" \  -H "Authorization: Bearer $TOKEN" \  -H "Accept: application/json")
 echo ""
 echo "­ƒöì Ticket 
-#${TICKET_ID} (TUTTI I CAMPI):"
+#${TICKET_ID} (ALL FIELDS):"
 echo "$RESPONSE" | jq ".objs[] | select(.id == ${TICKET_ID})"
 echo ""
 echo "­ƒöì Confronto con ticket 
-#1528466 (con SLA manuale):"
+#1528466 (with manual SLA):"
 echo "$RESPONSE" | jq ".objs[] | select(.id == 1528466)" 2>/dev/null || 
-echo "Ticket non in questa pagina"
+echo "Ticket not on this page"

@@ -45,8 +45,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 
 [Install]
-WantedBy=multi-user.target
-"""
+WantedBy=multi-user.target"""
 
     if SERVICE_PATH.exists():
         backup_file(SERVICE_PATH)

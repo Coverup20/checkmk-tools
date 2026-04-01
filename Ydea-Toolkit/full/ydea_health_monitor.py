@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""
-ydea_health_monitor.py - Monitoraggio disponibilità Ydea API
+"""ydea_health_monitor.py - Ydea API availability monitor
 
-Controlla periodicamente se Ydea è raggiungibile e notifica via email se down/recovery.
-Gestisce soglia errori consecutivi per evitare falsi positivi.
+Periodically checks if Ydea is reachable and notifies via email if down/recovery.
+Manages consecutive error threshold to avoid false positives.
 
 Usage:
     ydea_health_monitor.py
 
-Tipicamente eseguito via cron ogni 15 minuti.
+Typically run via cron every 15 minutes.
 
-Version: 1.0.0 (convertito da Bash)
-"""
+Version: 1.0.0 (ported from Bash)"""
 
 VERSION = "1.0.0"  # Versione script (aggiornare ad ogni modifica)
 
@@ -28,7 +26,7 @@ sys.path.insert(0, str(script_dir))
 
 from ydea_common import Logger, StateManager, EmailNotifier  # type: ignore
 
-# Import ydea-toolkit.py (nome con trattino richiede importlib)
+# Import ydea-toolkit.py (hyphenated name requires importlib)
 ydea_toolkit_path = script_dir / "ydea-toolkit.py"
 spec = importlib.util.spec_from_file_location("ydea_toolkit", ydea_toolkit_path)
 if spec and spec.loader:
@@ -41,15 +39,15 @@ else:
 YdeaAPI = ydea_toolkit.YdeaAPI
 
 
-# ===== CONFIGURAZIONE =====
+# ===== CONFIGURATION =====
 
 STATE_FILE = Path("/tmp/ydea_health_state.json")
 MAIL_SCRIPT = Path("/omd/sites/monitoring/local/share/check_mk/notifications/mail_ydea_down")
 
-# Destinatario email per notifiche
+# Email recipient for notifications
 ALERT_EMAIL = os.getenv("YDEA_ALERT_EMAIL", "massimo.palazzetti@nethesis.it")
 
-# Soglia di errori consecutivi prima di notificare (per evitare falsi positivi)
+# Threshold of consecutive errors before reporting (to avoid false positives)
 FAILURE_THRESHOLD = int(os.getenv("YDEA_FAILURE_THRESHOLD", "3"))
 
 # Default state
@@ -65,12 +63,10 @@ DEFAULT_STATE = {
 # ===== FUNZIONI UTILITY =====
 
 def test_ydea_login() -> bool:
-    """
-    Testa login Ydea API
+    """Test Ydea API login
     
     Returns:
-        True se login riuscito, False altrimenti
-    """
+        True if login successful, False otherwise"""
     try:
         api = YdeaAPI()
         api.ensure_token()
@@ -81,22 +77,20 @@ def test_ydea_login() -> bool:
 
 
 def send_email_alert(subject: str, body: str) -> bool:
-    """
-    Invia notifica email
+    """Send email notification
     
     Args:
-        subject: Oggetto email
-        body: Corpo email
+        subject: Email subject
+        body: Email body
         
     Returns:
-        True se invio riuscito, False altrimenti
-    """
+        True if sending successful, False otherwise"""
     Logger.info(f"Invio notifica email a {ALERT_EMAIL}")
     
-    # Usa lo script mail_ydea_down se esiste
+    # Use the mail_ydea_down script if it exists
     if MAIL_SCRIPT.exists() and os.access(MAIL_SCRIPT, os.X_OK):
         try:
-            # Esporta variabili per lo script di notifica
+            # Export variables for notification script
             env = os.environ.copy()
             env.update({
                 "NOTIFY_HOSTNAME": "ydea.cloud",
@@ -140,54 +134,50 @@ def send_email_alert(subject: str, body: str) -> bool:
 
 
 def build_down_alert() -> tuple[str, str]:
-    """
-    Costruisci email alert per Ydea down
+    """Build email alerts for Ydea down
     
     Returns:
-        Tuple (subject, body)
-    """
+        Tuple (subject, body)"""
     subject = " [ALERT] Ydea API - Servizio Non Raggiungibile"
     
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    body = f"""ATTENZIONE: Il servizio Ydea API non è raggiungibile.
+    body = f"""ATTENTION: The Ydea API service is not reachable.
 
-Dettagli:
-- Data/Ora rilevazione: {now}
-- Tentativi falliti consecutivi: {FAILURE_THRESHOLD}
+Details:
+- Date/Time detection: {now}
+- Consecutive failed attempts: {FAILURE_THRESHOLD}
 - URL: https://my.ydea.cloud
 - Endpoint: /app_api_v2/login
 
-Impatto:
-- Sistema di ticketing non disponibile
-- Alert CheckMK NON verranno convertiti in ticket Ydea
-- Creazione manuale ticket non possibile
+Impact:
+- Ticketing system not available
+- CheckMK Alerts will NOT be converted into Ydea tickets
+- Manual ticket creation not possible
 
-Azioni richieste:
-1. Verificare status servizio Ydea (https://status.ydea.cloud se disponibile)
-2. Controllare connettività di rete
-3. Verificare credenziali API
-4. Contattare supporto Ydea se necessario
+Required actions:
+1. Check Ydea service status (https://status.ydea.cloud if available)
+2. Check network connectivity
+3. Verify API credentials
+4. Contact Ydea support if necessary
 
-Il sistema continuerà a monitorare e invierà notifica quando il servizio sarà ripristinato.
+The system will continue to monitor and notify you when service is restored.
 
 ---
-Monitor automatico Ydea Health
-Check ogni 15 minuti"""
+Ydea Health automatic monitor
+Check every 15 minutes"""
     
     return subject, body
 
 
 def build_recovery_alert(last_failure_timestamp: str) -> tuple[str, str]:
-    """
-    Costruisci email alert per Ydea recovery
+    """Build email alerts for Ydea recovery
     
     Args:
-        last_failure_timestamp: Timestamp ultimo fallimento
+        last_failure_timestamp: Last failure timestamp
         
     Returns:
-        Tuple (subject, body)
-    """
+        Tuple (subject, body)"""
     subject = " [RECOVERY] Ydea API - Servizio Ripristinato"
     
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -201,16 +191,16 @@ def build_recovery_alert(last_failure_timestamp: str) -> tuple[str, str]:
         except Exception:
             pass
     
-    body = f"""Il servizio Ydea API è tornato online.
+    body = f"""The Ydea API service is back online.
 
-Dettagli:
-- Data/Ora recovery: {now}
-- Ultimo check fallito: {last_failure_str}
+Details:
+- Date/Time recovery: {now}
+- Last check failed: {last_failure_str}
 
-Il servizio di ticketing è nuovamente operativo.
+The ticketing service is operational again.
 
 ---
-Monitor automatico Ydea Health"""
+Ydea Health automatic monitor"""
     
     return subject, body
 
@@ -223,7 +213,7 @@ def main():
     # Inizializza state manager
     state = StateManager(STATE_FILE, default_state=DEFAULT_STATE)
     
-    # Leggi stato corrente
+    # Read current status
     current_status = state.get("status")
     consecutive_failures = state.get("consecutive_failures")
     was_notified = state.get("notified")
@@ -243,7 +233,7 @@ def main():
             
             send_email_alert(subject, body)
         
-        # Reset stato
+        # Reset status
         state.set("status", "up")
         state.set("consecutive_failures", 0)
         state.set("notified", False)
@@ -255,7 +245,7 @@ def main():
         consecutive_failures += 1
         Logger.error(f" Ydea API non raggiungibile (tentativi falliti: {consecutive_failures}/{FAILURE_THRESHOLD})")
         
-        # Notifica solo se raggiungiamo la soglia e non abbiamo già notificato
+        # Notify only if we reach the threshold and have not already notified
         if consecutive_failures >= FAILURE_THRESHOLD and not was_notified:
             Logger.info("Soglia di errori raggiunta, invio notifica")
             
@@ -268,7 +258,7 @@ def main():
                 Logger.error("Errore invio notifica")
                 state.set("notified", False)
         
-        # Aggiorna stato
+        # Update status
         state.set("status", "down")
         state.set("consecutive_failures", consecutive_failures)
         state.set("last_failure", str(int(datetime.now().timestamp())))

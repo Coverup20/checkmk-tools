@@ -1,431 +1,430 @@
-================================================================================
-ELENCO DETTAGLIATO SCRIPT NETHSERVER 7
+========================================================================================
+DETAILED LIST OF NETHSERVER 7 SCRIPTS
 Repository: checkmk-tools
-Cartella: script-check-ns7/
-Data: 27 Ottobre 2025
-================================================================================
+Folder: script-check-ns7/
+Date: October 27, 2025
+========================================================================================
 
- STRUTTURA CARTELLE
-├── nopolling/          (33 script: 17 principali + 16 wrapper remoti)
-└── polling/            (2 script: 1 principale + 1 wrapper remoto)
+ FOLDER STRUCTURE
+├── nopolling/ (33 scripts: 17 main + 16 remote wrappers)
+└── polling/ (2 scripts: 1 main + 1 remote wrapper)
 
-================================================================================
+========================================================================================
  SCRIPT-CHECK-NS7/NOPOLLING/
-================================================================================
+========================================================================================
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CATEGORIA: SERVIZI COCKPIT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORY: COCKPIT SERVICES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. check_cockpit_sessions.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         47
-Service:       Cockpit_sessions
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Lines: 47
+Service: Cockpit_sessions
 
-DESCRIZIONE:
-Monitora login/logout Cockpit leggendo /var/log/messages.
-Mostra quante sessioni sono attive e notifica ogni accesso.
+DESCRIPTION:
+Monitor login/logout Cockpit by reading /var/log/messages.
+Shows how many sessions are active and notifies you of each login.
 
-FUNZIONALITÀ:
- Rileva login Cockpit con indirizzo IP di provenienza
- Rileva logout Cockpit
- Usa statefile per processare solo nuove righe del log
- Alterna WARN/CRIT casualmente per forzare notifiche ad ogni login
+FEATURES:
+ Detect Cockpit login with originating IP address
+ Detect Cockpit logout
+ Use statefile to process only new log lines
+ Toggle WARN/CRIT randomly to force notifications on every login
 
-STATI:
-0 (OK)   - Logout rilevato
-1 (WARN) - Login rilevato (casuale)
-2 (CRIT) - Login rilevato (casuale)
+STATES:
+0 (OK) - Logout detected
+1 (WARN) - Login detected (random)
+2 (CRIT) - Login detected (random)
 
-FILE UTILIZZATI:
+FILES USED:
 - Log: /var/log/messages
 - State: /var/lib/check_mk_agent/cockpit_sessions.state
 
-PATTERN RICERCATI:
+RESEARCHED PATTERNS:
 - "New connection to session from"
 - "for session closed"
 
-ESEMPIO OUTPUT:
+OUTPUT EXAMPLE:
 "1 Cockpit_sessions - 2025-10-27 10:30:15 cockpit login from 192.168.1.100"
 "0 Cockpit_sessions - 2025-10-27 11:15:22 cockpit logout from 192.168.1.100"
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CATEGORIA: SERVIZI DOVECOT (MAIL)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORY: DOVECOT SERVICES (MAIL)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 2. check_dovecot_status.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         12
-Service:       Dovecot_status
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: 12
+Service: Dovecot_status
 
-DESCRIZIONE:
-Verifica se il servizio Dovecot (server mail IMAP/POP3) è in esecuzione.
+DESCRIPTION:
+Check if the Dovecot service (IMAP/POP3 mail server) is running.
 
-FUNZIONALITÀ:
- Check stato servizio systemd
+FEATURES:
+ Check systemd service status
 
-STATI:
-0 (OK)   - Dovecot running
+STATES:
+0 (OK) - Dovecot running
 2 (CRIT) - Dovecot not running
 
-COMANDI USATI:
+COMMANDS USED:
 - systemctl is-active --quiet dovecot
 
 
 3. check_dovecot_sessions.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         9
-Service:       Dovecot_sessions
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: 9
+Service: Dovecot_sessions
 
-DESCRIZIONE:
-Conta e mostra il numero di sessioni Dovecot attive (utenti connessi).
+DESCRIPTION:
+Counts and displays the number of active Dovecot sessions (connected users).
 
-FUNZIONALITÀ:
- Conta sessioni IMAP/POP3 attive
+FEATURES:
+ Counts active IMAP/POP3 sessions
 
-STATI:
-0 (OK)   - Sempre OK, mostra numero sessioni
+STATES:
+0 (OK) - Always OK, show number of sessions
 
-COMANDI USATI:
-- doveadm who
+COMMANDS USED:
+- whereadm who
 
-ESEMPIO OUTPUT:
+OUTPUT EXAMPLE:
 "0 Dovecot_sessions - 5 active session(s)"
 
 
 4. check_dovecot_maxuserconn.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         15
-Service:       Dovecot_maxuserconn
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: 15
+Service: Dovecot_maxuserconn
 
-DESCRIZIONE:
-Mostra il valore configurato di mail_max_userip_connections in Dovecot.
-Limite massimo connessioni simultanee per IP utente.
+DESCRIPTION:
+Shows the configured value of mail_max_userip_connections in Dovecot.
+Maximum simultaneous connections limit per user IP.
 
-FUNZIONALITÀ:
- Legge configurazione Dovecot
- Mostra valore mail_max_userip_connections
+FEATURES:
+ Read Dovecot configuration
+ Show mail_max_userip_connections value
 
-STATI:
-0 (OK)   - Sempre OK, mostra valore o "unset"
+STATES:
+0 (OK) - Always OK, show value or "unset"
 
-COMANDI USATI:
-- doveconf -a
+COMMANDS USED:
+- whereconf -a
 
-ESEMPIO OUTPUT:
+OUTPUT EXAMPLE:
 "0 Dovecot_maxuserconn - 10"
 
 
 5. check_dovecot_vsz.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         ~15
-Service:       Dovecot_vsz
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: ~15
+Service: Dovecot_vsz
 
-DESCRIZIONE:
-Mostra il limite VSZ (Virtual Size) configurato per i processi Dovecot.
+DESCRIPTION:
+Shows the VSZ (Virtual Size) limit configured for Dovecot processes.
 
-FUNZIONALITÀ:
- Legge default_vsz_limit da configurazione Dovecot
+FEATURES:
+ Read default_vsz_limit from Dovecot configuration
 
-STATI:
-0 (OK)   - Sempre OK, mostra valore
+STATES:
+0 (OK) - Always OK, show value
 
-COMANDI USATI:
-- doveconf
+COMMANDS USED:
+- whereconf
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CATEGORIA: SERVIZI POSTFIX (MAIL)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORY: POSTFIX SERVICES (MAIL)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 6. check_postfix_status.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         12
-Service:       Postfix_status
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: 12
+Service: Postfix_status
 
-DESCRIZIONE:
-Verifica se il servizio Postfix (server SMTP) è in esecuzione.
+DESCRIPTION:
+Check if the Postfix service (SMTP server) is running.
 
-FUNZIONALITÀ:
- Check stato servizio systemd
+FEATURES:
+ Check systemd service status
 
-STATI:
-0 (OK)   - Postfix running
+STATES:
+0 (OK) - Postfix running
 2 (CRIT) - Postfix not running
 
-COMANDI USATI:
+COMMANDS USED:
 - systemctl is-active --quiet postfix
 
 
 7. check_postfix_queue.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         17
-Service:       Postfix_queue
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: 17
+Service: Postfix_queue
 
-DESCRIZIONE:
-Monitora la coda mail di Postfix e segnala accumulo messaggi.
+DESCRIPTION:
+Monitor the Postfix mail queue and report message accumulation.
+FEATURES:
+ Count queued messages
+ Configured thresholds: <20 OK, <100 WARN, ≥100 CRIT
 
-FUNZIONALITÀ:
- Conta messaggi in coda
- Soglie configurate: <20 OK, <100 WARN, ≥100 CRIT
+STATES:
+0 (OK) - Queue < 20 messages
+1 (WARN) - Queue 20-99 messages
+2 (CRIT) - Queue ≥ 100 messages
+3 (UNKNOWN) - Queue reading error
 
-STATI:
-0 (OK)   - Coda < 20 messaggi
-1 (WARN) - Coda 20-99 messaggi
-2 (CRIT) - Coda ≥ 100 messaggi
-3 (UNKNOWN) - Errore lettura coda
-
-COMANDI USATI:
+COMMANDS USED:
 - mailq
 
-ESEMPIO OUTPUT:
+OUTPUT EXAMPLE:
 "0 Postfix_queue - Mail queue OK: 5 messages"
 "1 Postfix_queue - Mail queue WARNING: 45 messages"
 "2 Postfix_queue - Mail queue CRITICAL: 250 messages"
 
 
 8. check_postfix_process.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         ~15
-Service:       Postfix_process
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: ~15
+Service: Postfix_process
 
-DESCRIZIONE:
-Conta i processi Postfix attivi.
+DESCRIPTION:
+Counts active Postfix processes.
 
-FUNZIONALITÀ:
- Conta processi 'master' e 'qmgr' di Postfix
+FEATURES:
+ Count Postfix 'master' and 'qmgr' processes
 
-STATI:
-0 (OK)   - Processi presenti
+STATES:
+0 (OK) - Processes present
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CATEGORIA: SERVIZI WEBTOP
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORY: WEBTOP SERVICES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 9. check_webtop_status.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         12
-Service:       WebTop_status
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: 12
+Service: WebTop_status
 
-DESCRIZIONE:
-Verifica se WebTop (groupware) è in esecuzione.
+DESCRIPTION:
+Check if WebTop (groupware) is running.
 
-FUNZIONALITÀ:
- Check stato servizio Tomcat WebTop
+FEATURES:
+ Check Tomcat WebTop service status
 
-STATI:
-0 (OK)   - WebTop running
+STATES:
+0 (OK) - WebTop running
 2 (CRIT) - WebTop not running
 
-COMANDI USATI:
+COMMANDS USED:
 - systemctl is-active --quiet tomcat8@webtop
 
 
 10. check_webtop_maxmemory.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         14
-Service:       WebTop_maxmemory
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: 14
+Service: WebTop_maxmemory
 
-DESCRIZIONE:
-Mostra la memoria massima allocata per WebTop (Java heap).
+DESCRIPTION:
+Shows the maximum memory allocated for WebTop (Java heap).
 
-FUNZIONALITÀ:
- Legge MaxMemory da configurazione NethServer
+FEATURES:
+ Reads MaxMemory from NethServer configuration
 
-STATI:
-0 (OK)   - Sempre OK, mostra valore in MB o "unset"
+STATES:
+0 (OK) - Always OK, show value in MB or "unset"
 
-COMANDI USATI:
+COMMANDS USED:
 - config show webtop
 
-ESEMPIO OUTPUT:
+OUTPUT EXAMPLE:
 "0 WebTop_maxmemory - MaxMemory = 1024M"
 
 
 11. check_webtop_https.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         ~15
-Service:       WebTop_https
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: ~15
+Service: WebTop_https
 
-DESCRIZIONE:
-Verifica connettività HTTPS a WebTop.
+DESCRIPTION:
+Check HTTPS connectivity to WebTop.
 
-FUNZIONALITÀ:
- Test connessione HTTPS locale
+FEATURES:
+ Local HTTPS connection test
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CATEGORIA: SSH & SICUREZZA
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORY: SSH & SECURITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 12. check_ssh_root_sessions.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         16
-Service:       SSH_root_sessions
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: 16
+Service: SSH_root_sessions
 
-DESCRIZIONE:
-Monitora e notifica sessioni SSH aperte con utente root.
+DESCRIPTION:
+Monitor and report SSH sessions opened with root user.
 
-FUNZIONALITÀ:
- Conta sessioni root attive
- Mostra IP di provenienza
+FEATURES:
+ Count active root sessions
+ Show originating IP
 
-STATI:
-0 (OK)   - Nessuna sessione root
-2 (CRIT) - Una o più sessioni root attive
+STATES:
+0 (OK) - No root session
+2 (CRIT) - One or more active root sessions
 
-COMANDI USATI:
+COMMANDS USED:
 - who
 
-ESEMPIO OUTPUT:
+OUTPUT EXAMPLE:
 "0 SSH_root_sessions - no root sessions"
 "2 SSH_root_sessions - 2 root session(s) from 192.168.1.50,192.168.1.51"
 
 
 13. check_ssh_root_logins.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         ~20
-Service:       SSH_root_logins
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: ~20
+Service: SSH_root_logins
 
-DESCRIZIONE:
-Rileva nuovi login SSH come root dal log /var/log/secure.
+DESCRIPTION:
+Detect new SSH logins as root from the /var/log/secure log.
 
-FUNZIONALITÀ:
- Usa statefile per processare solo nuove righe
- Notifica ogni nuovo login root via SSH
+FEATURES:
+ Use statefile to process new lines only
+ Notify each new root login via SSH
 
 
 14. check-ssh-failures.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         24
-Service:       SSH-Failures
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: 24
+Service: SSH-Failures
 
-DESCRIZIONE:
-Monitora gli IP attualmente bannati da fail2ban per tentativi di accesso SSH falliti.
+DESCRIPTION:
+Monitor IPs currently banned by fail2ban for failed SSH login attempts.
 
-FUNZIONALITÀ:
- Interroga fail2ban jail sshd
- Conta IP bannati
+FEATURES:
+ Query fail2ban jail sshd
+ Count banned IPs
 
-STATI:
-0 (OK)   - Nessun IP bannato o fail2ban non attivo
-1 (WARN) - Uno o più IP bannati
+STATES:
+0 (OK) - No IPs banned or fail2ban not active
+1 (WARN) - One or more IPs banned
 
-COMANDI USATI:
+COMMANDS USED:
 - fail2ban-client status sshd
 
-ESEMPIO OUTPUT:
+OUTPUT EXAMPLE:
 "0 SSH-Failures - No SSH failed logins currently blocked"
 "1 SSH-Failures - SSH failed logins blocked (banned IPs) = 3"
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CATEGORIA: SOS (SUPPORTO REMOTO WINDMILL)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORY: SOS (WINDMILL REMOTE SUPPORT)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 15. check-sos-ns7.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         30
-Service:       SOS_Session
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: 30
+Service: SOS_Session
 
-DESCRIZIONE:
-Monitora stato sessione SOS (WindMill VPN + SSH reverse) senza mostrare l'ID.
+DESCRIPTION:
+Monitor SOS session status (WindMill VPN + SSH reverse) without showing ID.
 
-FUNZIONALITÀ:
- Verifica stato servizi don-openvpn e don-sshd
- Rileva SOS attivo/disattivo/parziale
+FEATURES:
+ Check the status of don-openvpn and don-sshd services
+ Detect SOS on/off/partial
 
-STATI:
-0 (OK)   - SOS disattivo (entrambi i servizi fermi)
-1 (WARN) - SOS attivo (entrambi i servizi running)
-2 (CRIT) - SOS PARZIALE (solo uno dei due servizi attivo)
+STATES:
+0 (OK) - SOS deactivated (both services stopped)
+1 (WARN) - SOS active (both services running)
+2 (CRIT) - PARTIAL SOS (only one of the two services active)
 
-METRICHE:
+METRICS:
 vpn={0|1}
 ssh={0|1}
 
-COMANDI USATI:
+COMMANDS USED:
 - systemctl is-active don-openvpn
 - systemctl is-active don-sshd
 
-ESEMPIO OUTPUT:
-"0 SOS_Session - SOS disattivo | vpn=0 ssh=0"
-"1 SOS_Session - SOS attivo | vpn=1 ssh=1"
-"2 SOS_Session - SOS PARZIALE: VPN=1 SSH=0 | vpn=1 ssh=0"
+OUTPUT EXAMPLE:
+"0 SOS_Session - SOS deactivated | vpn=0 ssh=0"
+"1 SOS_Session - SOS active | vpn=1 ssh=1"
+"2 SOS_Session - PARTIAL SOS: VPN=1 SSH=0 | vpn=1 ssh=0"
 
 
 16. check-sosid-ns7.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         30
-Service:       SOS_Session_ID
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: 30
+Service: SOS_Session_ID
 
-DESCRIZIONE:
-Monitora sessione SOS e mostra il Session ID quando attiva.
+DESCRIPTION:
+Monitor SOS session and show Session ID when active.
 
-FUNZIONALITÀ:
- Verifica stato servizi SOS
- Estrae Session ID dal comando 'don status'
- Notifica se SOS è attivo ma ID non trovato
+FEATURES:
+ Check SOS services status
+ Extract Session ID from 'don status' command
+ Notify if SOS is active but ID not found
 
-STATI:
-0 (OK)   - SOS non attivo
-1 (WARN) - SOS attivo con Session ID
-2 (CRIT) - SOS attivo ma ID non trovato
+STATES:
+0 (OK) - SOS not active
+1 (WARN) - SOS active with Session ID
+2 (CRIT) - SOS active but ID not found
 
-COMANDI USATI:
+COMMANDS USED:
 - systemctl is-active don-openvpn, don-sshd
 - don status
 
-ESEMPIO OUTPUT:
-"0 SOS_Session_ID - SOS non attivo"
-"1 SOS_Session_ID - SOS attivo - ID 123456789"
-"2 SOS_Session_ID - SOS attivo ma ID non trovato"
+OUTPUT EXAMPLE:
+"0 SOS_Session_ID - SOS not active"
+"1 SOS_Session_ID - SOS active - ID 123456789"
+"2 SOS_Session_ID - SOS active but ID not found"
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CATEGORIA: SISTEMA & PACCHETTI
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORY: SYSTEM & PACKAGES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 17. check-pkg-install.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         51
-Service:       PKG_INSTALL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Lines: 51
+Service: PKG_INSTALL
 
-DESCRIZIONE:
-Monitora attività di installazione/aggiornamento/rimozione pacchetti YUM.
-Notifica se ci sono state operazioni sui pacchetti negli ultimi N minuti.
+DESCRIPTION:
+Monitor YUM package installation/update/removal activity.
+Notify if there have been package operations in the last N minutes.
 
-FUNZIONALITÀ:
- Legge /var/log/yum.log
- Rileva: Installed, Updated, Erased, Removed
- Usa statefile per tracciare ultimo evento
- Timeout configurabile (default: 5 minuti)
+FEATURES:
+ Reads /var/log/yum.log
+ Detects: Installed, Updated, Erased, Removed
+ Use statefile to track last event
+ Configurable timeout (default: 5 minutes)
 
-CONFIGURAZIONE:
+CONFIGURATION:
 WARN_TIMEOUT_MINUTES=5
 
-STATI:
-0 (OK)   - Nessuna attività recente
-1 (WARN) - Attività rilevata negli ultimi N minuti
-2 (CRIT) - Log yum.log non leggibile
+STATES:
+0 (OK) - No recent activity
+1 (WARN) - Activity detected in the last N minutes
+2 (CRIT) - Log yum.log not readable
 
-FILE UTILIZZATI:
+FILES USED:
 - Log: /var/log/yum.log
 - State: /var/lib/check_pkg_install/last_event
 
-ESEMPIO OUTPUT:
-"0 PKG_INSTALL - OK: nessuna nuova attività nelle ultime 5 min (Ultima: Oct 20 14:30)"
-"1 PKG_INSTALL - WARN: attività recente (Oct 27 10:15): Installed: httpd-2.4.6"
+OUTPUT EXAMPLE:
+"0 PKG_INSTALL - OK: no new activity in the last 5 min (Last: Oct 20 14:30)"
+"1 PKG_INSTALL - WARN: Recent activity (Oct 27 10:15): Installed: httpd-2.4.6"
 
 
-================================================================================
- SCRIPT REMOTI (WRAPPER) - NOPOLLING
-================================================================================
+========================================================================================
+ REMOTE SCRIPTS (WRAPPER) - NOPOLLING
+========================================================================================
 
-Tutti gli script con prefisso "r" sono wrapper che scaricano ed eseguono
-la versione aggiornata dello script dal repository GitHub.
+All scripts prefixed with "r" are wrappers that download and run
+the updated version of the script from the GitHub repository.
 
 18. rcheck_cockpit_sessions.sh
 19. rcheck_dovecot_status.sh
@@ -445,134 +444,134 @@ la versione aggiornata dello script dal repository GitHub.
 33. rcheck-sosid-ns7.sh
 34. rcheck-pkg-install.sh
 
-FUNZIONAMENTO:
+OPERATION:
 bash <(curl -fsSL "$SCRIPT_URL") "$@"
 
-SCRIPT_URL BASE:
+BASE SCRIPT_URL:
 https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ns7/nopolling/
 
 
-================================================================================
+========================================================================================
  SCRIPT-CHECK-NS7/POLLING/
-================================================================================
+========================================================================================
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. check_ransomware_ns7.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         42
-Service:       (non specificato, output diretto)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Lines: 42
+Service: (unspecified, direct output)
 
-DESCRIZIONE:
-Monitor ransomware/cryptolocker per NethServer 7.9.
-Scansiona tutte le share Samba alla ricerca di file con estensioni sospette
-o ransom notes e logga i risultati.
+DESCRIPTION:
+Ransomware/cryptolocker monitor for NethServer 7.9.
+Scans all Samba shares for files with suspicious extensions
+or ransom notes and log the results.
 
-FUNZIONALITÀ:
- Scansiona tutte le share Samba configurate
- Rileva file con estensioni ransomware comuni
- Rileva ransom notes tipici
- Logga file sospetti trovati
+FEATURES:
+ Scan all configured Samba shares
+ Detects files with common ransomware extensions
+ Detects typical ransom notes
+ Log suspicious files found
 
-ESTENSIONI MONITORATE:
+MONITORED EXTENSIONS:
 encrypted, crypt, locked, enc, lock, ransom, pay, recover
 
-RANSOM NOTES CERCATI:
+RANSOM NOTES SEARCHED:
 README, DECRYPT, HOW_TO_RECOVER, UNLOCK, HELP, RESTORE
 
-STATI:
-0 (OK)   - Nessun file sospetto rilevato
-2 (CRIT) - File sospetti trovati
+STATES:
+0 (OK) - No suspicious files detected
+2 (CRIT) - Suspicious files found
 
-FILE UTILIZZATI:
+FILES USED:
 - Config: /etc/samba/smb.conf
 - Log: /var/log/ransomware_monitor.log
 
-COMANDI USATI:
-- grep (lettura configurazione Samba)
-- find (ricerca file nelle share)
+COMMANDS USED:
+- grep (read Samba configuration)
+- find (search for files in shares)
 
-ESEMPIO OUTPUT:
-"0 OK - Nessun ransomware rilevato"
-"2 CRITICAL - Ransomware: file sospetti rilevati. Vedi /var/log/ransomware_monitor.log"
+OUTPUT EXAMPLE:
+"0 OK - No ransomware detected"
+"2 CRITICAL - Ransomware: Suspicious files detected. See /var/log/ransomware_monitor.log"
 
-NOTE:
- Script in modalità POLLING - esecuzione periodica schedulata
- Può avere impatto sulle performance con share molto grandi
+NOTES:
+ Script in POLLING mode - scheduled periodic execution
+ It can impact performance with very large shares
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 2. rcheck_ransomware_ns7.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DESCRIZIONE:
-Wrapper remoto per check_ransomware_ns7.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DESCRIPTION:
+Remote wrapper for check_ransomware_ns7.sh
 
 SCRIPT_URL:
 https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ns7/polling/check_ransomware_ns7.sh
 
 
-================================================================================
-RIEPILOGO FUNZIONALITÀ
-================================================================================
+========================================================================================
+FEATURE SUMMARY
+========================================================================================
 
-┌──────────────────────────┬────────────────────────────────────────────────┐
-│ CATEGORIA                │ SCRIPT                                         │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│ Cockpit Web Interface    │ check_cockpit_sessions.sh                      │
-│                          │ rcheck_cockpit_sessions.sh                     │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│ Dovecot Mail Server      │ check_dovecot_status.sh                        │
-│                          │ check_dovecot_sessions.sh                      │
-│                          │ check_dovecot_maxuserconn.sh                   │
-│                          │ check_dovecot_vsz.sh                           │
-│                          │ + 4 wrapper remoti                             │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│ Postfix Mail Server      │ check_postfix_status.sh                        │
-│                          │ check_postfix_queue.sh                         │
-│                          │ check_postfix_process.sh                       │
-│                          │ + 3 wrapper remoti                             │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│ WebTop Groupware         │ check_webtop_status.sh                         │
-│                          │ check_webtop_maxmemory.sh                      │
-│                          │ check_webtop_https.sh                          │
-│                          │ + 3 wrapper remoti                             │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│ SSH Security             │ check_ssh_root_sessions.sh                     │
-│                          │ check_ssh_root_logins.sh                       │
-│                          │ check-ssh-failures.sh                          │
-│                          │ + 3 wrapper remoti                             │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│ SOS Support (WindMill)   │ check-sos-ns7.sh                               │
-│                          │ check-sosid-ns7.sh                             │
-│                          │ + 2 wrapper remoti                             │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│ System & Packages        │ check-pkg-install.sh                           │
-│                          │ + 1 wrapper remoto                             │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│ Ransomware Detection     │ check_ransomware_ns7.sh (polling)              │
-│                          │ + 1 wrapper remoto                             │
-└──────────────────────────┴────────────────────────────────────────────────┘
+┌──────────────────────────┬────────── ─────────────────── ───────────────────┐
+│ CATEGORY │ SCRIPT │
+├──────────────────────────┼────────── ─────────────────── ───────────────────┤
+│ Cockpit Web Interface │ check_cockpit_sessions.sh │
+│ │ rcheck_cockpit_sessions.sh │
+├──────────────────────────┼────────── ─────────────────── ───────────────────┤
+│ Dovecot Mail Server │ check_dovecot_status.sh │
+│ │ check_dovecot_sessions.sh │
+│ │ check_dovecot_maxuserconn.sh │
+│ │ check_dovecot_vsz.sh │
+│ │ + 4 remote wrappers │
+├──────────────────────────┼────────── ─────────────────── ───────────────────┤
+│ Postfix Mail Server │ check_postfix_status.sh │
+│ │ check_postfix_queue.sh │
+│ │ check_postfix_process.sh │
+│ │ + 3 remote wrappers │
+├──────────────────────────┼────────── ─────────────────── ───────────────────┤
+│ WebTop Groupware │ check_webtop_status.sh │
+│ │ check_webtop_maxmemory.sh │
+│ │ check_webtop_https.sh │
+│ │ + 3 remote wrappers │
+├──────────────────────────┼────────── ─────────────────── ───────────────────┤
+│ SSH Security │ check_ssh_root_sessions.sh │
+│ │ check_ssh_root_logins.sh │
+│ │ check-ssh-failures.sh │
+│ │ + 3 remote wrappers │
+├──────────────────────────┼────────── ─────────────────── ───────────────────┤
+│ SOS Support (WindMill) │ check-sos-ns7.sh │
+│ │ check-sosid-ns7.sh │
+│ │ + 2 remote wrappers │
+├──────────────────────────┼────────── ─────────────────── ───────────────────┤
+│ System & Packages │ check-pkg-install.sh │
+│ │ + 1 remote wrapper │
+├──────────────────────────┼────────── ─────────────────── ───────────────────┤
+│ Ransomware Detection │ check_ransomware_ns7.sh (polling) │
+│ │ + 1 remote wrapper │
+└──────────────────────────┴────────── ─────────────────── ───────────────────┘
 
 
-================================================================================
-DIPENDENZE
-================================================================================
+========================================================================================
+ADDICTIONS
+========================================================================================
 
-RICHIESTE:
+REQUESTS:
  NethServer 7.9
  CheckMK Raw 2.4.x
  bash
- curl (per script remoti)
+ curl (for remote scripts)
 
-SERVIZI MONITORATI:
+MONITORED SERVICES:
 - Cockpit (cockpit-ws)
-- Dovecot (server IMAP/POP3)
-- Postfix (server SMTP)
+- Dovecot (IMAP/POP3 server)
+- Postfix (SMTP server)
 - WebTop (tomcat8@webtop)
-- fail2ban (per SSH failures)
+- fail2ban (for SSH failures)
 - SOS WindMill (don-openvpn, don-sshd)
 
-COMANDI NETHSERVER USATI:
-- systemctl (gestione servizi)
+NETHSERVER COMMANDS USED:
+- systemctl (service management)
 - doveadm, doveconf (Dovecot)
 - mailq (Postfix)
 - config show (NethServer config)
@@ -580,99 +579,99 @@ COMANDI NETHSERVER USATI:
 - fail2ban-client (fail2ban)
 
 
-================================================================================
-UTILIZZO SCRIPT LOCALI
-================================================================================
+========================================================================================
+USE LOCAL SCRIPTS
+========================================================================================
 
-INSTALLAZIONE NOPOLLING:
-1. Copiare script in /usr/lib/check_mk_agent/local/
-2. Rendere eseguibile: chmod +x nome_script.sh
-3. Eseguire service discovery in CheckMK
+NOPOLLING INSTALLATION:
+1. Copy script to /usr/lib/check_mk_agent/local/
+2. Make executable: chmod +x script_name.sh
+3. Run service discovery in CheckMK
 
-ESEMPIO:
+EXAMPLE:
 cp check_dovecot_status.sh /usr/lib/check_mk_agent/local/
 chmod +x /usr/lib/check_mk_agent/local/check_dovecot_status.sh
 
-INSTALLAZIONE POLLING:
-1. Copiare script in /usr/lib/check_mk_agent/plugins/
-2. Rendere eseguibile: chmod +x nome_script.sh
-3. Configurare intervallo esecuzione (default: ogni 5 minuti)
+POLLING INSTALLATION:
+1. Copy script to /usr/lib/check_mk_agent/plugins/
+2. Make executable: chmod +x script_name.sh
+3. Configure execution interval (default: every 5 minutes)
 
-ESEMPIO:
+EXAMPLE:
 cp check_ransomware_ns7.sh /usr/lib/check_mk_agent/plugins/
 chmod +x /usr/lib/check_mk_agent/plugins/check_ransomware_ns7.sh
 
 
-================================================================================
-UTILIZZO SCRIPT REMOTI
-================================================================================
+========================================================================================
+USE OF REMOTE SCRIPTS
+========================================================================================
 
-INSTALLAZIONE:
-1. Copiare wrapper remoto (rNOME.sh) in /usr/lib/check_mk_agent/local/ o plugins/
-2. Rendere eseguibile: chmod +x rNOME.sh
-3. Lo script scaricherà automaticamente l'ultima versione da GitHub
+INSTALLATION:
+1. Copy remote wrapper (rNAME.sh) to /usr/lib/check_mk_agent/local/ or plugins/
+2. Make executable: chmod +x rNAME.sh
+3. The script will automatically download the latest version from GitHub
 
-ESEMPIO NOPOLLING:
+NOPOLLING EXAMPLE:
 cp rcheck_dovecot_status.sh /usr/lib/check_mk_agent/local/
 chmod +x /usr/lib/check_mk_agent/local/rcheck_dovecot_status.sh
 
-ESEMPIO POLLING:
+POLLING EXAMPLE:
 cp rcheck_ransomware_ns7.sh /usr/lib/check_mk_agent/plugins/
 chmod +x /usr/lib/check_mk_agent/plugins/rcheck_ransomware_ns7.sh
 
-VANTAGGI:
- Aggiornamenti automatici dal repository
- No manutenzione manuale degli script
+ADVANTAGES:
+ Automatic updates from the repository
+ No manual script maintenance
  Centralized management
 
 
-================================================================================
-NOTE AGGIUNTIVE
-================================================================================
+========================================================================================
+ADDITIONAL NOTES
+========================================================================================
 
-FORMATO OUTPUT CHECKMK:
-Tutti gli script seguono il formato CheckMK local check:
-STATO NOME_SERVIZIO - DETTAGLI [| METRICHE]
+CHECKMK OUTPUT FORMAT:
+All scripts follow the CheckMK local check format:
+STATUS SERVICE_NAME - DETAILS [| METRICS]
 
-STATI:
+STATES:
 0 = OK
 1 = WARNING
 2 = CRITICAL
 3 = UNKNOWN
 
-DIFFERENZA NOPOLLING vs POLLING:
-- NOPOLLING: Eseguiti ad ogni check agent (default: ogni 1 minuto)
-- POLLING: Eseguiti a intervalli configurati (tipicamente 5-60 minuti)
+DIFFERENCE NOPOLLING vs POLLING:
+- NOPOLLING: Performed at every check agent (default: every 1 minute)
+- POLLING: Performed at configured intervals (typically 5-60 minutes)
 
 BEST PRACTICES:
-- Usare nopolling per check veloci (status servizi, contatori)
-- Usare polling per check pesanti (scansione filesystem, ransomware)
-- Usare script remoti (r*) per deployment su più server
-- Verificare dipendenze prima del deployment
-- Controllare permessi file di log e statefile
+- Use nopolling for quick checks (service status, counters)
+- Use polling for heavy checks (filesystem scan, ransomware)
+- Use remote scripts (r*) for multi-server deployments
+- Check dependencies before deployment
+- Check log file and statefile permissions
 
 
-================================================================================
-STATEFILE E LOG
-================================================================================
+========================================================================================
+STATEFILE AND LOG
+========================================================================================
 
-SCRIPT CON STATEFILE:
-check_cockpit_sessions.sh      → /var/lib/check_mk_agent/cockpit_sessions.state
-check_ssh_root_logins.sh       → /var/lib/check_mk_agent/ssh_root_logins.state
-check-pkg-install.sh           → /var/lib/check_pkg_install/last_event
+SCRIPT WITH STATEFILE:
+check_cockpit_sessions.sh → /var/lib/check_mk_agent/cockpit_sessions.state
+check_ssh_root_logins.sh → /var/lib/check_mk_agent/ssh_root_logins.state
+check-pkg-install.sh → /var/lib/check_pkg_install/last_event
 
-SCRIPT CON LOG CUSTOM:
-check_ransomware_ns7.sh        → /var/log/ransomware_monitor.log
+SCRIPT WITH CUSTOM LOG:
+check_ransomware_ns7.sh → /var/log/ransomware_monitor.log
 
-LOG DI SISTEMA LETTI:
-/var/log/messages              (Cockpit sessions)
-/var/log/secure                (SSH root logins)
-/var/log/yum.log               (Package install)
+BEDS SYSTEM LOG:
+/var/log/messages (Cockpit sessions)
+/var/log/secure (SSH root logins)
+/var/log/yum.log (Package install)
 
 
-================================================================================
-ESEMPI DI OUTPUT COMPLETI
-================================================================================
+========================================================================================
+FULL OUTPUT EXAMPLES
+========================================================================================
 
 DOVECOT:
 0 Dovecot_status - Dovecot running
@@ -692,73 +691,73 @@ SSH SECURITY:
 1 SSH-Failures - SSH failed logins blocked (banned IPs) = 2
 
 SOS:
-0 SOS_Session - SOS disattivo | vpn=0 ssh=0
-1 SOS_Session_ID - SOS attivo - ID 987654321
+0 SOS_Session - SOS off | vpn=0 ssh=0
+1 SOS_Session_ID - SOS active - ID 987654321
 
 COCKPIT:
 1 Cockpit_sessions - 2025-10-27 15:30:00 cockpit login from 10.0.0.50
 
 PACKAGE:
-1 PKG_INSTALL - WARN: attività recente (Oct 27 14:20): Updated: kernel-3.10
+1 PKG_INSTALL - WARN: recent activity (Oct 27 14:20): Updated: kernel-3.10
 
 
-================================================================================
+========================================================================================
 TROUBLESHOOTING
-================================================================================
+========================================================================================
 
-PROBLEMA: Script non genera output
-SOLUZIONE:
-- Verificare permessi esecuzione: ls -l /usr/lib/check_mk_agent/local/
-- Testare manualmente: bash /usr/lib/check_mk_agent/local/nome_script.sh
-- Verificare dipendenze (systemctl, doveadm, ecc.)
+PROBLEM: Script does not generate output
+SOLUTION:
+- Check execution permissions: ls -l /usr/lib/check_mk_agent/local/
+- Test manually: bash /usr/lib/check_mk_agent/local/script_name.sh
+- Check dependencies (systemctl, doveadm, etc.)
 
-PROBLEMA: Servizio non appare in CheckMK
-SOLUZIONE:
-- Eseguire service discovery: Setup → Hosts → Full service scan
-- Verificare output agent: cmk -d hostname
-- Controllare log CheckMK: /omd/sites/SITENAME/var/log/
+PROBLEM: Service does not appear in CheckMK
+SOLUTION:
+- Run service discovery: Setup → Hosts → Full service scan
+- Check agent output: cmk -d hostname
+- Check CheckMK log: /omd/sites/SITENAME/var/log/
 
-PROBLEMA: Script remoto non funziona
-SOLUZIONE:
-- Verificare connettività GitHub: curl -I https://raw.githubusercontent.com
-- Controllare firewall/proxy
-- Testare URL manualmente: curl -fsSL "$SCRIPT_URL"
+PROBLEM: Remote Script does not work
+SOLUTION:
+- Check GitHub connectivity: curl -I https://raw.githubusercontent.com
+- Check firewall/proxy
+- Test URL manually: curl -fsSL "$SCRIPT_URL"
 
-PROBLEMA: Statefile non viene creato
-SOLUZIONE:
-- Verificare permessi cartella: ls -ld /var/lib/check_mk_agent/
-- Creare manualmente: mkdir -p /var/lib/check_mk_agent
-- Verificare SELinux: getenforce
+PROBLEM: Statefile is not created
+SOLUTION:
+- Check folder permissions: ls -ld /var/lib/check_mk_agent/
+- Create manually: mkdir -p /var/lib/check_mk_agent
+- Check SELinux: getenforce
 
 
-================================================================================
-SICUREZZA
-================================================================================
+========================================================================================
+SAFETY
+========================================================================================
 
-CONSIDERAZIONI:
- Gli script vengono eseguiti come utente checkmk o root
- Accesso a log di sistema richiede permessi adeguati
- Statefile possono contenere timestamp e IP
- Script remoti scaricano codice da GitHub - verificare HTTPS
+CONSIDERATIONS:
+ Scripts are run as user checkmk or root
+ Access to system logs requires appropriate permissions
+ Statefiles can contain timestamps and IPs
+ Remote scripts download code from GitHub - check HTTPS
 
-PERMESSI CONSIGLIATI:
-- Script: 755 (rwxr-xr-x)
+RECOMMENDED PERMISSIONS:
+- Scripts: 755 (rwxr-xr-x)
 - Statefile: 644 (rw-r--r--)
-- Log custom: 640 (rw-r-----)
+- Custom log: 640 (rw-r-----)
 
 
-================================================================================
-AUTORE E LICENZA
-================================================================================
+========================================================================================
+AUTHOR AND LICENSE
+========================================================================================
 
-Autore:     NethLab / Marzio Project
+Author: NethLab / Marzio Project
 Repository: https://github.com/Coverup20/checkmk-tools
-Licenza:    [Specificare licenza]
+License: [Specify license]
 
-Compatibilità testata:
+Tested compatibility:
 - NethServer 7.9
 - CheckMK Raw 2.4.x
 
-================================================================================
-Fine documento
-================================================================================
+========================================================================================
+End of document
+========================================================================================

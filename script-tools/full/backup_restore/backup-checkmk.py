@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-backup-checkmk.py
+"""backup-checkmk.py
 
 Creates an OMD site backup archive and removes archives older than retention days.
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import argparse
 import datetime as dt

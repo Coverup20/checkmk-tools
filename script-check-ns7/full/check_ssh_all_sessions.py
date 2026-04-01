@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check_ssh_all_sessions.py - CheckMK Local Check for all SSH sessions
+"""check_ssh_all_sessions.py - CheckMK Local Check for all SSH sessions
 
 Count all active SSH sessions (all users).
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -17,12 +15,10 @@ SERVICE_NAME = "SSH-all-sessions"
 
 
 def get_all_sessions() -> tuple:
-    """
-    Get count and unique users of all SSH sessions.
+    """Get count and unique users of all SSH sessions.
     
     Returns:
-        Tuple of (session_count, comma-separated unique users)
-    """
+        Tuple of (session_count, comma-separated unique users)"""
     try:
         result = subprocess.run(
             ["who"],
@@ -51,12 +47,10 @@ def get_all_sessions() -> tuple:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     count, users = get_all_sessions()
     
     if count > 0:

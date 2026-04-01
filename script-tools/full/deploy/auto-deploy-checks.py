@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""
-Auto Deploy CheckMK Checks - Installazione/Rimozione interattiva script CheckMK
+"""Auto Deploy CheckMK Checks - Interactive Install/Remove CheckMK script
 
-Menu interattivo per:
-- Installare script CheckMK (remote/full/both)
-- Rimuovere script installati
-- Rilevamento automatico tipo host
-- Forzatura permessi eseguibili garantita
+Interactive menu for:
+- Install CheckMK script (remote/full/both)
+- Remove installed scripts
+- Automatic host type detection
+- Guaranteed forcing of executable permissions
 
-Modalità CLI disponibile per automazione via curl.
+CLI mode available for automation via curl.
 
-Version: 1.7.0
-"""
+Version: 1.7.0"""
 
 import os
 import sys
@@ -41,7 +39,7 @@ class Colors:
 
 
 class HostDetector:
-    """Rileva tipo di host e sistema operativo."""
+    """Detect host type and operating system."""
     
     def __init__(self):
         self.os_info = self._read_os_release()
@@ -50,7 +48,7 @@ class HostDetector:
         self.detect_host_type()
     
     def _read_os_release(self) -> Dict[str, str]:
-        """Leggi /etc/os-release per info OS."""
+        """Read /etc/os-release for OS info."""
         os_info = {}
         
         if Path("/etc/os-release").exists():
@@ -66,7 +64,7 @@ class HostDetector:
         return os_info
     
     def _run_command(self, cmd: List[str]) -> Tuple[int, str, str]:
-        """Esegue comando e ritorna (exit_code, stdout, stderr)."""
+        """Execute command and return (exit_code, stdout, stderr)."""
         try:
             result = subprocess.run(
                 cmd,
@@ -80,10 +78,8 @@ class HostDetector:
             return 1, "", ""
     
     def get_ns8_modules(self) -> List[str]:
-        """
-        Ritorna la lista dei moduli NS8 installati via runagent -l.
-        Es: ['mail1', 'webtop1', 'nethvoice1', 'samba1', ...]
-        """
+        """Returns the list of NS8 modules installed via runagent -l.
+        Ex: ['mail1', 'webtop1', 'nethvoice1', 'samba1', ...]"""
         if self.script_category != 'script-check-ns8':
             return []
         exit_code, stdout, _ = self._run_command(['runagent', '-l'])
@@ -92,7 +88,7 @@ class HostDetector:
         return [line.strip() for line in stdout.split('\n') if line.strip()]
 
     def detect_host_type(self) -> None:
-        """Rileva tipo di host in base a caratteristiche del sistema."""
+        """Detect host type based on system characteristics."""
         
         # NethServer 7 (CentOS 7 based)
         if Path("/etc/nethserver-release").exists():
@@ -100,7 +96,7 @@ class HostDetector:
             self.script_category = "script-check-ns7"
             return
         
-        # NethSecurity 8 (OpenWrt based) - check PRIMA di NS8 perché /etc/nethserver può esistere anche su NethSecurity
+        # NethSecurity 8 (OpenWrt based) - check BEFORE NS8 because /etc/nethserver can also exist on NethSecurity
         if Path("/etc/openwrt_release").exists():
             with open("/etc/openwrt_release", 'r') as f:
                 content = f.read()
@@ -125,7 +121,7 @@ class HostDetector:
         
         # CheckMK Server (OMD)
         if Path("/omd").exists() or Path("/opt/omd").exists():
-            # Verifica presenza siti OMD
+            # Check presence of OMD sites
             exit_code, stdout, _ = self._run_command(["omd", "sites"])
             if exit_code == 0:
                 self.host_type = "CheckMK Server (OMD)"
@@ -161,7 +157,7 @@ class HostDetector:
 
 
 def print_header() -> None:
-    """Stampa header dello script."""
+    """Print script header."""
     print(f"{Colors.BLUE}╔═══════════════════════════════════════════════════════════╗{Colors.NC}")
     print(f"{Colors.BLUE}║{Colors.NC}   {Colors.GREEN}Auto Deploy CheckMK Checks v{VERSION}{Colors.NC}               {Colors.BLUE}║{Colors.NC}")
     print(f"{Colors.BLUE}╠═══════════════════════════════════════════════════════════╣{Colors.NC}")
@@ -170,7 +166,7 @@ def print_header() -> None:
     print()
 
 
-# Mapping: keyword nel nome script → prefisso modulo NS8 richiesto
+# Mapping: keyword in script name → NS8 module prefix required
 NS8_SCRIPT_MODULE_MAP = {
     'services':  'mail',
     'webtop':    'webtop',
@@ -180,10 +176,8 @@ NS8_SCRIPT_MODULE_MAP = {
 
 
 def filter_scripts_by_ns8_modules(scripts: List[Tuple[str, str]], modules: List[str]) -> Tuple[List[Tuple[str, str]], List[str]]:
-    """
-    Filtra la lista script in base ai moduli NS8 installati.
-    Ritorna (script_applicabili, script_esclusi).
-    """
+    """Filter the script list based on installed NS8 modules.
+    Returns (applicable_scripts, excluded_scripts)."""
     if not modules:
         return scripts, []
 
@@ -206,10 +200,10 @@ def filter_scripts_by_ns8_modules(scripts: List[Tuple[str, str]], modules: List[
                 break
 
         if required_module is None:
-            # Nessun requisito → sempre applicabile
+            # No requirements → always applicable
             applicable.append((filename, url))
         elif required_module in active_prefixes:
-            # Modulo richiesto presente
+            # Required form present
             applicable.append((filename, url))
         else:
             excluded.append(filename)
@@ -218,16 +212,14 @@ def filter_scripts_by_ns8_modules(scripts: List[Tuple[str, str]], modules: List[
 
 
 def list_available_scripts(category: str, script_type: str = 'both') -> List[Tuple[str, str]]:
-    """
-    Lista script disponibili nella categoria via GitHub API.
+    """List of scripts available in the category via GitHub API.
     
     Args:
-        category: Nome categoria (es: script-check-ns7)
-        script_type: 'remote', 'full', o 'both'
+        category: Category name (e.g. script-check-ns7)
+        script_type: 'remote', 'full', or 'both'
         
     Returns:
-        Lista di tuple (filename, url_raw)
-    """
+        List of tuples (filename, url_raw)"""
     scripts = []
     
     # Determina quali subdirectory scansionare
@@ -247,7 +239,7 @@ def list_available_scripts(category: str, script_type: str = 'both') -> List[Tup
             for item in data:
                 if item['type'] == 'file':
                     filename = item['name']
-                    # Filtra SOLO script Python (.py) - ESCLUDI bash (.sh)
+                    # Filter ONLY Python script (.py) - EXCLUDE bash (.sh)
                     if filename.endswith('.py'):
                         download_url = item['download_url']
                         scripts.append((filename, download_url))
@@ -259,12 +251,10 @@ def list_available_scripts(category: str, script_type: str = 'both') -> List[Tup
 
 
 def list_installed_scripts() -> List[str]:
-    """
-    Lista script già installati in /usr/lib/check_mk_agent/local/.
+    """List of scripts already installed in /usr/lib/check_mk_agent/local/.
     
     Returns:
-        Lista nomi file installati
-    """
+        List of installed file names"""
     installed = []
     
     if CHECKMK_LOCAL_PATH.exists():
@@ -276,16 +266,14 @@ def list_installed_scripts() -> List[str]:
 
 
 def download_script(url: str, dest_path: Path) -> bool:
-    """
-    Scarica script da URL remoto.
+    """Download script from remote URL.
     
     Args:
-        url: URL raw GitHub
-        dest_path: Path destinazione locale
+        url: GitHub raw URL
+        dest_path: Local destination path
         
     Returns:
-        True se successo, False altrimenti
-    """
+        True if successful, False otherwise"""
     try:
         # Aggiungi cache buster
         import time
@@ -311,16 +299,14 @@ def download_script(url: str, dest_path: Path) -> bool:
 
 
 def show_scripts_menu(scripts: List[Tuple[str, str]], category: str) -> None:
-    """
-    Mostra menu script disponibili con selezione multipla.
+    """Show available script menus with multiple selection.
     
     Args:
-        scripts: Lista (filename, url)
-        category: Categoria script
-    """
+        scripts: List (filename, url)
+        category: Script category"""
     print(f"\n{Colors.CYAN}Script disponibili in {category}:{Colors.NC}\n")
     
-    # Separa per tipo (remote vs full)
+    # Separate by type (remote vs full)
     remote_scripts = [(i, name, url) for i, (name, url) in enumerate(scripts, 1) if '/remote/' in url]
     full_scripts = [(i, name, url) for i, (name, url) in enumerate(scripts, 1) if '/full/' in url]
     
@@ -342,16 +328,14 @@ def show_scripts_menu(scripts: List[Tuple[str, str]], category: str) -> None:
 
 
 def parse_selection(selection: str, max_idx: int) -> List[int]:
-    """
-    Parsea input utente per selezione multipla.
+    """Parsea user input for multiple selection.
     
     Args:
-        selection: Input utente (es: "1,3,5" o "1-5" o "a" o "r")
-        max_idx: Numero massimo script
+        selection: User input (e.g. "1,3,5" or "1-5" or "a" or "r")
+        max_idx: Maximum number of scripts
         
     Returns:
-        Lista indici selezionati
-    """
+        List of selected indices"""
     if selection.lower() == 'a':
         return list(range(1, max_idx + 1))
     
@@ -386,16 +370,14 @@ def parse_selection(selection: str, max_idx: int) -> List[int]:
 
 
 def install_scripts(scripts: List[Tuple[str, str]], selected_indices: List[int]) -> int:
-    """
-    Installa script selezionati.
+    """Install selected scripts.
     
     Args:
-        scripts: Lista completa (filename, url)
-        selected_indices: Indici da installare
+        scripts: Complete list (filename, url)
+        selected_indexes: Indices to install
         
     Returns:
-        Numero script installati con successo
-    """
+        Number of successfully installed scripts"""
     if not CHECKMK_LOCAL_PATH.exists():
         print(f"{Colors.RED} Path CheckMK non trovato: {CHECKMK_LOCAL_PATH}{Colors.NC}")
         print(f"{Colors.YELLOW}  Installare prima CheckMK Agent{Colors.NC}")
@@ -409,10 +391,10 @@ def install_scripts(scripts: List[Tuple[str, str]], selected_indices: List[int])
         
         filename, url = scripts[idx - 1]
         
-        # Rimuovi estensione per deployment (CheckMK convention)
+        # Remove extension for deployment (CheckMK convention)
         deploy_name = filename.rsplit('.', 1)[0] if '.' in filename else filename
         
-        # CRITICO: CheckMK ignora file con underscore! Converti _ → -
+        # CRITICAL: CheckMK ignores files with underscores! Convert _ → -
         deploy_name = deploy_name.replace('_', '-')
         
         dest_path = CHECKMK_LOCAL_PATH / deploy_name
@@ -420,7 +402,7 @@ def install_scripts(scripts: List[Tuple[str, str]], selected_indices: List[int])
         print(f"{Colors.CYAN}Installazione:{Colors.NC} {filename} → {dest_path}... ", end='', flush=True)
         
         if download_script(url, dest_path):
-            # Forza permessi eseguibili (doppia sicurezza)
+            # Force executable permissions (double security)
             try:
                 os.chmod(dest_path, 0o755)
             except OSError:
@@ -435,15 +417,13 @@ def install_scripts(scripts: List[Tuple[str, str]], selected_indices: List[int])
 
 
 def uninstall_scripts(script_names: List[str]) -> int:
-    """
-    Rimuove script installati.
+    """Removes installed scripts.
     
     Args:
-        script_names: Lista nomi file da rimuovere
+        script_names: List of file names to remove
         
     Returns:
-        Numero script rimossi con successo
-    """
+        Number of scripts successfully removed"""
     if not CHECKMK_LOCAL_PATH.exists():
         print(f"{Colors.RED} Path CheckMK non trovato: {CHECKMK_LOCAL_PATH}{Colors.NC}")
         return 0
@@ -470,12 +450,10 @@ def uninstall_scripts(script_names: List[str]) -> int:
 
 
 def show_main_menu() -> str:
-    """
-    Mostra menu principale e restituisce azione scelta.
+    """Mostra menu principale e restituisce azione scelta.
     
     Returns:
-        'install_agent', 'install', 'uninstall', 'uninstall_all', o 'exit'
-    """
+        'install_agent', 'install', 'uninstall', 'uninstall_all', o 'exit'"""
     print(f"\n{Colors.CYAN}╔═══════════════════════════════════════╗{Colors.NC}")
     print(f"{Colors.CYAN}║  Cosa vuoi fare?                      ║{Colors.NC}")
     print(f"{Colors.CYAN}╚═══════════════════════════════════════╝{Colors.NC}\n")
@@ -512,21 +490,19 @@ def show_main_menu() -> str:
 
 
 def uninstall_agent() -> int:
-    """
-    Rimuove CheckMK Agent dal sistema.
+    """Remove CheckMK Agent from your system.
     
     Returns:
-        0 = successo, 1 = errore
-    """
+        0 = success, 1 = error"""
     print(f"\n{Colors.YELLOW}Rimozione CheckMK Agent...{Colors.NC}\n")
     
-    # Verifica se installato
+    # Check if installed
     if not os.path.exists('/usr/bin/check_mk_agent'):
         print(f"  {Colors.YELLOW}CheckMK Agent non installato{Colors.NC}")
         return 0
     
     try:
-        # Stop servizi
+        # Stop services
         subprocess.run(
             ['systemctl', 'stop', 'check-mk-agent-plain.socket'],
             stdout=subprocess.DEVNULL,
@@ -538,7 +514,7 @@ def uninstall_agent() -> int:
             stderr=subprocess.DEVNULL
         )
         
-        # Rimuovi pacchetto
+        # Remove package
         # Prova rpm
         result = subprocess.run(
             ['rpm', '-e', 'check-mk-agent'],
@@ -567,21 +543,19 @@ def uninstall_agent() -> int:
 
 
 def uninstall_frpc() -> int:
-    """
-    Rimuove FRPC Client dal sistema.
+    """Removes FRPC Client from the system.
     
     Returns:
-        0 = successo, 1 = errore
-    """
+        0 = success, 1 = error"""
     print(f"\n{Colors.YELLOW}Rimozione FRPC Client...{Colors.NC}\n")
     
-    # Verifica se installato
+    # Check if installed
     if not os.path.exists('/usr/local/bin/frpc'):
         print(f"  {Colors.YELLOW}FRPC Client non installato{Colors.NC}")
         return 0
     
     try:
-        # Stop e disable servizio
+        # Stop and disable service
         subprocess.run(
             ['systemctl', 'stop', 'frpc'],
             stdout=subprocess.DEVNULL,
@@ -593,7 +567,7 @@ def uninstall_frpc() -> int:
             stderr=subprocess.DEVNULL
         )
         
-        # Rimuovi file
+        # Remove files
         files_to_remove = [
             '/usr/local/bin/frpc',
             '/etc/systemd/system/frpc.service',
@@ -604,7 +578,7 @@ def uninstall_frpc() -> int:
             if os.path.exists(file_path):
                 os.remove(file_path)
         
-        # Rimuovi directory se vuota
+        # Remove directory if empty
         if os.path.exists('/etc/frp'):
             try:
                 os.rmdir('/etc/frp')
@@ -627,17 +601,15 @@ def uninstall_frpc() -> int:
 
 
 def check_agent_installed() -> Tuple[bool, str]:
-    """
-    Controlla se CheckMK Agent è installato.
+    """Check if CheckMK Agent is installed.
     
     Returns:
-        (is_installed, version_info)
-    """
-    # Metodo 1: Verifica file eseguibile
+        (is_installed, version_info)"""
+    # Method 1: Check executable file
     if not os.path.exists('/usr/bin/check_mk_agent'):
         return False, ""
     
-    # Metodo 2: Ottieni versione da package manager
+    # Method 2: Get version from package manager
     try:
         # Prova rpm (RHEL/CentOS/NethServer)
         result = subprocess.run(
@@ -668,23 +640,21 @@ def check_agent_installed() -> Tuple[bool, str]:
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
     
-    # Se file esiste ma non riusciamo a ottenere versione
+    # If file exists but we can't get version
     return True, "(versione sconosciuta)"
 
 
 def check_frpc_installed() -> Tuple[bool, str]:
-    """
-    Controlla se FRPC è installato e attivo.
+    """Check if FRPC is installed and active.
     
     Returns:
-        (is_installed, status_info)
-    """
-    # Controlla se binario esiste
+        (is_installed, status_info)"""
+    # Check if binary exists
     if not Path("/usr/local/bin/frpc").exists():
         return False, "non installato"
     
     try:
-        # Controlla servizio systemd
+        # Check systemd service
         result = subprocess.run(
             ['systemctl', 'is-active', 'frpc'],
             stdout=subprocess.PIPE,
@@ -702,17 +672,15 @@ def check_frpc_installed() -> Tuple[bool, str]:
             return True, f"installato ({status})"
     
     except (FileNotFoundError, subprocess.TimeoutExpired):
-        # Se systemctl non funziona, controlla solo file
+        # If systemctl doesn't work, just check files
         return True, "installato (stato sconosciuto)"
 
 
 def show_current_status() -> Tuple[bool, bool]:
-    """
-    Mostra stato attuale CheckMK Agent e FRPC.
+    """Show current CheckMK Agent and FRPC status.
     
     Returns:
-        (agent_installed, frpc_installed)
-    """
+        (agent_installed, frpc_installed)"""
     print(f"\n{Colors.CYAN}╔═══════════════════════════════════════════════════════════╗{Colors.NC}")
     print(f"{Colors.CYAN}║   Stato Attuale Sistema                                ║{Colors.NC}")
     print(f"{Colors.CYAN}╚═══════════════════════════════════════════════════════════╝{Colors.NC}\n")
@@ -736,18 +704,16 @@ def show_current_status() -> Tuple[bool, bool]:
 
 
 def install_checkmk_agent() -> int:
-    """
-    Workflow completo: Agent → FRPC → Deploy Script.
-    Controlla stato, installa componenti mancanti, poi offre deploy script.
+    """Complete workflow: Agent → FRPC → Deploy Script.
+    Checks status, installs missing components, then offers deploy script.
     
     Returns:
-        0 se successo, 1 se errore
-    """
+        0 if successful, 1 if error"""
     print(f"\n{Colors.MAGENTA}╔═══════════════════════════════════════════════════════════╗{Colors.NC}")
     print(f"{Colors.MAGENTA}║   Setup Completo Sistema CheckMK                       ║{Colors.NC}")
     print(f"{Colors.MAGENTA}╚═══════════════════════════════════════════════════════════╝{Colors.NC}")
     
-    # ===== STEP 1: Controlla e installa CheckMK Agent =====
+    # ===== STEP 1: Check and install CheckMK Agent =====
     print(f"\n{Colors.CYAN}━━━ STEP 1: CheckMK Agent ━━━{Colors.NC}\n")
     
     agent_installed, agent_info = check_agent_installed()
@@ -772,7 +738,7 @@ def install_checkmk_agent() -> int:
                 print(f"{Colors.RED} Aggiornamento agent fallito{Colors.NC}")
                 return 1
             
-            # Ricontrolla versione
+            # Double check version
             agent_installed, agent_info = check_agent_installed()
             if agent_installed:
                 print(f"\n  {Colors.GREEN} CheckMK Agent aggiornato - {agent_info}{Colors.NC}\n")
@@ -795,7 +761,7 @@ def install_checkmk_agent() -> int:
         else:
             print(f"\n  {Colors.YELLOW} Agent potrebbe non essere stato installato{Colors.NC}\n")
     
-    # ===== STEP 2: Controlla e installa FRPC =====
+    # ===== STEP 2: Check and install FRPC =====
     print(f"{Colors.CYAN}━━━ STEP 2: FRPC Client (tunnel remoto) ━━━{Colors.NC}\n")
     
     frpc_installed, frpc_info = check_frpc_installed()
@@ -845,7 +811,7 @@ def install_checkmk_agent() -> int:
     if choice == 's':
         print(f"\n{Colors.GREEN} Hai scelto:{Colors.NC} Procedi con deploy script\n")
         print(f"{Colors.GREEN} Setup base completato. Passo al deploy script...{Colors.NC}\n")
-        # Ritorna 2 come segnale per continuare con deploy script
+        # It returns 2 as a signal to continue with deploy script
         return 2
     else:
         print(f"\n{Colors.YELLOW} Hai scelto:{Colors.NC} Esci senza deploy script\n")
@@ -854,13 +820,11 @@ def install_checkmk_agent() -> int:
 
 
 def install_agent_only() -> int:
-    """
-    Installa CheckMK Agent direttamente (senza script esterno).
-    Rileva OS, scarica pacchetto corretto e lo installa.
+    """Install CheckMK Agent directly (without external script).
+    Detects OS, downloads correct package and installs it.
     
     Returns:
-        0 se successo, 1 se errore
-    """
+        0 if successful, 1 if error"""
     print(f"{Colors.YELLOW}Download e installazione CheckMK Agent...{Colors.NC}\n")
     
     try:
@@ -890,14 +854,14 @@ def install_agent_only() -> int:
         # URL base CheckMK agents
         base_url = "https://monitoring.nethlab.it/monitoring/check_mk/agents"
         
-        # Scarica listing agent
+        # Download listing agent
         print(f"  Recupero lista agent da CheckMK server...")
         
         request = urllib.request.Request(base_url + "/", headers={'Cache-Control': 'no-cache'})
         with urllib.request.urlopen(request, timeout=30) as response:
             listing = response.read().decode('utf-8')
         
-        # Trova ultima versione
+        # Find latest version
         if pkg_type == "deb":
             pattern = r'check-mk-agent_[\d.]+p[\d]+-[\d]+_all\.deb'
         else:  # rpm
@@ -908,14 +872,14 @@ def install_agent_only() -> int:
             print(f"{Colors.RED} Nessun pacchetto agent trovato{Colors.NC}")
             return 1
         
-        # Prendi ultima versione (sort)
+        # Get latest version (sort)
         latest_pkg = sorted(matches)[-1]
         pkg_url = f"{base_url}/{latest_pkg}"
         
         print(f"  Versione: {latest_pkg}")
         print(f"  Download da: {pkg_url}\n")
         
-        # Scarica pacchetto
+        # Download package
         tmp_pkg = f"/tmp/{latest_pkg}"
         
         print(f"{Colors.YELLOW}Download in corso...{Colors.NC}")
@@ -926,7 +890,7 @@ def install_agent_only() -> int:
         
         print(f"{Colors.GREEN} Download completato{Colors.NC}\n")
         
-        # Installa pacchetto
+        # Install package
         print(f"{Colors.YELLOW}Installazione pacchetto...{Colors.NC}")
         
         if pkg_type == "deb":
@@ -961,10 +925,10 @@ def install_agent_only() -> int:
         
         print(f"{Colors.GREEN} Pacchetto installato{Colors.NC}\n")
         
-        # Configura socket systemd
+        # Configure systemd sockets
         print(f"{Colors.YELLOW}Configurazione socket systemd...{Colors.NC}")
         
-        # Disabilita servizi old-style
+        # Disable old-style services
         subprocess.run(['systemctl', 'stop', 'check-mk-agent.socket', 'cmk-agent-ctl-daemon.service'], 
                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(['systemctl', 'disable', 'check-mk-agent.socket', 'cmk-agent-ctl-daemon.service'],
@@ -980,8 +944,7 @@ ListenStream=6556
 Accept=yes
 
 [Install]
-WantedBy=sockets.target
-"""
+WantedBy=sockets.target"""
         
         service_config = """[Unit]
 Description=Checkmk Agent Service (plain)
@@ -990,8 +953,7 @@ Description=Checkmk Agent Service (plain)
 Type=simple
 ExecStart=/usr/bin/check_mk_agent
 StandardInput=socket
-User=root
-"""
+User=root"""
         
         with open('/etc/systemd/system/check-mk-agent-plain.socket', 'w') as f:
             f.write(socket_config)
@@ -999,7 +961,7 @@ User=root
         with open('/etc/systemd/system/check-mk-agent-plain@.service', 'w') as f:
             f.write(service_config)
         
-        # Abilita e avvia socket
+        # Enable and start socket
         subprocess.run(['systemctl', 'daemon-reload'], check=True)
         subprocess.run(['systemctl', 'enable', 'check-mk-agent-plain.socket'], 
                       check=True, stdout=subprocess.DEVNULL)
@@ -1017,12 +979,10 @@ User=root
 
 
 def install_frpc_only() -> int:
-    """
-    Installa solo FRPC Client (chiede configurazione).
+    """Install FRPC Client only (requires configuration).
     
     Returns:
-        0 se successo, 1 se errore
-    """
+        0 if successful, 1 if error"""
     print(f"{Colors.YELLOW}═══════════════════════════════════════════════════════════{Colors.NC}")
     print(f"{Colors.CYAN}Configurazione FRPC{Colors.NC}")
     print(f"{Colors.YELLOW}═══════════════════════════════════════════════════════════{Colors.NC}\n")
@@ -1038,7 +998,7 @@ def install_frpc_only() -> int:
         )
         default_hostname = hostname_result.stdout.strip() if hostname_result.returncode == 0 else "host"
         
-        # Chiedi configurazione
+        # Ask for configuration
         print(f"Nome host [{default_hostname}]: ", end='', flush=True)
         frpc_hostname = input().strip() or default_hostname
         
@@ -1061,30 +1021,29 @@ def install_frpc_only() -> int:
         
         print(f"\n{Colors.YELLOW}Installazione FRPC...{Colors.NC}\n")
         
-        # Crea directory configurazione
+        # Create configuration directory
         os.makedirs("/etc/frp", exist_ok=True)
         
-        # Scrivi configurazione
+        # Write configuration
         config = f"""[common]
 server_addr = "{frp_server}"
 server_port = 7000
 auth.method = "token"
-auth.token  = "{auth_token}"
-tls.enable  = true
-log.to      = "/var/log/frpc.log"
-log.level   = "info"
+auth.token = "{auth_token}"
+tls.enable = true
+log.to = "/var/log/frpc.log"
+log.level = "info"
 
 [{frpc_hostname}]
-type        = "tcp"
-local_ip    = "127.0.0.1"
-local_port  = 6556
-remote_port = {remote_port}
-"""
+type = "tcp"
+local_ip = "127.0.0.1"
+local_port = 6556
+remote_port = {remote_port}"""
         
         with open("/etc/frp/frpc.toml", 'w') as f:
             f.write(config)
         
-        # Scarica FRPC binary se non esiste
+        # Download FRPC binary if it does not exist
         if not Path("/usr/local/bin/frpc").exists():
             frp_version = "0.64.0"
             import platform
@@ -1101,7 +1060,7 @@ remote_port = {remote_port}
             subprocess.run(['chmod', '+x', '/usr/local/bin/frpc'], check=True)
             os.remove('/tmp/frpc.tar.gz')
         
-        # Crea servizio systemd
+        # Create systemd service
         service = """[Unit]
 Description=FRP Client Service
 After=network-online.target
@@ -1115,13 +1074,12 @@ RestartSec=5s
 User=root
 
 [Install]
-WantedBy=multi-user.target
-"""
+WantedBy=multi-user.target"""
         
         with open("/etc/systemd/system/frpc.service", 'w') as f:
             f.write(service)
         
-        # Abilita e avvia servizio
+        # Enable and start service
         subprocess.run(['systemctl', 'daemon-reload'], check=True)
         subprocess.run(['systemctl', 'enable', 'frpc'], check=True, stdout=subprocess.DEVNULL)
         subprocess.run(['systemctl', 'start', 'frpc'], check=True)
@@ -1137,12 +1095,10 @@ WantedBy=multi-user.target
 
 
 def ask_script_type() -> str:
-    """
-    Chiede all'utente quale tipo di script installare.
+    """Asks the user what type of script to install.
     
     Returns:
-        'remote', 'full', o 'both'
-    """
+        'remote', 'full', or 'both'"""
     print(f"\n{Colors.CYAN}╔═══════════════════════════════════════╗{Colors.NC}")
     print(f"{Colors.CYAN}║  Quale tipo di script?                ║{Colors.NC}")
     print(f"{Colors.CYAN}╚═══════════════════════════════════════╝{Colors.NC}\n")
@@ -1181,25 +1137,23 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description='Auto Deploy CheckMK Checks - Rileva host e installa script corretti',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Esempi:
-  # Modalità interattiva (menu)
+        epilog="""Examples:
+  # Interactive mode (menu)
   %(prog)s
   
-  # Installa tutti gli script automaticamente
+  # Install all scripts automatically
   %(prog)s --install-all --yes
   
-  # Installa script specifici
+  # Install specific scripts
   %(prog)s --install "1,3,5" --yes
   
-  # Rimuovi script installati (interattivo)
+  # Remove installed scripts (interactive)
   %(prog)s --uninstall
   
   # One-liner via curl
   curl -fsSL URL | sudo python3 - --install-all --yes
   
-Nota: Ora vengono installati SOLO script completi (full/), non più launcher remoti.
-"""
+Note: ONLY full (full/) scripts are now installed, no more remote launchers."""
     )
     
     parser.add_argument('--install-all', action='store_true',
@@ -1221,7 +1175,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
     
     print_header()
     
-    # Verifica root
+    # Verify root
     if os.geteuid() != 0:
         print(f"{Colors.RED} Questo script richiede privilegi root{Colors.NC}")
         print(f"{Colors.YELLOW}  Esegui con: sudo {sys.argv[0]}{Colors.NC}\n")
@@ -1229,7 +1183,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
     
     # ===== MENU INTERATTIVO (se nessun argomento CLI specificato) =====
     if not any([args.uninstall, args.install_all, args.install, args.type, args.install_remote]):
-        # Modalità interattiva con menu principale
+        # Interactive mode with main menu
         action = show_main_menu()
         
         if action == 'exit':
@@ -1241,7 +1195,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
             result = install_checkmk_agent()
             
             if result == 2:
-                # Utente vuole continuare con deploy script
+                # User wants to continue with deploy script
                 # Chiedi tipo script
                 script_type = ask_script_type()
                 if script_type == 'cancel':
@@ -1251,9 +1205,9 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
                 # Forza modalità install-all
                 args.install_all = True
                 args.type = script_type
-                # Continua il flusso sotto
+                # Continue the flow below
             else:
-                # Setup completato o errore
+                # Setup complete or error
                 return result
         
         elif action == 'uninstall':
@@ -1261,7 +1215,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
             args.uninstall = True
         
         elif action == 'uninstall_all':
-            # Rimozione completa: Script → FRPC → Agent
+            # Complete removal: Script → FRPC → Agent
             print(f"\n{Colors.YELLOW}╔═══════════════════════════════════════════════════════════╗{Colors.NC}")
             print(f"{Colors.YELLOW}║    RIMOZIONE COMPLETA SISTEMA CHECKMK                  ║{Colors.NC}")
             print(f"{Colors.YELLOW}╚═══════════════════════════════════════════════════════════╝{Colors.NC}\n")
@@ -1303,11 +1257,11 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
             return 0
         
         elif action == 'install':
-            # Modalità interattiva installazione
-            # Il tipo verrà chiesto più avanti nel flusso
+            # Interactive installation mode
+            # The type will be asked later in the flow
             pass
     
-    # ===== MODALITÀ RIMOZIONE =====
+    # ===== REMOVAL MODE =====
     if args.uninstall:
         print(f"\n{Colors.YELLOW}Modalità: Rimozione script installati{Colors.NC}\n")
         
@@ -1347,7 +1301,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
             print(f"{Colors.RED} Nessuno script selezionato{Colors.NC}")
             return 1
         
-        # Conferma rimozione
+        # Confirm removal
         print(f"\n{Colors.RED} Verranno rimossi {len(to_remove)} script{Colors.NC}")
         for name in to_remove:
             print(f"  - {name}")
@@ -1366,7 +1320,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
             else:
                 print(f"\n{Colors.GREEN} Hai scelto:{Colors.NC} Conferma rimozione\n")
         
-        # Esegui rimozione
+        # Perform removal
         print(f"{Colors.RED}▶ Rimozione in corso...{Colors.NC}\n")
         removed = uninstall_scripts(to_remove)
         
@@ -1377,9 +1331,9 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
         
         return 0
     
-    # ===== MODALITÀ INSTALLAZIONE =====
+    # ===== INSTALLATION MODE =====
     
-    # Rileva host
+    # Detect hosts
     print(f"{Colors.YELLOW}Rilevamento sistema in corso...{Colors.NC}\n")
     detector = HostDetector()
     
@@ -1391,14 +1345,14 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
         print(f"\n{Colors.RED} Impossibile determinare categoria script appropriata{Colors.NC}")
         return 1
     
-    # USA SEMPRE SCRIPT FULL (non più launcher remote)
+    # ALWAYS USE FULL SCRIPT (no more remote launchers)
     script_type = 'full'
     
     # Backward compatibility: ignora --type e --install-remote
     if args.type or args.install_remote:
         print(f"\n{Colors.YELLOW}[INFO] Ora vengono installati SOLO script completi (full/), non più launcher{Colors.NC}")
     
-    # Lista script disponibili
+    # List of available scripts
     print(f"\n{Colors.YELLOW}Recupero lista script da GitHub...{Colors.NC}")
     scripts = list_available_scripts(detector.script_category, script_type)
     
@@ -1408,7 +1362,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
     
     print(f"{Colors.GREEN} Trovati {len(scripts)} script completi{Colors.NC}")
 
-    # Filtra script per moduli NS8 installati
+    # Filter scripts for installed NS8 modules
     if detector.script_category == 'script-check-ns8':
         ns8_modules = detector.get_ns8_modules()
         if ns8_modules:
@@ -1418,16 +1372,16 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
                 print(f"{Colors.YELLOW} Script esclusi (modulo non installato): {', '.join(excluded)}{Colors.NC}")
             print(f"{Colors.GREEN} Script applicabili a questo host: {len(scripts)}{Colors.NC}")
 
-    # Determina selezione (da args o input interattivo)
+    # Determine selection (from args or interactive input)
     selected_indices: List[int] = []
     
     if args.install_all:
-        # Installa tutti
+        # Install all
         selected_indices = list(range(1, len(scripts) + 1))
         print(f"\n{Colors.CYAN}Modalità: Installa TUTTI gli script completi{Colors.NC}")
     
     elif args.install:
-        # Installa script specifici
+        # Install specific scripts
         selected_indices = parse_selection(args.install, len(scripts))
         print(f"\n{Colors.CYAN}Modalità: Installa script specifici{Colors.NC}")
     
@@ -1454,7 +1408,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
         print(f"{Colors.RED} Nessuno script selezionato{Colors.NC}")
         return 1
     
-    # Conferma installazione
+    # Confirm installation
     print(f"\n{Colors.YELLOW}Verranno installati {len(selected_indices)} script in:{Colors.NC}")
     print(f"  {CHECKMK_LOCAL_PATH}\n")
     
@@ -1472,11 +1426,11 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
     else:
         print(f"{Colors.GREEN}Conferma automatica (--yes){Colors.NC}")
     
-    # Installazione
+    # Installation
     print(f"\n{Colors.GREEN}▶ Installazione in corso...{Colors.NC}\n")
     installed = install_scripts(scripts, selected_indices)
     
-    # Verifica permessi eseguibili post-installazione
+    # Check executable permissions post-installation
     executable_count = 0
     if CHECKMK_LOCAL_PATH.exists():
         for item in CHECKMK_LOCAL_PATH.iterdir():
@@ -1491,7 +1445,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
     print(f"  Path: {CHECKMK_LOCAL_PATH}")
     print(f"{Colors.BLUE}{'='*60}{Colors.NC}\n")
     
-    # Suggerimenti post-installazione
+    # Post-installation tips
     print(f"{Colors.CYAN}Prossimi step:{Colors.NC}")
     print(f"  1. Verifica output agent: {Colors.YELLOW}check_mk_agent{Colors.NC}")
     print(f"  2. Forza discovery su CheckMK server")

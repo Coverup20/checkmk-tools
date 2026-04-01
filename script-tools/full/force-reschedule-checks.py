@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-"""
-force-reschedule-checks.py - Forza immediatamente i check su tutti gli host CheckMK
+"""force-reschedule-checks.py - Force checks on all CheckMK hosts immediately
 
-Uso:
-    python3 force-reschedule-checks.py                     # forza Check_MK su tutti gli host
-    python3 force-reschedule-checks.py --service "PING"    # forza PING su tutti gli host
-    python3 force-reschedule-checks.py --all               # forza TUTTI i servizi di TUTTI gli host
-    python3 force-reschedule-checks.py --host fw.studiopaci.info  # solo un host specifico
+Usage:
+    python3 force-reschedule-checks.py # force Check_MK on all hosts
+    python3 force-reschedule-checks.py --service "PING" # force PING on all hosts
+    python3 force-reschedule-checks.py --all # force ALL services on ALL hosts
+    python3 force-reschedule-checks.py --host fw.studiopaci.info # only a specific host
 
-Da eseguire come utente 'monitoring' sul server CheckMK.
-Oppure da root: su - monitoring -c "python3 /opt/checkmk-tools/script-tools/full/force-reschedule-checks.py"
+To be run as the 'monitoring' user on the CheckMK server.
+Or from root: su - monitoring -c "python3 /opt/checkmk-tools/script-tools/full/force-reschedule-checks.py"
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import socket
 import select
@@ -26,7 +24,7 @@ NAGIOS_CMD = "/omd/sites/monitoring/tmp/run/nagios.cmd"
 
 
 def livestatus_query(query: str) -> list[str]:
-    """Invia una query a Livestatus e restituisce le righe della risposta."""
+    """It sends a query to Livestatus and returns the response lines."""
     s = socket.socket(socket.AF_UNIX)
     try:
         s.connect(LIVE_SOCKET)
@@ -46,7 +44,7 @@ def livestatus_query(query: str) -> list[str]:
 
 
 def send_nagios_cmd(command: str) -> None:
-    """Scrive un comando nel pipe di Nagios."""
+    """Writes a command to the Nagios pipe."""
     with open(NAGIOS_CMD, "w") as f:
         f.write(command + "\n")
 
@@ -100,7 +98,7 @@ def main() -> int:
     ts = int(time.time())
 
     if args.all_services:
-        # Forza TUTTI i servizi di tutti gli host
+        # Force ALL services on all hosts
         if args.host:
             query = (
                 "GET services\n"
@@ -129,7 +127,7 @@ def main() -> int:
         print(f"{'[DRY-RUN] ' if args.dry_run else ''}Forzati {count} servizi su tutti gli host.")
 
     else:
-        # Forza il servizio specificato (default: Check_MK)
+        # Force the specified service (default: Check_MK)
         if args.host:
             query = (
                 "GET services\n"
@@ -155,7 +153,7 @@ def main() -> int:
             count += 1
         print(f"{'[DRY-RUN] ' if args.dry_run else ''}Forzato '{args.service}' su {count} host.")
 
-    # Opzionalmente forza anche il check host (PING)
+    # Optionally also forces host check (PING)
     if args.ping:
         if args.host:
             query = (

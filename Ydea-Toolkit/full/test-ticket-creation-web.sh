@@ -1,21 +1,21 @@
 #!/bin/bash
-# test-ticket-creation-web.sh - Test creazione ticket via form HTML (dati reali da HAR)
+# test-ticket-creation-web.sh - Test ticket creation via HTML form (real data from HAR)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Configurazione
+# Configuration
 YDEA_BASE_URL="https://my.ydea.cloud"
 COOKIE_FILE="$SCRIPT_DIR/../config/.ydea-cookies"
 
-# Credenziali (da configurare)
+# Credentials (to be configured)
 if [[ ! -f "$SCRIPT_DIR/../config/credentials.sh" ]]; then
-    echo " File credenziali mancante: $SCRIPT_DIR/../config/credentials.sh"
+    echo "Missing credential file: $SCRIPT_DIR/../config/credentials.sh"
     echo ""
-    echo "Crea il file con:"
+    echo "Create the file with:"
     echo "  YDEA_USERNAME='your@email.com'"
-    echo "  YDEA_PASSWORD='your-password'"
+    echo "YDEA_PASSWORD='your-password'"
     exit 1
 fi
 
@@ -30,20 +30,20 @@ echo ""
 login_ydea() {
     echo " Login a YDEA..."
     
-    # GET pagina login per CSRF token
+    # GET login page for CSRF token
     LOGIN_PAGE=$(curl -s -c "$COOKIE_FILE" "${YDEA_BASE_URL}/login")
     
-    # Estrai CSRF token dalla pagina login
+    # Extract CSRF token from login page
     CSRF_TOKEN=$(echo "$LOGIN_PAGE" | grep -oP '(?<=name="_csrf_token" value=")[^"]+' || echo "")
     
     if [[ -z "$CSRF_TOKEN" ]]; then
-        echo " Token CSRF non trovato nella pagina login"
+        echo "CSRF token not found on login page"
         return 1
     fi
     
-    echo "   Token CSRF: ${CSRF_TOKEN:0:20}..."
+    echo "CSRF Token: ${CSRF_TOKEN:0:20}..."
     
-    # POST login (con verbose per debug)
+    # POST login (with verbose for debugging)
     HTTP_CODE=$(curl -w "%{http_code}" -o /tmp/login_response.html \
         -b "$COOKIE_FILE" -c "$COOKIE_FILE" \
         -X POST "${YDEA_BASE_URL}/login_check" \
@@ -57,42 +57,42 @@ login_ydea() {
     
     echo "   HTTP Code: $HTTP_CODE"
     
-    # Debug: salva risposta per analisi
+    # Debugging: Save response for analysis
     if [[ "$HTTP_CODE" != "200" ]]; then
-        echo "  Risposta salvata in /tmp/login_response.html per debug"
+        echo "Response saved in /tmp/login_response.html for debugging"
     fi
     
-    # Verifica login riuscito - pattern multipli
+    # Verify successful login - multiple patterns
     if echo "$LOGIN_RESPONSE" | grep -qi "logout\|esci\|dashboard\|/ticket/new\|benvenuto"; then
-        echo " Login riuscito!"
+        echo "Login successful!"
         return 0
     elif echo "$LOGIN_RESPONSE" | grep -qi "invalid\|credenziali\|password\|errato"; then
-        echo " Login fallito - Credenziali non valide"
-        echo "   Verifica username/password in credentials.sh"
+        echo "Login failed - Invalid credentials"
+        echo "Check username/password in credentials.sh"
         return 1
     else
-        echo " Login fallito - Risposta inattesa"
-        echo "   Primi 500 caratteri della risposta:"
+        echo "Login failed - Unexpected response"
+        echo "First 500 characters of the response:"
         echo "$LOGIN_RESPONSE" | head -c 500
         return 1
     fi
 }
 
-# Funzione estrazione CSRF token da form ticket
+# CSRF token extraction function from ticket form
 get_ticket_form_token() {
-    echo " Estrazione CSRF token da /ticket/new..."
+    echo "Extracting CSRF token from /ticket/new..."
     
     NEW_TICKET_PAGE=$(curl -s -b "$COOKIE_FILE" "${YDEA_BASE_URL}/ticket/new")
     
-    # Estrai token dal campo appbundle_ticket[_token]
+    # Extract token from appbundle_ticket[_token] field
     FORM_TOKEN=$(echo "$NEW_TICKET_PAGE" | grep -oP '(?<=name="appbundle_ticket\[_token\]" value=")[^"]+' || echo "")
     
     if [[ -z "$FORM_TOKEN" ]]; then
-        echo " Token form non trovato"
+        echo "Form token not found"
         return 1
     fi
     
-    echo "   Token form: ${FORM_TOKEN:0:40}..."
+    echo "Form token: ${FORM_TOKEN:0:40}..."
     echo "$FORM_TOKEN"
 }
 
@@ -109,16 +109,16 @@ create_ticket() {
     [[ -n "$sla" ]] && echo "   SLA: $sla"
     echo "────────────────────────────────────────────────────────────────────"
     
-    # Ottieni token fresco
+    # Get fresh token
     FORM_TOKEN=$(get_ticket_form_token)
     
     if [[ -z "$FORM_TOKEN" ]]; then
-        echo " Impossibile ottenere token form"
+        echo "Unable to get form token"
         return 1
     fi
     
     # Dati estratti dal HAR (valori reali)
-    # Adatta questi ID ai tuoi dati reali
+    # Adapt these IDs to your real data
     AZIENDA_ID="2339268"           # AZIENDA MONITORATA test
     DESTINAZIONE_ID="2831588"       # Sede/destinazione
     
@@ -216,7 +216,7 @@ create_ticket() {
     BODY+="Content-Disposition: form-data; name=\"custom_attributes[int][3958]\"\r\n\r\n"
     BODY+="14553\r\n"
     
-    # Fine multipart
+    # End multipart
     BODY+="--${BOUNDARY}--\r\n"
     
     # POST ticket
@@ -226,24 +226,24 @@ create_ticket() {
         --data-binary "$BODY" \
         -L -w "\nHTTP_CODE:%{http_code}\nREDIRECT:%{url_effective}\n")
     
-    # Estrai info da response
+    # Extract info from response
     HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d: -f2)
     REDIRECT_URL=$(echo "$RESPONSE" | grep "REDIRECT:" | cut -d: -f2-)
     
     # Se redirect a /ticket/{ID}, estrai ID
     if [[ "$REDIRECT_URL" =~ /ticket/([0-9]+) ]]; then
         TICKET_ID="${BASH_REMATCH[1]}"
-        echo " Ticket creato: ID $TICKET_ID"
+        echo "Ticket created: ID $TICKET_ID"
         echo " URL: ${YDEA_BASE_URL}/ticket/${TICKET_ID}"
         return 0
     elif [[ "$HTTP_CODE" == "200" ]] && echo "$RESPONSE" | grep -q "ticket creato\|success"; then
-        echo " Ticket probabilmente creato (HTTP 200)"
+        echo "Ticket probably created (HTTP 200)"
         # Cerca ID nel body
         TICKET_ID=$(echo "$RESPONSE" | grep -oP '/ticket/\K[0-9]+' | head -1)
         [[ -n "$TICKET_ID" ]] && echo " URL: ${YDEA_BASE_URL}/ticket/${TICKET_ID}"
         return 0
     else
-        echo " Creazione fallita (HTTP $HTTP_CODE)"
+        echo "Creation failed (HTTP $HTTP_CODE)"
         echo ""
         echo "Response (primi 500 char):"
         echo "$RESPONSE" | head -c 500
@@ -253,13 +253,13 @@ create_ticket() {
 
 # Main
 if ! login_ydea; then
-    echo " Impossibile procedere senza login"
+    echo "Unable to proceed without login"
     exit 1
 fi
 
 echo ""
 echo "════════════════════════════════════════════════════════════════════"
-echo " TEST 1: Ticket con contratto SLA Premium_Mon"
+echo "TEST 1: Ticket with SLA Premium_Mon contract"
 echo "════════════════════════════════════════════════════════════════════"
 
 # Valori estratti dal HAR
@@ -272,7 +272,7 @@ echo ""
 sleep 2
 
 echo "════════════════════════════════════════════════════════════════════"
-echo " TEST 2: Ticket SENZA campo SLA (solo contratto)"
+echo "TEST 2: Ticket WITHOUT SLA field (contract only)"
 echo "════════════════════════════════════════════════════════════════════"
 
 create_ticket "[TEST] Solo contratto, no SLA esplicito" "$CONTRACT_ID" ""
@@ -281,12 +281,12 @@ echo ""
 echo "════════════════════════════════════════════════════════════════════"
 echo " Test completati!"
 echo ""
-echo " VERIFICA MANUALE su YDEA:"
-echo "   1. Vai su https://my.ydea.cloud"
-echo "   2. Controlla i 2 ticket appena creati"
-echo "   3. Verifica quale ha SLA 'Premium_Mon' attivo"
+echo "MANUAL VERIFICATION on YDEA:"
+echo "1. Go to https://my.ydea.cloud"
+echo "2. Check the 2 tickets you just created"
+echo "3. Check which one has active SLA 'Premium_Mon'"
 echo ""
-echo " Questo ti dirà se il campo 'serviceLevelAgreement' è:"
-echo "   - NECESSARIO per applicare lo SLA corretto"
-echo "   - OPZIONALE (lo SLA viene preso dal contratto)"
+echo "This will tell you if the 'serviceLevelAgreement' field is:"
+echo "- REQUIRED to apply the correct SLA"
+echo "- OPTIONAL (the SLA is taken from the contract)"
 echo "════════════════════════════════════════════════════════════════════"

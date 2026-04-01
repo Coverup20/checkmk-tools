@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-checkmk_config_backup.py - Backup DR completo configurazione CheckMK.
+"""checkmk_config_backup.py - Full DR backup of CheckMK configuration.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import argparse
 import datetime as dt
@@ -124,7 +122,7 @@ def collect_metadata(site: str, site_base: Path, metadata_path: Path) -> None:
         edition = match.group(1)
 
     metadata = f"""=== CHECKMK DISASTER RECOVERY BACKUP ===
-Data backup: {dt.datetime.now()}
+Backup date: {dt.datetime.now()}
 Hostname: {safe_cmd_output(['hostname', '-f'])}
 Site: {site}
 CheckMK Version: {read_file(site_base / 'version')}
@@ -134,21 +132,20 @@ Kernel: {safe_cmd_output(['uname', '-r'])}
 OMD Version: {safe_cmd_output(['omd', 'version'])}
 Python Version: {safe_site_output(site, 'python3 --version')}
 
-=== SPAZIO DISCO ===
+=== DISK SPACE ===
 {safe_cmd_output(['bash', '-lc', f"df -h {site_base} | tail -1"]) }
 
-=== DIMENSIONI COMPONENTI ===
+=== COMPONENT DIMENSIONS ===
 Site directory: {safe_cmd_output(['bash', '-lc', f"du -sh {site_base} 2>/dev/null | cut -f1"])}
 Config (etc/): {safe_cmd_output(['bash', '-lc', f"du -sh {site_base}/etc 2>/dev/null | cut -f1"])}
 Local extensions: {safe_cmd_output(['bash', '-lc', f"du -sh {site_base}/local 2>/dev/null | cut -f1"])}
 Var data: {safe_cmd_output(['bash', '-lc', f"du -sh {site_base}/var/check_mk 2>/dev/null | cut -f1"])}
 
-=== HOSTS MONITORATI ===
+=== MONITORED HOSTS ===
 Host count: {safe_site_output(site, 'cmk --list-hosts 2>/dev/null | wc -l')}
 
-=== SERVIZI ATTIVI ===
-{safe_site_output(site, 'omd status')}
-"""
+=== ACTIVE SERVICES ===
+{safe_site_output(site, 'omd status')}"""
 
     metadata_path.write_text(metadata, encoding="utf-8")
     log("[OK] Metadati raccolti")
@@ -200,18 +197,17 @@ def create_archive(site: str, site_base: Path, archive_path: Path) -> Tuple[str,
 
 
 def create_restore_instructions(path: Path, site: str) -> None:
-    text = f"""=== ISTRUZIONI DISASTER RECOVERY RESTORE ===
+    text = f"""=== DISASTER RECOVERY RESTORE INSTRUCTIONS ===
 
 1) omd stop <SITE_NAME>
 2) tar xzf checkmk-DR-<SITE_NAME>-<DATE>.tgz -C /opt/omd/sites/<SITE_NAME>/
 3) chown -R <SITE_NAME>:<SITE_NAME> /opt/omd/sites/<SITE_NAME>
 4) omd start <SITE_NAME>
-5) su - <SITE_NAME> -c 'cmk -R && cmk -O'
+5) on - <SITE_NAME> -c 'cmk -R && cmk -O'
 
-NOTE:
-- Reinstallare integrazione Ydea e cronjob se necessario.
-- INCLUDE_RRD={str(INCLUDE_RRD).lower()} nel backup sorgente.
-"""
+NOTES:
+- Reinstall Ydea integration and cronjob if necessary.
+- INCLUDE_RRD={str(INCLUDE_RRD).lower()} in source backup."""
     path.write_text(text, encoding="utf-8")
 
 

@@ -1,11 +1,11 @@
-# Installazione standard
+# Standard installation
 /usr/local/bin/install-checkmk-agent-auto.sh
 
-# Reinstallazione forzata
+# Forced reinstallation
 /usr/local/bin/install-checkmk-agent-auto.sh --reinstall
 
-# Installazione silenziosa via FRP
+# Silent installation via FRP
 /usr/local/bin/install-checkmk-agent-auto.sh --silent
 
-# Rimozione completa
+# Complete removal
 /usr/local/bin/install-checkmk-agent-auto.sh --remove

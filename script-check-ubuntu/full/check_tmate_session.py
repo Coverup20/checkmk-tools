@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check_tmate_session.py - CheckMK Local Check per sessioni tmate attive
+"""check_tmate_session.py - CheckMK Local Check for active tmate sessions
 
-Output:
-  OK      = sessione attiva, nessun viewer connesso
-  WARNING = qualcuno e' connesso come viewer (mostra il suo IP)
+Outputs:
+  OK = session active, no viewer connected
+  WARNING = someone is connected as a viewer (shows their IP)
 
-Version: 1.4.0
-"""
+Version: 1.4.0"""
 
 import sys
 import os
@@ -21,7 +19,7 @@ TOKEN_FILE = "/run/tmate-ssh.txt"
 
 
 def get_tmate_sockets() -> list:
-    """Trova tutti i socket tmate attivi dai processi in esecuzione."""
+    """Find all active tmate sockets from running processes."""
     sockets = []
     try:
         result = subprocess.run(
@@ -63,7 +61,7 @@ def get_token_from_socket(sock: str) -> str:
 
 
 def get_client_ttys_from_socket(sock: str) -> list:
-    """Restituisce lista di TTY dei viewer connessi (es. /dev/pts/1)."""
+    """Returns list of TTYs of connected viewers (e.g. /dev/pts/1)."""
     ttys = []
     try:
         result = subprocess.run(
@@ -82,7 +80,7 @@ def get_client_ttys_from_socket(sock: str) -> list:
 
 
 def get_viewer_ip(tty: str) -> str:
-    """Ricava l'IP del viewer da 'who' usando la TTY (es. /dev/pts/1 -> pts/1)."""
+    """Get the viewer IP from 'who' using the TTY (e.g. /dev/pts/1 -> pts/1)."""
     pts = tty.replace("/dev/", "")  # /dev/pts/1 -> pts/1
     try:
         result = subprocess.run(
@@ -100,7 +98,7 @@ def get_viewer_ip(tty: str) -> str:
 
 
 def main() -> int:
-    # Verifica che tmate sia in esecuzione
+    # Check that tmate is running
     try:
         result = subprocess.run(["pgrep", "-x", "tmate"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -123,7 +121,7 @@ def main() -> int:
         viewer_ips = [get_viewer_ip(tty) for tty in ttys]
         sessions.append((token, viewer_ips))
 
-    # Fallback al file token
+    # Fallback to the token
     if not sessions and os.path.exists(TOKEN_FILE):
         try:
             token = open(TOKEN_FILE).read().strip()

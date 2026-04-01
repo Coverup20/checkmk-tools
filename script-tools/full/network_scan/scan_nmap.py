@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""
-scan_nmap.py - Interactive Nmap Scanner
+"""scan_nmap.py - Interactive Nmap Scanner
 
-Wrapper interattivo per Nmap.
+Interactive wrapper for Nmap.
 Features:
-- Selezione target (Host/Range/CIDR o File)
-- Modalità Port Scan (default 1-1024) o Discovery (-sn)
-- Livelli Verbose/Debug
-- Output organizzato con Timestamp
-- Generazione Summary automatico
+- Target selection (Host/Range/CIDR or File)
+- Port Scan (default 1-1024) or Discovery (-sn) mode
+- Verbose/Debug levels
+- Output organized with Timestamp
+- Automatic summary generation
 
 Usage:
     scan_nmap.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -26,7 +24,7 @@ from pathlib import Path
 
 VERSION = "1.0.0"
 
-# --- Configurazione ---
+# --- Configuration ---
 DEFAULT_OUTDIR = Path("./scans")
 DEFAULT_PORTS = "1-1024"
 
@@ -87,7 +85,7 @@ def main():
     # 3. Verbosity
     vlevel = Console.input_sel("Verbose: (0) None, (1) -v, (2) -vv, (3) -d", ["0", "1", "2", "3"], "0")
     
-    # 4. Output
+    # 4. Outputs
     outdir = Console.input_val("Output Dir", str(DEFAULT_OUTDIR))
     outdir_path = Path(outdir)
     outdir_path.mkdir(parents=True, exist_ok=True)

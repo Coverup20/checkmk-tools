@@ -1,34 +1,34 @@
-#  Windows Installer - Session Complete & All Fixed!
-> **Categoria:** Storico
+# Windows Installer - Session Complete & All Fixed!
+> **Category:** Historical
 
-**Date:** 2025-11-07  
-**Status:**  **ALL ISSUES RESOLVED**
+**Dates:** 2025-11-07  
+**Status:** **ALL ISSUES RESOLVED**
 
 ---
 
-##  Session Summary
+## Session Summary
 
 ### What Was Accomplished Today
 
 **Problem 1: URL Download Error (404)**
--  **Issue:** Script tried URL inesatta per CheckMK Agent MSI
--  **Fix:** Updated with correct URL `monitoring.nethlab.it/monitoring/check_mk/agents/windows/check_mk_agent.msi`
--  **Commit:** `c2f3c3b`
+- **Issue:** Script tried Incorrect URL for CheckMK Agent MSI
+- **Fix:** Updated with correct URL `monitoring.nethlab.it/monitoring/check_mk/agents/windows/check_mk_agent.msi`
+- **Commit:** `c2f3c3b`
 
 **Problem 2: FRPC Service Not Starting**
--  **Issue:** Service registered but wouldn't auto-start
--  **Diagnosis:** Manual execution works perfectly, service registration needed retry logic
--  **Fix:** Added retry logic (3 attempts), better error handling, improved diagnostics
--  **Commit:** `90229ce`
+- **Issue:** Service registered but wouldn't auto-start
+- **Diagnosis:** Manual execution works perfectly, service registration needed retry logic
+- **Fix:** Added retry logic (3 attempts), better error handling, improved diagnostics
+- **Commit:** `90229ce`
 
 **Problem 3: Poor Service Startup Feedback**
--  **Issue:** Silent failures, no clear diagnostics
--  **Fix:** Enhanced logging, config location display, manual start instructions
--  **Commit:** `8f48008`
+- **Issue:** Silent failures, no clear diagnosis
+- **Fix:** Enhanced logging, config location display, manual start instructions
+- **Commit:** `8f48008`
 
 ---
 
-##  Fixes Applied
+## Fixes Applied
 
 ### Fix 1: Correct URL
 **Commit:** `3911469`
@@ -66,7 +66,7 @@ $CHECKMK_MSI_URLS = @(
 
 ---
 
-##  Testing Results
+## Testing Results
 
 ### Installation Test (Windows 11)
  **System Detection:** Windows 11, v10.0.26220, x86 - DETECTED CORRECTLY  
@@ -82,13 +82,13 @@ $CHECKMK_MSI_URLS = @(
 ```
 
 ### Issue Identified & Fixed
--  **Problem:** Service didn't auto-start initially
--  **Cause:** Timing issues with service registration and startup
--  **Solution:** Retry logic with proper delays
+- **Problem:** Service didn't auto-start initially
+- **Cause:** Timing issues with service registration and startup
+- **Solution:** Retry logic with proper delays
 
 ---
 
-##  Script Improvements Summary
+## Script Improvements Summary
 
 | Aspect | Before | After | Status |
 |--------|--------|-------|--------|
@@ -100,7 +100,7 @@ $CHECKMK_MSI_URLS = @(
 
 ---
 
-##  Git History
+## Git History
 
 ```
 Latest commits:
@@ -116,15 +116,15 @@ All commits **pushed to GitHub**: https://github.com/Coverup20/checkmk-tools
 
 ---
 
-##  Ready for Production
+## Ready for Production
 
-### What Works Now
+### WhatWorksNow
  CheckMK Agent installation via MSI  
  FRPC client installation and configuration  
  Service registration with AUTO_START  
  Automatic service startup (with retry logic)  
  Complete uninstallation  
- Proper error handling and diagnostics  
+ Proper error handling and diagnosis  
 
 ### To Use the Fixed Script
 
@@ -147,7 +147,7 @@ cd 'C:\Users\Marzio\Desktop\CheckMK\Script\script-tools'
 
 ---
 
-##  Documentation Created
+## Documentation Created
 
 | Document | Purpose |
 |----------|---------|
@@ -159,7 +159,7 @@ cd 'C:\Users\Marzio\Desktop\CheckMK\Script\script-tools'
 
 ---
 
-##  Key Achievements
+## Key Achievements
 
  **Fixed all reported issues**  
  **Enhanced reliability** with retry logic  
@@ -170,7 +170,7 @@ cd 'C:\Users\Marzio\Desktop\CheckMK\Script\script-tools'
 
 ---
 
-##  What to Test Next
+## What to Test Next
 
 ### Quick Validation
 ```powershell
@@ -191,7 +191,7 @@ Get-Content 'C:\ProgramData\frp\logs\frpc.log' -Tail 20
 
 ---
 
-##  Final Notes
+## Final Notes
 
 ### Reliability Improvements
 - **Retry Logic:** 3 attempts to start FRPC service
@@ -215,14 +215,14 @@ Get-Content 'C:\ProgramData\frp\logs\frpc.log' -Tail 20
 
 ---
 
-##  Session Result
+## Session Result
 
 ### Before This Session
 ```
  Script had URL errors (404)
  FRPC wouldn't start automatically
  No retry or recovery logic
- Poor error diagnostics
+ Poor error diagnosis
 ```
 
 ### After This Session
@@ -236,13 +236,13 @@ Get-Content 'C:\ProgramData\frp\logs\frpc.log' -Tail 20
 
 ---
 
-**Status:**  **COMPLETE & PRODUCTION READY**  
-**All TODO items:**  **COMPLETED**  
+**Status:** **COMPLETE & PRODUCTION READY**  
+**All TODO items:** **COMPLETED**  
 **Ready for:** Testing on Windows systems  
 
 ---
 
-## Quick Reference
+## QuickReference
 
 ### Run Installer
 ```powershell
@@ -272,4 +272,4 @@ Get-Content 'C:\ProgramData\frp\logs\frpc.log' -Tail 50 -Wait
 **Last Commit:** 8f48008  
 **Last Update:** 2025-11-07
 
- **Session Successfully Completed!** 
+ **Session Successfully Completed!**

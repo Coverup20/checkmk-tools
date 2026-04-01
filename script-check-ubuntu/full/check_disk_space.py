@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-check_disk_space.py - CheckMK Local Check for Disk Space Monitoring
+"""check_disk_space.py - CheckMK Local Check for Disk Space Monitoring
 
 Monitors disk space usage on root filesystem with configurable thresholds.
 Compatible with CheckMK local check format.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -22,15 +20,13 @@ THRESHOLD_CRITICAL = 95
 
 
 def run_command(cmd: list[str]) -> Tuple[int, str, str]:
-    """
-    Execute a shell command and return exit code, stdout, stderr.
+    """Execute a shell command and return exit code, stdout, stderr.
     
     Args:
         cmd: Command as list of strings
         
     Returns:
-        Tuple of (exit_code, stdout, stderr)
-    """
+        Tuple of (exit_code, stdout, stderr)"""
     try:
         result = subprocess.run(
             cmd,
@@ -49,15 +45,13 @@ def run_command(cmd: list[str]) -> Tuple[int, str, str]:
 
 
 def get_disk_usage(mount_point: str = "/") -> Optional[int]:
-    """
-    Get disk usage percentage for specified mount point.
+    """Get disk usage percentage for specified mount point.
     
     Args:
         mount_point: Filesystem mount point to check (default: /)
         
     Returns:
-        Usage percentage (0-100) or None if error
-    """
+        Usage percentage (0-100) or None if error"""
     exit_code, stdout, _ = run_command(["df", mount_point])
     
     if exit_code != 0 or not stdout:
@@ -85,12 +79,10 @@ def get_disk_usage(mount_point: str = "/") -> Optional[int]:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     usage = get_disk_usage("/")
     
     if usage is None:

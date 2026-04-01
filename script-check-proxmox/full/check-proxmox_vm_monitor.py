@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check-proxmox_vm_monitor.py - CheckMK Local Check for Proxmox VM Monitor
+"""check-proxmox_vm_monitor.py - CheckMK Local Check for Proxmox VM Monitor
 
 General VM and container health check with summary metrics.
 
 Proxmox VE
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys

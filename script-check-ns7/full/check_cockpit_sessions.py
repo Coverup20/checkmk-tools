@@ -1,13 +1,11 @@
 #!/usr/bin/python3 -u
-"""
-check_cockpit_sessions.py - CheckMK Local Check for Cockpit session events
+"""check_cockpit_sessions.py - CheckMK Local Check for Cockpit session events
 
 Monitor Cockpit login/logout events from /var/log/messages and report active sessions.
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -23,12 +21,10 @@ LOG_FILE = "/var/log/messages"
 
 
 def get_last_line_processed():
-    """
-    Get last log line number processed.
+    """Get last log line number processed.
     
     Returns:
-        Last line number processed, 0 if no state file
-    """
+        Last line number processed, 0 if no state file"""
     if not os.path.exists(STATE_FILE):
         return 0
     
@@ -40,12 +36,10 @@ def get_last_line_processed():
 
 
 def save_last_line_processed(line_num):
-    """
-    Save last log line number processed.
+    """Save last log line number processed.
     
     Args:
-        line_num: Line number to save
-    """
+        line_num: Line number to save"""
     os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
     try:
         with open(STATE_FILE, 'w') as f:
@@ -55,15 +49,13 @@ def save_last_line_processed(line_num):
 
 
 def extract_ip(line):
-    """
-    Extract IP address from log line.
+    """Extract IP address from log line.
     
     Args:
         line: Log line
         
     Returns:
-        IP address or empty string
-    """
+        IP address or empty string"""
     match = re.search(r'from (\d+\.\d+\.\d+\.\d+)', line)
     if match:
         return match.group(1)
@@ -71,21 +63,19 @@ def extract_ip(line):
 
 
 def get_new_cockpit_events(last_line):
-    """
-    Get new Cockpit events from log file.
+    """Get new Cockpit events from log file.
     
     Args:
         last_line: Last line processed
         
     Returns:
-        List of tuples (line_number, log_line)
-    """
+        List of tuples (line_number, log_line)"""
     if not os.path.exists(LOG_FILE):
         return []
     
     events = []
     try:
-        # Usa esplicitamente UTF-8 e sostituisci i caratteri non validi per evitare UnicodeDecodeError
+        # Explicitly use UTF-8 and replace invalid characters to avoid UnicodeDecodeError
         with open(LOG_FILE, 'r', encoding='utf-8', errors='replace') as f:
             for i, line in enumerate(f, start=1):
                 if i > last_line and 'cockpit-ws:' in line:
@@ -100,10 +90,9 @@ def count_active_sessions():
     """Count active Cockpit sessions via ss command.
 
     Returns:
-        Number of active sessions
-    """
+        Number of active sessions"""
     try:
-        # Usa path assoluto se disponibile, altrimenti fallback su "ss" nel PATH
+        # Use absolute path if available, otherwise fallback to "ss" in the PATH
         ss_cmd = "/usr/sbin/ss" if os.path.exists("/usr/sbin/ss") else "ss"
 
         result = subprocess.run(
@@ -129,12 +118,10 @@ def count_active_sessions():
 
 
 def main():
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     last_line = get_last_line_processed()
     new_events = get_new_cockpit_events(last_line)

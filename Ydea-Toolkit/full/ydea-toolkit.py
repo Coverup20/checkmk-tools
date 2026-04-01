@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-ydea-toolkit.py - Toolkit completo per Ydea API v2
+"""ydea-toolkit.py - Complete toolkit for Ydea API v2
 
-Include login, gestione token, CRUD ticket, tracking system, logging.
-Conversione Python del toolkit bash originale con feature parity completa.
+Includes login, token management, CRUD ticket, tracking system, logging.
+Python conversion of the original bash toolkit with full parity feature.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import sys
@@ -31,13 +29,13 @@ except ImportError:
 
 VERSION = "1.0.2"
 
-# ===== CONFIGURAZIONE GLOBALE =====
+# ===== GLOBAL CONFIGURATION =====
 
 class YdeaConfig:
-    """Gestione configurazione Ydea Toolkit"""
+    """Ydea Toolkit configuration management"""
     
     def __init__(self):
-        # Load .env solo se variabili critiche non impostate
+        # Load .env only if critical variables not set
         if not os.getenv("YDEA_ID") or not os.getenv("YDEA_API_KEY"):
             script_dir = Path(__file__).resolve().parent
             env_files = [
@@ -86,7 +84,7 @@ config = YdeaConfig()
 # ===== LOGGING SYSTEM =====
 
 class YdeaLogger:
-    """Sistema di logging con rotazione e livelli"""
+    """Logging system with rotation and levels"""
     
     def __init__(self):
         self.log_file = config.LOG_FILE
@@ -105,7 +103,7 @@ class YdeaLogger:
         self.logger = logging.getLogger('ydea-toolkit')
     
     def rotate(self):
-        """Rotazione log se supera dimensione massima"""
+        """Log rotation if exceeds maximum size"""
         if not self.log_file.exists():
             return
         
@@ -123,14 +121,14 @@ class YdeaLogger:
             pass  # Fail silently su rotazione log
     
     def write(self, level: str, message: str):
-        """Scrivi log su file"""
+        """Write log to file"""
         self.rotate()
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         pid = os.getpid()
         log_line = f"[{timestamp}] [{level}] [PID:{pid}] {message}\n"
         
         try:
-            # Crea directory se non esiste
+            # Create directory if it does not exist
             self.log_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.log_file, 'a', encoding='utf-8') as f:
                 f.write(log_line)
@@ -170,13 +168,13 @@ logger = YdeaLogger()
 # ===== TOKEN MANAGEMENT =====
 
 class TokenManager:
-    """Gestione token JWT"""
+    """JWT token management"""
     
     def __init__(self):
         self.token_file = config.TOKEN_FILE
     
     def save_token(self, token: str):
-        """Salva token JWT su file"""
+        """Save JWT token to file"""
         now = int(time.time())
         expires = now + 3600  # 1 ora
         
@@ -200,7 +198,7 @@ class TokenManager:
             raise
     
     def load_token(self) -> Optional[str]:
-        """Carica token da file"""
+        """Load token from file"""
         if not self.token_file.exists():
             return None
         
@@ -212,7 +210,7 @@ class TokenManager:
             return None
     
     def get_expires_at(self) -> int:
-        """Ottieni timestamp scadenza token"""
+        """Get token expiration timestamp"""
         if not self.token_file.exists():
             return 0
         
@@ -224,7 +222,7 @@ class TokenManager:
             return 0
     
     def is_fresh(self) -> bool:
-        """Verifica se token è ancora valido"""
+        """Check if token is still valid"""
         if not self.token_file.exists():
             return False
         
@@ -247,7 +245,7 @@ token_manager = TokenManager()
 # ===== YDEA API CLIENT =====
 
 class YdeaAPI:
-    """Client API Ydea v2"""
+    """Ydea API Client v2"""
     
     def __init__(self):
         self.base_url = config.BASE_URL.rstrip('/')
@@ -258,7 +256,7 @@ class YdeaAPI:
         })
     
     def login(self):
-        """Effettua login e salva token"""
+        """Log in and save token"""
         logger.info("Tentativo login a Ydea Cloud...")
         
         if not config.YDEA_ID or not config.YDEA_API_KEY:
@@ -303,7 +301,7 @@ class YdeaAPI:
             sys.exit(1)
     
     def ensure_token(self):
-        """Assicura che token sia valido, altrimenti login"""
+        """Ensure token is valid, otherwise login"""
         if token_manager.is_fresh():
             logger.debug("Token ancora valido")
         else:
@@ -316,12 +314,10 @@ class YdeaAPI:
         path: str,
         json_body: Optional[Dict[Any, Any]] = None
     ) -> Tuple[Dict[Any, Any], int]:
-        """
-        Chiamata API generica con retry su 401
+        """Generic API call with retry on 401
         
         Returns:
-            Tuple[response_json, status_code]
-        """
+            Tuple[response_json, status_code]"""
         if not method or not path:
             logger.error("Uso: api_call(method, path, [json_body])")
             raise ValueError("Method e path obbligatori")
@@ -351,7 +347,7 @@ class YdeaAPI:
             status_code = response.status_code
             logger.api_call(method, url, status_code)
             
-            # Se 401, refresh token e retry
+            # If 401, refresh token and retry
             if status_code == 401:
                 logger.warn("Token scaduto (401), rinnovo e riprovo...")
                 self.login()
@@ -378,7 +374,7 @@ class YdeaAPI:
                 except Exception:
                     pass
             
-            # Mostra errore se non 2xx
+            # Show error if not 2xx
             if not (200 <= status_code < 300):
                 try:
                     error_data = response.json()
@@ -407,11 +403,11 @@ api = YdeaAPI()
 # ===== TICKET OPERATIONS =====
 
 class TicketOperations:
-    """Operazioni CRUD sui ticket"""
+    """CRUD operations on tickets"""
     
     @staticmethod
     def list_tickets(limit: int = 50, status: Optional[str] = None) -> Dict[Any, Any]:
-        """Lista tutti i ticket con filtri opzionali"""
+        """List all tickets with optional filters"""
         path = f"/tickets?limit={limit}"
         if status:
             path += f"&status={status}"
@@ -424,14 +420,14 @@ class TicketOperations:
     
     @staticmethod
     def get_ticket(ticket_id: int) -> Dict[Any, Any]:
-        """Dettagli di un singolo ticket"""
+        """Details of a single ticket"""
         if not ticket_id:
             logger.error("Ticket ID richiesto")
             raise ValueError("ticket_id obbligatorio")
         
         logger.info(f"Recupero ticket #{ticket_id}...")
         
-        # L'endpoint /tickets/{id} non è accessibile, usiamo list e filtriamo
+        # The /tickets/{id} endpoint is not accessible, we use list and filter
         all_tickets_response = TicketOperations.list_tickets(limit=100)
         ticket_data = next(
             (t for t in all_tickets_response.get('objs', []) if t.get('id') == ticket_id),
@@ -453,7 +449,7 @@ class TicketOperations:
         tipo: Optional[str] = None,
         creatoda: Optional[int] = None
     ) -> Dict[Any, Any]:
-        """Crea un nuovo ticket"""
+        """Create a new ticket"""
         if not title:
             logger.error("Specifica almeno il titolo")
             raise ValueError("title obbligatorio")
@@ -519,7 +515,7 @@ class TicketOperations:
     
     @staticmethod
     def update_ticket(ticket_id: int, json_updates: Dict[Any, Any]) -> Dict[Any, Any]:
-        """Aggiorna un ticket"""
+        """Update a ticket"""
         if not ticket_id or not json_updates:
             logger.error("Specifica ticket_id e json_updates")
             raise ValueError("ticket_id e json_updates obbligatori")
@@ -568,7 +564,7 @@ class TicketOperations:
     
     @staticmethod
     def search_tickets(query: str, limit: int = 20) -> Dict[Any, Any]:
-        """Cerca ticket per testo"""
+        """Search tickets by text"""
         if not query:
             logger.error("Specifica una query di ricerca")
             raise ValueError("query obbligatoria")
@@ -582,14 +578,14 @@ class TicketOperations:
     
     @staticmethod
     def list_categories() -> Dict[Any, Any]:
-        """Lista categorie disponibili"""
+        """List of available categories"""
         logger.info("Recupero categorie...")
         response, _ = api.api_call("GET", "/categories")
         return response
     
     @staticmethod
     def list_users(limit: int = 50) -> Dict[Any, Any]:
-        """Lista utenti"""
+        """User list"""
         logger.info(f"Recupero utenti (limit: {limit})...")
         response, _ = api.api_call("GET", f"/users?limit={limit}")
         return response
@@ -601,13 +597,13 @@ tickets = TicketOperations()
 # ===== TRACKING SYSTEM =====
 
 class TrackingSystem:
-    """Sistema tracking ticket per monitoraggio stati"""
+    """Ticket tracking system for status monitoring"""
     
     def __init__(self):
         self.tracking_file = config.TRACKING_FILE
     
     def init_tracking_file(self):
-        """Inizializza file tracking se non esiste"""
+        """Initialize tracking file if it does not exist"""
         if not self.tracking_file.exists():
             self.tracking_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.tracking_file, 'w', encoding='utf-8') as f:
@@ -627,7 +623,7 @@ class TrackingSystem:
         
         now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         
-        # Recupera dettagli ticket da API (usa /tickets?limit=100 perché /tickets/{id} non accessibile)
+        # Retrieve ticket details from API (use /tickets?limit=100 because /tickets/{id} not accessible)
         try:
             all_tickets = tickets.list_tickets(limit=100)
             ticket_data = next(
@@ -642,7 +638,7 @@ class TrackingSystem:
         descrizione_ticket = ticket_data.get('descrizione', '')
         priorita = ticket_data.get('priorita', 'Normale')
         
-        # Gestione assegnatoA (può essere oggetto o stringa)
+        # Management assignedA (can be object or string)
         assigned = ticket_data.get('assegnatoA')
         if isinstance(assigned, dict):
             if assigned:
@@ -675,7 +671,7 @@ class TrackingSystem:
         with open(self.tracking_file, 'r', encoding='utf-8') as f:
             tracking = json.load(f)
         
-        # Verifica se già tracciato
+        # Check if already tracked
         existing = next((t for t in tracking['tickets'] if t['ticket_id'] == ticket_id), None)
         
         if existing:
@@ -694,7 +690,7 @@ class TrackingSystem:
         logger.success(f"Ticket #{ticket_id} ({codice}) tracciato - Host: {host}, Service: {service}")
     
     def update_tracked_tickets(self):
-        """Aggiorna stato di tutti i ticket tracciati"""
+        """Update status of all tracked tickets"""
         self.init_tracking_file()
         
         count = 0
@@ -707,7 +703,7 @@ class TrackingSystem:
         with open(self.tracking_file, 'r', encoding='utf-8') as f:
             tracking = json.load(f)
         
-        # Recupera tutti i ticket dall'API
+        # Retrieve all tickets from the API
         try:
             all_tickets_response = tickets.list_tickets(limit=100)
             all_tickets = {t['id']: t for t in all_tickets_response.get('objs', [])}
@@ -749,7 +745,7 @@ class TrackingSystem:
             else:
                 assegnato_a = "Non assegnato"
             
-            # Controlla se risolto
+            # Check if resolved
             if stato in ['Effettuato', 'Chiuso', 'Completato', 'Risolto']:
                 logger.success(f"  Ticket #{ticket_id} RISOLTO (stato: {stato})")
                 ticket_entry['stato'] = stato
@@ -760,7 +756,7 @@ class TrackingSystem:
                 ticket_entry['last_update'] = now
                 resolved += 1
             else:
-                # Aggiorna stato
+                # Update status
                 ticket_entry['stato'] = stato
                 ticket_entry['descrizione_ticket'] = descrizione_ticket
                 ticket_entry['priorita'] = priorita
@@ -792,7 +788,7 @@ class TrackingSystem:
         
         before_count = len(tracking['tickets'])
         
-        # Filtra ticket da mantenere
+        # Filter tickets to keep
         tracking['tickets'] = [
             t for t in tracking['tickets']
             if not t.get('resolved_at') or t.get('resolved_at', '') > cutoff_date
@@ -840,7 +836,7 @@ class TrackingSystem:
                 print(f"  [{t.get('resolved_at', 'N/A')}] #{t['ticket_id']} {t['codice']} - {t['host']}/{t['service']}")
             print("")
         
-        # Tempo medio di risoluzione
+        # Average resolution time
         if resolved_tickets:
             try:
                 resolutions = []
@@ -856,7 +852,7 @@ class TrackingSystem:
                 pass
     
     def list_tracked_tickets(self):
-        """Lista tutti i ticket tracciati (JSON)"""
+        """List of all tracked tickets (JSON)"""
         self.init_tracking_file()
         
         with open(self.tracking_file, 'r', encoding='utf-8') as f:
@@ -871,7 +867,7 @@ tracking = TrackingSystem()
 # ===== INTERACTIVE CONFIG =====
 
 def interactive_config():
-    """Configurazione interattiva (wizard .env)"""
+    """Interactive configuration (wizard .env)"""
     script_dir = Path(__file__).resolve().parent
     env_file = script_dir / ".env"
     
@@ -940,7 +936,7 @@ def interactive_config():
     new_log_level = input(f"Livello log (DEBUG/INFO/WARN/ERROR) [{current_log_level}]: ").strip() or current_log_level
     new_log_level = new_log_level.upper()
     
-    # Tracking file
+    # Tracking files
     current_tracking_file = str(config.TRACKING_FILE)
     new_tracking_file = input(f"Percorso file tracking ticket [{current_tracking_file}]: ").strip() or current_tracking_file
     
@@ -951,38 +947,36 @@ def interactive_config():
     print("")
     print(f" Salvataggio configurazione in: {env_file}")
     
-    # Backup se esiste
+    # Backup if exists
     if env_file.exists():
         backup_name = f"{env_file}.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         shutil.copy(env_file, backup_name)
         print(f"   (backup creato: {backup_name})")
     
-    # Scrivi nuovo .env
-    env_content = f"""
-# ===== YDEA TOOLKIT CONFIGURATION =====
-# Generato il: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+    # Write new .env
+    env_content = f"""# ===== YDEA TOOLKIT CONFIGURATION =====
+# Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-# Credenziali API (OBBLIGATORIE)
+# API Credentials (MANDATORY)
 export YDEA_ID="{new_id}"
 export YDEA_API_KEY="{new_key}"
 
-# ID Utente per operazioni (opzionali)
+# User ID for operations (optional)
 export YDEA_USER_ID_CREATE_TICKET={new_ticket_id}
 export YDEA_USER_ID_CREATE_NOTE={new_note_id}
 
-# ===== GESTIONE LOG E TRACKING =====
+# ===== LOG MANAGEMENT AND TRACKING =====
 export YDEA_LOG_FILE="{new_log_file}"
 export YDEA_LOG_MAX_SIZE={new_log_size}
 export YDEA_LOG_LEVEL="{new_log_level}"
 export YDEA_TRACKING_FILE="{new_tracking_file}"
 export YDEA_TRACKING_RETENTION_DAYS={new_retention}
 
-# ===== CONFIGURAZIONI AVANZATE =====
-# Decommentare e modificare se necessario
+# ===== ADVANCED CONFIGURATIONS =====
+# Uncomment and edit if necessary
 # export YDEA_BASE_URL="https://my.ydea.cloud/app_api_v2"
 # export YDEA_TOKEN_FILE="${{HOME}}/.ydea_token.json"
-# export YDEA_DEBUG=0
-"""
+# export YDEA_DEBUG=0"""
     
     with open(env_file, 'w', encoding='utf-8') as f:
         f.write(env_content.lstrip())
@@ -1015,119 +1009,117 @@ export YDEA_TRACKING_RETENTION_DAYS={new_retention}
 
 def show_usage():
     """Mostra help/usage"""
-    usage = """
-  Ydea Toolkit - Gestione API v2 (Python)
+    usage = """Ydea Toolkit - API Management v2 (Python)
 
 SETUP:
-  export YDEA_ID="tuo_id"              # Da: Impostazioni → La mia azienda → API
-  export YDEA_API_KEY="tua_chiave_api"
+  export YDEA_ID="your_id" # From: Settings → My Company → API
+  export YDEA_API_KEY="your_api_key"
   
-  # ID Utente per operazioni (opzionali)
-  export YDEA_USER_ID_CREATE_TICKET=4675    # ID per creazione ticket
-  export YDEA_USER_ID_CREATE_NOTE=4675      # ID per creazione note/commenti
+  # User ID for operations (optional)
+  export YDEA_USER_ID_CREATE_TICKET=4675 # ID for ticket creation
+  export YDEA_USER_ID_CREATE_NOTE=4675 # ID for creating notes/comments
   
-  export YDEA_DEBUG=1                  # (opzionale) per debug verboso
-  export YDEA_LOG_FILE=/path/log.log   # (default: /var/log/ydea-toolkit.log)
+  export YDEA_DEBUG=1 # (optional) for verbose debugging
+  export YDEA_LOG_FILE=/path/log.log # (default: /var/log/ydea-toolkit.log)
 
-COMANDI:
+COMMANDS:
 
-  Autenticazione:
-    login                              Effettua login e salva token
+  Authentication:
+    login Log in and save token
 
-  API Generiche:
-    api <METHOD> </path> [json_body]   Chiamata API generica
+  Generic APIs:
+    api <METHOD> </path> [json_body] Generic API call
     
-  Ticket - Lista e Ricerca:
-    list [limit] [status]              Lista ticket (default: 50)
-    search <query> [limit]             Cerca ticket per testo
-    get <ticket_id>                    Dettagli ticket specifico
+  Ticket - List and Search:
+    list [limit] [status] Ticket list (default: 50)
+    search <query> [limit] Search tickets by text
+    get <ticket_id> Specific ticket details
     
-  Ticket - Creazione e Modifica:
+  Ticket - Creation and Modification:
     create <title> [description] [priority] [sla_id]
-    update <ticket_id> '<json>'        Aggiorna ticket (formato JSON)
-    close <ticket_id> [nota]           Chiudi ticket
-    comment <ticket_id> '<testo>' [pubblico:true|false]
-                                       Aggiungi commento
+    update <ticket_id> '<json>' Update ticket (JSON format)
+    close <ticket_id> [note] Close ticket
+    comment <ticket_id> '<text>' [public:true|false]
+                                       Add comment
   
-  Tracking Ticket (Monitoraggio Stati):
-    track <ticket_id> <codice> <host> <service> [desc]
-                                       Aggiungi ticket al tracking automatico
-    update-tracking                    Aggiorna stati di tutti i ticket tracciati
-    cleanup-tracking                   Rimuovi ticket risolti vecchi
-    list-tracking                      Mostra JSON completo ticket tracciati
-    stats                              Statistiche ticket (aperti/risolti/tempi)
+  Tracking Ticket (Status Monitoring):
+    track <ticket_id> <code> <host> <service> [desc]
+                                       Add tickets to automatic tracking
+    update-tracking Update statuses of all tracked tickets
+    cleanup-tracking Remove old resolved tickets
+    list-tracking Show full JSON tracked tickets
+    stats Ticket statistics (open/resolved/times)
     
-  Log e Debug:
-    logs [lines]                       Mostra ultimi N log (default: 50)
-    clearlog                           Pulisci file di log
+  Logs and Debugging:
+    logs [lines] Show last N logs (default: 50)
+    clearlog Clear log files
   
-  Configurazione:
-    config                             Configurazione interattiva (ID, API key, user ID)
+  Configuration:
+    config Interactive configuration (ID, API key, user ID)
     
-  Altro:
-    categories                         Lista categorie
-    users [limit]                      Lista utenti
-    version                            Mostra versione toolkit
+  Other:
+    categories List of categories
+    users [limit] List of users
+    version Show toolkit version
 
-ESEMPI:
+EXAMPLES:
 
-  # Configurazione iniziale interattiva
+  # Interactive initial setup
   ./ydea-toolkit.py config
   
-  # Login iniziale
+  # Initial login
   ./ydea-toolkit.py login
 
-  # Lista ultimi 10 ticket aperti
+  # List of last 10 open tickets
   ./ydea-toolkit.py list 10 open | jq .
 
-  # Crea nuovo ticket
-  ./ydea-toolkit.py create "Server down" "Il server web non risponde" high
+  # Create new ticket
+  ./ydea-toolkit.py create "Server down" "The web server is not responding" high
 
-  # Cerca ticket
-  ./ydea-toolkit.py search "errore database" | jq '.data[] | {id, title, status}'
+  # Search tickets
+  ./ydea-toolkit.py search "database error" | jq '.data[] | {id, title, status}'
 
-  # Aggiungi commento
-  ./ydea-toolkit.py comment 12345 "Problema risolto riavviando il servizio"
+  # Add comment
+  ./ydea-toolkit.py comment 12345 "Problem resolved by restarting the service"
 
-  # Chiudi ticket
-  ./ydea-toolkit.py close 12345 "Risolto con riavvio"
+  # Close ticket
+  ./ydea-toolkit.py close 12345 "Solved with reboot"
 
-  # Tracking ticket da CheckMK
-  ./ydea-toolkit.py track 12345 "TK25/003376" "server-web" "Apache Status" "Alert da CheckMK"
+  # Tracking tickets from CheckMK
+  ./ydea-toolkit.py track 12345 "TK25/003376" "web-server" "Apache Status" "Alert from CheckMK"
   
-  # Visualizza statistiche tracking
+  # View tracking statistics
   ./ydea-toolkit.py stats
   
-  # Aggiorna tutti i ticket tracciati
+  # Update all tracked tickets
   ./ydea-toolkit.py update-tracking
   
-  # Visualizza log
+  # View log
   ./ydea-toolkit.py logs 100
 
-  # Chiamata API custom
+  # Custom API call
   ./ydea-toolkit.py api GET /tickets/12345/history | jq .
 
-VARIABILI AMBIENTE:
-  # Credenziali API (OBBLIGATORIE)
-  YDEA_ID                    ID account API Ydea
-  YDEA_API_KEY               Chiave API Ydea
+ENVIRONMENT VARIABLES:
+  # API Credentials (MANDATORY)
+  YDEA_ID Ydea API account ID
+  YDEA_API_KEY Ydea API key
   
-  # ID Utente per operazioni (opzionali)
-  YDEA_USER_ID_CREATE_TICKET (default: 4675) ID per creazione ticket
-  YDEA_USER_ID_CREATE_NOTE   (default: 4675) ID per creazione note/commenti
+  # User ID for operations (optional)
+  YDEA_USER_ID_CREATE_TICKET (default: 4675) ID for ticket creation
+  YDEA_USER_ID_CREATE_NOTE (default: 4675) ID for creating notes/comments
   
-  # Configurazioni generali
-  YDEA_BASE_URL              (default: https://my.ydea.cloud/app_api_v2)
-  YDEA_TOKEN_FILE            (default: ~/.ydea_token.json)
-  YDEA_LOG_FILE              (default: /var/log/ydea-toolkit.log)
-  YDEA_LOG_MAX_SIZE          (default: 10485760 = 10MB)
-  YDEA_TRACKING_FILE         (default: /var/log/ydea-tickets-tracking.json)
-  YDEA_TRACKING_RETENTION_DAYS (default: 365 giorni)
-  YDEA_EXPIRY_SKEW           (default: 60 secondi)
-  YDEA_DEBUG                 (default: 0, imposta 1 per debug)
+  # General configurations
+  YDEA_BASE_URL (default: https://my.ydea.cloud/app_api_v2)
+  YDEA_TOKEN_FILE (default: ~/.ydea_token.json)
+  YDEA_LOG_FILE (default: /var/log/ydea-toolkit.log)
+  YDEA_LOG_MAX_SIZE (default: 10485760 = 10MB)
+  YDEA_TRACKING_FILE (default: /var/log/ydea-tickets-tracking.json)
+  YDEA_TRACKING_RETENTION_DAYS (default: 365 days)
+  YDEA_EXPIRY_SKEW (default: 60 seconds)
+  YDEA_DEBUG (default: 0, set 1 for debug)
 
-VERSIONE: {VERSION}
-"""
+VERSION: {VERSION}"""
     print(usage)
 
 
@@ -1149,7 +1141,7 @@ def show_logs(lines: int = 50):
 
 
 def clear_log():
-    """Pulisci file di log"""
+    """Clean log files"""
     if config.LOG_FILE.exists():
         with open(config.LOG_FILE, 'w', encoding='utf-8') as f:
             f.write('')

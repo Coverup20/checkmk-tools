@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""
-check_ns8_services.py - CheckMK Local Check per Servizi Mail NS8
+"""check_ns8_services.py - CheckMK Local Check for NS8 Mail Services
 
-Monitora servizi mail principali (clamav, rspamd, dovecot, postfix).
-Controlli speciali per Dovecot:
-- Sessioni IMAP attive
-- Errori vsz_limit nei log (CRITICAL se presenti)
-- Configurazione VszLimit (WARNING se non impostato)
+Monitor main email services (clamav, rspamd, dovecot, postfix).
+Special controls for Dovecot:
+- Active IMAP sessions
+- vsz_limit errors in logs (CRITICAL if present)
+- VszLimit configuration (WARNING if not set)
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -23,15 +21,13 @@ TARGET_SERVICES = ['clamav', 'rspamd', 'dovecot', 'postfix']
 
 
 def run_command(cmd: List[str]) -> Tuple[int, str, str]:
-    """
-    Execute a shell command and return exit code, stdout, stderr.
+    """Execute a shell command and return exit code, stdout, stderr.
     
     Args:
         cmd: Command as list of strings
         
     Returns:
-        Tuple of (exit_code, stdout, stderr)
-    """
+        Tuple of (exit_code, stdout, stderr)"""
     try:
         result = subprocess.run(
             cmd,
@@ -50,12 +46,10 @@ def run_command(cmd: List[str]) -> Tuple[int, str, str]:
 
 
 def get_mail_instances() -> List[str]:
-    """
-    Get list of mail instances via runagent.
+    """Get list of mail instances via runagent.
     
     Returns:
-        List of mail instance names (e.g., ['mail1', 'mail2'])
-    """
+        List of mail instance names (e.g., ['mail1', 'mail2'])"""
     exit_code, stdout, stderr = run_command(['runagent', '-l'])
     
     if exit_code != 0:
@@ -71,15 +65,13 @@ def get_mail_instances() -> List[str]:
 
 
 def get_container_status(instance: str) -> Dict[str, str]:
-    """
-    Get container names and status via podman ps.
+    """Get container names and status via podman ps.
     
     Args:
         instance: Mail instance name
         
     Returns:
-        Dict mapping container_name -> status (e.g., {'dovecot': 'Up'})
-    """
+        Dict mapping container_name -> status (e.g., {'dovecot': 'Up'})"""
     exit_code, stdout, stderr = run_command([
         'runagent', '-m', instance, 'podman', 'ps',
         '--format', '{{.Names}} {{.Status}}'
@@ -100,15 +92,13 @@ def get_container_status(instance: str) -> Dict[str, str]:
 
 
 def get_imap_sessions(instance: str) -> int:
-    """
-    Get count of IMAP sessions via doveadm who.
+    """Get count of IMAP sessions via doveadm who.
     
     Args:
         instance: Mail instance name
         
     Returns:
-        Count of IMAP sessions
-    """
+        Count of IMAP sessions"""
     exit_code, stdout, stderr = run_command([
         'runagent', '-m', instance, 'podman', 'exec', 'dovecot',
         'doveadm', 'who'
@@ -122,15 +112,13 @@ def get_imap_sessions(instance: str) -> int:
 
 
 def get_vsz_limit(instance: str) -> Optional[str]:
-    """
-    Get VszLimit configuration from config show dovecot.
+    """Get VszLimit configuration from config show dovecot.
     
     Args:
         instance: Mail instance name
         
     Returns:
-        VszLimit value as string or None if not set
-    """
+        VszLimit value as string or None if not set"""
     exit_code, stdout, stderr = run_command(['config', 'show', 'dovecot'])
     
     if exit_code != 0 or not stdout:
@@ -147,15 +135,13 @@ def get_vsz_limit(instance: str) -> Optional[str]:
 
 
 def count_vsz_errors(instance: str) -> int:
-    """
-    Count vsz_limit error occurrences in recent dovecot logs.
+    """Count vsz_limit error occurrences in recent dovecot logs.
     
     Args:
         instance: Mail instance name
         
     Returns:
-        Count of vsz_limit errors in last LOG_LINES
-    """
+        Count of vsz_limit errors in last LOG_LINES"""
     # Build shell command to tail logs and grep for errors
     shell_cmd = f"tail -n {LOG_LINES} /var/log/dovecot* 2>/dev/null | grep -c 'Cannot allocate memory due to vsz_limit'"
     
@@ -174,12 +160,10 @@ def count_vsz_errors(instance: str) -> int:
 
 
 def check_dovecot_extras(instance: str) -> None:
-    """
-    Perform extra checks for dovecot: IMAP sessions and vsz_limit.
+    """Perform extra checks for dovecot: IMAP sessions and vsz_limit.
     
     Args:
-        instance: Mail instance name
-    """
+        instance: Mail instance name"""
     # IMAP sessions
     imap_count = get_imap_sessions(instance)
     
@@ -212,12 +196,10 @@ def check_dovecot_extras(instance: str) -> None:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     mail_instances = get_mail_instances()
     
     if not mail_instances:

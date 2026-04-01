@@ -1,5 +1,5 @@
 #!/bin/bash
-# explore-sla-endpoint.sh - Esplora possibili endpoint/campi SLA in YDEA API
+# explore-sla-endpoint.sh - Explore possible SLA endpoints/fields in YDEA API
 
 set -euo pipefail
 
@@ -14,57 +14,57 @@ echo ""
 ensure_token
 
 # Test 1: Cerca endpoint /sla
-echo "TEST 1: GET /sla (lista SLA disponibili)"
+echo "TEST 1: GET /sla (list of available SLAs)"
 echo "────────────────────────────────────────────────────────────────────"
-RESPONSE=$(ydea_api GET "/sla?limit=10" || echo '{"error": "endpoint non trovato"}')
+RESPONSE=$(ydea_api GET "/sla?limit=10" || echo '{"error": "endpoint not found"}')
 echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
 echo ""
 echo ""
 
 # Test 2: Cerca nella struttura anagrafica
-echo "TEST 2: GET /anagrafiche/2339268 (cerca SLA di default)"
+echo "TEST 2: GET /personal data/2339268 (search for default SLA)"
 echo "────────────────────────────────────────────────────────────────────"
-RESPONSE=$(ydea_api GET "/anagrafiche/2339268" || echo '{"error": "endpoint non trovato"}')
+RESPONSE=$(ydea_api GET "/anagrafiche/2339268" || echo '{"error": "endpoint not found"}')
 echo "$RESPONSE" | jq '{id, ragioneSociale, sla_default: .sla, sla_id, contratti: .contratti}' 2>/dev/null || echo "$RESPONSE"
 echo ""
 echo "Campi contenenti 'sla' (case-insensitive):"
-echo "$RESPONSE" | jq 'keys | map(select(test("sla"; "i")))' 2>/dev/null || echo "Nessun campo trovato"
+echo "$RESPONSE" | jq 'keys | map(select(test("sla"; "i")))' 2>/dev/null || echo "No fields found"
 echo ""
 echo ""
 
 # Test 3: Cerca nella struttura contratti
 echo "TEST 3: GET /contratti/180437 (cerca SLA nel contratto)"
 echo "────────────────────────────────────────────────────────────────────"
-RESPONSE=$(ydea_api GET "/contratti/180437" || echo '{"error": "endpoint non trovato"}')
+RESPONSE=$(ydea_api GET "/contratti/180437" || echo '{"error": "endpoint not found"}')
 echo "$RESPONSE" | jq '{id, nome, sla, sla_id, anagrafica_id}' 2>/dev/null || echo "$RESPONSE"
 echo ""
 echo "Campi contenenti 'sla' (case-insensitive):"
-echo "$RESPONSE" | jq 'keys | map(select(test("sla"; "i")))' 2>/dev/null || echo "Nessun campo trovato"
+echo "$RESPONSE" | jq 'keys | map(select(test("sla"; "i")))' 2>/dev/null || echo "No fields found"
 echo ""
 echo ""
 
-# Test 4: Prova UPDATE ticket con SLA
+# Test 4: Test UPDATE ticket with SLA
 TICKET_ID="1630352"  # Ticket TEST 2 creato in precedenza
-echo "TEST 4: PATCH /ticket/${TICKET_ID} (tenta di aggiungere SLA a ticket esistente)"
+echo "TEST 4: PATCH /ticket/${TICKET_ID} (try to add SLA to existing ticket)"
 echo "────────────────────────────────────────────────────────────────────"
 
 UPDATE_BODY=$(jq -n --argjson sla_id 147 '{sla_id: $sla_id}')
 echo "Body: $UPDATE_BODY"
 echo ""
 
-RESPONSE=$(ydea_api PATCH "/ticket/${TICKET_ID}" "$UPDATE_BODY" || echo '{"error": "update fallito"}')
+RESPONSE=$(ydea_api PATCH "/ticket/${TICKET_ID}" "$UPDATE_BODY" || echo '{"error": "update failed"}')
 echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
 echo ""
 
-# Verifica se SLA è stata aggiunta
-echo "Verifica ticket dopo PATCH:"
+# Check if SLA has been added
+echo "Check ticket after PATCH:"
 DETAIL=$(ydea_api GET "/ticket/${TICKET_ID}" || ydea_api GET "/tickets?id=${TICKET_ID}")
-echo "$DETAIL" | jq '{id, codice, sla_id, sla}' 2>/dev/null || echo "Ticket non trovato con endpoint GET"
+echo "$DETAIL" | jq '{id, codice, sla_id, sla}' 2>/dev/null || echo "Ticket not found with GET endpoint"
 echo ""
 echo ""
 
-# Test 5: Prova con campo diverso
-echo "TEST 5: Prova campo 'slaId' (camelCase) invece di 'sla_id'"
+# Test 5: Test with different field
+echo "TEST 5: Test field 'slaId' (camelCase) instead of 'sla_id'"
 echo "────────────────────────────────────────────────────────────────────"
 
 TICKET_BODY=$(jq -n \
@@ -92,15 +92,15 @@ RESPONSE=$(ydea_api POST "/ticket" "$TICKET_BODY")
 TICKET_ID_NEW=$(echo "$RESPONSE" | jq -r '.id // .ticket_id // .data.id // empty')
 
 if [[ -n "$TICKET_ID_NEW" && "$TICKET_ID_NEW" != "null" ]]; then
-  echo " Ticket creato: ID=$TICKET_ID_NEW"
+  echo "Ticket created: ID=$TICKET_ID_NEW"
   
-  # Recupera e verifica SLA
+  # Retrieve and verify SLA
   sleep 1
-  echo "Verifica SLA..."
+  echo "Check SLA..."
   DETAIL=$(ydea_api GET "/tickets?id=${TICKET_ID_NEW}&limit=1" | jq '.objs[0] // .data[0] // .')
   echo "$DETAIL" | jq '{id, codice, sla_id, sla}' 2>/dev/null
 else
-  echo " Creazione fallita"
+  echo "Creation failed"
   echo "$RESPONSE" | jq '.'
 fi
 
@@ -116,9 +116,9 @@ for endpoint in "/api-docs" "/schema" "/openapi" "/swagger"; do
   RESPONSE=$(ydea_api GET "$endpoint" 2>/dev/null || echo '{"error": "not found"}')
   
   if echo "$RESPONSE" | jq -e '.error' >/dev/null 2>&1; then
-    echo "    Non disponibile"
+    echo "Not available"
   else
-    echo "    TROVATO!"
+    echo "FOUND!"
     echo "$RESPONSE" | jq '.' | head -50
     break
   fi
@@ -129,11 +129,11 @@ echo "════════════════════════�
 echo " Esplorazione completata!"
 echo ""
 echo " CONCLUSIONI:"
-echo "   1. Verifica manualmente i ticket su https://my.ydea.cloud"
-echo "   2. Se SLA appare su UI ma non via API, potrebbe essere:"
+echo "1. Manually verify tickets on https://my.ydea.cloud"
+echo "2. If SLA appears on UI but not via API, it could be:"
 echo "      - Campo custom attribute"
-echo "      - Logica lato server post-creazione"
-echo "      - API v3 con endpoint diverso"
+echo "- Post-build server-side logic"
+echo "- API v3 with different endpoint"
 echo ""
-echo " SUGGERIMENTO: Contatta YDEA per documentazione API SLA"
+echo "TIP: Contact YDEA for API SLA documentation"
 echo "════════════════════════════════════════════════════════════════════"

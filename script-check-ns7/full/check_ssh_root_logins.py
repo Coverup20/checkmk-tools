@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check_ssh_root_logins.py - CheckMK Local Check for root SSH sessions
+"""check_ssh_root_logins.py - CheckMK Local Check for root SSH sessions
 
 Notify if there are SSH sessions opened as root (CRITICAL alert).
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -17,12 +15,10 @@ SERVICE_NAME = "SSH-sessions-count"
 
 
 def get_root_sessions() -> tuple:
-    """
-    Get count and IPs of root SSH sessions.
+    """Get count and IPs of root SSH sessions.
     
     Returns:
-        Tuple of (count, comma-separated IPs)
-    """
+        Tuple of (count, comma-separated IPs)"""
     try:
         result = subprocess.run(
             ["who"],
@@ -50,12 +46,10 @@ def get_root_sessions() -> tuple:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     count, ips = get_root_sessions()
     
     if count > 0:

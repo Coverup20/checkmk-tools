@@ -157,7 +157,7 @@ def run_step(cfg: InstallerConfig) -> None:
 
     sites_output = run_capture(["omd", "sites"], check=False)
     if cfg.site_name not in sites_output:
-        # Pulisce gruppo/utente unix orfano (lasciato da run parziale precedente)
+        # Cleans orphaned unix user/group (left from previous partial run)
         import subprocess as _sp
         _grp = _sp.run(["getent", "group", cfg.site_name], capture_output=True)
         if _grp.returncode == 0:

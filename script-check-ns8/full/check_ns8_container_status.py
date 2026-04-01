@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-check_ns8_container_status.py - Stato container NS8 per CheckMK
+"""check_ns8_container_status.py - NS8 container status for CheckMK
 
-Version: 1.3.0
-"""
+Version: 1.3.0"""
 
 import subprocess
 import sys

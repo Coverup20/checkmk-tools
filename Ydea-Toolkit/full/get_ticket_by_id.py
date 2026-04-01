@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""
-get_ticket_by_id.py - Recupera dettagli ticket Ydea per ID
+"""get_ticket_by_id.py - Retrieve Ydea ticket details by ID
 
-Recupera e mostra i dettagli completi di un ticket Ydea dato il suo ID.
+Retrieves and displays complete details of a Ydea ticket given its ID.
 
 Usage:
     get_ticket_by_id.py <ticket_id>
@@ -10,8 +9,7 @@ Usage:
 Example:
     get_ticket_by_id.py 12345
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import json

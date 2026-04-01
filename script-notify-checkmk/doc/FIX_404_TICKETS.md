@@ -1,33 +1,33 @@
-# Fix Gestione Errori 404 - ydea_realip
+# Fix 404 Error Handling - ydea_realip
 
-## Problema Identificato
+## Problem Identified
 
-Gli alert di CheckMK cercavano di aggiungere note a ticket Ydea che non esistevano più (chiusi o cancellati), ricevendo errori 404:
+CheckMK alerts attempted to add notes to Ydea tickets that no longer existed (closed or deleted), receiving 404 errors:
 
 ```
 curl: (22) The requested URL returned error: 404
-[2025-11-14 12:18:19] ERRORE aggiunta nota a ticket #1502113
+[2025-11-14 12:18:19] ERROR added note to ticket #1502113
 ```
 
-### Cause
+### Causes
 
-1. **Ticket chiuso manualmente**: L'operatore chiude il ticket su Ydea
-2. **Ticket cancellato**: Il ticket viene rimosso dal sistema
-3. **Cache non sincronizzata**: Lo script mantiene il riferimento a ticket non più validi
-4. **Nessuna gestione errore 404**: L'errore veniva solo loggato senza azioni correttive
+1. **Ticket closed manually**: The operator closes the ticket on Ydea
+2. **Ticket Deleted**: The ticket is removed from the system
+3. **Cache not synchronized**: The script keeps the reference to tickets that are no longer valid
+4. **No 404 error handling**: The error was only logged without corrective action
 
-### Conseguenze
+### Consequences
 
--  Perdita di tracciamento per alert ricorrenti
--  Log pieni di errori 404 ripetuti
--  Nessuna notifica quando un problema si ripresenta
--  Cache inquinata con ticket ID non validi
+- Loss of tracking for recurring alerts
+- Logs full of repeated 404 errors
+- No notification when a problem recurs
+- Cache polluted with invalid ticket IDs
 
-## Soluzione Implementata
+## Solution Implemented
 
-### 1. Gestione Intelligente Errore 404
+### 1. Intelligent 404 Error Management
 
-**Funzione `add_private_note` migliorata**:
+**Improved `add_private_note` function**:
 
 ```bash
 add_private_note() {
@@ -36,12 +36,12 @@ add_private_note() {
   
   local result
   result=$("$YDEA_TOOLKIT" comment "$ticket_id" "$note" 2>&1) || {
-    # Verifica se è un errore 404 (ticket non trovato/chiuso)
+    # Check if it is a 404 error (ticket not found/closed)
     if echo "$result" | grep -q "404\|not found\|Not Found"; then
-      log "WARN: Ticket #$ticket_id non trovato (404) - potrebbe essere stato chiuso"
-      return 2  # Return code speciale per 404
+      log "WARN: Ticket #$ticket_id not found (404) - may have been closed"
+      return 2 # Special return code for 404
     else
-      log "ERRORE aggiunta nota a ticket #$ticket_id: $result"
+      log "ERROR adding note to ticket #$ticket_id: $result"
       return 1
     fi
   }
@@ -51,228 +51,228 @@ add_private_note() {
 ```
 
 **Return codes**:
-- `0`: Successo
-- `1`: Errore generico
-- `2`: Errore 404 (ticket non trovato)
+- `0`: Success
+- `1`: Generic error
+- `2`: Error 404 (ticket not found)
 
-### 2. Rimozione Automatica dalla Cache
+### 2. Automatic Removal from Cache
 
-Nuova funzione per pulire la cache quando un ticket non è più valido:
+New function to clear the cache when a ticket is no longer valid:
 
 ```bash
 remove_ticket_from_cache() {
   local key="$1"
   init_cache
   
-  debug "Rimozione ticket dalla cache: $key"
+  debug "Removing tickets from cache: $key"
   jq --arg key "$key" 'del(.[$key])' "$TICKET_CACHE" > "${TICKET_CACHE}.tmp" && \
     cat "${TICKET_CACHE}.tmp" > "$TICKET_CACHE" && \
     rm -f "${TICKET_CACHE}.tmp"
 }
 ```
 
-### 3. Ricreazione Automatica Ticket
+### 3. Automatic Ticket Recreation
 
-Se il ticket non esiste più MA lo stato è ancora critico, viene creato automaticamente un nuovo ticket:
+If the ticket no longer exists BUT the status is still critical, a new ticket is automatically created:
 
 ```bash
 if [[ $note_result -eq 2 ]]; then
-  # Errore 404 - ticket non esiste più
-  log "Ticket #$TICKET_ID non più valido, rimozione dalla cache"
+  # Error 404 - ticket no longer exists
+  log "Ticket #$TICKET_ID no longer valid, removed from cache"
   remove_ticket_from_cache "$TICKET_KEY"
   
-  # Se lo stato è ancora critico, crea un nuovo ticket
+  # If the status is still critical, create a new ticket
   if [[ "$STATE" == "CRIT" || "$STATE" == "CRITICAL" || "$STATE" == "DOWN" ]]; then
-    log "Stato ancora CRITICAL, creazione nuovo ticket"
+    log "Status still CRITICAL, new ticket created"
     
-    # ... crea nuovo ticket con nota speciale ...
+    # ... create new ticket with special note ...
     
     NEW_TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY")
     
     if [[ -n "$NEW_TICKET_ID" ]]; then
-      log " Nuovo ticket creato: #$NEW_TICKET_ID (sostituisce #$TICKET_ID)"
+      log "New ticket created: #$NEW_TICKET_ID (replaces #$TICKET_ID)"
       save_ticket_cache "$TICKET_KEY" "$NEW_TICKET_ID" "$STATE"
     fi
   fi
 fi
 ```
 
-### 4. Nota Informativa nel Nuovo Ticket
+### 4. Information Note in the New Ticket
 
-I nuovi ticket creati dopo un 404 includono una nota speciale:
+New tickets created after a 404 include a special note:
 
 ```
 -------------------------------------------
- NOTA: Ticket precedente #1502113 non più disponibile
-Nuovo ticket creato automaticamente
+ NOTE: Previous ticket #1502113 no longer available
+New ticket created automatically
 -------------------------------------------
 ```
 
-Questo aiuta l'operatore a capire il contesto.
+This helps the operator understand the context.
 
-## Flusso di Gestione
+## Management Flow
 
-### Caso 1: Ticket Esiste e Funziona
+### Case 1: Ticket Exists and Works
 ```
-Alert → Trova ticket in cache → Aggiunge nota → Successo 
-```
-
-### Caso 2: Ticket Chiuso/Cancellato + Stato OK/UP
-```
-Alert OK/UP → Trova ticket in cache → Errore 404 
-  → Rimuove dalla cache 
-  → Nessun nuovo ticket (problema rientrato) 
+Alert → Find cached ticket → Add note → Success 
 ```
 
-### Caso 3: Ticket Chiuso/Cancellato + Stato CRITICAL
+### Case 2: Ticket Closed/Cancelled + Status OK/UP
 ```
-Alert CRITICAL → Trova ticket in cache → Errore 404 
-  → Rimuove dalla cache 
-  → Crea NUOVO ticket 
-  → Salva nuovo ID in cache 
-```
-
-### Caso 4: Errore Generico (non 404)
-```
-Alert → Trova ticket in cache → Errore generico
-  → Log errore
-  → Mantiene ticket in cache (retry futuro) 
+Alert OK/UP → Find cached ticket → Error 404 
+  → Remove from cache 
+  → No new tickets (problem resolved) 
 ```
 
-## Benefici
+### Case 3: Ticket Closed/Cancelled + CRITICAL Status
+```
+Alert CRITICAL → Find cached ticket → Error 404 
+  → Remove from cache 
+  → Create NEW ticket 
+  → Save new ID in cache 
+```
 
-| Aspetto | Prima | Dopo |
+### Case 4: Generic Error (not 404)
+```
+Alert → Find cached ticket → Generic error
+  → Error log
+  → Keeps tickets in cache (future retry) 
+```
+
+## Benefits
+
+| Appearance | Before | After |
 |---------|-------|------|
-| **Errori 404 ripetuti** |  Infiniti log di errore |  Gestiti automaticamente |
-| **Cache inquinata** |  ID non validi permanenti |  Pulizia automatica |
-| **Alert persi** |  Nessuna notifica se ticket chiuso |  Nuovo ticket auto-creato |
-| **Tracciabilità** |  Continuità persa |  Nota su ticket precedente |
-| **Intervento manuale** |  Necessario |  Auto-healing |
+| **Repeated 404 errors** |  Infinite error logs |  Automatically managed |
+| **Cache polluted** |  Permanent invalid IDs |  Automatic cleaning |
+| **Missed Alerts** |  No notification if ticket closed |  New self-created ticket |
+| **Traceability** |  Continuity lost |  Note on previous ticket |
+| **Manual intervention** |  Necessary |  Self-healing |
 
-## Casistiche Gestite
+## Case Studies Managed
 
-###  Operatore Chiude Ticket Manualmente
+### Operator Closes Ticket Manually
 
-**Scenario**: L'operatore risolve e chiude il ticket #1502113
+**Scenario**: The operator resolves and closes ticket #1502113
 
-**Comportamento**:
-1. Alert successivo riceve 404
-2. Script rimuove #1502113 dalla cache
-3. Se problema rientrato (OK): Nessuna azione
-4. Se problema persiste (CRIT): Nuovo ticket creato
+**Behavior**:
+1. Next alert receives 404
+2. Script removes #1502113 from cache
+3. If problem resolved (OK): No action
+4. If problem persists (CRIT): New ticket created
 
-###  Ticket Cancellato dal Sistema
+### Ticket Deleted from System
 
-**Scenario**: Sistema Ydea cancella ticket vecchi dopo X giorni
+**Scenario**: Ydea system deletes old tickets after X days
 
-**Comportamento**: Identico al caso precedente
+**Behavior**: Identical to the previous case
 
-###  Flapping con Ticket Chiuso
+### Flapping with Ticket Closed
 
 **Scenario**: 
-- Servizio va CRIT → Ticket #1001 creato
-- Operatore chiude ticket
-- Servizio torna CRIT (flapping)
+- Service goes CRIT → Ticket #1001 created
+- Operator closes ticket
+- Service returns CRIT (flapping)
 
-**Comportamento**:
-1. Alert CRIT riceve 404 su #1001
-2. Cache pulita
-3. Nuovo ticket #1002 creato
-4. Nota indica ticket precedente
-5. Detection flapping funziona normalmente
+**Behavior**:
+1. Alert CRIT receives 404 on #1001
+2. Clean cache
+3. New ticket #1002 created
+4. Note indicates previous ticket
+5. Detection flapping works normally
 
-###  Alert OK su Ticket Chiuso
+### Alert OK on Ticket Closed
 
 **Scenario**:
-- Servizio va OK
-- Ticket già chiuso dall'operatore
+- Service is OK
+- Ticket already closed by the operator
 
-**Comportamento**:
-1. Riceve 404
-2. Pulisce cache
-3. **NON crea nuovo ticket** (problema rientrato)
-4. Log: "Stato OK non critico, nessun nuovo ticket creato"
+**Behavior**:
+1. Receives 404
+2. Clean cache
+3. **DO NOT create new ticket** (problem resolved)
+4. Log: "Status OK non-critical, no new tickets created"
 
-## Log Migliorati
+## Improved Logs
 
-### Prima
+### First
 ```
-[2025-11-14 12:18:19] ERRORE aggiunta nota a ticket #1502113
+[2025-11-14 12:18:19] ERROR added note to ticket #1502113
 curl: (22) The requested URL returned error: 404
 ```
 
-### Dopo
+### After
 ```
-[2025-11-14 12:18:19] WARN: Ticket #1502113 non trovato (404) - potrebbe essere stato chiuso
-[2025-11-14 12:18:19] Ticket #1502113 non più valido, rimozione dalla cache
-[2025-11-14 12:18:19] Stato ancora CRITICAL, creazione nuovo ticket
-[2025-11-14 12:18:20]  Nuovo ticket creato: #1502200 (sostituisce #1502113)
+[2025-11-14 12:18:19] WARN: Ticket #1502113 Not Found (404) - may have been closed
+[2025-11-14 12:18:19] Ticket #1502113 no longer valid, removed from cache
+[2025-11-14 12:18:19] Status still CRITICAL, new ticket created
+[2025-11-14 12:18:20] New Ticket Created: #1502200 (Replaces #1502113)
 ```
 
 ## Testing
 
-Script testato con:
+Script tested with:
 
- **Test 1**: Ticket chiuso manualmente + Alert OK
-- Risultato: Cache pulita, nessun nuovo ticket
+ **Test 1**: Ticket closed manually + Alert OK
+- Result: Cache cleared, no new tickets
 
- **Test 2**: Ticket chiuso manualmente + Alert CRIT
-- Risultato: Nuovo ticket creato con nota
+ **Test 2**: Ticket closed manually + Alert CRIT
+- Result: New ticket created with note
 
- **Test 3**: Ticket cancellato + Alert WARNING
-- Risultato: Cache pulita, nessun nuovo ticket (solo CRIT creano ticket)
+ **Test 3**: Canceled Ticket + Alert WARNING
+- Result: Clear cache, no new tickets (only CRITs create tickets)
 
- **Test 4**: Errore rete (non 404)
-- Risultato: Log errore, ticket mantenuto in cache
+ **Test 4**: Network error (not 404)
+- Result: Error log, ticket kept in cache
 
- **Test 5**: Flapping con ticket chiuso
-- Risultato: Nuovo ticket con detection flapping
+ **Test 5**: Flapping with closed ticket
+- Result: New ticket with flapping detection
 
-## Compatibilità
+## Compatibility
 
--  Backward compatible con funzionamento esistente
--  Nessuna modifica a `ydea-toolkit.sh` richiesta
--  Cache esistente continua a funzionare
--  Formato log compatibile con parsing esistente
+- Backward compatible with existing operation
+- No changes to `ydea-toolkit.sh` required
+- Existing cache continues to work
+- Log format compatible with existing parsing
 
-## Manutenzione
+## Maintenance
 
-### Pulizia Manuale Cache (se necessario)
+### Manual Cache Cleanup (if necessary)
 ```bash
-# Visualizza cache
+# View cache
 cat /tmp/ydea_checkmk_tickets.json | jq .
 
-# Rimuovi ticket specifico
+# Remove specific ticket
 jq 'del(.["192.168.10.100:Memory"])' /tmp/ydea_checkmk_tickets.json > /tmp/ydea_checkmk_tickets.json.tmp
 mv /tmp/ydea_checkmk_tickets.json.tmp /tmp/ydea_checkmk_tickets.json
 
-# Reset completo cache
+# Complete cache reset
 echo '{}' > /tmp/ydea_checkmk_tickets.json
 ```
 
-### Monitoraggio Errori 404
+### 404 Error Monitoring
 ```bash
-# Conta errori 404 nel log CheckMK
+# Count 404 errors in CheckMK log
 grep "404.*ticket" /omd/sites/monitoring/var/log/notify.log | wc -l
 
-# Verifica pulizia cache automatica
-grep "rimozione dalla cache" /omd/sites/monitoring/var/log/notify.log
+# Verify automatic cache cleanup
+grep "remove from cache" /omd/sites/monitoring/var/log/notify.log
 ```
 
-## Metriche Attese
+## Expected Metrics
 
-Con questo fix:
-- **Riduzione errori 404 nei log**: -95%
-- **Auto-healing ticket mancanti**: ~90%
-- **Continuità tracking alert**: +100%
-- **Intervento manuale richiesto**: -80%
+With this fix:
+- **Reduction of 404 errors in logs**: -95%
+- **Auto-healing missing tickets**: ~90%
+- **Tracking alert continuity**: +100%
+- **Manual intervention required**: -80%
 
-## Autore
+## Author
 
 Marzio - 2025-11-14
 
-## Riferimenti
+## References
 
-- Issue: Errori 404 su ticket chiusi (#1502113, #1501974)
+- Issue: 404 errors on closed tickets (#1502113, #1501974)
 - Related: ydea_realip, ydea-toolkit.sh
 - CheckMK notify.log analysis

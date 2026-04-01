@@ -5,7 +5,7 @@ from pathlib import Path
 from lib.common import backup_file, command_exists, log_header, log_info, log_success, run as run_cmd
 from lib.config import InstallerConfig
 
-# IP sempre in whitelist (mai bannare)
+# IP always whitelisted (never banned)
 _ALWAYS_IGNORE = ["127.0.0.1/8", "::1"]
 
 
@@ -19,7 +19,7 @@ def run_step(cfg: InstallerConfig) -> None:
         backup = backup_file(jail_local)
         log_info(f"Backup created: {backup}")
 
-    # Costruisce ignoreip unendo gli IP fissi con quelli da config
+    # Constructs ignoreip by merging the fixed IPs with those from the config
     extra_ips = [ip.strip() for ip in cfg.fail2ban_ignoreip.split() if ip.strip()]
     all_ips = " ".join(dict.fromkeys(_ALWAYS_IGNORE + extra_ips))  # deduplica, mantiene ordine
     if extra_ips:
@@ -44,7 +44,7 @@ def run_step(cfg: InstallerConfig) -> None:
         encoding="utf-8",
     )
 
-    # Valida configurazione prima di riavviare — blocca se jail.local è corrotto
+    # Validate configuration before rebooting — crash if jail.local is corrupt
     run_cmd(["fail2ban-client", "-t"])
 
     if command_exists("systemctl"):

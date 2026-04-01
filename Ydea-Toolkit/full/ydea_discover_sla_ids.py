@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
-"""
-ydea_discover_sla_ids.py - Scopri ID per categorie, sottocategorie e SLA personalizzata
+"""ydea_discover_sla_ids.py - Discover IDs by categories, subcategories and custom SLA
 
-Utilizzato per trovare gli ID necessari per la gestione ticket con SLA Premium_Mon.
-Interroga Ydea API e genera file JSON di configurazione.
+Used to find IDs needed for ticket management with Premium_Mon SLA.
+Query Ydea API and generate configuration JSON files.
 
 Usage:
     ydea_discover_sla_ids.py
 
-Output:
-    - sla-premium-mon-ids.json: File configurazione con ID trovati
-    - *-full-dump.json: Dump completi per debug
+Outputs:
+    - sla-premium-mon-ids.json: Configuration file with IDs found
+    - *-full-dump.json: Full dumps for debugging
 
-Version: 1.0.0 (convertito da Bash)
-"""
+Version: 1.0.0 (ported from Bash)"""
 
 VERSION = "1.0.0"
 
@@ -42,11 +40,11 @@ else:
 YdeaAPI = ydea_toolkit.YdeaAPI
 
 
-# ===== CONFIGURAZIONE =====
+# ===== CONFIGURATION =====
 
 OUTPUT_FILE = script_dir / "sla-premium-mon-ids.json"
 
-# Categorie da cercare
+# Categories to search
 MACRO_CATEGORY = "Premium_Mon"
 SUBCATEGORIES = [
     "Centrale telefonica NethVoice",
@@ -65,7 +63,7 @@ SLA_NAME = "TK25/003209 SLA Personalizzata"
 # ===== FUNZIONI HELPER =====
 
 def print_header(title: str):
-    """Stampa header formattato"""
+    """Print formatted header"""
     print()
     print("=" * 64)
     print(f"  {title}")
@@ -74,7 +72,7 @@ def print_header(title: str):
 
 
 def save_dump(filename: str, data: Dict[str, Any]):
-    """Salva dump completo per debug"""
+    """Save full dump for debugging"""
     dump_path = script_dir / filename
     with open(dump_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
@@ -84,12 +82,10 @@ def save_dump(filename: str, data: Dict[str, Any]):
 # ===== DISCOVERY CATEGORIE =====
 
 def discover_categories() -> Dict[str, Any]:
-    """
-    Discovery categorie e sottocategorie
+    """Discovery categories and subcategories
     
     Returns:
-        Dizionario con macro_category e subcategories
-    """
+        Dictionary with macro_category and subcategories"""
     print_header(" DISCOVERY CATEGORIE E SOTTOCATEGORIE")
     
     Logger.info("Recupero lista categorie da Ydea API...")
@@ -147,7 +143,7 @@ def discover_categories() -> Dict[str, Any]:
         print()
         Logger.info(f"Sottocategorie trovate: {found_count}/{len(SUBCATEGORIES)}")
         
-        # Costruisci output
+        # Build outputs
         result = {}
         if macro_cat_id:
             result["macro_category"] = {"id": macro_cat_id, "name": MACRO_CATEGORY}
@@ -163,12 +159,10 @@ def discover_categories() -> Dict[str, Any]:
 # ===== DISCOVERY SLA =====
 
 def discover_sla() -> Dict[str, Any]:
-    """
-    Discovery SLA personalizzata
+    """Custom SLA discovery
     
     Returns:
-        Dizionario con sla info
-    """
+        Dictionary with sla info"""
     print_header(" DISCOVERY SLA PERSONALIZZATA")
     
     Logger.info("Recupero lista SLA da Ydea API...")
@@ -210,7 +204,7 @@ def discover_sla() -> Dict[str, Any]:
                 sla_nome = sla.get("nome") or sla.get("name") or sla.get("title")
                 print(f"  {sla.get('id')} → {sla_nome}")
             
-            # Prova ricerca parziale
+            # Try partial search
             Logger.info("Tentativo ricerca per codice 'TK25/003209'...")
             for sla in objs:
                 sla_nome = sla.get("nome") or sla.get("name") or sla.get("title") or ""
@@ -219,7 +213,7 @@ def discover_sla() -> Dict[str, Any]:
                     Logger.success(f"SLA trovata tramite ricerca parziale → ID: {sla_id}")
                     break
         
-        # Costruisci output
+        # Build outputs
         result = {}
         if sla_id:
             result["sla"] = {"id": sla_id, "name": SLA_NAME}
@@ -234,12 +228,10 @@ def discover_sla() -> Dict[str, Any]:
 # ===== DISCOVERY PRIORITÀ =====
 
 def discover_priorities() -> Dict[str, Any]:
-    """
-    Discovery priorità
+    """Discovery priority
     
     Returns:
-        Dizionario con low_priority info
-    """
+        Dictionary with low_priority info"""
     print_header(" DISCOVERY PRIORITÀ")
     
     Logger.info("Recupero lista priorità da Ydea API...")
@@ -274,7 +266,7 @@ def discover_priorities() -> Dict[str, Any]:
                 priority_nome = priority.get("nome") or priority.get("name")
                 print(f"  {priority.get('id')} → {priority_nome}")
         
-        # Costruisci output
+        # Build outputs
         result = {}
         if low_priority_id:
             result["low_priority"] = {"id": low_priority_id, "name": "Bassa"}
@@ -295,7 +287,7 @@ def main():
     Logger.info("Inizio discovery per SLA Premium_Mon...")
     Logger.info(f"Output verrà salvato in: {OUTPUT_FILE}")
     
-    # Verifica autenticazione
+    # Verify authentication
     try:
         api = YdeaAPI()
         if not api.ensure_token():
@@ -318,7 +310,7 @@ def main():
     # Discovery priorità
     priorities_json = discover_priorities()
     
-    # Combina tutti i risultati
+    # Combine all results
     print_header(" GENERAZIONE FILE CONFIGURAZIONE")
     
     final_json = {
@@ -330,7 +322,7 @@ def main():
         "low_priority": priorities_json.get("low_priority")
     }
     
-    # Salva il file
+    # Save the file
     with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
         json.dump(final_json, f, indent=2, ensure_ascii=False)
     
@@ -342,7 +334,7 @@ def main():
     print(json.dumps(final_json, indent=2, ensure_ascii=False))
     print()
     
-    # Verifica completezza
+    # Check completeness
     missing_items = []
     
     if not final_json.get("macro_category", {}).get("id"):

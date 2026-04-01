@@ -1,5 +1,5 @@
 # FRPC Installation Fix - Summary
-> **Categoria:** Storico
+> **Category:** Historical
 
 ## Problem
 The `install-agent-interactive.sh` script failed on OpenWrt systems with:
@@ -7,7 +7,7 @@ The `install-agent-interactive.sh` script failed on OpenWrt systems with:
 ./install-agent-interactive.sh: line 570: cd: /usr/local/src: No such file or directory
 ```
 
-## Root Cause
+## Root Causes
 - Script attempted to download FRPC to `/usr/local/src` which doesn't exist on OpenWrt
 - Uninstall functions only handled systemd, not OpenWrt's init.d system
 - Reference code existed in working `install-checkmk-agent-debtools-frp-nsec8c.sh` but wasn't integrated
@@ -100,19 +100,18 @@ killall socat 2>/dev/null || true
 ./install-agent-interactive.sh
 
 # Uninstall options
-./install-agent-interactive.sh --uninstall-frpc     # Remove FRPC only
-./install-agent-interactive.sh --uninstall-agent    # Remove Agent only  
-./install-agent-interactive.sh --uninstall          # Remove both
+./install-agent-interactive.sh --uninstall-frpc # Remove FRPC only
+./install-agent-interactive.sh --uninstall-agent # Remove Agent only  
+./install-agent-interactive.sh --uninstall # Remove both
 ```
 
 ## Next Steps
-1.  **Fixed**: Script can now download to `/tmp` on OpenWrt
-2.  **Fixed**: Uninstall functions work on both systemd and init.d systems
-3.  **Integrated**: All improvements from working reference script
-4.  **Ready for Testing**: Test on NethSecurity 8.7.1 FRPC installation
+1. **Fixed**: Script can now download to `/tmp` on OpenWrt
+2. **Fixed**: Uninstall functions work on both systemd and init.d systems
+3. **Integrated**: All improvements from working reference script
+4. **Ready for Testing**: Test on NethSecurity 8.7.1 FRPC installation
 
 ## Code Reference Source
 All fixes are based on proven working code from:
-- `install-checkmk-agent-debtools-frp-nsec8c.sh` (v3.0 - stabile)
+- `install-checkmk-agent-debtools-frp-nsec8c.sh` (v3.0 - stable)
 - Successfully deployed and verified on NethSecurity 8.7.1
-

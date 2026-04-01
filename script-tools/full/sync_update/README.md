@@ -1,3 +1,3 @@
 # sync_update
 
-Script di sincronizzazione repository e aggiornamento script/config.
+Repository synchronization script and script/config update.

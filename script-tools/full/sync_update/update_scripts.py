@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""
-update_scripts.py - Update CheckMK Scripts from Repo
+"""update_scripts.py - Update CheckMK Scripts from Repo
 
-Aggiorna gli script installati nel sistema copiandoli dal repository locale.
-Esegue git pull e sovrascrive solo i file esistenti nelle destinazioni note.
-Sostituisce i file solo se cambia VERSION oppure hash contenuto.
+Update the scripts installed on the system by copying them from the local repository.
+Performs git pull and overwrites only existing files in known targets.
+Replaces files only if VERSION or content hash changes.
 
-Destinazioni supportate:
+Supported destinations:
 - /opt/omd/sites/monitoring/local/bin
 - /usr/lib/check_mk_agent/plugins
 - /usr/lib/check_mk_agent/local
@@ -15,8 +14,7 @@ Destinazioni supportate:
 Usage:
     update_scripts.py [repo_dir]
 
-Version: 1.2.1
-"""
+Version: 1.2.1"""
 
 import hashlib
 import gzip

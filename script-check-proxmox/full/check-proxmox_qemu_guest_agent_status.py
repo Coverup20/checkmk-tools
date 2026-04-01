@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check-proxmox_qemu_guest_agent_status.py - CheckMK Local Check for QEMU Guest Agent
+"""check-proxmox_qemu_guest_agent_status.py - CheckMK Local Check for QEMU Guest Agent
 
 Verify QEMU Guest Agent status for all running VMs (pvesh JSON API).
 
 Proxmox VE
 
-Version: 1.0.2
-"""
+Version: 1.0.2"""
 
 import subprocess
 import json

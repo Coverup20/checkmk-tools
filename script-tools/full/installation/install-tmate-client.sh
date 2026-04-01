@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # install-tmate-client.sh
-# Installa e configura tmate client per connettersi al server self-hosted
+# Install and configure tmate client to connect to the self-hosted server
 #
-# Uso: bash install-tmate-client.sh
+# Usage: bash install-tmate-client.sh
 # Compatibile: Ubuntu/Debian
 #
-# Dopo l'installazione il token SSH è disponibile in: /run/tmate-ssh.txt
-# Leggi token con: cat /run/tmate-ssh.txt
+# After installation the SSH token is available in: /run/tmate-ssh.txt
+# Read token with: cat /run/tmate-ssh.txt
 
 set -euo pipefail
 
@@ -20,15 +20,15 @@ log() { echo "[$(date '+%F %T')] $*"; }
 
 log "=== install-tmate-client.sh v${VERSION} ==="
 
-# Chiedi IP o FQDN del server tmate interattivamente
+# Ask tmate server IP or FQDN interactively
 while true; do
     read -rp "Inserisci IP o FQDN del server tmate (es: 143.110.148.110): " TMATE_SERVER_HOST
     [[ -n "$TMATE_SERVER_HOST" ]] && break
-    echo "ERRORE: valore non può essere vuoto."
+    echo "ERROR: value cannot be empty."
 done
 log "Server tmate: ${TMATE_SERVER_HOST}:${TMATE_SERVER_PORT}"
 
-# 1. Installa tmate
+# 1. Install tmate
 if ! command -v tmate &>/dev/null; then
     log "Installazione tmate..."
     apt-get install -y tmate
@@ -42,7 +42,7 @@ cat > /etc/tmate.conf << 'EOF'
 set -g tmate-web-share off
 EOF
 
-# 3. ~/.tmate.conf (root - punta al server self-hosted)
+# 3. ~/.tmate.conf (root - points to self-hosted server)
 log "Configurazione ~/.tmate.conf..."
 cat > /root/.tmate.conf << EOF
 set -g tmate-server-host ${TMATE_SERVER_HOST}
@@ -52,7 +52,7 @@ set -g tmate-server-rsa-fingerprint ${TMATE_SERVER_RSA_FP}
 set -g tmate-server-ed25519-fingerprint ${TMATE_SERVER_ED25519_FP}
 EOF
 
-# 4. Script token writer
+# 4. Token writer script
 log "Installazione tmate-token-writer.sh..."
 cat > /usr/local/bin/tmate-token-writer.sh << 'SCRIPT'
 #!/usr/bin/env bash
@@ -115,7 +115,7 @@ Type=oneshot
 ExecStart=/usr/local/bin/tmate-token-writer.sh
 EOF
 
-# 7. tmate-token.timer (refresh ogni 15 secondi)
+# 7. tmate-token.timer (refresh every 15 seconds)
 cat > /etc/systemd/system/tmate-token.timer << 'EOF'
 [Unit]
 Description=Periodically refresh tmate token file
@@ -130,19 +130,19 @@ Unit=tmate-token.service
 WantedBy=timers.target
 EOF
 
-# 8. Abilita e avvia
+# 8. Enable and launch
 log "Abilitazione e avvio servizi..."
 systemctl daemon-reload
 systemctl enable --now tmate.service tmate-token.timer
 
-# 9. Attendi e mostra token
+# 9. Wait and show token
 log "Attesa generazione token (max 45s)..."
 for i in $(seq 1 45); do
     if [[ -s /run/tmate-ssh.txt ]]; then
         TOKEN=$(cat /run/tmate-ssh.txt)
         log "=== TOKEN TMATE ==="
         echo ""
-        echo "  $TOKEN"
+        echo "$TOKEN"
         echo ""
         log "=== Fine ==="
         exit 0

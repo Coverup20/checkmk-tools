@@ -1,43 +1,43 @@
 # checkmk (Python)
 
-Re-implementazione in Python di quanto presente in `install-cmk8/install-cmk/` (bootstrap + moduli 10/15/20/...).
+Re-implementation in Python of what is present in `install-cmk8/install-cmk/` (bootstrap + modules 10/15/20/...).
 
-## Uso (Ubuntu)
+## Usage (Ubuntu)
 
 ```bash
 cd /opt/checkmk-tools/script-tools/full/installation/checkmk
 
-# Menu (consigliato)
+# Menu (recommended)
 ./installer.py
 
-# Setup guidato: genera .env senza doverlo editare a mano
+# Guided setup: generate .env without having to edit it by hand
 ./installer.py init --interactive
 
-# In alternativa (manuale):
+# Alternatively (manual):
 # cp .env.example .env
 
-# Installazione completa (esegui con sudo)
+# Complete installation (run with sudo)
 sudo -E ./installer.py bootstrap
 
-# Verifica
+# Check
 sudo -E ./installer.py verify
 
-# Rimozione completa (uninstall)
+# Complete removal (uninstall)
 sudo -E ./installer.py remove-all
 ```
 
-Nota: `bootstrap`, `certbot` e `verify` richiedono esplicitamente root (`sudo -E`).
+Note: `bootstrap`, `certbot` and `verify` explicitly require root (`sudo -E`).
 
-Suggerimento: la modalità non-interattiva ha senso se `.env` è già completo.
-Per questo usa `./installer.py init --interactive` una sola volta, poi puoi rilanciare `bootstrap` senza prompt.
+Tip: Non-interactive mode makes sense if `.env` is already complete.
+For this use `./installer.py init --interactive` only once, then you can relaunch `bootstrap` without prompt.
 
-Durante `bootstrap` vengono anche:
+During `bootstrap` also comes:
 
-- installati `git` e `python3-pip`
-- deployati i local checks OS-aware in `/usr/lib/check_mk_agent/local` (via `script-tools/full/deploy/auto-deploy-checks.py`)
-- installato e abilitato `auto-git-sync.service` (sync di `/opt/checkmk-tools`)
+- installed `git` and `python3-pip`
+- deployed OS-aware local checks in `/usr/lib/check_mk_agent/local` (via `script-tools/full/deploy/auto-deploy-checks.py`)
+- installed and enabled `auto-git-sync.service` (sync of `/opt/checkmk-tools`)
 
-Per disabilitare:
+To disable:
 
 - `DEPLOY_LOCAL_CHECKS=false`
 - `ENABLE_AUTO_GIT_SYNC=false`

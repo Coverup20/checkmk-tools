@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
-"""
-test_ticket_creation_web.py - Test creazione ticket via Form HTML (Web Scraping)
+"""test_ticket_creation_web.py - Test ticket creation via HTML Form (Web Scraping)
 
-Simula un browser per:
-1. Effettuare login web
-2. Estrarre CSRF token
-3. Inviare form creazione ticket
+Simulate a browser for:
+1. Log in to the web
+2. Extract CSRF token
+3. Send ticket creation form
 
-NOTA: Questo script dipende dalla struttura HTML della pagina web di Ydea
-e potrebbe smettere di funzionare se la UI cambia.
-Per produzione, usare sempre le API (come in create_monitoring_ticket.py).
+NOTE: This script depends on the HTML structure of the Ydea web page
+and may stop working if the UI changes.
+For production, always use the API (as in create_monitoring_ticket.py).
 
 Usage:
     test_ticket_creation_web.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import re
@@ -28,7 +26,7 @@ import mimetypes
 import uuid
 from pathlib import Path
 
-# Configurazione
+# Configuration
 YDEA_BASE_URL = "https://my.ydea.cloud"
 COOKIE_FILE = Path("/tmp/ydea_cookies.txt")
 
@@ -40,14 +38,14 @@ class Colors:
     BLUE = '\033[0;34m'
     NC = '\033[0m'
 
-# Carica credenziali da .env o environment
+# Load credentials from .env or environment
 SCRIPT_DIR = Path(__file__).resolve().parent
 ENV_FILE = SCRIPT_DIR / "../.env" # Adjust relative path as needed
 
 username = os.environ.get("YDEA_USERNAME")
 password = os.environ.get("YDEA_PASSWORD")
 
-# Se non in env, prova a cercare in file credentials.sh (legacy) o .env
+# If not in env, try looking in credentials.sh (legacy) or .env files
 if not username or not password:
     # Try .env
     env_path = Path("/opt/ydea-toolkit/.env")

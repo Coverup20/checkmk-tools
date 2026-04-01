@@ -1,164 +1,162 @@
-================================================================================
-ELENCO DETTAGLIATO SCRIPT NETHSERVER 8
+========================================================================================
+DETAILED LIST OF NETHSERVER 8 SCRIPTS
 Repository: checkmk-tools
-Cartella: script-check-ns8/
-Data: 27 Ottobre 2025
-================================================================================
+Folder: script-check-ns8/
+Date: October 27, 2025
+========================================================================================
 
- STRUTTURA CARTELLE
-├── nopolling/          (5 script: 2 principali + 2 wrapper remoti + 1 readme)
-└── polling/            (11 script: 5 principali + 5 wrapper remoti + 1 readme)
+ FOLDER STRUCTURE
+├── nopolling/ (5 scripts: 2 main + 2 remote wrappers + 1 readme)
+└── polling/ (11 scripts: 5 main + 5 remote wrappers + 1 readme)
 
-================================================================================
+========================================================================================
  SCRIPT-CHECK-NS8/NOPOLLING/
-================================================================================
+========================================================================================
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CATEGORIA: SOS (SUPPORTO REMOTO)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORY: SOS (REMOTE SUPPORT)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. check-sos.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         40
-Service:       SOS_session
-Path Install:  /usr/local/bin/
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: 40
+Service: SOS_session
+Install Path: /usr/local/bin/
 
-DESCRIZIONE:
-Monitora lo stato della sessione SOS (NethSecurity Support) leggendo 
-/var/log/messages per rilevare eventi start/stop della sessione.
+DESCRIPTION:
+Monitor SOS (NethSecurity Support) session status by reading 
+/var/log/messages to detect session start/stop events.
 
-FUNZIONALITÀ:
- Legge eventi start-support-session e stop-support-session dai log
- Estrae Session ID dal messaggio "Transmit the following session ID"
- Determina se sessione è ACTIVE o INACTIVE confrontando timestamp
- Mostra Session ID quando disponibile
+FEATURES:
+ Reads start-support-session and stop-support-session events from logs
+ Extract Session ID from "Transmit the following session ID" message
+ Determines whether session is ACTIVE or INACTIVE by comparing timestamps
+ Show Session ID when available
 
-STATI:
-0 (OK)   - SOS Session INACTIVE
-1 (WARN) - SOS Session ACTIVE (sessione supporto attiva)
+STATES:
+0 (OK) - SOS Session INACTIVE
+1 (WARN) - SOS Session ACTIVE (support session active)
 
-FILE UTILIZZATI:
+FILES USED:
 - Log: /var/log/messages
 
-PATTERN RICERCATI:
+RESEARCHED PATTERNS:
 - "start-support-session"
 - "stop-support-session"
 - "Transmit the following session ID"
 
-LOGICA:
-- Se ultima riga start è più recente di ultima riga stop → ACTIVE
-- Se non c'è stop o start è successivo → ACTIVE
-- Altrimenti → INACTIVE
+LOGIC:
+- If last start line is more recent than last stop line → ACTIVE
+- If there is no stop or start it is next → ACTIVE
+- Otherwise → INACTIVE
 
-ESEMPIO OUTPUT:
+OUTPUT EXAMPLE:
 "0 SOS_session - SOS Session: INACTIVE (ID: N/A)"
 "1 SOS_session - SOS Session: ACTIVE (ID: 987654321)"
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CATEGORIA: MONITORAGGIO PODMAN
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORY: PODMAN MONITORING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 2. monitor_podman_events.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         21 (ripetuto 3 volte nel file)
-Service:       (demone background - nessun output CheckMK)
-Path Install:  /usr/local/bin/
-Tipo:          Demone di logging eventi
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: 21 (repeated 3 times in the file)
+Service: (background daemon - no CheckMK output)
+Install Path: /usr/local/bin/
+Type: Event logging daemon
 
-DESCRIZIONE:
-Demone che ascolta continuamente gli eventi Podman e registra solo gli eventi
-significativi (create, start, stop, remove) escludendo i container Redis.
+DESCRIPTION:
+Demon that continuously listens to Podman events and only records the events
+significant (create, start, stop, remove) excluding Redis containers.
 
-FUNZIONALITÀ:
- Ascolta eventi Podman in real-time (podman events)
- Filtra solo eventi tipo container
- Registra solo eventi: create, start, stop, remove
- Esclude automaticamente container "redis"
- Formatta eventi con timestamp, status, nome, ID
+FEATURES:
+ Listen to Podman events in real-time (podman events)
+ Filter only container type events
+ Log events only: create, start, stop, remove
+ Automatically exclude "redis" containers
+ Format events with timestamp, status, name, ID
 
-FILE UTILIZZATI:
+FILES USED:
 - Log output: /var/log/podman_events.log
 
-COMANDI USATI:
+COMMANDS USED:
 - podman events --filter type=container
 
-FORMATO LOG:
-YYYY-MM-DD HH:MM:SS - TIMESTAMP STATUS NOME (CONTAINERID)
+LOG FORMAT:
+YYYY-MM-DD HH:MM:SS - TIMESTAMP STATUS NAME (CONTAINERID)
 
-UTILIZZO:
-Deve essere eseguito come servizio systemd o in background.
-Fornisce il log che viene poi letto da check_podman_events.sh (polling).
+USE:
+It must be run as a systemd or background service.
+Provides the log which is then read by check_podman_events.sh (polling).
 
-ESEMPIO LOG:
+EXAMPLE LOG:
 2025-10-27 14:30:15 - 2025-10-27T14:30:15.123456+00:00 start webtop1 (abc123def456)
 2025-10-27 14:32:20 - 2025-10-27T14:32:20.789012+00:00 stop mail1 (def789ghi012)
 
-NOTE:
- Script demone - non genera output CheckMK
- Richiede esecuzione continua in background
- Il file contiene codice duplicato (3 copie identiche)
+NOTES:
+ Daemon script - does not generate CheckMK output
+ Requires continuous running in the background
+ File contains duplicate code (3 identical copies)
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 3. rcheck-sos.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DESCRIZIONE:
-Wrapper remoto per check-sos.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DESCRIPTION:
+Remote wrapper for check-sos.sh
 
 SCRIPT_URL:
 https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ns8/nopolling/check-sos.sh
 
-Path Install: /usr/local/bin/
+Install Path: /usr/local/bin/
 
 
 4. rmonitor_podman_events.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DESCRIZIONE:
-Wrapper remoto per monitor_podman_events.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DESCRIPTION:
+Remote wrapper for monitor_podman_events.sh
 
 SCRIPT_URL:
 https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ns8/nopolling/monitor_podman_events.sh
 
-Path Install: /usr/local/bin/
+Install Path: /usr/local/bin/
 
 
 5. readme.txt
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CONTENUTO:
-"vanno messi qua /usr/local/bin/"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CONTENT:
+"they should be placed here /usr/local/bin/"
 
-NOTA:
-Gli script nopolling di NS8 NON vanno in /usr/lib/check_mk_agent/local/
-ma in /usr/local/bin/ perché sono utility e demoni di sistema.
-
-
-================================================================================
+NOTE:
+NS8 nopolling scripts do NOT go in /usr/lib/check_mk_agent/local/
+but in /usr/local/bin/ because they are system utilities and daemons.
+========================================================================================
  SCRIPT-CHECK-NS8/POLLING/
-================================================================================
+========================================================================================
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CATEGORIA: CONTAINER & ISTANZE NS8
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORY: CONTAINER & NS8 INSTANCES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. check_ns8_containers.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         64
-Service:       Multipli (uno per istanza)
-Path Install:  /usr/lib/check_mk_agent/local/
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Lines: 64
+Service: Multiple (one per instance)
+Install Path: /usr/lib/check_mk_agent/local/
 
-DESCRIZIONE:
-Monitoraggio completo delle istanze NethServer 8 tramite comando runagent.
-Controlla stato, risorse CPU/RAM di ogni istanza con nomi friendly.
+DESCRIPTION:
+Complete monitoring of NethServer 8 instances via runagent command.
+Check status, CPU/RAM resources of each instance with friendly names.
 
-FUNZIONALITÀ:
- Elenca tutte le istanze NS8 (esclusi cluster e node)
- Mappa nomi tecnici a nomi friendly (es: ldapproxy1 → LdapProxy)
- Verifica se istanza è attiva (runagent -m test)
- Estrae statistiche container (CPU%, RAM usage, RAM%)
- Per istanza Mail: conta sessioni IMAP attive con doveadm
+FEATURES:
+ List all NS8 instances (excluding clusters and nodes)
+ Map technical names to friendly names (e.g. ldapproxy1 → LdapProxy)
+ Check if instance is active (runagent -m test)
+ Extract container statistics (CPU%, RAM usage, RAM%)
+ Per Mail instance: Count active IMAP sessions with doveadm
 
-MAPPING NOMI FRIENDLY:
+FRIENDLY NAME MAPPING:
 ldapproxy → LdapProxy
 openldap → OpenLDAP
 webtop → WebTop
@@ -172,79 +170,79 @@ metrics → Metrics
 loki → Loki
 nethsecurity → NethSecurity
 
-STATI:
-0 (OK)   - Istanza/servizio attivo
-1 (WARN) - Nessuna sessione IMAP (solo per Mail)
-2 (CRIT) - Istanza non attiva
+STATES:
+0 (OK) - Instance/service active
+1 (WARN) - No IMAP session (for Mail only)
+2 (CRIT) - Instance not active
 
-COMANDI USATI:
-- runagent -l (lista istanze)
-- runagent -m ISTANZA true (test istanza)
-- runagent -m ISTANZA podman stats (statistiche container)
-- runagent -m ISTANZA doveadm who (sessioni IMAP)
+COMMANDS USED:
+- runagent -l (instance list)
+- runagent -m INSTANCE true (instance test)
+- runagent -m INSTANCE podman stats (container statistics)
+- runagent -m INSTANCE whereadm who (IMAP sessions)
 
-SERVIZI GENERATI PER OGNI ISTANZA:
-- {Nome}           (stato istanza)
-- {Nome}_CPU       (utilizzo CPU)
-- {Nome}_RAM       (utilizzo RAM)
-- Mail_IMAP        (solo per istanza Mail: sessioni attive)
+SERVICES GENERATED FOR EACH INSTANCE:
+- {Name} (instance status)
+- {Name}_CPU (CPU usage)
+- {Name}_RAM (RAM usage)
+- Mail_IMAP (only for Mail instance: active sessions)
 
-ESEMPIO OUTPUT:
-"0 WebTop - WebTop attivo"
+OUTPUT EXAMPLE:
+"0 WebTop - WebTop active"
 "0 WebTop_CPU - CPU 15.2%"
 "0 WebTop_RAM - RAM 512MiB (25.6%)"
-"0 Mail - Mail attivo"
+"0 Mail - Active Mail"
 "0 Mail_CPU - CPU 8.5%"
 "0 Mail_RAM - RAM 1.2GiB (12.3%)"
-"0 Mail_IMAP - Sessioni IMAP attive: 5"
+"0 Mail_IMAP - Active IMAP sessions: 5"
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CATEGORIA: SERVIZI MAIL
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORY: MAIL SERVICES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 2. check_ns8_services.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         73
-Service:       clamav, rspamd, dovecot, postfix, imap_sessions, dovecot_vszlimit
-Path Install:  /usr/lib/check_mk_agent/local/
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Lines: 73
+Service: clamav, rspamd, dovecot, postfix, imap_sessions, dovecot_vszlimit
+Install Path: /usr/lib/check_mk_agent/local/
 
-DESCRIZIONE:
-Controllo approfondito dei servizi mail di NethServer 8.
-Monitora container interni (ClamAV, Rspamd, Dovecot, Postfix) e problemi 
-specifici come vsz_limit di Dovecot.
+DESCRIPTION:
+In-depth check of NethServer 8 email services.
+Monitor internal containers (ClamAV, Rspamd, Dovecot, Postfix) and issues 
+specifics like Dovecot's vsz_limit.
 
-FUNZIONALITÀ:
- Rileva tutte le istanze mail (mail1, mail2, ...)
- Verifica stato container: clamav, rspamd, dovecot, postfix
- Conta sessioni IMAP attive (doveadm who)
- Legge configurazione VszLimit da config show dovecot
- Scansiona log Dovecot per errori "Cannot allocate memory due to vsz_limit"
- Conta occorrenze vsz_limit nelle ultime 500 righe di log
+FEATURES:
+ Detect all mail instances (mail1, mail2, ...)
+ Check container status: clamav, rspamd, dovecot, postfix
+ Count active IMAP sessions (doveadm who)
+ Read VszLimit configuration from config show dovecot
+ Scan Dovecot logs for "Cannot allocate memory due to vsz_limit" errors
+ Count vsz_limit occurrences in the last 500 log lines
 
-CONFIGURAZIONE:
-LOG_LINES=500  (righe di log da analizzare)
+CONFIGURATION:
+LOG_LINES=500 (log lines to analyze)
 
 TARGET_SERVICES:
-- clamav   (antivirus)
-- rspamd   (antispam)
-- dovecot  (IMAP/POP3)
-- postfix  (SMTP)
+- clamav (antivirus)
+- rspamd (antispam)
+- dovecot (IMAP/POP3)
+- postfix (SMTP)
 
-STATI:
-0 (OK)   - Servizio attivo, nessun problema
-1 (WARN) - Nessuna sessione IMAP o VszLimit non impostato
-2 (CRIT) - Servizio non attivo o vsz_limit rilevato nei log
-3 (UNKNOWN) - Servizio non trovato
+STATES:
+0 (OK) - Service active, no problem
+1 (WARN) - No IMAP session or VszLimit not set
+2 (CRIT) - Service down or vsz_limit detected in logs
+3 (UNKNOWN) - Service not found
 
-COMANDI USATI:
+COMMANDS USED:
 - runagent -l | grep '^mail'
 - runagent -m MAIL podman ps
 - runagent -m MAIL podman exec dovecot doveadm who
 - config show dovecot
 - runagent -m MAIL podman exec dovecot tail -n 500 /var/log/dovecot*
 
-SERVIZI GENERATI:
+SERVICES GENERATED:
 - clamav
 - rspamd
 - dovecot
@@ -252,151 +250,151 @@ SERVIZI GENERATI:
 - imap_sessions
 - dovecot_vszlimit
 
-ESEMPIO OUTPUT:
-"0 clamav - clamav attivo"
-"0 rspamd - rspamd attivo"
-"0 dovecot - dovecot attivo"
-"0 postfix - postfix attivo"
-"0 imap_sessions - Sessioni IMAP attive: 8"
-"0 dovecot_vszlimit - Nessun allarme nei log (limite configurato=512M)"
-"2 dovecot_vszlimit - CRIT: rilevato vsz_limit (3 occorrenze nelle ultime 500 righe, limite configurato=256M)"
+OUTPUT EXAMPLE:
+"0 clamav - clamav active"
+"0 rspamd - rspamd active"
+"0 dovecot - dovecot active"
+"0 postfix - postfix active"
+"0 imap_sessions - Active IMAP sessions: 8"
+"0 dovecot_vszlimit - No alarms in logs (configured limit=512M)"
+"2 dovecot_vszlimit - CRIT: vsz_limit detected (3 occurrences in last 500 rows, configured limit=256M)"
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CATEGORIA: TOMCAT & JAVA
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORY: TOMCAT & JAVA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 3. check_ns8_tomcat8.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         45
-Service:       Tomcat8
-Path Install:  /usr/lib/check_mk_agent/local/
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: 45
+Service: Tomcat8
+Install Path: /usr/lib/check_mk_agent/local/
 
-DESCRIZIONE:
-Monitora processo Tomcat8 all'interno dei container NS8.
-Controlla utilizzo memoria RAM e uptime con soglie configurabili.
+DESCRIPTION:
+Monitor Tomcat8 process inside NS8 containers.
+Monitor RAM usage and uptime with configurable thresholds.
 
-FUNZIONALITÀ:
- Cerca processo Tomcat (org.apache.catalina.startup.Bootstrap) in tutti i container
- Misura memoria RSS del processo in MB
- Calcola uptime del processo
- Applica soglie WARN/CRIT su utilizzo memoria
+FEATURES:
+ Search for Tomcat process (org.apache.catalina.startup.Bootstrap) in all containers
+ RSS memory measurement of the process in MB
+ Calculate process uptime
+ Apply WARN/CRIT thresholds on memory usage
 
-CONFIGURAZIONE SOGLIE:
-WARN=1024   (warning se memoria ≥ 1024MB)
-CRIT=1536   (critical se memoria ≥ 1536MB)
+THRESHOLDS CONFIGURATION:
+WARN=1024 (warning if memory ≥ 1024MB)
+CRIT=1536 (critical if memory ≥ 1536MB)
 
-STATI:
-0 (OK)   - Memoria sotto soglia WARN
-1 (WARN) - Memoria ≥ 1024MB
-2 (CRIT) - Memoria ≥ 1536MB o Tomcat non attivo
+STATES:
+0 (OK) - Memory below WARN threshold
+1 (WARN) - Memory ≥ 1024MB
+2 (CRIT) - Memory ≥ 1536MB or Tomcat not active
 
-COMANDI USATI:
+COMMANDS USED:
 - runagent -l
-- runagent -m ISTANZA podman ps
-- runagent -m ISTANZA podman exec CONTAINER pgrep -f "org.apache.catalina"
-- runagent -m ISTANZA podman exec CONTAINER ps -o rss= -p PID
-- runagent -m ISTANZA podman exec CONTAINER ps -o etime= -p PID
+- runagent -m INSTANCE podman ps
+- runagent -m INSTANCE podman exec CONTAINER pgrep -f "org.apache.catalina"
+- runagent -m INSTANCE podman exec CONTAINER ps -o rss= -p PID
+- runagent -m INSTANCE podman exec CONTAINER ps -o etime= -p PID
 
-ESEMPIO OUTPUT:
-"0 Tomcat8 - Tomcat8 OK - Memoria=856MB; Uptime=3-15:42:10"
-"1 Tomcat8 - Tomcat8 WARN - Memoria=1150MB (>1024MB); Uptime=1-08:20:05"
-"2 Tomcat8 - Tomcat8 CRIT - Memoria=1620MB (>1536MB); Uptime=10:15:30"
-"2 Tomcat8 - NON attivo"
+OUTPUT EXAMPLE:
+"0 Tomcat8 - Tomcat8 OK - Memory=856MB; Uptime=3-15:42:10"
+"1 Tomcat8 - Tomcat8 WARN - Memory=1150MB (>1024MB); Uptime=1-08:20:05"
+"2 Tomcat8 - Tomcat8 CRIT - Memory=1620MB (>1536MB); Uptime=10:15:30"
+"2 Tomcat8 - NOT active"
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CATEGORIA: WEBTOP
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORY: WEBTOP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 4. check_ns8_webtop.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         37
-Service:       Webtop5
-Path Install:  /usr/lib/check_mk_agent/local/
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Lines: 37
+Service: Webtop5
+Install Path: /usr/lib/check_mk_agent/local/
 
-DESCRIZIONE:
-Monitora WebTop in NethServer 8 verificando presenza istanza e raggiungibilità
-interfaccia web tramite HTTP/HTTPS.
+DESCRIPTION:
+Monitor WebTop in NethServer 8 by checking instance presence and reachability
+web interface via HTTP/HTTPS.
 
-FUNZIONALITÀ:
- Estrae dominio da FQDN (hostname -f)
- Cerca istanze WebTop con runagent
- Testa raggiungibilità URL https://webtop.DOMINIO/webtop/
- Verifica codice HTTP di risposta
+FEATURES:
+ Extract domain from FQDN (hostname -f)
+ Search for WebTop instances with runagent
+ Test URL reachability https://webtop.DOMINIO/webtop/
+ Check HTTP response code
 
-STATI:
-0 (OK)   - WebTop risponde con HTTP 200
-2 (CRIT) - Nessuna istanza trovata, dominio non rilevato, o HTTP != 200
+STATES:
+0 (OK) - WebTop responds with HTTP 200
+2 (CRIT) - No instances found, domain not detected, or HTTP != 200
 
-COMANDI USATI:
+COMMANDS USED:
 - hostname -f
 - runagent -l | grep '^webtop'
 - curl -sk -o /dev/null -w "%{http_code}" URL
 
-URL TESTATO:
-https://webtop.{DOMINIO}/webtop/
+TESTED URL:
+https://webtop.{DOMAIN}/webtop/
 
-ESEMPIO OUTPUT:
-"0 Webtop5 - WebTop risponde su https://webtop.example.com/webtop/ (HTTP 200)"
-"2 Webtop5 - WebTop NON risponde su https://webtop.example.com/webtop/ (HTTP 503)"
-"2 Webtop5 - Nessuna istanza WebTop trovata"
-"2 Webtop5 - Nessun dominio rilevato da hostname -f"
+OUTPUT EXAMPLE:
+"0 Webtop5 - WebTop responds at https://webtop.example.com/webtop/ (HTTP 200)"
+"2 Webtop5 - WebTop NOT responding on https://webtop.example.com/webtop/ (HTTP 503)"
+"2 Webtop5 - No WebTop instances found"
+"2 Webtop5 - No domains detected by hostname -f"
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CATEGORIA: EVENTI PODMAN
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CATEGORY: PODMAN EVENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 5. check_podman_events.sh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Righe:         28
-Service:       Podman_Status
-Path Install:  /usr/lib/check_mk_agent/local/
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rows: 28
+Service: Podman_Status
+Install Path: /usr/lib/check_mk_agent/local/
 
-DESCRIZIONE:
-Legge il log degli eventi Podman (generato da monitor_podman_events.sh)
-e mostra l'ultimo evento significativo degli ultimi 5 minuti.
+DESCRIPTION:
+Read Podman event log (generated by monitor_podman_events.sh)
+and shows the last significant event of the last 5 minutes.
 
-FUNZIONALITÀ:
- Legge /var/log/podman_events.log
- Filtra eventi degli ultimi 5 minuti
- Esclude eventi container "redis"
- Filtra solo eventi: create, start, stop, remove
- Mostra ultimo evento (Nome container + Azione)
+FEATURES:
+ Reads /var/log/podman_events.log
+ Filter events from the last 5 minutes
+ Exclude "redis" container events
+ Filter only events: create, start, stop, remove
+ Show last event (Container Name + Action)
 
-CONFIGURAZIONE:
-RECENT="5 minutes ago"  (finestra temporale)
+CONFIGURATION:
+RECENT="5 minutes ago" (time window)
 
-STATI:
-0 (OK)   - Nessun evento negli ultimi 5 minuti
-1 (WARN) - Evento rilevato (notifica cambiamento stato container)
+STATES:
+0 (OK) - No events in the last 5 minutes
+1 (WARN) - Event detected (container status change notification)
 
-FILE UTILIZZATI:
+FILES USED:
 - Log input: /var/log/podman_events.log
 
-LOGICA:
-- Filtra righe con timestamp > (now - 5 minuti)
-- Esclude "redis"
-- Cerca solo create|start|stop|remove
-- Prende ultima riga
-- Estrae Nome (campo 6) e Azione (campo 5)
-- Capitalizza prima lettera
+LOGIC:
+- Filter rows with timestamp > (now - 5 minutes)
+- Excludes "redis"
+- Search only for create|start|stop|remove
+- Takes last line
+- Extract Name (field 6) and Action (field 5)
+- Capitalize first letter
 
-ESEMPIO OUTPUT:
-"0 Podman_Status - Nessun Evento"
+OUTPUT EXAMPLE:
+"0 Podman_Status - No Events"
 "1 Podman_Status - Webtop1 Start"
 "1 Podman_Status - Mail1 Stop"
 "1 Podman_Status - Traefik Create"
 
-DIPENDENZE:
- Richiede monitor_podman_events.sh attivo in background
- Richiede /var/log/podman_events.log popolato
+ADDICTIONS:
+ Requires monitor_podman_events.sh running in the background
+ Requires /var/log/podman_events.log populated
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SCRIPT REMOTI (WRAPPER) - POLLING
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REMOTE SCRIPTS (WRAPPER) - POLLING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 6. rcheck_ns8_containers.sh
 7. rcheck_ns8_services.sh
@@ -404,135 +402,133 @@ SCRIPT REMOTI (WRAPPER) - POLLING
 9. rcheck_ns8_webtop.sh
 10. rcheck_podman_events.sh
 
-FUNZIONAMENTO:
+OPERATION:
 bash <(curl -fsSL "$SCRIPT_URL") "$@"
 
-SCRIPT_URL BASE:
+BASE SCRIPT_URL:
 https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ns8/polling/
 
-Path Install: /usr/lib/check_mk_agent/local/
+Install Path: /usr/lib/check_mk_agent/local/
 
 
 11. readme.txt
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CONTENUTO:
-"vanno messi qua /usr/lib/check_mk_agent/local"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CONTENT:
+"they should be placed here /usr/lib/check_mk_agent/local"
 
-NOTA:
-Gli script polling di NS8 vanno in /usr/lib/check_mk_agent/local/
-(non in plugins/ come altri sistemi).
+NOTE:
+NS8 polling scripts go in /usr/lib/check_mk_agent/local/
+(not in plugins/ like other systems).
+========================================================================================
+FEATURE SUMMARY
+========================================================================================
 
-
-================================================================================
-RIEPILOGO FUNZIONALITÀ
-================================================================================
-
-┌──────────────────────────┬────────────────────────────────────────────────┐
-│ CATEGORIA                │ SCRIPT                                         │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│ SOS Support              │ check-sos.sh                                   │
-│                          │ rcheck-sos.sh                                  │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│ Podman Events Daemon     │ monitor_podman_events.sh                       │
-│                          │ rmonitor_podman_events.sh                      │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│ Container Monitoring     │ check_ns8_containers.sh                        │
-│                          │ rcheck_ns8_containers.sh                       │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│ Mail Services            │ check_ns8_services.sh                          │
-│                          │ rcheck_ns8_services.sh                         │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│ Tomcat Monitoring        │ check_ns8_tomcat8.sh                           │
-│                          │ rcheck_ns8_tomcat8.sh                          │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│ WebTop Monitoring        │ check_ns8_webtop.sh                            │
-│                          │ rcheck_ns8_webtop.sh                           │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│ Podman Events Check      │ check_podman_events.sh                         │
-│                          │ rcheck_podman_events.sh                        │
-└──────────────────────────┴────────────────────────────────────────────────┘
+┌──────────────────────────┬────────── ─────────────────── ───────────────────┐
+│ CATEGORY │ SCRIPT │
+├──────────────────────────┼────────── ─────────────────── ───────────────────┤
+│ SOS Support │ check-sos.sh │
+│ │ rcheck-sos.sh │
+├──────────────────────────┼────────── ─────────────────── ───────────────────┤
+│ Podman Events Daemon │ monitor_podman_events.sh │
+│ │ rmonitor_podman_events.sh │
+├──────────────────────────┼────────── ─────────────────── ───────────────────┤
+│ Container Monitoring │ check_ns8_containers.sh │
+│ │ rcheck_ns8_containers.sh │
+├──────────────────────────┼────────── ─────────────────── ───────────────────┤
+│ Mail Services │ check_ns8_services.sh │
+│ │ rcheck_ns8_services.sh │
+├──────────────────────────┼────────── ─────────────────── ───────────────────┤
+│ Tomcat Monitoring │ check_ns8_tomcat8.sh │
+│ │ rcheck_ns8_tomcat8.sh │
+├──────────────────────────┼────────── ─────────────────── ───────────────────┤
+│ WebTop Monitoring │ check_ns8_webtop.sh │
+│ │ rcheck_ns8_webtop.sh │
+├──────────────────────────┼────────── ─────────────────── ───────────────────┤
+│ Podman Events Check │ check_podman_events.sh │
+│ │ rcheck_podman_events.sh │
+└──────────────────────────┴────────── ─────────────────── ───────────────────┘
 
 
-================================================================================
-DIPENDENZE
-================================================================================
+========================================================================================
+ADDICTIONS
+========================================================================================
 
-RICHIESTE:
- NethServer 8 (basato su Podman)
+REQUESTS:
+ NethServer 8 (based on Podman)
  CheckMK Raw 2.4.x
  bash
- curl (per script remoti)
- runagent (comando NS8 per gestione istanze)
+ curl (for remote scripts)
+ runagent (NS8 command for instance management)
  podman (container runtime)
 
-COMANDI NETHSERVER 8 SPECIFICI:
-- runagent -l                    (lista istanze)
-- runagent -m ISTANZA comando    (esegue comando in istanza)
-- config show SERVICE            (configurazione NS8)
+SPECIFIC NETHSERVER 8 COMMANDS:
+- runagent -l (instance list)
+- runagent -m INSTANCE command (execute command in instance)
+- config show SERVICE (NS8 configuration)
 
-COMANDI PODMAN:
-- podman events                  (stream eventi)
-- podman ps                      (lista container)
-- podman exec                    (esegui comando in container)
-- podman stats                   (statistiche risorse)
+PODMAN COMMANDS:
+- podman events (event stream)
+- podman ps (container list)
+- podman exec (execute command in container)
+- podman stats (resource statistics)
 
-SERVIZI MONITORATI:
-- SOS (supporto remoto NethSecurity)
-- Istanze NS8: LdapProxy, OpenLDAP, WebTop, Nextcloud, NethVoice, Traefik, Mail, Samba, Mattermost, Metrics, Loki
+MONITORED SERVICES:
+- SOS (NethSecurity remote support)
+- NS8 instances: LdapProxy, OpenLDAP, WebTop, Nextcloud, NethVoice, Traefik, Mail, Samba, Mattermost, Metrics, Loki
 - Mail services: ClamAV, Rspamd, Dovecot, Postfix
-- Tomcat8 (per WebTop)
+- Tomcat8 (for WebTop)
 
 
-================================================================================
-ARCHITETTURA NETHSERVER 8
-================================================================================
+========================================================================================
+NETHSERVER 8 ARCHITECTURE
+========================================================================================
 
-CONCETTI CHIAVE:
-NethServer 8 usa un'architettura basata su istanze modulari containerizzate.
+KEY CONCEPTS:
+NethServer 8 uses an architecture based on modular containerized instances.
 
-ISTANZE:
-Ogni applicazione (Mail, WebTop, Nextcloud, ecc.) gira in una "istanza"
-che contiene uno o più container Podman.
+INSTANCES:
+Each application (Mail, WebTop, Nextcloud, etc.) runs in an "instance"
+that contains one or more Podman containers.
 
 RUNAGENT:
-Comando NS8 per interagire con le istanze:
-- runagent -l                    → Lista tutte le istanze
-- runagent -m mail1 comando      → Esegue comando dentro istanza mail1
+NS8 command to interact with instances:
+- runagent -l → List all instances
+- runagent -m mail1 command → Execute command inside mail1 instance
 
-CONTAINER INTERNI:
-Ogni istanza mail contiene container separati:
-- clamav    (antivirus)
-- rspamd    (antispam)
-- dovecot   (IMAP/POP3)
-- postfix   (SMTP)
+INTERNAL CONTAINERS:
+Each mail instance contains separate containers:
+- clamav (antivirus)
+- rspamd (antispam)
+- dovecot (IMAP/POP3)
+- postfix (SMTP)
 
-ESEMPIO GERARCHIA:
+HIERARCHY EXAMPLE:
 NethServer 8 Host
-├── Istanza: mail1
-│   ├── Container: clamav
-│   ├── Container: rspamd
-│   ├── Container: dovecot
-│   └── Container: postfix
-├── Istanza: webtop1
-│   └── Container: tomcat8
-└── Istanza: traefik1
+├── Instance: mail1
+│ ├── Container: clamav
+│ ├── Container: rspamd
+│ ├── Containers: dovecot
+│ └── Containers: postfix
+├── Instance: webtop1
+│ └── Container: tomcat8
+└── Instance: traefik1
     └── Container: traefik
 
 
-================================================================================
-UTILIZZO SCRIPT LOCALI
-================================================================================
+========================================================================================
+USE LOCAL SCRIPTS
+========================================================================================
 
-INSTALLAZIONE NOPOLLING (/usr/local/bin/):
-1. Copiare script in /usr/local/bin/
-2. Rendere eseguibile: chmod +x /usr/local/bin/nome_script.sh
-3. Per monitor_podman_events.sh: creare servizio systemd
+NOPOLLING INSTALLATION (/usr/local/bin/):
+1. Copy script to /usr/local/bin/
+2. Make it executable: chmod +x /usr/local/bin/script_name.sh
+3. For monitor_podman_events.sh: Create systemd service
 
-ESEMPIO NOPOLLING:
+NOPOLLING EXAMPLE:
 cp check-sos.sh /usr/local/bin/
 chmod +x /usr/local/bin/check-sos.sh
 
-SERVIZIO SYSTEMD PER MONITOR PODMAN:
+SYSTEMD SERVICE FOR PODMAN MONITOR:
 File: /etc/systemd/system/podman-events-monitor.service
 
 [Unit]
@@ -548,220 +544,220 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 
-Abilitare:
+Enable:
 systemctl enable --now podman-events-monitor.service
 
 
-INSTALLAZIONE POLLING (/usr/lib/check_mk_agent/local/):
-1. Copiare script in /usr/lib/check_mk_agent/local/
-2. Rendere eseguibile: chmod +x nome_script.sh
-3. Eseguire service discovery in CheckMK
+POLLING INSTALLATION (/usr/lib/check_mk_agent/local/):
+1. Copy script to /usr/lib/check_mk_agent/local/
+2. Make executable: chmod +x script_name.sh
+3. Run service discovery in CheckMK
 
-ESEMPIO POLLING:
+POLLING EXAMPLE:
 cp check_ns8_containers.sh /usr/lib/check_mk_agent/local/
 chmod +x /usr/lib/check_mk_agent/local/check_ns8_containers.sh
 
 
-================================================================================
-UTILIZZO SCRIPT REMOTI
-================================================================================
+========================================================================================
+USE OF REMOTE SCRIPTS
+========================================================================================
 
-INSTALLAZIONE:
-1. Copiare wrapper remoto (rNOME.sh) nella directory appropriata
-2. Rendere eseguibile: chmod +x rNOME.sh
-3. Lo script scaricherà automaticamente l'ultima versione da GitHub
+INSTALLATION:
+1. Copy remote wrapper (rNAME.sh) to the appropriate directory
+2. Make executable: chmod +x rNAME.sh
+3. The script will automatically download the latest version from GitHub
 
-ESEMPIO NOPOLLING (in /usr/local/bin/):
+NOPOLLING EXAMPLE (in /usr/local/bin/):
 cp rcheck-sos.sh /usr/local/bin/
 chmod +x /usr/local/bin/rcheck-sos.sh
 
-ESEMPIO POLLING (in /usr/lib/check_mk_agent/local/):
+POLLING EXAMPLE (in /usr/lib/check_mk_agent/local/):
 cp rcheck_ns8_containers.sh /usr/lib/check_mk_agent/local/
 chmod +x /usr/lib/check_mk_agent/local/rcheck_ns8_containers.sh
 
-VANTAGGI:
- Aggiornamenti automatici dal repository
- No manutenzione manuale degli script
+ADVANTAGES:
+ Automatic updates from the repository
+ No manual script maintenance
  Centralized management
 
 
-================================================================================
-NOTE AGGIUNTIVE
-================================================================================
+========================================================================================
+ADDITIONAL NOTES
+========================================================================================
 
-FORMATO OUTPUT CHECKMK:
-Tutti gli script seguono il formato CheckMK local check:
+CHECKMK OUTPUT FORMAT:
+All scripts follow the CheckMK local check format:
 <<<local>>>
-STATO NOME_SERVIZIO - DETTAGLI [| METRICHE]
+STATUS SERVICE_NAME - DETAILS [| METRICS]
 
-STATI:
+STATES:
 0 = OK
 1 = WARNING
 2 = CRITICAL
 3 = UNKNOWN
 
-DIFFERENZA PATH INSTALLAZIONE:
-- NOPOLLING NS8: /usr/local/bin/ (utility di sistema)
+INSTALLATION PATH DIFFERENCE:
+- NOPOLLING NS8: /usr/local/bin/ (system utility)
 - POLLING NS8: /usr/lib/check_mk_agent/local/ (check CheckMK)
 
-NOTA: A differenza di NS7, gli script polling NS8 vanno in local/ non in plugins/
+NOTE: Unlike NS7, NS8 polling scripts go in local/ not plugins/
 
 BEST PRACTICES:
-- Avviare monitor_podman_events.sh come servizio systemd
-- Usare check_ns8_containers.sh per overview generale istanze
-- Usare check_ns8_services.sh per monitoraggio approfondito mail
-- Monitorare vsz_limit di Dovecot (problema comune NS8)
-- Configurare soglie Tomcat in base a RAM disponibile
+- Start monitor_podman_events.sh as systemd service
+- Use check_ns8_containers.sh for general instance overview
+- Use check_ns8_services.sh for in-depth mail monitoring
+- Monitor Dovecot's vsz_limit (common NS8 issue)
+- Configure Tomcat thresholds based on available RAM
 
 
-================================================================================
-FILE DI LOG
-================================================================================
+========================================================================================
+LOG FILES
+========================================================================================
 
-SCRIPT CON LOG CUSTOM:
-monitor_podman_events.sh       → /var/log/podman_events.log (scrive)
-check_podman_events.sh         → /var/log/podman_events.log (legge)
+SCRIPT WITH CUSTOM LOG:
+monitor_podman_events.sh → /var/log/podman_events.log (writes)
+check_podman_events.sh → /var/log/podman_events.log (read)
 
-LOG DI SISTEMA LETTI:
-/var/log/messages              (SOS session)
-/var/log/dovecot*              (vsz_limit errors - dentro container)
+BEDS SYSTEM LOG:
+/var/log/messages (SOS session)
+/var/log/dovecot* (vsz_limit errors - inside container)
 
 
-================================================================================
-ESEMPI DI OUTPUT COMPLETI
-================================================================================
+========================================================================================
+FULL OUTPUT EXAMPLES
+========================================================================================
 
 SOS:
 0 SOS_session - SOS Session: INACTIVE (ID: N/A)
 1 SOS_session - SOS Session: ACTIVE (ID: 123456789)
 
 CONTAINERS:
-0 WebTop - WebTop attivo
+0 WebTop - WebTop active
 0 WebTop_CPU - CPU 12.5%
 0 WebTop_RAM - RAM 768MiB (38.4%)
-0 Mail - Mail attivo
+0 Mail - Mail active
 0 Mail_CPU - CPU 5.2%
 0 Mail_RAM - RAM 1.5GiB (15.0%)
-0 Mail_IMAP - Sessioni IMAP attive: 12
+0 Mail_IMAP - Active IMAP sessions: 12
 
 MAIL SERVICES:
-0 clamav - clamav attivo
-0 rspamd - rspamd attivo
-0 dovecot - dovecot attivo
-0 postfix - postfix attivo
-0 imap_sessions - Sessioni IMAP attive: 8
-0 dovecot_vszlimit - Nessun allarme nei log (limite configurato=512M)
+0 clamav - clamav active
+0 rspamd - rspamd active
+0 dovecot - dovecot active
+0 postfix - postfix active
+0 imap_sessions - Active IMAP sessions: 8
+0 dovecot_vszlimit - No alarms in logs (configured limit=512M)
 
 TOMCAT:
-0 Tomcat8 - Tomcat8 OK - Memoria=945MB; Uptime=5-12:30:15
-1 Tomcat8 - Tomcat8 WARN - Memoria=1100MB (>1024MB); Uptime=2-08:15:42
+0 Tomcat8 - Tomcat8 OK - Memory=945MB; Uptime=5-12:30:15
+1 Tomcat8 - Tomcat8 WARN - Memory=1100MB (>1024MB); Uptime=2-08:15:42
 
 WEBTOP:
-0 Webtop5 - WebTop risponde su https://webtop.example.com/webtop/ (HTTP 200)
+0 Webtop5 - WebTop responds at https://webtop.example.com/webtop/ (HTTP 200)
 
 PODMAN EVENTS:
-0 Podman_Status - Nessun Evento
+0 Podman_Status - No Events
 1 Podman_Status - Traefik Start
 
 
-================================================================================
+========================================================================================
 TROUBLESHOOTING
-================================================================================
+========================================================================================
 
-PROBLEMA: runagent command not found
-SOLUZIONE:
-- Verificare di essere su NethServer 8
-- runagent è specifico di NS8, non disponibile su NS7
+PROBLEM: runagent command not found
+SOLUTION:
+- Verify you are on NethServer 8
+- runagent is specific to NS8, not available on NS7
 
-PROBLEMA: Podman_Status sempre "Nessun Evento"
-SOLUZIONE:
-- Verificare che monitor_podman_events.sh sia in esecuzione
-- Controllare log: tail -f /var/log/podman_events.log
-- Verificare servizio systemd: systemctl status podman-events-monitor
+PROBLEM: Podman_Status always "No Events"
+SOLUTION:
+- Verify that monitor_podman_events.sh is running
+- Check log: tail -f /var/log/podman_events.log
+- Check systemd service: systemctl status podman-events-monitor
 
-PROBLEMA: check_ns8_services.sh non trova istanze mail
-SOLUZIONE:
-- Verificare istanze: runagent -l | grep mail
-- Testare manualmente: runagent -m mail1 true
+PROBLEM: check_ns8_services.sh does not find mail instances
+SOLUTION:
+- Check instances: runagent -l | grep mail
+- Test manually: runagent -m mail1 true
 
-PROBLEMA: dovecot_vszlimit sempre CRIT
-SOLUZIONE:
-- Aumentare VszLimit: config setprop dovecot VszLimit 1024
-- Riavviare dovecot: runagent -m mail1 systemctl restart dovecot
-- Verificare configurazione: config show dovecot
+PROBLEM: dovecot_vszlimit always CRIT
+SOLUTION:
+- Increase VszLimit: config setprop dovecot VszLimit 1024
+- Restart dovecot: runagent -m mail1 systemctl restart dovecot
+- Check configuration: config show dovecot
 
-PROBLEMA: Script remoto non funziona
-SOLUZIONE:
-- Verificare connettività GitHub: curl -I https://raw.githubusercontent.com
-- Controllare firewall NS8
-- Testare URL manualmente: curl -fsSL "$SCRIPT_URL"
+PROBLEM: Remote Script does not work
+SOLUTION:
+- Check GitHub connectivity: curl -I https://raw.githubusercontent.com
+- Check NS8 firewall
+- Test URL manually: curl -fsSL "$SCRIPT_URL"
 
-PROBLEMA: Tomcat8 non trovato
-SOLUZIONE:
-- Verificare istanze WebTop: runagent -l | grep webtop
-- Verificare processo: runagent -m webtop1 podman exec CONTAINER pgrep -f catalina
+PROBLEM: Tomcat8 not found
+SOLUTION:
+- Check WebTop instances: runagent -l | grep webtop
+- Check process: runagent -m webtop1 podman exec CONTAINER pgrep -f catalina
 
 
-================================================================================
-SICUREZZA
-================================================================================
+========================================================================================
+SAFETY
+========================================================================================
 
-CONSIDERAZIONI:
- Gli script vengono eseguiti come root (richiesto per runagent)
- Accesso completo a tutti i container e istanze
- Log di sistema accessibili
- Script remoti scaricano codice da GitHub - verificare HTTPS
+CONSIDERATIONS:
+ Scripts run as root (required for runagent)
+ Full access to all containers and instances
+ Accessible system logs
+ Remote scripts download code from GitHub - check HTTPS
 
-PERMESSI CONSIGLIATI:
+RECOMMENDED PERMISSIONS:
 - Script in /usr/local/bin/: 755 (rwxr-xr-x)
 - Script in /usr/lib/check_mk_agent/local/: 755 (rwxr-xr-x)
 - Log /var/log/podman_events.log: 644 (rw-r--r--)
 
 RUNAGENT SECURITY:
-runagent esegue comandi con privilegi elevati all'interno delle istanze.
-Verificare sempre i comandi eseguiti negli script.
+runagent executes commands with elevated privileges within instances.
+Always check the commands executed in scripts.
 
 
-================================================================================
-DIFFERENZE NS7 vs NS8
-================================================================================
+========================================================================================
+DIFFERENCES NS7 vs NS8
+========================================================================================
 
-┌─────────────────────────┬────────────────────┬────────────────────────────┐
-│ CARATTERISTICA          │ NETHSERVER 7       │ NETHSERVER 8               │
-├─────────────────────────┼────────────────────┼────────────────────────────┤
-│ Architettura            │ Monolitica         │ Istanze modulari           │
-├─────────────────────────┼────────────────────┼────────────────────────────┤
-│ Container Runtime       │ N/A (bare metal)   │ Podman                     │
-├─────────────────────────┼────────────────────┼────────────────────────────┤
-│ Gestione servizi        │ systemctl          │ runagent                   │
-├─────────────────────────┼────────────────────┼────────────────────────────┤
-│ Path script nopolling   │ /usr/lib/.../local/│ /usr/local/bin/            │
-├─────────────────────────┼────────────────────┼────────────────────────────┤
-│ Path script polling     │ /usr/lib/.../plugi │ /usr/lib/.../local/        │
-│                         │ ns/                │                            │
-├─────────────────────────┼────────────────────┼────────────────────────────┤
-│ Mail stack              │ Integrato          │ Container separati         │
-├─────────────────────────┼────────────────────┼────────────────────────────┤
-│ WebTop                  │ tomcat8@webtop     │ Container in istanza       │
-├─────────────────────────┼────────────────────┼────────────────────────────┤
-│ SOS                     │ don (WindMill)     │ NethSecurity Support       │
-├─────────────────────────┼────────────────────┼────────────────────────────┤
-│ Configurazione          │ config-database    │ config show/setprop        │
-└─────────────────────────┴────────────────────┴────────────────────────────┘
+┌─────────────────────────┬─────────── ─────────┬───────── ───────────────────┐
+│ FEATURE │ NETHSERVER 7 │ NETHSERVER 8 │
+├─────────────────────────┼─────────── ─────────┼───────── ───────────────────┤
+│ Architecture │ Monolithic │ Modular instances │
+├─────────────────────────┼─────────── ─────────┼───────── ───────────────────┤
+│ Container Runtime │ N/A (bare metal) │ Podman │
+├─────────────────────────┼─────────── ─────────┼───────── ───────────────────┤
+│ Service Manager │ systemctl │ runagent │
+├─────────────────────────┼─────────── ─────────┼───────── ───────────────────┤
+│ Path script nopolling │ /usr/lib/.../local/│ /usr/local/bin/ │
+├─────────────────────────┼─────────── ─────────┼───────── ───────────────────┤
+│ Path script polling │ /usr/lib/.../plugi │ /usr/lib/.../local/ │
+│ │ ns/ │ │
+├─────────────────────────┼─────────── ─────────┼───────── ───────────────────┤
+│ Mail stack │ Integrated │ Separate containers │
+├─────────────────────────┼─────────── ─────────┼───────── ───────────────────┤
+│ WebTop │ tomcat8@webtop │ Container in instance │
+├─────────────────────────┼─────────── ─────────┼───────── ───────────────────┤
+│ SOS │ don (WindMill) │ NethSecurity Support │
+├─────────────────────────┼─────────── ─────────┼───────── ───────────────────┤
+│ Configuration │ config-database │ config show/setprop │
+└─────────────────────────┴─────────── ─────────┴───────── ───────────────────┘
 
 
-================================================================================
-AUTORE E LICENZA
-================================================================================
+========================================================================================
+AUTHOR AND LICENSE
+========================================================================================
 
-Autore:     NethLab / Marzio Project
+Author: NethLab / Marzio Project
 Repository: https://github.com/Coverup20/checkmk-tools
-Licenza:    [Specificare licenza]
+License: [Specify license]
 
-Compatibilità testata:
+Tested compatibility:
 - NethServer 8 (Podman-based)
 - CheckMK Raw 2.4.x
 
-================================================================================
-Fine documento
-================================================================================
+========================================================================================
+End of document
+========================================================================================

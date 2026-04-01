@@ -1,11 +1,11 @@
 #!/bin/bash
-# search-ticket-by-code.sh - Cerca un ticket per codice (es: TK25/003209)
+# search-ticket-by-code.sh - Search for a ticket by code (e.g. TK25/003209)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Source del toolkit solo per funzioni helper
+# Toolkit source for helper functions only
 source "$SCRIPT_DIR/ydea-toolkit.sh"
 
 TICKET_CODE="${1:-}"
@@ -18,16 +18,16 @@ if [[ -z "$TICKET_CODE" ]]; then
     exit 1
 fi
 
-echo " Cercando ticket con codice: $TICKET_CODE..."
+echo "Searching for tickets with code: $TICKET_CODE..."
 echo ""
 
-# Assicurati di avere il token
+# Make sure you have the token
 ensure_token
 TOKEN="$(load_token)"
 
-# Prova con limite maggiore per trovare ticket più vecchi
+# Try with higher limit to find older tickets
 for LIMIT in 100 200 500 1000; do
-    echo " Tentativo con limit=$LIMIT..."
+    echo "Attempting limit=$LIMIT..."
     
     RESPONSE=$(curl -s -w '\n%{http_code}' \
       -H "Accept: application/json" \
@@ -38,30 +38,30 @@ for LIMIT in 100 200 500 1000; do
     HTTP_CODE="$(echo "$RESPONSE" | tail -n1)"
     
     if [[ "$HTTP_CODE" != "200" ]]; then
-      echo " Errore HTTP $HTTP_CODE"
+      echo "HTTP Error $HTTP_CODE"
       continue
     fi
     
-    # Cerca il ticket per codice
+    # Search for the ticket by code
     TICKET_DATA=$(echo "$HTTP_BODY" | jq --arg code "$TICKET_CODE" '.objs[] | select(.codice == $code)')
     
     if [[ -n "$TICKET_DATA" && "$TICKET_DATA" != "null" ]]; then
-      echo " Ticket trovato con limit=$LIMIT!"
+      echo "Ticket found with limit=$LIMIT!"
       echo ""
       
       TICKET_ID=$(echo "$TICKET_DATA" | jq -r '.id')
       
       echo "════════════════════════════════════════════════════════════════════"
-      echo "STRUTTURA COMPLETA DEL TICKET $TICKET_CODE (ID: $TICKET_ID)"
+      echo "COMPLETE TICKET STRUCTURE $TICKET_CODE (ID: $TICKET_ID)"
       echo "════════════════════════════════════════════════════════════════════"
       echo ""
       
-      # Mostra tutto il JSON formattato
+      # Show all formatted JSON
       echo "$TICKET_DATA" | jq '.'
       
       echo ""
       echo "════════════════════════════════════════════════════════════════════"
-      echo "CAMPI CHIAVE ESTRATTI"
+      echo "KEY FIELDS EXTRACTED"
       echo "════════════════════════════════════════════════════════════════════"
       echo ""
       
@@ -88,13 +88,13 @@ for LIMIT in 100 200 500 1000; do
       echo "  SLA:"
       echo "   SLA: $(echo "$TICKET_DATA" | jq -r '.sla // "N/A"')"
       echo "   SLA ID: $(echo "$TICKET_DATA" | jq -r '.sla_id // .slaId // "N/A"')"
-      echo "   SLA Nome: $(echo "$TICKET_DATA" | jq -r '.sla_nome // .slaNome // "N/A"')"
+      echo "SLA Name: $(echo"$TICKET_DATA" | jq -r '.sla_nome // .slaNome // "N/A"')"
       echo "   SLA Descrizione: $(echo "$TICKET_DATA" | jq -r '.sla_descrizione // .slaDescrizione // "N/A"')"
       echo ""
       
-      echo " Stato:"
-      echo "   Stato: $(echo "$TICKET_DATA" | jq -r '.stato // "N/A"')"
-      echo "   Stato ID: $(echo "$TICKET_DATA" | jq -r '.stato_id // .statoId // "N/A"')"
+      echo "State:"
+      echo "Status: $(echo"$TICKET_DATA" | jq -r '.stato // "N/A"')"
+      echo "ID Status: $(echo"$TICKET_DATA" | jq -r '.stato_id // .statoId // "N/A"')"
       echo ""
       
       echo " Custom Attributes:"
@@ -103,7 +103,7 @@ for LIMIT in 100 200 500 1000; do
       elif echo "$TICKET_DATA" | jq -e '.custom_attributes' >/dev/null 2>&1; then
         echo "$TICKET_DATA" | jq '.custom_attributes'
       else
-        echo "   Nessun custom attribute trovato"
+        echo "No custom attributes found"
       fi
       echo ""
       
@@ -117,7 +117,7 @@ for LIMIT in 100 200 500 1000; do
       echo ""
       
       echo "════════════════════════════════════════════════════════════════════"
-      echo "TUTTE LE CHIAVI DISPONIBILI NEL JSON"
+      echo "ALL KEYS AVAILABLE IN JSON"
       echo "════════════════════════════════════════════════════════════════════"
       echo ""
       
@@ -137,9 +137,9 @@ for LIMIT in 100 200 500 1000; do
     fi
 done
 
-echo " Ticket $TICKET_CODE non trovato nei primi 1000 ticket"
+echo "Ticket $TICKET_CODE not found in first 1000 tickets"
 echo ""
-echo " Suggerimento: Potrebbe essere un ticket molto vecchio o archiviato."
-echo "   Prova a cercare manualmente su Ydea: https://my.ydea.cloud"
+echo "Tip: It could be a very old or archived ticket."
+echo "Try searching manually on Ydea: https://my.ydea.cloud"
 
 exit 1

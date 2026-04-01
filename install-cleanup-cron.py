@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
-"""
-install-cleanup-cron.py - Installa cron job per cleanup-checkmk-retention
+"""install-cleanup-cron.py - Installs cron job for cleanup-checkmk-retention
 
-Installa un cron job che esegue cleanup-checkmk-retention.sh da GitHub,
-rimuovendo dati CheckMK obsoleti (RRD >180gg, nagios archives >180gg,
-notify backups >30gg).
+Install a cron job that runs cleanup-checkmk-retention.sh from GitHub,
+removing obsolete CheckMK data (RRD >180 days, nagios archives >180 days,
+notify backups >30 days).
 
 Usage:
-  python3 install-cleanup-cron.py              # Interactive mode
-  python3 install-cleanup-cron.py --yes        # Auto-confirm (default 03:00)
+  python3 install-cleanup-cron.py # Interactive mode
+  python3 install-cleanup-cron.py --yes # Auto-confirm (default 03:00)
   python3 install-cleanup-cron.py --yes --time "0 2 * * *"
   python3 install-cleanup-cron.py --yes --email admin@example.com
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import argparse
 import os
@@ -54,7 +52,7 @@ def die(msg: str) -> None:
 
 
 def ask(prompt: str, default: str = "") -> str:
-    """Input interattivo compatibile con pipe (usa /dev/tty se necessario)."""
+    """Pipe-compatible interactive input (use /dev/tty if necessary)."""
     if not sys.stdin.isatty():
         try:
             with open("/dev/tty", "r") as tty:
@@ -320,13 +318,11 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=f"install-cleanup-cron.py v{VERSION} - Installa cron job cleanup-checkmk-retention",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Esempi:
+        epilog="""Esempi:
   python3 install-cleanup-cron.py                          # Interattivo
   python3 install-cleanup-cron.py --yes                    # Auto-confirm (03:00)
   python3 install-cleanup-cron.py --yes --time "0 2 * * *"
-  python3 install-cleanup-cron.py --yes --email admin@example.com
-        """,
+  python3 install-cleanup-cron.py --yes --email admin@example.com""",
     )
     p.add_argument("--yes", "-y", action="store_true", help="Auto-confirm (non-interattivo)")
     p.add_argument("--time", "-t", default=DEFAULT_CRON_TIME,

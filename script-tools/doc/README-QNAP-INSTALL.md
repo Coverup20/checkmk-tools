@@ -1,185 +1,185 @@
-# Installazione CheckMK Agent + FRPC su QNAP NAS
-> **Categoria:** Operativo
+# Install CheckMK Agent + FRPC on QNAP NAS
+> **Category:** Operational
 
-##  Descrizione
+## Description
 
-Script per l'installazione automatica di CheckMK Agent e FRPC su sistemi QNAP NAS.
+Script for automatically installing CheckMK Agent and FRPC on QNAP NAS systems.
 
-##  Requisiti
+## Requirements
 
-- QNAP NAS con QTS 4.x/5.x o QuTS hero
-- Accesso SSH attivo
-- Utente root o admin
-- Almeno 100MB di spazio disco
+- QNAP NAS with QTS 4.x/5.x or QuTS hero
+- SSH access active
+- Root or admin user
+- At least 100MB of disk space
 
-##  Installazione
+## Installation
 
-### 1. Carica lo script sul NAS
+### 1. Upload the script to your NAS
 
 ```bash
 # Via SCP
 scp install-agent-frpc-qnap.sh admin@IP_QNAP:/tmp/
 
-# Oppure scarica direttamente sul NAS
+# Or download directly to the NAS
 ssh admin@IP_QNAP
 cd /tmp
 wget https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/install-agent-frpc-qnap.sh
 chmod +x install-agent-frpc-qnap.sh
 ```
 
-### 2. Esegui l'installazione
+### 2. Run the installation
 
 ```bash
 sudo ./install-agent-frpc-qnap.sh
 ```
 
-##  Opzioni
+## Options
 
 ```bash
-# Installazione interattiva (default)
+# Interactive installation (default)
 ./install-agent-frpc-qnap.sh
 
-# Disinstalla solo FRPC
+# Uninstall FRPC only
 ./install-agent-frpc-qnap.sh --uninstall-frpc
 
-# Disinstalla solo Agent
+# Uninstall Agent only
 ./install-agent-frpc-qnap.sh --uninstall-agent
 
-# Disinstalla tutto
+# Uninstall everything
 ./install-agent-frpc-qnap.sh --uninstall
 
-# Aiuto
+# Help
 ./install-agent-frpc-qnap.sh --help
 ```
 
-##  Gestione dipendenze
+## Dependency management
 
-### Se `socat` non è disponibile
+### If `socat` is not available
 
-Lo script tenterà di installare automaticamente `socat`. Se fallisce, hai tre opzioni:
+The script will attempt to automatically install `socat`. If that fails, you have three options:
 
-#### Opzione 1: Installa Entware (consigliato)
+#### Option 1: Install Entware (recommended)
 
-1. Apri **App Center** su QNAP
-2. Cerca e installa **Entware**
-3. Dopo l'installazione di Entware:
+1. Open **App Center** on QNAP
+2. Search and install **Entware**
+3. After installing Entware:
    ```bash
    opkg update
    opkg install socat
    ```
-4. Riesegui lo script di installazione
+4. Rerun the installation script
 
-#### Opzione 2: Scarica socat manualmente
+#### Option 2: Download socat manually
 
 ```bash
-# Per QNAP x86_64
+# For QNAP x86_64
 cd /tmp
 wget http://bin.entware.net/x86-64/other/socat
 chmod +x socat
 mv socat /usr/local/bin/
 ```
 
-#### Opzione 3: Usa xinetd (alternativa)
+#### Option 3: Use xinetd (alternative)
 
-Lo script chiederà automaticamente se vuoi usare xinetd al posto di socat:
+The script will automatically ask if you want to use xinetd instead of socat:
 ```
-Vuoi provare a usare xinetd al posto di socat? [s/N]: s
+Want to try using xinetd instead of socat? [y/N]: yes
 ```
 
-##  Struttura installazione
+## Installation structure
 
 ```
 /opt/checkmk/
 ├── bin/
-│   └── check_mk_agent          # Agent CheckMK
+│ └── check_mk_agent # CheckMK agent
 ├── log/
-│   └── agent.log               # Log agent
-├── start_agent.sh              # Script avvio
-└── stop_agent.sh               # Script stop
+│ └── agent.log # Agent log
+├── start_agent.sh # Startup script
+└── stop_agent.sh # Stop script
 
 /opt/frpc/
 ├── bin/
-│   └── frpc                    # Client FRPC
+│ └── frpc # FRPC client
 ├── conf/
-│   └── frpc.toml              # Configurazione
+│ └── frpc.toml # Configuration
 ├── log/
-│   ├── frpc.log               # Log FRPC
-│   └── startup.log            # Log startup
-├── start_frpc.sh              # Script avvio
-└── stop_frpc.sh               # Script stop
+│ ├── frpc.log # FRPC log
+│ └── startup.log # Startup log
+├── start_frpc.sh # Startup script
+└── stop_frpc.sh # Stop script
 
-/etc/config/autorun.sh         # Autostart QNAP
+/etc/config/autorun.sh # Autostart QNAP
 ```
 
-##  Comandi utili
+## Useful commands
 
 ### CheckMK Agent
 
 ```bash
-# Avvia agent
+# Start agent
 /opt/checkmk/start_agent.sh
 
-# Ferma agent
+# Stop agent
 /opt/checkmk/stop_agent.sh
 
-# Test manuale
+# Manual testing
 /usr/bin/check_mk_agent
 
-# Verifica porta
+# Check port
 nc localhost 6556
 
-# Log agent
+# Agent logs
 tail -f /opt/checkmk/log/agent.log
 ```
 
 ### FRPC Client
 
 ```bash
-# Avvia FRPC
+# Start FRPC
 /opt/frpc/start_frpc.sh
 
-# Ferma FRPC
+# Stop FRPC
 /opt/frpc/stop_frpc.sh
 
-# Verifica processo
+# Check process
 ps aux | grep frpc
 
-# Log FRPC
+# FRPC logs
 tail -f /opt/frpc/log/frpc.log
 
-# Modifica configurazione
+# Edit configuration
 vi /opt/frpc/conf/frpc.toml
 ```
 
-##  Troubleshooting
+## Troubleshooting
 
-### Agent non risponde
+### Agent not responding
 
 ```bash
-# Verifica processo
+# Check process
 ps aux | grep -E "socat|xinetd"
 
-# Verifica porta
+# Check port
 netstat -tlnp | grep 6556
 
-# Restart manuale
+# Manual restart
 /opt/checkmk/stop_agent.sh
 /opt/checkmk/start_agent.sh
 
-# Test locale
+# Local test
 echo "exit" | nc localhost 6556
 ```
 
-### FRPC non si connette
+### FRPC does not connect
 
 ```bash
-# Verifica log
+# Check log
 tail -50 /opt/frpc/log/frpc.log
 
-# Verifica configurazione
+# Check configuration
 cat /opt/frpc/conf/frpc.toml
 
-# Test connessione server
+# Test server connection
 nc -zv SERVER_IP 7000
 
 # Restart
@@ -187,37 +187,37 @@ nc -zv SERVER_IP 7000
 /opt/frpc/start_frpc.sh
 ```
 
-### Autostart non funziona
+### Autostart does not work
 
 ```bash
-# Verifica autorun.sh
+# Check autorun.sh
 cat /etc/config/autorun.sh
 
-# Verifica permessi
+# Check permissions
 ls -la /etc/config/autorun.sh
 chmod +x /etc/config/autorun.sh
 
-# Test manuale autorun
+# Manual autorun test
 /etc/config/autorun.sh
 ```
 
-##  Note
+## Notes
 
-- I servizi si avviano automaticamente al boot tramite `/etc/config/autorun.sh`
-- Il backup di `autorun.sh` viene creato automaticamente prima delle modifiche
-- L'agent CheckMK ascolta sulla porta TCP **6556**
-- FRPC si connette al server FRP specificato durante l'installazione
-- I log vengono mantenuti per 7 giorni (FRPC) o illimitati (Agent)
+- Services start automatically on boot via `/etc/config/autorun.sh`
+- Backup of `autorun.sh` is created automatically before changes
+- CheckMK agent listens on TCP port **6556**
+- FRPC connects to the FRP server specified during installation
+- Logs are kept for 7 days (FRPC) or unlimited (Agent)
 
-##  Supporto
+## Support
 
-In caso di problemi:
+In case of problems:
 
-1. Verifica i log in `/opt/checkmk/log/` e `/opt/frpc/log/`
-2. Controlla che le porte non siano bloccate dal firewall QNAP
-3. Verifica la configurazione in `/opt/frpc/conf/frpc.toml`
-4. Consulta la documentazione CheckMK e FRP ufficiale
+1. Check the logs in `/opt/checkmk/log/` and `/opt/frpc/log/`
+2. Check that the ports are not blocked by QNAP firewall
+3. Check the configuration in `/opt/frpc/conf/frpc.toml`
+4. Consult the official CheckMK and FRP documentation
 
-##  Licenza
+## License
 
-Script sviluppato per uso interno - Modificabile liberamente
+Script developed for internal use - Freely editable

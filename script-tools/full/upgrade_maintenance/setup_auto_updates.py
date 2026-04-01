@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
-"""
-setup_auto_updates.py - Setup System Auto-Updates
+"""setup_auto_updates.py - Setup System Auto-Updates
 
-Configura aggiornamenti automatici del sistema (apt update/upgrade)
-tramite cronjob.
+Configure automatic system updates (apt update/upgrade)
+via cronjob.
 
 Features:
-- Menu interattivo per la frequenza (Daily, Weekly, Monthly, Custom)
-- Logging integrato (/var/log/auto-updates.log)
-- Backup crontab esistente
-- Rimozione vecchie config
+- Interactive menu for frequency (Daily, Weekly, Monthly, Custom)
+- Integrated logging (/var/log/auto-updates.log)
+- Backup existing crontab
+- Removal of old configs
 
 Usage:
     setup_auto_updates.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -25,7 +23,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-# --- Configurazione ---
+# --- Configuration ---
 LOG_FILE = "/var/log/auto-updates.log"
 UPDATE_CMD = "sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y"
 

@@ -1,131 +1,131 @@
-# Setup Auto-Updates - Configurazione Aggiornamenti Automatici Sistema
-> **Categoria:** Operativo
+# Setup Auto-Updates - Configure Automatic System Updates
+> **Category:** Operational
 
-## Descrizione
+## Description
 
-Script per configurare aggiornamenti automatici del sistema Linux tramite crontab. Permette di pianificare l'esecuzione periodica di `apt update`, `apt full-upgrade` e `apt autoremove` con logging automatico.
+Script to configure automatic Linux system updates via crontab. Allows you to schedule periodic execution of `apt update`, `apt full-upgrade` and `apt autoremove` with automatic logging.
 
-## Componenti
+## Components
 
-### 1. Script Full (Interattivo)
+### 1. Script Full (Interactive)
 **Path:** `script-tools/full/upgrade_maintenance/setup-auto-updates.sh`
 
-Versione completa con interfaccia interattiva che guida l'utente nella configurazione.
+Full version with interactive interface that guides the user through configuration.
 
 ### 2. Remote Launcher
 **Path:** `script-tools/remote/rsetup-auto-updates.sh`
 
-Launcher che scarica ed esegue lo script completo direttamente da GitHub.
+Launcher that downloads and runs the complete script directly from GitHub.
 
-## Caratteristiche
+## Features
 
--  **Menu interattivo** con opzioni predefinite
--  **Backup automatico** del crontab esistente
--  **Logging completo** degli aggiornamenti
--  **Validazione input** per sicurezza
--  **Gestione duplicati** - rimuove entry esistenti
--  **Output colorato** per migliore leggibilità
--  **Personalizzazione orari** flessibile
+- **Interactive menu** with predefined options
+- **Automatic backup** of existing crontab
+- **Full logging** of updates
+- **Input validation** for security
+- **Duplicate management** - removes existing entries
+- **Colored output** for better readability
+- Flexible **Time customization**
 
-## Utilizzo
+## Usage
 
-### Esecuzione Locale (Interattiva)
+### Local Execution (Interactive)
 
 ```bash
-# Dalla cartella dello script
+# From the script folder
 cd /path/to/script-tools/full
 sudo bash setup-auto-updates.sh
 ```
 
-### Esecuzione Remota
+### Remote Execution
 
 ```bash
-# Download ed esecuzione in un comando
+# Download and run in one command
 bash <(curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/remote/rsetup-auto-updates.sh)
 ```
 
-### Esecuzione da Repository Clonato
+### Running from Cloned Repository
 
 ```bash
-# Se hai clonato il repository
+# If you cloned the repository
 cd script-tools/remote
 sudo bash rsetup-auto-updates.sh
 ```
 
-## Opzioni di Pianificazione
+## Scheduling Options
 
-### 1. Giornaliero
-- **Frequenza:** Ogni giorno
-- **Orario default:** 03:00
-- **Cron:** `0 3 * * *`
+### 1. Daily
+- **Frequency:** Every day
+- **Default time:** 03:00
+- **Chron:** `0 3 * * *`
 
-### 2. Settimanale
-- **Frequenza:** Ogni domenica
-- **Orario default:** 03:00
-- **Cron:** `0 3 * * 0`
+### 2. Weekly
+- **Frequency:** Every Sunday
+- **Default time:** 03:00
+- **Chron:** `0 3 * * 0`
 
-### 3. Mensile
-- **Frequenza:** 1° giorno del mese
-- **Orario default:** 03:00
-- **Cron:** `0 3 1 * *`
+### 3. Monthly
+- **Frequency:** 1st day of the month
+- **Default time:** 03:00
+- **Chron:** `0 3 1 * *`
 
-### 4. Personalizzato
-- **Frequenza:** Inserimento manuale
-- **Formato:** `minuto ora giorno mese giornosettimana`
-- **Esempio:** `30 2 * * 1` (ogni lunedì alle 02:30)
+### 4. Customized
+- **Frequency:** Manual entry
+- **Format:** `minute hour day month weekday`
+- **Example:** `30 2 * * 1` (every Monday at 02:30)
 
-## Menu Interattivo
+## Interactive Menu
 
 ```
-╔════════════════════════════════════════════════════════════════╗
-║    Configurazione Aggiornamenti Automatici Sistema            ║
-╚════════════════════════════════════════════════════════════════╝
+╔════════════════════════════════ ════════════════════════════════╗
+║ Configuring Automatic System Updates ║
+╚════════════════════════════════ ════════════════════════════════╝
 
-Comando che verrà eseguito:
+Command that will be executed:
 sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y
 
-Seleziona la frequenza degli aggiornamenti automatici:
+Select the frequency of automatic updates:
 
-  1) Giornaliero  - Ogni giorno alle 03:00
-  2) Settimanale  - Ogni domenica alle 03:00
-  3) Mensile      - Il primo giorno del mese alle 03:00
-  4) Personalizzato - Specifica orario e frequenza custom
-  5) Annulla
+  1) Daily - Every day at 03:00
+  2) Weekly - Every Sunday at 03:00
+  3) Monthly - The first day of the month at 03:00
+  4) Custom - Specify custom time and frequency
+  5) Cancel
 
-Scelta [1-5]:
+Choice [1-5]:
 ```
 
-## Esempi di Configurazioni Personalizzate
+## Examples of Custom Configurations
 
-### Ogni 6 ore
+### Every 6 hours
 ```
-Pianificazione cron: 0 */6 * * *
-```
-
-### Ogni lunedì alle 02:30
-```
-Pianificazione cron: 30 2 * * 1
+Cron Schedule: 0 */6 * * *
 ```
 
-### Due volte al giorno (02:00 e 14:00)
+### Every Monday at 02:30
 ```
-Prima entry: 0 2 * * *
-Seconda entry: 0 14 * * *
-```
-
-### Primo e quindicesimo del mese
-```
-Pianificazione cron: 0 3 1,15 * *
+Cron schedule: 30 2 * * 1
 ```
 
-## File di Log
+### Twice a day (02:00 and 14:00)
+```
+First entry: 0 2 * * *
+Second entry: 0 14 * * *
+```
 
-### Posizione
+### First and fifteenth of the month
+```
+Cron Schedule: 0 3 1.15 * *
+```
+
+## Log files
+
+### Location
 ```
 /var/log/auto-updates.log
 ```
 
-### Formato Log
+### Log Format
 ```
 [Sun Jan 12 03:00:01 2026] Starting system updates
 Hit:1 http://archive.ubuntu.com/ubuntu jammy InRelease
@@ -133,129 +133,129 @@ Hit:1 http://archive.ubuntu.com/ubuntu jammy InRelease
 [Sun Jan 12 03:05:23 2026] Updates completed successfully
 ```
 
-### Monitoraggio in Tempo Reale
+### Real-Time Monitoring
 ```bash
-# Visualizzare gli ultimi aggiornamenti
+# View the latest updates
 tail -f /var/log/auto-updates.log
 
-# Vedere le ultime 50 righe
+# See last 50 lines
 tail -n 50 /var/log/auto-updates.log
 
-# Cercare errori
+# Look for errors
 grep -i error /var/log/auto-updates.log
 ```
 
 ## Backup Crontab
 
-### Posizione Backup
+### Backup location
 ```
 /root/crontab_backups/
 ```
 
-### Formato File
+### File Format
 ```
 crontab_backup_YYYYMMDD_HHMMSS.txt
 ```
 
-### Ripristino Backup
+### Restore Backup
 ```bash
-# Visualizza backup disponibili
+# View available backups
 ls -lh /root/crontab_backups/
 
-# Ripristina un backup specifico
+# Restore a specific backup
 crontab /root/crontab_backups/crontab_backup_20260112_100530.txt
 
-# Verifica ripristino
+# Verify recovery
 crontab -l
 ```
 
-## Gestione Crontab
+## Crontab management
 
-### Visualizzare Entry Correnti
+### View Current Entries
 ```bash
 crontab -l
 ```
 
-### Modificare Manualmente
+### Edit Manually
 ```bash
 crontab -e
 ```
 
-### Rimuovere Tutte le Entry
+### Remove All Entries
 ```bash
 crontab -r
 ```
 
-### Rimuovere Solo Auto-Updates
+### Remove Auto-Updates Only
 ```bash
 crontab -l | grep -v "apt update.*apt full-upgrade" | crontab -
 ```
 
-## Requisiti di Sistema
+## System Requirements
 
 - **OS:** Linux (Debian/Ubuntu based)
 - **Package Manager:** APT
-- **Permessi:** Root (sudo)
-- **Dipendenze:** bash, cron, curl (per versione remota)
+- **Permissions:** Root (sudo)
+- **Dependencies:** bash, cron, curl (for remote version)
 
-## Verifica Installazione
+## Check Installation
 
 ```bash
-# Verifica che cron sia attivo
+# Verify that cron is active
 systemctl status cron
 
-# Verifica entry nel crontab
+# Verify entry in crontab
 crontab -l | grep "apt update"
 
-# Test manuale del comando
+# Manual testing of the command
 sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y
 ```
 
 ## Troubleshooting
 
-### Entry non viene eseguita
+### Entry is not executed
 
-1. Verifica che cron sia attivo:
+1. Check that cron is active:
 ```bash
 systemctl status cron
 systemctl start cron
 ```
 
-2. Controlla i log di sistema:
+2. Check the system logs:
 ```bash
 grep CRON /var/log/syslog
 ```
 
-3. Verifica sintassi cron:
+3. Check cron syntax:
 ```bash
 crontab -l
 ```
 
-### Permessi insufficienti
+### Insufficient permissions
 
 ```bash
-# Assicurati di eseguire con sudo
+# Make sure you run with sudo
 sudo bash setup-auto-updates.sh
 ```
 
-### Log file non accessibile
+### Log file not accessible
 
 ```bash
-# Verifica permessi
+# Check permissions
 ls -l /var/log/auto-updates.log
 
-# Ricrea il file se necessario
+# Recreate the file if necessary
 sudo touch /var/log/auto-updates.log
 sudo chmod 644 /var/log/auto-updates.log
 ```
 
-### Script remoto non scaricabile
+### Remote script not downloadable
 
 ```bash
-# Verifica connessione
+# Check connection
 curl -I https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/upgrade_maintenance/setup-auto-updates.sh
 
-# Usa versione locale
+# Use local version
 git clone https://github.com/Coverup20/checkmk-tools.git
 cd checkmk-tools/script-tools/full
 sudo bash setup-auto-updates.sh
@@ -263,107 +263,107 @@ sudo bash setup-auto-updates.sh
 
 ## Best Practices
 
-### 1. Orario di Esecuzione
-- Scegli orari di basso traffico (es. 02:00-04:00)
-- Evita orari di lavoro per server di produzione
-- Considera il fuso orario del server
+### 1. Execution Time
+- Choose low traffic times (e.g. 02:00-04:00)
+- Avoid working hours for production servers
+- Consider the server's time zone
 
-### 2. Frequenza Aggiornamenti
-- **Server di produzione:** Settimanale o mensile
-- **Server di sviluppo:** Giornaliero
-- **Workstation:** Settimanale
+### 2. Update Frequency
+- **Production Server:** Weekly or monthly
+- **Development Server:** Daily
+- **Workstation:** Weekly
 
-### 3. Monitoraggio
-- Controlla regolarmente i log
-- Imposta alert per errori critici
-- Verifica spazio disco disponibile
+### 3. Tracking
+- Check logs regularly
+- Set alerts for critical errors
+- Check available disk space
 
 ### 4. Backup
-- Mantieni backup del crontab
-- Testa i ripristini periodicamente
-- Documenta le configurazioni custom
+- Keep crontab backup
+- Test restores periodically
+- Document custom configurations
 
-### 5. Sicurezza
-- Rivedi gli aggiornamenti installati
-- Monitora riavvii necessari
-- Pianifica maintenance window per kernel updates
+### 5. Security
+- Review installed updates
+- Monitor necessary reboots
+- Schedule maintenance window for kernel updates
 
 ## Testing
 
-### Test Manuale Immediato
+### Immediate Manual Test
 ```bash
-# Esegui il comando senza aspettare la schedulazione
+# Execute the command without waiting for the scheduler
 sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y
 ```
 
-### Test Dry-Run
+### Dry-Run Test
 ```bash
-# Simula aggiornamenti senza installarli
+# Simulate updates without installing them
 sudo apt update
 sudo apt list --upgradable
 ```
 
-### Verifica Next Run
+### Check Next Run
 ```bash
-# Installa at per vedere prossima esecuzione
-# (cron non ha un comando nativo per questo)
+# Install at to see next run
+# (cron doesn't have a native command for this)
 ```
 
-## Disinstallazione
+## Uninstall
 
-### Metodo 1: Rimozione Manuale
+### Method 1: Manual Removal
 ```bash
 crontab -e
-# Cancella la riga relativa agli auto-updates
+# Delete the auto-updates line
 ```
 
-### Metodo 2: Rimozione Automatica
+### Method 2: Automatic Removal
 ```bash
 crontab -l | grep -v "apt update.*apt full-upgrade" | grep -v "^# Auto-updates:" | crontab -
 ```
 
-### Pulizia Completa
+### Complete Cleaning
 ```bash
-# Rimuovi entry crontab
+# Remove crontab entry
 crontab -l | grep -v "apt update.*apt full-upgrade" | crontab -
 
-# Rimuovi log file
+# Remove log files
 sudo rm /var/log/auto-updates.log
 
-# (Opzionale) Rimuovi backup
+# (Optional) Remove backup
 sudo rm -rf /root/crontab_backups/
 ```
 
-## Supporto e Contributi
+## Support and Contributions
 
 - **Repository:** https://github.com/Coverup20/checkmk-tools
 - **Issues:** https://github.com/Coverup20/checkmk-tools/issues
-- **Documentazione:** `script-tools/doc/`
+- **Documentation:** `script-tools/doc/`
 
 ## Changelog
 
 ### Version 1.0 (2026-01-12)
-- Release iniziale
-- Menu interattivo con 5 opzioni
-- Backup automatico crontab
-- Logging completo
-- Validazione input
-- Gestione duplicati
-- Output colorato
+- Initial release
+- Interactive menu with 5 options
+- Automatic backup crontab
+- Complete logging
+- Input validation
+- Duplicate management
+- Colorful output
 
-## Licenza
+## License
 
-Questo script fa parte del progetto checkmk-tools.
+This script is part of the checkmk-tools project.
 
-## Note Importanti
+## Important Notes
 
- **ATTENZIONE:**
-- Gli aggiornamenti automatici possono richiedere riavvii
-- Monitora sempre i log dopo le prime esecuzioni
-- Testa prima su sistemi non critici
-- Mantieni backup del sistema aggiornati
+ **ATTENTION:**
+- Automatic updates may require reboots
+- Always monitor logs after first runs
+- Test on non-critical systems first
+- Keep up-to-date system backups
 
- **SUGGERIMENTO:**
-- Configura notifiche email per i risultati degli aggiornamenti
-- Considera l'uso di `unattended-upgrades` per configurazioni più avanzate
-- Integra con sistemi di monitoring esistenti (CheckMK, Nagios, etc.)
+ **TIP:**
+- Configure email notifications for update results
+- Consider using `unattended-upgrades` for more advanced configurations
+- Integrate with existing monitoring systems (CheckMK, Nagios, etc.)

@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""
-test_curl.py - Test base connessione Ydea API con curl-like output
+"""test_curl.py - Basic Ydea API connection test with curl-like output
 
-Testa la connessione base all'API Ydea mostrando headers e response.
-Equivalente Python del test-curl.sh originale.
+Test the basic connection to the Ydea API by showing headers and responses.
+Python equivalent of the original test-curl.sh.
 
 Usage:
     test_curl.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import importlib.util
@@ -31,7 +29,7 @@ YdeaAPI = ydea_toolkit.YdeaAPI
 
 
 def main():
-    """Test connessione API"""
+    """API connection test"""
     print("=" * 60)
     print(" Test Connessione Ydea API")
     print("=" * 60)

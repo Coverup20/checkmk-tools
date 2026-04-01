@@ -1,3 +1,3 @@
 # misc
 
-Script temporaneamente non riclassificati in una categoria specifica.
+Scripts temporarily not reclassified into a specific category.

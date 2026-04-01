@@ -1,43 +1,43 @@
-# Guida Installazione CMK Local Discovery Trigger
+# CMK Local Discovery Trigger Installation Guide
 
-## Obiettivo
+## Objective
 
-Questa guida installa e configura il trigger che:
+This guide installs and configures the trigger that:
 
-- legge i local checks da `cmk -d <host>`
-- rileva differenze (`new` / `vanished` / hash)
-- esegue discovery solo quando serve
-- scrive log unificato in `/var/log/checkmk_server_autoheal.log`
+- read local checks from `cmk -d <host>`
+- detect differences (`new` / `vanished` / hash)
+- runs discovery only when needed
+- writes unified log to `/var/log/checkmk_server_autoheal.log`
 
-Supporta installazione completa lato server e prerequisiti lato host.
+Supports full server-side installation and host-side prerequisites.
 
-## Prerequisiti
+## Prerequisites
 
-- Server CheckMK con repository presente in `/opt/checkmk-tools`
-- Python 3 disponibile sul server
-- Accesso root o sudo
-- Host monitorati già configurati in CheckMK
+- CheckMK server with repository present in `/opt/checkmk-tools`
+- Python 3 available on the server
+- Root or sudo access
+- Monitored hosts already configured in CheckMK
 
-## Installazione lato server
+## Server-side installation
 
-### Modalità rapida (consigliata)
+### Quick mode (recommended)
 
 ```bash
-# Zero argomenti: auto-detect site/user/group + preset produzione (timer 5 min)
+# Zero arguments: auto-detect site/user/group + production preset (5 min timer)
 python3 /opt/checkmk-tools/script-tools/full/sync_update/install-cmk-local-discovery-trigger.py
 
-# Variante esplicita preset rapido
+# Quick preset explicit variant
 python3 /opt/checkmk-tools/script-tools/full/sync_update/install-cmk-local-discovery-trigger.py --quick
 ```
 
-### 1) Aggiorna repository
+### 1) Update repository
 
 ```bash
 cd /opt/checkmk-tools
 git pull
 ```
 
-### 2) Installa/aggiorna service e timer
+### 2) Install/update service and timer
 
 ```bash
 python3 /opt/checkmk-tools/script-tools/full/sync_update/install-cmk-local-discovery-trigger.py \
@@ -48,7 +48,7 @@ python3 /opt/checkmk-tools/script-tools/full/sync_update/install-cmk-local-disco
   --agent-timeout 90 \
   --log-file /var/log/checkmk_server_autoheal.log
 
-# Opzionale: ingloba installazione git + setup auto sync git
+# Optional: include git installation + auto sync git setup
 python3 /opt/checkmk-tools/script-tools/full/sync_update/install-cmk-local-discovery-trigger.py \
   --site monitoring \
   --run-as-user monitoring \
@@ -62,143 +62,143 @@ python3 /opt/checkmk-tools/script-tools/full/sync_update/install-cmk-local-disco
   --auto-sync-log-file /var/log/auto-git-sync.log
 ```
 
-### 3) Riavvia timer e avvia un run
+### 3) Restart timer and start a run
 
 ```bash
 systemctl restart checkmk-local-discovery-trigger.timer
 systemctl start --no-block checkmk-local-discovery-trigger.service
 ```
 
-### 4) Verifica stato
+### 4) Check status
 
 ```bash
 systemctl status checkmk-local-discovery-trigger.timer --no-pager -l
 systemctl status checkmk-local-discovery-trigger.service --no-pager -l
 ```
 
-### 5) Verifica log
+### 5) Check log
 
 ```bash
 tail -n 100 -f /var/log/checkmk_server_autoheal.log
 ```
 
-## Configurazione lato host
+## Host side configuration
 
-Il trigger lato server funziona solo se gli host espongono local checks validi.
+Server-side triggering only works if hosts display valid local checks.
 
-### Installazione lato host (consigliata)
+### Host-side installation (recommended)
 
-Su ogni host monitorato conviene mantenere aggiornato `/opt/checkmk-tools` con auto sync git.
+On each monitored host it is best to keep `/opt/checkmk-tools` updated with auto sync git.
 
 ```bash
 cd /opt/checkmk-tools
 git pull
 
-# Installer dedicato host per auto sync git repository
+# Dedicated installer host for auto sync git repository
 python3 /opt/checkmk-tools/script-tools/full/installation/install-auto-git-sync.py
 
-# Verifica servizio auto sync su host
+# Check auto sync service on host
 systemctl status auto-git-sync.service --no-pager -l
 tail -n 100 /var/log/auto-git-sync.log
 ```
 
-Se sull'host usi local checks Python da repository, puoi anche installare il sync checks:
+If you use Python local checks from the repository on your host, you can also install sync checks:
 
 ```bash
-# Zero argomenti: installazione automatica con default safe
+# Zero arguments: automatic installation with default safe
 python3 /opt/checkmk-tools/script-tools/full/sync_update/install-python-full-sync.py
 
-# Variante esplicita modalità rapida
+# Explicit fast mode variant
 python3 /opt/checkmk-tools/script-tools/full/sync_update/install-python-full-sync.py --quick
 
 systemctl status checkmk-python-full-sync.timer --no-pager -l
 ```
 
-Se l'host non usa systemd, l'installer host configura automaticamente fallback cron ogni 5 minuti.
+If the host does not use systemd, the host installer automatically sets up cron fallbacks every 5 minutes.
 
-### Requisiti host
+### Host requirements
 
-- Agent CheckMK raggiungibile dal server
-- Script local checks presenti nella cartella corretta host
-- Script eseguibili
-- Output local check nel formato CheckMK standard
+- Agent CheckMK reachable from the server
+- Script local checks present in the correct host folder
+- Executable scripts
+- Output local check in standard CheckMK format
 
-Formato atteso per ogni riga local check:
+Expected format for each local check line:
 
 ```text
 <STATE> <SERVICE_NAME> - <message>
 ```
 
-### Path tipici local checks su host Linux
+### Typical path local checks on Linux hosts
 
 ```text
 /usr/lib/check_mk_agent/local/
 ```
 
-### Test rapido host dal server CheckMK
+### Quick host test from CheckMK server
 
 ```bash
 cmk -d <HOSTNAME>
 cmk -D <HOSTNAME>
 ```
 
-Se `cmk -d` non contiene sezione `<<<local>>>`, il trigger non troverà servizi local su quell'host.
+If `cmk -d` contains no `<<<local>>>` section, the trigger will not find local services on that host.
 
-## Integrazione auto sync git (inglobata)
+## Auto sync git integration (embedded)
 
-Se usi `--setup-auto-sync-git`, l'installer:
+If you use `--setup-auto-sync-git`, the installer:
 
-- installa `git` se mancante (apt/dnf/yum)
-- crea/aggiorna `auto-git-sync.service`
-- abilita e avvia il servizio auto sync
-- configura log in `/var/log/auto-git-sync.log`
+- install `git` if missing (apt/dnf/yum)
+- create/update `auto-git-sync.service`
+- enable and start the auto sync service
+- configure log in `/var/log/auto-git-sync.log`
 
-Verifica rapida:
+Quick check:
 
 ```bash
 systemctl status auto-git-sync.service --no-pager -l
 tail -n 100 /var/log/auto-git-sync.log
 ```
 
-## Cosa vedrai nel log
+## What you will see in the log
 
-Esempi utili:
+Useful examples:
 
 - `Probe OK: <host> (rc=0)`
-- `Nuovi servizi local su <host>: ...`
-- `Servizi local vanished su <host>: ...`
-- `Nessun cambio: <host>`
+- `New local services on <host>: ...`
+- `Local services vanished on <host>: ...`
+- `No change: <host>`
 - `cmk -d timeout ...`
-- `Completato: changed=..., discovery_ok=..., unchanged=...`
+- `Done: changed=..., discovery_ok=..., unchanged=...`
 
-## Tuning consigliato
+## Tuning recommended
 
-Parametri bilanciati (produzione):
+Balanced parameters (production):
 
 - `--interval-min 5`
 - `--agent-timeout 90`
 
-Per ambienti molto lenti puoi aumentare `--agent-timeout`.
+For very slow environments you can increase `--agent-timeout`.
 
-## Troubleshooting rapido
+## Quick troubleshooting
 
-### Errore di copia comando con parentesi
+### Error copying command with parentheses
 
-Se compare errore tipo:
+If an error like this appears:
 
 ```text
 -bash: syntax error near unexpected token `('
 ```
 
-hai incollato un link markdown invece di un comando shell.
+you pasted a markdown link instead of a shell command.
 
-Usa sempre path reale, ad esempio:
+Always use real path, for example:
 
 ```bash
 python3 /opt/checkmk-tools/script-tools/full/sync_update/install-cmk-local-discovery-trigger.py --help
 ```
 
-### Log file assente
+### Log file missing
 
 ```bash
 touch /var/log/checkmk_server_autoheal.log
@@ -206,19 +206,19 @@ chown monitoring:monitoring /var/log/checkmk_server_autoheal.log
 chmod 664 /var/log/checkmk_server_autoheal.log
 ```
 
-### Servizio sembra "bloccato"
+### Service seems "stuck"
 
-Con `Type=oneshot` è normale vedere `activating` durante il ciclo.
+With `Type=oneshot` it is normal to see `activating` during the loop.
 
-Verifica live:
+Live verification:
 
 ```bash
 journalctl -u checkmk-local-discovery-trigger.service -f
 ```
 
-## Aggiornamento futuro
+## Future update
 
-Per aggiornare a nuove versioni:
+To update to new versions:
 
 ```bash
 cd /opt/checkmk-tools

@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-check-sosid-ns7.py - CheckMK Local Check for SOS session ID
+"""check-sosid-ns7.py - CheckMK Local Check for SOS session ID
 
 Show SOS session ID if active on NethServer 7.
 Check systemd services and query 'don status' for ID.
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -22,15 +20,13 @@ SSH_UNIT = "don-sshd"
 
 
 def is_active(unit: str) -> int:
-    """
-    Check if systemd unit is active.
+    """Check if systemd unit is active.
     
     Args:
         unit: Systemd unit name
         
     Returns:
-        1 if active, 0 if not active
-    """
+        1 if active, 0 if not active"""
     try:
         result = subprocess.run(
             ["systemctl", "is-active", "--quiet", unit],
@@ -44,12 +40,10 @@ def is_active(unit: str) -> int:
 
 
 def get_session_id() -> Optional[str]:
-    """
-    Get SOS session ID from 'don status' command.
+    """Get SOS session ID from 'don status' command.
     
     Returns:
-        Session ID string or None if not found
-    """
+        Session ID string or None if not found"""
     try:
         result = subprocess.run(
             ["don", "status"],
@@ -77,12 +71,10 @@ def get_session_id() -> Optional[str]:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     vpn_status = is_active(VPN_UNIT)
     ssh_status = is_active(SSH_UNIT)
     

@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-telegram_selfmon - Telegram Self-Monitoring Notification
+"""telegram_selfmon - Telegram Self-Monitoring Notification
 Bulk: no
 
 CheckMK notification script - dedicated for "monitor" host self-monitoring alerts.
 Sends Telegram message with hardcoded CHAT_ID for self-monitoring channel.
 
-Version: 1.1.0
-"""
+Version: 1.1.0"""
 
 import os
 import sys
@@ -20,7 +18,7 @@ VERSION = "1.1.0"
 
 # === CONFIG ===
 TOKEN = os.getenv("TELEGRAM_TOKEN", "")
-# CHAT_ID da variabile d'ambiente TELEGRAM_SELFMON_CHAT_ID (configurare per server in OMD environment)
+# CHAT_ID from environment variable TELEGRAM_SELFMON_CHAT_ID (configure for server in OMD environment)
 CHAT_ID = os.environ.get("TELEGRAM_SELFMON_CHAT_ID", "")
 CMK_URL = "https://monitor.nethlab.it/monitoring"
 SITE = "monitoring"
@@ -128,7 +126,7 @@ def main():
         return 0
     
     except (URLError, Exception) as e:
-        # Log error ma return 0 per non bloccare CheckMK
+        # Log error but return 0 to not block CheckMK
         print(f"WARNING: Telegram send failed: {e}", file=sys.stderr)
         return 0
 

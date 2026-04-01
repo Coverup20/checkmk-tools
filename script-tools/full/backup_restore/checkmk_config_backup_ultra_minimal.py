@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-checkmk_config_backup_ultra_minimal.py - Backup ultra-minimale CheckMK.
+"""checkmk_config_backup_ultra_minimal.py - CheckMK ultra-minimal backup.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import argparse
 import datetime as dt
@@ -94,16 +92,15 @@ def collect_metadata(site: str, site_base: Path, metadata_path: Path) -> None:
         if result.returncode == 0:
             version = result.stdout.strip()
 
-    metadata = f"""=== CHECKMK BACKUP ULTRA-MINIMALE ===
-Data backup: {dt.datetime.now()}
+    metadata = f"""=== CHECKMK ULTRA-MINIMAL BACKUP ===
+Backup date: {dt.datetime.now()}
 Site: {site}
 CheckMK Version: {version}
 
 === BACKUP STRATEGY ===
-Tipo: ULTRA-MINIMALE
-Include: conf.d, multisite.d, backup.mk, notifications, web, wato, version, ydea-toolkit
-Escluso: snapshot WATO storici, utenti web, RRD, inventory, bakery, cache
-"""
+Type: ULTRA-MINIMAL
+Includes: conf.d, multisite.d, backup.mk, notifications, web, wato, version, ydea-toolkit
+Excluded: historical WATO snapshots, web users, RRD, inventory, bakery, cache"""
     metadata_path.write_text(metadata, encoding="utf-8")
     log("[OK] Metadati raccolti")
 
@@ -224,7 +221,7 @@ def apply_retention(site: str) -> None:
 
 
 def create_restore_file(path: Path) -> None:
-    text = """=== ISTRUZIONI RESTORE DA BACKUP ULTRA-MINIMALE ===
+    text = """=== RESTORE INSTRUCTIONS FROM ULTRA-MINIMAL BACKUP ===
 
 1) omd stop <site>
 2) cd /opt/omd/sites/<site>
@@ -234,9 +231,8 @@ def create_restore_file(path: Path) -> None:
 6) omd start <site>
 7) cmk -R
 
-Ripristinato: hosts/rules, dashboard, notifiche custom, ydea-toolkit.
-Da ricreare: utenti web, certificati SSL custom.
-"""
+Restored: hosts/rules, dashboard, custom notifications, ydea-toolkit.
+To recreate: web users, custom SSL certificates."""
     path.write_text(text, encoding="utf-8")
 
 

@@ -1,102 +1,102 @@
-# CheckMK Smart Deploy - Sistema Ibrido
-> **Categoria:** Operativo
+# CheckMK Smart Deploy - Hybrid System
+> **Category:** Operational
 
-##  **File nel Sistema:**
+## **Files in System:**
 
-- **`smart-deploy-hybrid.sh`** -  **Installatore principale** (questo è quello che usi!)
-- **`smart-wrapper-template.sh`** - � **Template base** (struttura del wrapper che viene replicata)
-- **`README-Smart-Deploy.md`** -  **Documentazione** (questo file)
+- **`smart-deploy-hybrid.sh`** - **Master installer** (this is what you use!)
+- **`smart-wrapper-template.sh`** - � **Base template** (wrapper structure that is replicated)
+- **`README-Smart-Deploy.md`** - **Documentation** (this file)
 
-##  **Cos'è**
+## **What is it**
 
-Un sistema intelligente che combina:
-- ** Download da GitHub** per avere sempre l'ultima versione
-- ** Cache locale** per funzionare anche senza internet
-- ** Auto-update** trasparente ad ogni esecuzione CheckMK
+An intelligent system that combines:
+- ** Download from GitHub ** to always have the latest version
+- **Local cache** to work even without internet
+- Transparent **Auto-update** with each CheckMK run
 
-##  **Come Funziona**
+## **How It Works**
 
-### **1. Deploy Iniziale**
+### **1. Initial Deployment**
 ```bash
-# Sul server target
+# On the target server
 curl -s https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-Tools/smart-deploy-hybrid.sh | sudo bash
 ```
 
-### **2. Struttura Creata**
+### **2. Structure Created**
 ```
 /usr/lib/check_mk_agent/local/
-├── check_cockpit_sessions      # Wrapper smart
-├── check_dovecot_status        # Wrapper smart  
-├── check_ssh_root_sessions     # Wrapper smart
-└── check_postfix_status        # Wrapper smart
+├── check_cockpit_sessions # Smart wrapper
+├── check_dovecot_status # Smart wrapper  
+├── check_ssh_root_sessions # Smart wrapper
+└── check_postfix_status # Smart wrapper
 
 /var/cache/checkmk-scripts/
-├── check_cockpit_sessions.sh   # Cache locale
-├── check_dovecot_status.sh     # Cache locale
-├── update-all.sh               # Script manutenzione
-└── *.info                      # Info aggiornamenti
+├── check_cockpit_sessions.sh # Local cache
+├── check_dovecot_status.sh # Local cache
+├── update-all.sh # Maintenance script
+└── *.info # Update info
 ```
 
-### **3. Logica di Esecuzione**
+### **3. Execution Logic**
 ```
-CheckMK esegue script → Wrapper prova GitHub → Success? Aggiorna cache → Esegue cache locale
+CheckMK run script → Wrapper try GitHub → Success? Refresh cache → Perform local cache
                                            ↓
-                                         Fail? → Usa cache esistente
+                                         Fail? → Use existing cache
 ```
 
-##  **Vantaggi**
+## **Advantages**
 
--  **Sempre aggiornato** (quando c'è internet)
--  **Sempre funzionante** (anche senza internet)  
--  **Zero manutenzione** (auto-update trasparente)
--  **Fallback robusto** (cache locale sicura)
--  **Deploy rapido** (un comando su tutti i server)
+- **Always updated** (when there is internet)
+- **Always working** (even without internet)  
+- **Zero maintenance** (transparent auto-update)
+- **Robust fallback** (secure local cache)
+- **Fast Deploy** (one command on all servers)
 
-##  **Comandi Utili**
+## **Useful Commands**
 
-### **Test Manuale**
+### **Manual Test**
 ```bash
-# Testa un singolo script
+# Test a single script
 /usr/lib/check_mk_agent/local/check_cockpit_sessions
 
-# Forza aggiornamento di tutti
+# Force update everyone
 /var/cache/checkmk-scripts/update-all.sh
 ```
 
-### **Debug**
+### **Debugging**
 ```bash
-# Vedi cache
+# See cache
 ls -la /var/cache/checkmk-scripts/
 
-# Vedi info ultimo aggiornamento  
+# See latest update info  
 cat /var/cache/checkmk-scripts/check_cockpit_sessions.sh.info
 
-# Test download manuale
+# Manual download test
 curl -s https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ns7/check_cockpit_sessions.sh
 ```
 
-##  **Monitoraggio**
+## **Monitoring**
 
-Gli script self-report se non riescono ad aggiornarsi:
+Self-report scripts if they fail to update:
 ```
 2 check_cockpit_sessions - CRITICAL: No script available (GitHub unreachable, no cache)
 ```
 
-##  **Manutenzione**
+## **Maintenance**
 
-### **Aggiungere Nuovo Script**
-1. Pusha lo script su GitHub
-2. Modifica `smart-deploy-hybrid.sh` aggiungendo alla lista `SCRIPTS`
-3. Ri-esegui il deploy
+### **Add New Script**
+1. Push the script to GitHub
+2. Edit `smart-deploy-hybrid.sh` by adding `SCRIPTS` to the list
+3. Re-deploy
 
-### **Rimuovere Script**
+### **Remove Script**
 ```bash
-rm /usr/lib/check_mk_agent/local/nome_script
-rm /var/cache/checkmk-scripts/nome_script.*
+rm /usr/lib/check_mk_agent/local/script_name
+rm /var/cache/checkmk-scripts/script_name.*
 ```
 
-##  **Il Meglio dei Due Mondi**
+## **The Best of Both Worlds**
 
-- **Aggiornamenti automatici** come il tuo collega
-- **Stabilità** dei file locali tradizionali
+- **Automatic updates** like your colleague
+- **Stability** of traditional local files
 - **Zero single point of failure**

@@ -48,7 +48,7 @@ if r:
 else:
     print("  nessuno ")
 
-# ===== PENDING (mai controllati) =====
+# ===== PENDING (never checked) =====
 r = live("GET services\nFilter: has_been_checked = 0\nColumns: host_name description active_checks_enabled passive_checks_enabled\n").strip()
 print(f"\n[PENDING - mai controllati]")
 if r:
@@ -67,7 +67,7 @@ print(f"\n[CRIT - tutti]")
 if r:
     lines = r.split("\n")
     print(f"  Totale: {len(lines)}")
-    # Raggruppa per host
+    # Group by host
     by_host = {}
     for line in lines:
         p = line.split(";")

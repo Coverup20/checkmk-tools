@@ -1,3 +1,3 @@
 # deploy
 
-Script per deploy agent/check e smart deploy.
+Script for agent/check deployment and smart deployment.

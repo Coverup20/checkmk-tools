@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-checkmk_manage_job01_weekly.py - CheckMK Job01 Weekly Backup Management
+"""checkmk_manage_job01_weekly.py - CheckMK Job01 Weekly Backup Management
 
 Manages weekly full CheckMK backups (job01-complete):
 - Direct upload without compression (362M)
 - Uploads to DigitalOcean Spaces cloud storage
 - Retention: 5 backups (local + cloud)
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -33,12 +31,10 @@ LOG_FILE = "/var/log/checkmk-backup-job01.log"
 
 
 def log(message: str) -> None:
-    """
-    Log message to stdout and log file.
+    """Log message to stdout and log file.
     
     Args:
-        message: Message to log
-    """
+        message: Message to log"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     formatted = f"[{timestamp}] {message}"
     print(formatted)
@@ -51,12 +47,10 @@ def log(message: str) -> None:
 
 
 def error(message: str) -> None:
-    """
-    Log error and exit.
+    """Log error and exit.
     
     Args:
-        message: Error message
-    """
+        message: Error message"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     formatted = f"[{timestamp}]  ERROR: {message}"
     print(formatted, file=sys.stderr)
@@ -106,12 +100,10 @@ def check_dependencies() -> None:
 
 
 def find_unprocessed_backup() -> Optional[Path]:
-    """
-    Find job01-complete backup without timestamp (unprocessed).
+    """Find job01-complete backup without timestamp (unprocessed).
     
     Returns:
-        Path to backup or None if not found
-    """
+        Path to backup or None if not found"""
     log(" Searching for unprocessed job01-complete backup...")
     
     backup_path = Path(BACKUP_DIR)
@@ -129,16 +121,14 @@ def find_unprocessed_backup() -> Optional[Path]:
 
 
 def get_backup_size(backup_path: Path, site: str) -> str:
-    """
-    Get human-readable backup size.
+    """Get human-readable backup size.
     
     Args:
         backup_path: Path to backup directory
         site: Site name
         
     Returns:
-        Human-readable size string
-    """
+        Human-readable size string"""
     site_tar = backup_path / f"site-{site}.tar.gz"
     
     if not site_tar.exists():
@@ -152,15 +142,13 @@ def get_backup_size(backup_path: Path, site: str) -> str:
 
 
 def rename_with_timestamp(backup_path: Path) -> Path:
-    """
-    Rename backup with timestamp of modification time.
+    """Rename backup with timestamp of modification time.
     
     Args:
         backup_path: Current backup path
         
     Returns:
-        New backup path
-    """
+        New backup path"""
     # Get backup modification time
     mtime = backup_path.stat().st_mtime
     timestamp = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d-%Hh%M")
@@ -175,13 +163,11 @@ def rename_with_timestamp(backup_path: Path) -> Path:
 
 
 def upload_to_cloud(backup_path: Path, site: str) -> None:
-    """
-    Upload full backup to cloud using rclone (no compression).
+    """Upload full backup to cloud using rclone (no compression).
     
     Args:
         backup_path: Backup directory path
-        site: Site name
-    """
+        site: Site name"""
     log("  Uploading to cloud (full backup, no compression)...")
     
     rclone_config = f"/opt/omd/sites/{site}/.config/rclone/rclone.conf"
@@ -203,15 +189,13 @@ def upload_to_cloud(backup_path: Path, site: str) -> None:
 
 
 def apply_local_retention(retention: int) -> int:
-    """
-    Apply retention policy to local backups.
+    """Apply retention policy to local backups.
     
     Args:
         retention: Number of backups to keep
         
     Returns:
-        Number of local backups after retention
-    """
+        Number of local backups after retention"""
     log(f"  Applying local retention (keep last {retention})...")
     
     backup_path = Path(BACKUP_DIR)
@@ -237,16 +221,14 @@ def apply_local_retention(retention: int) -> int:
 
 
 def apply_cloud_retention(retention: int, site: str) -> int:
-    """
-    Apply retention policy to cloud backups.
+    """Apply retention policy to cloud backups.
     
     Args:
         retention: Number of backups to keep
         site: Site name
         
     Returns:
-        Number of cloud backups after retention
-    """
+        Number of cloud backups after retention"""
     log(f"  Applying cloud retention (keep last {retention})...")
     
     try:
@@ -280,12 +262,10 @@ def apply_cloud_retention(retention: int, site: str) -> int:
 
 
 def main() -> int:
-    """
-    Main entry point.
+    """Main entry point.
     
     Returns:
-        Exit code (0=success, 1=error)
-    """
+        Exit code (0=success, 1=error)"""
     log("============================================")
     log("CheckMK Job01 Weekly Backup Management")
     log("============================================")

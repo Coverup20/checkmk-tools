@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-check_postfix_queue.py - CheckMK Local Check for Postfix mail queue
+"""check_postfix_queue.py - CheckMK Local Check for Postfix mail queue
 
 Monitor Postfix mail queue size with thresholds.
 Thresholds: <20 OK, <100 WARNING, >=100 CRITICAL
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -19,12 +17,10 @@ SERVICE_NAME = "Postfix-queue"
 
 
 def get_queue_size() -> int:
-    """
-    Get number of messages in Postfix queue.
+    """Get number of messages in Postfix queue.
     
     Returns:
-        Number of messages in queue, -1 if unable to read
-    """
+        Number of messages in queue, -1 if unable to read"""
     try:
         result = subprocess.run(
             ["mailq"],
@@ -50,12 +46,10 @@ def get_queue_size() -> int:
 
 
 def main() -> int:
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     queue_size = get_queue_size()
     
     if queue_size < 0:

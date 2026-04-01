@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-fix_enable_checkmk_core.py - Riabilita il servizio "Check_MK" (SOLO Check_MK,
-non Check_MK Agent/Discovery) su tutti gli host dove è stato disabilitato.
+"""fix_enable_checkmk_core.py - Reenable the "Check_MK" service (Check_MK ONLY,
+not Check_MK Agent/Discovery) on all hosts where it has been disabled.
 
-Il servizio "Check_MK" è il DATA COLLECTOR di CheckMK: schedula cmk --check <host>
-e feed i risultati passivi a tutti gli altri servizi. DEVE essere active=1.
-Senza di esso tutto il sistema va stale permanentemente.
+The "Check_MK" service is the CheckMK DATA COLLECTOR: schedule cmk --check <host>
+and feed the passive results to all other services. MUST be active=1.
+Without it the whole system goes permanently offline.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 import socket
 import select
 import subprocess
@@ -60,7 +58,7 @@ print("=" * 65)
 print("FIX: Riabilita Check_MK core service (data collector)")
 print("=" * 65)
 
-# Trova tutti gli host dove il servizio "Check_MK" (esatto) è active=0
+# Find all hosts where the "Check_MK" service (exactly) is active=0
 rows = ls(
     "GET services\n"
     "Filter: description = Check_MK\n"

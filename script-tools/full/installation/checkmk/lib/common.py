@@ -92,11 +92,10 @@ _BACKUP_DIR = Path("/var/backups/checkmk-installer")
 
 
 def backup_file(path: Path, dest_dir: Path | None = None) -> Path:
-    """Backup a file into dest_dir (default: /var/backups/checkmk-installer/).
+    """Backup to file into dest_dir (default: /var/backups/checkmk-installer/).
 
     The backup filename encodes the original path so it never lands inside
-    sensitive directories like /etc/apt/apt.conf.d/ where apt would complain.
-    """
+    sensitive directories like /etc/apt/apt.conf.d/ where apt would complain."""
     if not path.exists():
         return path
     out_dir = dest_dir if dest_dir is not None else _BACKUP_DIR

@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
-"""
-check_host_connectivity.py - CheckMK active check: host UP/DOWN via ARP (nmap)
+"""check_host_connectivity.py - CheckMK active check: host UP/DOWN via ARP (nmap)
 
-Sostituisce check_icmp per host con firewall attivo (Windows, Linux, router, ecc.).
-Usa nmap -sn (ARP scan) che funziona anche quando ICMP e TCP sono bloccati dal firewall.
-Richiede: sudo nmap configurato per utente monitoring in /etc/sudoers.d/monitoring-nmap
+Replaces check_icmp for hosts with active firewall (Windows, Linux, routers, etc.).
+Use nmap -sn (ARP scan) which works even when ICMP and TCP are blocked by the firewall.
+Requires: sudo nmap configured for user monitoring in /etc/sudoers.d/monitoring-nmap
 
-Deploy su CheckMK server:
+Deploy on CheckMK server:
   cp check_host_connectivity.py /omd/sites/monitoring/local/lib/nagios/plugins/check_host_connectivity
   chmod +x /omd/sites/monitoring/local/lib/nagios/plugins/check_host_connectivity
 
-Prerequisito (già configurato):
+Prerequisite (already configured):
   /etc/sudoers.d/monitoring-nmap:
     monitoring ALL=(root) NOPASSWD: /usr/bin/nmap
 
-Configurazione WATO (host check command):
+WATO (host check command) configuration:
   Setup → Hosts → Host Check Command → "Use a custom check plugin"
   Plugin: check_host_connectivity
   Arguments: -H $HOSTADDRESS$
@@ -24,8 +23,7 @@ Usage:
   check_host_connectivity.py -H hostname.domain.local
   check_host_connectivity.py -H 192.168.32.100 --timeout 3
 
-Version: 2.1.0
-"""
+Version: 2.1.0"""
 
 import argparse
 import re
@@ -45,7 +43,7 @@ UNKNOWN  = 3
 
 
 def resolve_host(host: str) -> str:
-    """Risolve hostname in IP. Ritorna stringa vuota se non risolve."""
+    """Resolve hostname to IP. Returns empty string if it doesn't resolve."""
     try:
         return socket.gethostbyname(host)
     except socket.gaierror:
@@ -53,13 +51,11 @@ def resolve_host(host: str) -> str:
 
 
 def check_nmap_arp(ip: str, timeout: float) -> Tuple[bool, float]:
-    """
-    Verifica se l'host è UP tramite ARP scan (nmap -sn).
-    Usa sudo nmap per permettere ARP anche all'utente monitoring.
+    """Check if the host is UP via ARP scan (nmap -sn).
+    Use sudo nmap to allow ARP for user monitoring as well.
 
     Returns:
-        (is_up, rtt_ms) — rtt_ms = -1 se non trovato
-    """
+        (is_up, rtt_ms) — rtt_ms = -1 if not found"""
     t0 = time.monotonic()
     try:
         result = subprocess.run(
@@ -91,12 +87,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description=f"CheckMK active check: host UP/DOWN via ARP (nmap) v{VERSION}",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Esempi:
+        epilog="""Esempi:
   check_host_connectivity.py -H 192.168.32.100
   check_host_connectivity.py -H hostname.domain.local
-  check_host_connectivity.py -H 192.168.32.100 --timeout 5
-""")
+  check_host_connectivity.py -H 192.168.32.100 --timeout 5""")
     parser.add_argument("-H", "--host", required=True,
                         help="Hostname o IP da controllare")
     parser.add_argument("--timeout", type=float, default=3.0,

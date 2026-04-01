@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-"""
-smart_deploy.py - Smart Deploy for CheckMK Scripts
+"""smart_deploy.py - Smart Deploy for CheckMK Scripts
 
-Crea wrapper "smart" per script CheckMK che gestiscono:
-- Download automatico da GitHub
-- Caching locale
-- Esecuzione resiliente (fallback su cache)
-- Supporto notifiche/plugins/local checks
+Create "smart" wrappers for CheckMK scripts that handle:
+- Automatic download from GitHub
+- Local caching
+- Resilient execution (cache fallback)
+- Support notifications/plugins/local checks
 
 Usage:
     smart_deploy.py [--auto]
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -23,7 +21,7 @@ from pathlib import Path
 
 VERSION = "1.0.0"
 
-# --- Configurazione ---
+# --- Configuration ---
 GITHUB_REPO = "Coverup20/checkmk-tools"
 BASE_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main"
 CACHE_DIR = Path("/var/cache/checkmk-scripts")
@@ -112,8 +110,7 @@ def main():
         sys.exit(2)
 
 if __name__ == "__main__":
-    main()
-"""
+    main()"""
     
     try:
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -134,7 +131,7 @@ def main():
     
     paths = detect_paths()
     
-    # Mappa script da deployare
+    # Script map to deploy
     # name -> (github_path, type)
     scripts = {
         "check_cockpit_sessions": ("script-check-ns7/check_cockpit_sessions.sh", "local"),

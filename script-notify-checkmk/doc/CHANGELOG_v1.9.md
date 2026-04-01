@@ -1,33 +1,33 @@
-# Changelog v1.9 - Cache TTL con Risoluzione Ticket
+# Changelog v1.9 - TTL Cache with Ticket Resolution
 
-## Data
+## Date
 2025-01-15
 
-## Versione
+## Version
 ydea_realip v1.9
 
-## Problema Risolto
+## Problem Solved
 
-Cache dei ticket non distingueva tra ticket attivi e risolti, causando:
-- Rimozione immediata ticket quando operatore chiudeva ticket su Ydea
-- Impossibilità di tracciare momento esatto risoluzione alert
-- TTL uniforme per tutti i ticket (30 giorni) indipendentemente dallo stato
+Ticket cache did not distinguish between active and resolved tickets, causing:
+- Immediate ticket removal when operator closed ticket on Ydea
+- Inability to track exact alert resolution moment
+- Uniform TTL for all tickets (30 days) regardless of status
 
-## Soluzione Implementata
+## Solution Implemented
 
-### 1. Configurazione TTL Differenziati
+### 1. Differentiated TTL configuration
 
 ```bash
-# Ticket risolti (alert rientrato): 5 giorni
+# Tickets resolved (alert returned): 5 days
 RESOLVED_TICKET_TTL=$((5*24*3600))
 
-# Ticket attivi (alert persistente): 30 giorni
+# Active tickets (persistent alert): 30 days
 CACHE_MAX_AGE=$((30*24*3600))
 ```
 
-### 2. Struttura Cache Estesa
+### 2. Extended Cache Structure
 
-**Prima:**
+**Before:**
 ```json
 {
   "ticket_id": 1502598,
@@ -37,27 +37,27 @@ CACHE_MAX_AGE=$((30*24*3600))
 }
 ```
 
-**Dopo:**
+**After:**
 ```json
 {
   "ticket_id": 1502598,
   "state": "OK",
   "created_at": 1735040400,
   "last_update": 1735126800,
-  "resolved_at": 1735126800  // null se ticket attivo, timestamp se risolto
+  "resolved_at": 1735126800 // null if active ticket, timestamp if resolved
 }
 ```
 
-### 3. Nuova Funzione: `mark_ticket_resolved()`
+### 3. New Function: `mark_ticket_resolved()`
 
 ```bash
 mark_ticket_resolved() {
   local key="$1"
   init_cache
   
-  # Verifica che il ticket esista in cache
+  # Verify that the ticket exists in cache
   if ! ticket_in_cache "$key"; then
-    debug "Ticket $key non in cache, skip mark_resolved"
+    debug "Ticket $key not cached, skip mark_resolved"
     return 0
   fi
   
@@ -66,22 +66,22 @@ mark_ticket_resolved() {
      --arg ts "$(date -u +%s)" \
     '.[$key].resolved_at = ($ts | tonumber) | .[$key].last_update = ($ts | tonumber)' \
     "$TICKET_CACHE" 2>/dev/null) || {
-    log "WARN: Impossibile marcare ticket risolto per $key"
+    log "WARN: Unable to mark resolved ticket for $key"
     return 1
   }
   
   atomic_cache_write "$TICKET_CACHE" "$updated_cache"
-  debug "Ticket $key marcato come risolto, cleanup tra 5 giorni"
+  debug "Ticket $key marked as resolved, cleanup in 5 days"
 }
 ```
 
-### 4. Cleanup Intelligente
+### 4. Smart Cleanup
 
-**Prima (linee 70-87):**
+**Before (lines 70-87):**
 ```bash
 clean_old_cache_entries() {
   local now=$(date -u +%s)
-  local cutoff=$((now - CACHE_MAX_AGE))  # Sempre 30 giorni
+  local cutoff=$((now - CACHE_MAX_AGE)) # Always 30 days
   
   cleaned=$(jq --arg cutoff "$cutoff" 'to_entries | map(
     select(
@@ -94,20 +94,20 @@ clean_old_cache_entries() {
 }
 ```
 
-**Dopo (linee 70-100):**
+**After (lines 70-100):**
 ```bash
 clean_old_cache_entries() {
   local now=$(date -u +%s)
-  local resolved_cutoff=$((now - RESOLVED_TICKET_TTL))  # 5 giorni
-  local active_cutoff=$((now - CACHE_MAX_AGE))          # 30 giorni
+  local resolved_cutoff=$((now - RESOLVED_TICKET_TTL)) # 5 days
+  local active_cutoff=$((now - CACHE_MAX_AGE)) # 30 days
   
   cleaned=$(jq --arg resolved_cutoff "$resolved_cutoff" --arg active_cutoff "$active_cutoff" '
     to_entries | map(
       select(
-        # Ticket risolti: controlla resolved_at
+        # Resolved tickets: Check resolved_at
         if .value.resolved_at != null then
           (.value.resolved_at | tonumber) > ($resolved_cutoff | tonumber)
-        # Ticket attivi: controlla last_update
+        # Active tickets: Check last_update
         else
           .value.last_update != null and
           (.value.last_update | tonumber) > ($active_cutoff | tonumber)
@@ -116,116 +116,116 @@ clean_old_cache_entries() {
     ) | from_entries
   ' "$TICKET_CACHE")
   
-  atomic_cache_write "$cleaned"  # Usa flock per sicurezza
+  atomic_cache_write "$cleaned" # Use flock for safety
 }
 ```
 
-### 5. Alert OK/UP - Marcatura Risoluzione
+### 5. Alert OK/UP - Resolution marking
 
-**SERVICE Alerts (linee 454-461):**
+**SERVICE Alerts (lines 454-461):**
 ```bash
 if [[ $note_result -eq 0 ]]; then
-  log "Nota privata aggiunta al ticket #$TICKET_ID"
+  log "Private note added to ticket #$TICKET_ID"
   update_ticket_state "$TICKET_KEY" "$STATE"
   
-  # Se stato passa a OK/UP, marca ticket come risolto (parte timer 5 giorni)
+  # If status changes to OK/UP, mark ticket as resolved (5 day timer part)
   if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
     mark_ticket_resolved "$TICKET_KEY"
-    log "Ticket #$TICKET_ID marcato come risolto, cleanup automatico tra 5 giorni"
+    log "Ticket #$TICKET_ID marked as resolved, automatic cleanup in 5 days"
   fi
 ```
 
-**HOST Alerts (linee 612-619):**
+**HOST Alerts (lines 612-619):**
 ```bash
 if [[ $note_result -eq 0 ]]; then
-  log "Nota privata aggiunta al ticket #$TICKET_ID"
+  log "Private note added to ticket #$TICKET_ID"
   update_ticket_state "$TICKET_KEY" "$STATE"
   
-  # Se stato passa a OK/UP, marca ticket come risolto (parte timer 5 giorni)
+  # If status changes to OK/UP, mark ticket as resolved (5 day timer part)
   if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
     mark_ticket_resolved "$TICKET_KEY"
-    log "Ticket #$TICKET_ID marcato come risolto, cleanup automatico tra 5 giorni"
+    log "Ticket #$TICKET_ID marked as resolved, automatic cleanup in 5 days"
   fi
 ```
 
-## Modifiche ai File
+## File Changes
 
 ### `ydea_realip`
-- **Linee 13-14**: Aggiunta configurazione `RESOLVED_TICKET_TTL`
-- **Linee 70-100**: Riscritta `clean_old_cache_entries()` con logica differenziata
-- **Linea 157**: Aggiunto `resolved_at: null` in `save_ticket_cache()`
-- **Linee 167-189**: Nuova funzione `mark_ticket_resolved()`
-- **Linee 454-461**: Alert SERVICE - marcatura risoluzione su OK/UP
-- **Linee 490-497**: Alert SERVICE - marcatura risoluzione su OK/UP (caso errore API)
-- **Linee 612-619**: Alert HOST - marcatura risoluzione su OK/UP
+- **Lines 13-14**: Added `RESOLVED_TICKET_TTL` configuration
+- **Lines 70-100**: Rewritten `clean_old_cache_entries()` with differentiated logic
+- **Line 157**: Added `resolved_at: null` to `save_ticket_cache()`
+- **Lines 167-189**: New function `mark_ticket_resolved()`
+- **Lines 454-461**: Alert SERVICE - marking resolution on OK/UP
+- **Lines 490-497**: Alert SERVICE - resolution marking on OK/UP (API error case)
+- **Lines 612-619**: Alert HOST - marking resolution on OK/UP
 
 ### `CACHE_TTL_UPDATE.md`
-- Documentazione completa del workflow
-- Struttura cache JSON
-- Casistiche gestite
-- Guide testing e deploy
+- Complete workflow documentation
+- JSON cache structure
+- Case studies managed
+- Testing and deployment guides
 
-## Workflow Aggiornato
+## Workflow Updated
 
 ### 1. Alert CRITICAL/DOWN
 ```
-Cache → API check → Aggiungi nota o crea ticket → Salva cache (resolved_at: null)
+Cache → API check → Add note or create ticket → Save cache (resolved_at: null)
 ```
 
-### 2. Alert OK/UP (Rientro)
+### 2. Alert OK/UP (Return)
 ```
-Aggiungi nota "Allarme rientrato" → mark_ticket_resolved() → Imposta resolved_at: now → Timer 5gg
-```
-
-### 3. Cleanup Automatico
-```
-- Ticket risolti (resolved_at != null): rimossi dopo 5 giorni
-- Ticket attivi (resolved_at == null): rimossi dopo 30 giorni
+Add note "Alarm cleared" → mark_ticket_resolved() → Set resolved_at: now → 5-day timer
 ```
 
-## Benefici
+### 3. Automatic Cleanup
+```
+- Resolved tickets (resolved_at != null): removed after 5 days
+- Active tickets (resolved_at == null): removed after 30 days
+```
 
-1. **Persistenza Cache**: Ticket non rimossi quando operatore chiude su Ydea
-2. **TTL Intelligente**: 5gg per risolti (cleanup rapido), 30gg per attivi (tracking lungo)
-3. **Audit Trail**: Timestamp esatto risoluzione alert tracciato in `resolved_at`
-4. **Anti-Duplicazione**: Verifica API previene creazione duplicati per ticket chiusi
-5. **Race-Safe**: Usa `atomic_cache_write()` con flock per tutte le modifiche cache
+## Benefits
 
-## Testing Eseguito
+1. **Cache Persistence**: Tickets not removed when operator closes on Ydea
+2. **Smart TTL**: 5 days for resolved (quick cleanup), 30 days for active (long tracking)
+3. **Audit Trail**: Exact alert resolution timestamp plotted in `resolved_at`
+4. **Anti-Duplication**: API Verification prevents creation of duplicates for closed tickets
+5. **Race-Safe**: Use `atomic_cache_write()` with flock for all cache changes
 
--  Verifica sintassi bash (`bash -n`): OK
--  Struttura JSON valida per tutte le operazioni cache
--  Funzione `mark_ticket_resolved()` correttamente integrata
--  Cleanup usa atomic writes per prevenire race conditions
+## Testing Done
 
-## Deploy Richiesto
+- Check bash syntax (`bash -n`): OK
+- JSON structure valid for all cache operations
+- `mark_ticket_resolved()` function properly integrated
+- Cleanup uses atomic writes to prevent race conditions
+
+## Deploy Required
 
 ```bash
-# 1. Backup cache corrente
+#1. Backup current cache
 ssh monitoring@monitor.nethlab.it "cp /tmp/ydea_checkmk_tickets.json /tmp/ydea_checkmk_tickets.json.pre-v1.9"
 
-# 2. Deploy script aggiornato
+#2. Deploy updated script
 scp script-notify-checkmk/ydea_realip monitoring@monitor.nethlab.it:/opt/omd/sites/monitoring/local/share/check_mk/notifications/
 
-# 3. Verifica deployment
+# 3. Check deployment
 ssh monitoring@monitor.nethlab.it "grep -c 'mark_ticket_resolved' /opt/omd/sites/monitoring/local/share/check_mk/notifications/ydea_realip"
-# Output atteso: 3 (1 definizione + 2 chiamate)
+# Expected output: 3 (1 definition + 2 calls)
 
-# 4. Monitor logs per conferma funzionamento
-tail -f /opt/omd/sites/monitoring/var/log/notify.log | grep -E "marcato come risolto|cleanup automatico"
+#4. Monitor logs to confirm operation
+tail -f /opt/omd/sites/monitoring/var/log/notify.log | grep -E "marked as resolved|automatic cleanup"
 ```
 
-## Note Tecniche
+## Technical Notes
 
-- `resolved_at` può essere `null` (ticket attivo) o `timestamp` (ticket risolto)
-- `clean_old_cache_entries()` eseguita a ogni `init_cache()`
-- `atomic_cache_write()` garantisce coerenza cache in concorrenza
-- Ticket con `resolved_at` vecchio di 5+ giorni viene rimosso automaticamente
-- Ticket attivo (`resolved_at: null`) rimosso dopo 30 giorni da `last_update`
+- `resolved_at` can be `null` (active ticket) or `timestamp` (resolved ticket)
+- `clean_old_cache_entries()` run on every `init_cache()`
+- `atomic_cache_write()` ensures concurrent cache coherence
+- Ticket with `resolved_at` older than 5+ days is automatically removed
+- Active ticket (`resolved_at: null`) removed after 30 days by `last_update`
 
-## Compatibilità
+## Compatibility
 
--  Retrocompatibile: cache senza `resolved_at` trattata come ticket attivo (TTL 30gg)
--  jq 1.6+: richiesto per `if-then-else` in filtri JSON
--  flock: già richiesto dalla v1.8 per atomic operations
--  bash 4.0+: nessuna nuova feature richiesta
+- Backwards compatible: cache without `resolved_at` treated as active ticket (TTL 30 days)
+- jq 1.6+: Required for `if-then-else` in JSON filters
+- flock: already required since v1.8 for atomic operations
+- bash 4.0+: no new features required

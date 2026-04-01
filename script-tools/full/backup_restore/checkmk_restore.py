@@ -1,28 +1,26 @@
 #!/usr/bin/env python3
-"""
-checkmk_restore.py - CheckMK Disaster Recovery Restore Tool
+"""checkmk_restore.py - CheckMK Disaster Recovery Restore Tool
 
-Strumento interattivo per il ripristino di siti CheckMK da backup DR.
-Supporta download diretto da Rclone, gestione siti OMD e ripristino configurazioni.
+Interactive tool for restoring CheckMK sites from DR backups.
+Supports direct download from Rclone, OMD site management and configuration restore.
 
 Features:
-- Listing interattivo backup remoti (rclone)
-- Download e verifica integrità
-- Stop/Start automatico del site
-- Backup di sicurezza pre-restore
-- Ripristino permessi e ricompilazione cmk
+- Interactive listing of remote backups (rclone)
+- Download and verify integrity
+- Automatic stop/start of the site
+- Pre-restore security backup
+- Restoring permissions and recompiling cmk
 
 Usage:
     checkmk_restore.py [options]
 
 Options:
-    --site NAME       Nome del site da ripristinare
-    --backup FILE     Nome del file backup da usare (se già locale o noto)
-    --non-interactive Esegui in modalità non interattiva (richiede --site e --backup)
-    --debug           Debug logging
+    --site NAME Name of the site to restore
+    --backup FILE Name of the backup file to use (if already local or known)
+    --non-interactive Run in non-interactive mode (requires --site and --backup)
+    --debug Debug logging
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -35,7 +33,7 @@ import json
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 
-# --- Configurazione ---
+# --- Configuration ---
 DEFAULT_RCLONE_REMOTE = "do:testmonbck"
 BACKUP_BASE_DIR = Path("/opt/checkmk-backup")
 LOG_FILE = BACKUP_BASE_DIR / "restore-dr.log"
@@ -184,7 +182,7 @@ class RcloneManager:
         ]
         
         try:
-            # Crea directory config prima
+            # Create config directory first
             run_cmd(["mkdir", "-p", ".config/rclone"], user=self.site)
             run_cmd(cmd, user=self.site)
             Console.success("Rclone configurato")
@@ -194,7 +192,7 @@ class RcloneManager:
             return False
 
     def list_backups(self) -> List[tuple]:
-        """Ritorna lista (filename, size, date)"""
+        """Return list (filename, size, date)"""
         Console.info("Recupero lista backup...")
         paths = [
             f"checkmk-backups/{self.site}",
@@ -204,7 +202,7 @@ class RcloneManager:
         backups = []
         for p in paths:
             try:
-                # Usa lsf con formato tsp (time, size, path)
+                # Use lsf with tsp (time, size, path) format
                 remote_path = f"{self.remote}/{p}"
                 cmd = ["rclone", "lsf", remote_path, "--format", "tsp", 
                        f"--config={self.config}", "--s3-no-check-bucket", "--files-only"]

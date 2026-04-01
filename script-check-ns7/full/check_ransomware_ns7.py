@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-check_ransomware_ns7.py - CheckMK Local Check for Ransomware detection
+"""check_ransomware_ns7.py - CheckMK Local Check for Ransomware detection
 
 Scan all Samba shares for suspicious files (encrypted extensions, ransom notes).
 Log findings to /var/log/ransomware_monitor.log
 
 NethServer 7.9
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys
@@ -24,12 +22,10 @@ RANSOM_NOTES = ["README", "DECRYPT", "HOW_TO_RECOVER", "UNLOCK", "HELP", "RESTOR
 
 
 def get_samba_shares():
-    """
-    Get list of Samba shares from smb.conf.
+    """Get list of Samba shares from smb.conf.
     
     Returns:
-        List of tuples (share_name, share_path)
-    """
+        List of tuples (share_name, share_path)"""
     if not os.path.exists("/etc/samba/smb.conf"):
         return []
     
@@ -74,15 +70,13 @@ def get_samba_shares():
 
 
 def find_suspect_files(share_path):
-    """
-    Find suspicious files in share path.
+    """Find suspicious files in share path.
     
     Args:
         share_path: Path to share
         
     Returns:
-        List of suspect file paths
-    """
+        List of suspect file paths"""
     if not os.path.exists(share_path):
         return []
     
@@ -122,14 +116,12 @@ def find_suspect_files(share_path):
 
 
 def log_suspect_files(share_name, share_path, files):
-    """
-    Log suspect files to logfile.
+    """Log suspect files to logfile.
     
     Args:
         share_name: Name of share
         share_path: Path to share
-        files: List of suspect file paths
-    """
+        files: List of suspect file paths"""
     if not files:
         return
     
@@ -145,12 +137,10 @@ def log_suspect_files(share_name, share_path, files):
 
 
 def main():
-    """
-    Main check logic.
+    """Main check logic.
     
     Returns:
-        Exit code (always 0 for CheckMK local checks)
-    """
+        Exit code (always 0 for CheckMK local checks)"""
     shares = get_samba_shares()
     
     # Scan all shares

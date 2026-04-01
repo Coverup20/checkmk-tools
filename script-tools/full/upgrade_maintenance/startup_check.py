@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""
-startup_check.py - Rocksolid Startup Check & Remediation
+"""startup_check.py - Rocksolid Startup Check & Remediation
 
-Verifica e ripristina servizi critici all'avvio.
+Check and restore critical services at startup.
 Features:
-- Ripristino binari critici (tar, gzip, ar) da backup se corrotti
-- Verifica/Ripristino Node.js & Nginx (NethSecurity UI)
-- Verifica/Ripristino CheckMK Agent & FRPC
-- Auto-Deploy script locali e plugin da repo
-- Verifica QEMU Guest Agent (VM)
+- Restore critical binaries (tar, gzip, ar) from backups if corrupted
+- Verify/Restore Node.js & Nginx (NethSecurity UI)
+- Check/Restore CheckMK Agent & FRPC
+- Auto-Deploy local scripts and plugins from repo
+- Check QEMU Guest Agent (VM)
 
 Usage:
     startup_check.py
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import sys
 import os
@@ -26,7 +24,7 @@ from pathlib import Path
 
 VERSION = "1.0.0"
 
-# --- Configurazione ---
+# --- Configuration ---
 LOG_FILE = "/var/log/rocksolid-startup.log"
 BACKUP_DIR = Path("/opt/checkmk-backups/binaries")
 REPO_PLUGINS = Path("/opt/checkmk-tools/script-check-nsec8/plugins")

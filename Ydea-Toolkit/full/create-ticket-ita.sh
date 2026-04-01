@@ -5,7 +5,7 @@ TITLE="$1"
 DESCRIPTION="$2"
 PRIORITY_ITA="$3"
 
-# Converti priorità italiana in inglese
+# Convert Italian priority to English
 case "${PRIORITY_ITA,,}" in
   bassa)    PRIORITY="low" ;;
   media)    PRIORITY="normal" ;;
@@ -14,7 +14,7 @@ case "${PRIORITY_ITA,,}" in
   *)        PRIORITY="normal" ;;
 esac
 
-echo " Creazione ticket con priorità: $PRIORITY_ITA → $PRIORITY"
+echo "Creation of tickets with priority: $PRIORITY_ITA → $PRIORITY"
 echo ""
 
 ./ydea-toolkit.sh create "$TITLE" "$DESCRIPTION" "$PRIORITY"

@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
-"""
-sync-python-full-checks.py - Sincronizza e deploya Python local checks
+"""sync-python-full-checks.py - Synchronize and deploy Python local checks
 
-Copia i check Python da script-check-*/full/*.py
-verso /usr/lib/check_mk_agent/local/ (senza estensione .py).
+Copy Python checks from script-check-*/full/*.py
+to /usr/lib/check_mk_agent/local/ (without .py extension).
 
-Utilizzato da install-checkmk-sync.py come STEP 2.
+Used by install-checkmk-sync.py as STEP 2.
 
-Argomenti:
-  --repo           Path repository locale (default: /opt/checkmk-tools)
-  --target         Directory destinazione local checks (default: /usr/lib/check_mk_agent/local)
-  --category       Categoria script-check-* specifica (default: auto-detect)
-  --all-categories Sincronizza tutte le categorie script-check-*
-  --scripts        Nomi script specifici da deployare, separati da virgola
-                   Es: check_fail2ban_status,check_disk_space
-  --temp-dir       Deploy in directory temporanea invece di --target
-                   (anteprima senza deploy reale)
+Topics:
+  --repo Path local repository (default: /opt/checkmk-tools)
+  --target Local checks target directory (default: /usr/lib/check_mk_agent/local)
+  --category Specify script-check-* category (default: auto-detect)
+  --all-categories Sync all categories script-check-*
+  --scripts Specific script names to deploy, separated by commas
+                   Ex: check_fail2ban_status,check_disk_space
+  --temp-dir Deploy to temp directory instead of --target
+                   (preview without real deployment)
 
-Version: 1.2.1
-"""
+Version: 1.2.1"""
 
 import argparse
 import os
@@ -38,13 +36,13 @@ TARGET_DEFAULT = "/usr/lib/check_mk_agent/local"
 # ─── Utilities ────────────────────────────────────────────────────────────────
 
 def set_executable(path: Path) -> None:
-    """Rende il file eseguibile (rwxr-xr-x)."""
+    """Makes the file executable (rwxr-xr-x)."""
     current = path.stat().st_mode
     path.chmod(current | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
 def get_categories(repo: Path, category: str, all_categories: bool) -> List[Path]:
-    """Restituisce lista di directory script-check-* da processare."""
+    """Returns list of script-check-* directories to process."""
     if all_categories:
         cats = sorted(repo.glob("script-check-*/"))
         return [c for c in cats if c.is_dir()]
@@ -56,23 +54,21 @@ def get_categories(repo: Path, category: str, all_categories: bool) -> List[Path
             sys.exit(1)
         return [cat_path]
 
-    # Auto-detect: tutte le categorie con almeno un file in full/
+    # Auto-detect: all categories with at least one file in full/
     cats = sorted(repo.glob("script-check-*/"))
     return [c for c in cats if c.is_dir() and (c / "full").is_dir()]
 
 
 def find_launchers(category_dir: Path,
                    scripts_filter: Optional[Set[str]] = None) -> List[Path]:
-    """
-    Trova check Python in category_dir/full/*.py
+    """Find check Python in category_dir/full/*.py
 
-    Se scripts_filter è specificato, restituisce solo i check
-    il cui stem (nome senza .py) è presente nel set.
-    """
+    If scripts_filter is specified, returns only checks
+    whose stem (name without .py) is present in the set."""
     full_dir = category_dir / "full"
     if not full_dir.is_dir():
         return []
-    # Solo file che iniziano con "check" → esclude daemon, utility, etc.
+    # Only files starting with "check" → excludes daemons, utilities, etc.
     launchers = sorted(f for f in full_dir.glob("*.py") if f.stem.startswith("check"))
     if scripts_filter:
         launchers = [l for l in launchers if l.stem in scripts_filter]
@@ -80,7 +76,7 @@ def find_launchers(category_dir: Path,
 
 
 def list_all_launchers(repo: Path) -> List[Path]:
-    """Restituisce tutti i check disponibili nel repo (tutte le categorie)."""
+    """Returns all checks available in the repo (all categories)."""
     result = []
     for cat in sorted(repo.glob("script-check-*/")):
         full_dir = cat / "full"
@@ -90,7 +86,7 @@ def list_all_launchers(repo: Path) -> List[Path]:
 
 
 def deploy_name(launcher: Path) -> str:
-    """Calcola il nome file destinazione (senza .py)."""
+    """Calculate the destination file name (without .py)."""
     name = launcher.stem  # rimuove .py
     return name
 
@@ -99,17 +95,15 @@ def deploy_name(launcher: Path) -> str:
 
 def sync_category(category_dir: Path, target_dir: Path,
                   scripts_filter: Optional[Set[str]] = None) -> Tuple[int, int, int]:
-    """
-    Sincronizza i launcher di una categoria.
+    """Sync launchers in a category.
 
     Args:
-        category_dir:    Directory script-check-*
-        target_dir:      Destinazione deploy (reale o temp)
-        scripts_filter:  Se specificato, deploya solo gli script nel set
+        category_dir: Directory script-check-*
+        target_dir: Deployment target (real or temp)
+        scripts_filter: If specified, deploy only scripts in the set
 
     Returns:
-        (deployed, updated, skipped)
-    """
+        (deployed, updated, skipped)"""
     launchers = find_launchers(category_dir, scripts_filter)
     if not launchers:
         return 0, 0, 0
@@ -130,7 +124,7 @@ def sync_category(category_dir: Path, target_dir: Path,
             skipped += 1
             continue
 
-        # Se destination esiste, controlla se è identico
+        # If destination exists, check if it is identical
         if dest_path.exists():
             try:
                 dest_content = dest_path.read_bytes()
@@ -139,7 +133,7 @@ def sync_category(category_dir: Path, target_dir: Path,
                     continue
             except OSError:
                 pass
-            # Contenuto diverso → aggiorna
+            # Different content → update
             try:
                 dest_path.write_bytes(src_content)
                 set_executable(dest_path)
@@ -149,9 +143,9 @@ def sync_category(category_dir: Path, target_dir: Path,
                 print(f"  [ERROR] {launcher.name}: {e}")
                 skipped += 1
         else:
-            # Non esiste → deploy solo se esiste già un check deployato con stesso prefisso
-            # (per rispettare la regola: deploy solo se bash check già presente)
-            # In modalità sync (non primo deploy) copiamo direttamente
+            # Does not exist → deploy only if a deployed check with the same prefix already exists
+            # (to respect the rule: deploy only if bash check is already present)
+            # In sync mode (not first deploy) we copy directly
             try:
                 dest_path.write_bytes(src_content)
                 set_executable(dest_path)
@@ -167,13 +161,11 @@ def sync_category(category_dir: Path, target_dir: Path,
 def run(repo: Path, target_dir: Path, category: str, all_categories: bool,
         scripts_filter: Optional[Set[str]] = None,
         temp_dir: Optional[Path] = None) -> int:
-    """
-    Entry point principale.
+    """Main entry point.
 
     Args:
-        scripts_filter: Se specificato, deploya solo gli script nel set
-        temp_dir:       Se specificato, deploya in questa dir (anteprima)
-    """
+        scripts_filter: If specified, deploy only scripts in the set
+        temp_dir: If specified, deploy to this dir (preview)"""
     # Destinazione effettiva
     effective_target = temp_dir if temp_dir is not None else target_dir
     is_temp = temp_dir is not None
@@ -200,7 +192,7 @@ def run(repo: Path, target_dir: Path, category: str, all_categories: bool,
             print(f"[ERROR] Impossibile creare target dir: {e}", file=sys.stderr)
             return 1
 
-    # Se scripts_filter specificato → cerca in tutte le categorie ignorando --category
+    # If scripts_filter specified → searches all categories ignoring --category
     if scripts_filter:
         categories = get_categories(repo, "auto", all_categories=True)
     else:
@@ -237,20 +229,18 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=f"sync-python-full-checks v{VERSION} - Deploy Python local checks",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Esempi:
-  # Deploy tutte le categorie
+        epilog="""Examples:
+  # Deploy all categories
   sync-python-full-checks.py --all-categories
 
-  # Deploy solo script specifici
+  # Deploy specific scripts only
   sync-python-full-checks.py --scripts rssh_fail2ban_status,rssh_disk_usage
 
-  # Anteprima (temp dir) senza deploy reale
+  # Preview (temp dir) without real deployment
   sync-python-full-checks.py --all-categories --temp-dir /tmp/preview
 
-  # Lista script disponibili
-  sync-python-full-checks.py --list
-        """,
+  # List of available scripts
+  sync-python-full-checks.py --list""",
     )
     p.add_argument("--repo", default=str(REPO_DEFAULT),
                    help=f"Path repository locale (default: {REPO_DEFAULT})")

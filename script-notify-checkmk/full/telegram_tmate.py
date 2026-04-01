@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""
-telegram_tmate.py - Notifiche Telegram per canale Check MK Tmate
+"""telegram_tmate.py - Telegram notifications for Check MK Tmate channel
 
-Script notifica dedicato. TOKEN e CHAT_ID letti da .env file:
+Dedicated notification script. TOKEN and CHAT_ID read from .env file:
   /omd/sites/monitoring/local/share/check_mk/notifications/telegram_tmate.env
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import sys
@@ -26,7 +24,7 @@ SITE = "monitoring"
 
 
 def load_env_file(path: str) -> None:
-    """Carica variabili da .env file se non già presenti nell'ambiente."""
+    """Load variables from .env file if not already present in the environment."""
     if not os.path.isfile(path):
         return
     with open(path, "r") as f:
@@ -76,7 +74,7 @@ def send_telegram(token: str, chat_id: str, text: str, reply_markup: str) -> Non
 
 
 def main() -> int:
-    # Carica .env file
+    # Upload .env file
     load_env_file(ENV_FILE)
 
     token = os.environ.get("TELEGRAM_TOKEN", "")

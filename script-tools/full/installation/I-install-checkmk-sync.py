@@ -1,26 +1,24 @@
 #!/usr/bin/env python3
-"""
-install-checkmk-sync.py - Installer unificato CheckMK
+"""install-checkmk-sync.py - CheckMK unified installer
 
-Esegue in sequenza:
-  STEP A → CheckMK Agent install    (download da server CMK, plain TCP 6556)
-             + FRPC opzionale       (tunnel verso server FRP)
-  STEP 1 → auto-git-sync            (git pull automatico ogni N secondi)
-  STEP 2 → checkmk-python-full-sync (deploy check Python ogni 5 minuti)
+Execute in sequence:
+  STEP A → CheckMK Agent install (download from CMK server, plain TCP 6556)
+             + optional FRPC (tunnel to FRP server)
+  STEP 1 → auto-git-sync (automatic git pull every N seconds)
+  STEP 2 → checkmk-python-full-sync (deploy check Python every 5 minutes)
 
-Compatibilità:
-  - Debian/Ubuntu                   → deb + systemd socket
-  - RHEL/Rocky/NethServer           → rpm + systemd socket
-  - OpenWrt / NethSecurity 8        → estrazione .deb manuale + socat/procd
-  - Sistemi cron-only               → cron jobs fallback per git-sync/py-sync
+Compatibility:
+  - Debian/Ubuntu → deb + systemd socket
+  - RHEL/Rocky/NethServer → rpm + systemd socket
+  - OpenWrt / NethSecurity 8 → manual .deb extraction + socat/procd
+  - Cron-only systems → cron jobs fallback for git-sync/py-sync
 
-Sostituisce:
+Replaces:
   - install-agent-interactive.sh / install-agent-interactive.py
   - install-auto-git-sync.sh
   - install-python-full-sync.py
 
-Version: 2.0.0
-"""
+Version: 2.0.0"""
 
 import argparse
 import os
@@ -72,12 +70,12 @@ OPENWRT_CRONTAB = Path("/etc/crontabs/root")
 # ─── Utilities ────────────────────────────────────────────────────────────────
 
 def run(cmd: List[str], **kwargs) -> None:
-    """Esegue comando, solleva eccezione se fallisce."""
+    """Execute command, raise exception if failed."""
     subprocess.run(cmd, check=True, **kwargs)
 
 
 def run_capture(cmd: List[str], cwd: str = "") -> subprocess.CompletedProcess:
-    """Esegue comando e cattura output (non solleva eccezione)."""
+    """Execute command and capture output (does not raise exception)."""
     return subprocess.run(
         cmd,
         check=False,
@@ -121,7 +119,7 @@ def get_repo_owner(repo_path: Path) -> str:
 
 
 def cron_update(lines_to_keep_filter: str, new_line: str, openwrt: bool = False) -> None:
-    """Aggiorna crontab: rimuove righe con marker, aggiunge nuova riga."""
+    """Update crontab: remove lines with markers, add new line."""
     if openwrt:
         current = []
         if OPENWRT_CRONTAB.exists():
@@ -151,10 +149,8 @@ def cron_update(lines_to_keep_filter: str, new_line: str, openwrt: bool = False)
 # agente – rilevamento OS ─────────────────────────────────────────────────────
 
 def detect_os_info() -> Dict[str, str]:
-    """
-    Rileva OS e restituisce un dizionario con chiavi:
-      os_id, os_ver, pkg_type (deb|rpm|openwrt), pkg_manager (apt|dnf|yum|opkg)
-    """
+    """Detects OS and returns a dictionary with keys:
+      os_id, os_ver, pkg_type (deb|rpm|openwrt), pkg_manager (apt|dnf|yum|opkg)"""
     info: Dict[str, str] = {
         "os_id": "", "os_ver": "", "pkg_type": "", "pkg_manager": "",
     }
@@ -208,10 +204,9 @@ def detect_os_info() -> Dict[str, str]:
 # agente – download ───────────────────────────────────────────────────────────
 
 def fetch_text(url: str, timeout: int = 15) -> str:
-    """Scarica testo da URL (nessuna dipendenza esterna).
+    """Download text from URL (no external dependencies).
 
-    Raises: RuntimeError se fallisce.
-    """
+    Raises: RuntimeError if it fails."""
     try:
         with urllib.request.urlopen(url, timeout=timeout) as resp:
             return resp.read().decode("utf-8", errors="ignore")
@@ -220,7 +215,7 @@ def fetch_text(url: str, timeout: int = 15) -> str:
 
 
 def download_file(url: str, outpath: str) -> None:
-    """Scarica file binario con curl o wget."""
+    """Download binary file with curl or wget."""
     if shutil.which("curl"):
         run(["curl", "-fsSL", url, "-o", outpath])
     elif shutil.which("wget"):
@@ -230,7 +225,7 @@ def download_file(url: str, outpath: str) -> None:
 
 
 def latest_agent_filename(base_url: str, pkg_type: str) -> str:
-    """Ottiene il nome file dell'ultima versione agente dal listing HTML."""
+    """Gets the file name of the latest agent version from the HTML listing."""
     try:
         html = fetch_text(base_url + "/")
     except RuntimeError as exc:
@@ -247,10 +242,10 @@ def latest_agent_filename(base_url: str, pkg_type: str) -> str:
     return matches[-1]
 
 
-# agente – installazione Linux ────────────────────────────────────────────────
+# agent – Linux installation ──────────────────────── ────────────────────────
 
 def _pkg_install(pkg_mgr: str, *packages: str) -> None:
-    """Installa pacchetti con il package manager specificato."""
+    """Install packages with the specified package manager."""
     if pkg_mgr == "apt":
         run(["apt-get", "install", "-y", *packages])
     elif pkg_mgr == "dnf":
@@ -264,7 +259,7 @@ def _pkg_install(pkg_mgr: str, *packages: str) -> None:
 
 
 def install_agent_linux(base_url: str, pkg_type: str, pkg_mgr: str) -> None:
-    """Installa agente CheckMK su Debian/Ubuntu/RHEL tramite deb o rpm."""
+    """Install CheckMK agent on Debian/Ubuntu/RHEL via deb or rpm."""
     fname = latest_agent_filename(base_url, pkg_type)
     url = f"{base_url}/{fname}"
     tmp = f"/tmp/{fname}"
@@ -274,7 +269,7 @@ def install_agent_linux(base_url: str, pkg_type: str, pkg_mgr: str) -> None:
     if pkg_type == "deb":
         result = run_capture(["dpkg", "-i", tmp])
         if result.returncode != 0:
-            # fix dipendenze rotte (comune su Ubuntu)
+            # fix broken dependencies (common on Ubuntu)
             run_capture([pkg_mgr == "apt" and "apt-get" or "apt-get",
                          "install", "-f", "-y"])
     else:
@@ -285,8 +280,8 @@ def install_agent_linux(base_url: str, pkg_type: str, pkg_mgr: str) -> None:
 
 
 def install_agent_openwrt(base_url: str) -> None:
-    """Installa agente CheckMK su OpenWrt: estrae il binario dal .deb manualmente."""
-    # installa dipendenze necessarie per estrarre .deb
+    """Install CheckMK agent on OpenWrt: Extract the binary from the .deb manually."""
+    # installs dependencies needed to extract .deb
     run_capture(["opkg", "update"])
     for pkg in ("ca-certificates", "wget", "tar", "gzip", "socat", "binutils"):
         run_capture(["opkg", "install", pkg])
@@ -323,7 +318,7 @@ def install_agent_openwrt(base_url: str) -> None:
 
 
 def install_agent(base_url: str, os_info: Dict[str, str]) -> None:
-    """Dispatcher installazione agente in base all'OS."""
+    """Agent installation dispatcher based on OS."""
     if os_info["pkg_type"] == "openwrt":
         install_agent_openwrt(base_url)
     else:
@@ -333,13 +328,13 @@ def install_agent(base_url: str, os_info: Dict[str, str]) -> None:
             else "apt-get",
             "install", "-y", "ca-certificates", "curl", "wget",
         ])
-        # update cache prima dell'install
+        # update cache before installing
         if os_info["pkg_manager"] == "apt":
             run_capture(["apt-get", "update", "-y"])
         install_agent_linux(base_url, os_info["pkg_type"], os_info["pkg_manager"])
 
 
-# agente – configurazione socket ──────────────────────────────────────────────
+# agent – socket configuration ─────────────────────── ───────────────────────
 
 _AGENT_SOCKET_UNIT = """\
 [Unit]
@@ -351,8 +346,7 @@ ListenStream=6556
 Accept=yes
 
 [Install]
-WantedBy=sockets.target
-"""
+WantedBy=sockets.target"""
 
 _AGENT_SERVICE_UNIT = """\
 [Unit]
@@ -360,8 +354,7 @@ Description=Checkmk Agent (TCP 6556 plain) connection
 
 [Service]
 ExecStart=-/usr/bin/check_mk_agent
-StandardInput=socket
-"""
+StandardInput=socket"""
 
 _AGENT_OPENWRT_INITD = """\
 #!/bin/sh /etc/rc.common
@@ -382,12 +375,11 @@ start_service() {
 
 stop_service() {
     killall socat >/dev/null 2>&1 || true
-}
-"""
+}"""
 
 
 def configure_agent_systemd() -> None:
-    """Configura socket plain TCP 6556 via systemd (disabilita ctl-daemon)."""
+    """Configure plain TCP socket 6556 via systemd (disable ctl-daemon)."""
     for unit in ("check-mk-agent.socket", "cmk-agent-ctl-daemon.service"):
         run_capture(["systemctl", "stop", unit])
         run_capture(["systemctl", "disable", unit])
@@ -401,7 +393,7 @@ def configure_agent_systemd() -> None:
 
 
 def configure_agent_openwrt() -> None:
-    """Configura agente via procd + socat su OpenWrt."""
+    """Configure agent via procd + socat on OpenWrt."""
     initd = Path("/etc/init.d/check_mk_agent")
     write_text(initd, _AGENT_OPENWRT_INITD)
     initd.chmod(0o755)
@@ -420,7 +412,7 @@ def configure_agent(os_info: Dict[str, str]) -> None:
 # agente – uninstall ──────────────────────────────────────────────────────────
 
 def uninstall_agent(os_info: Dict[str, str]) -> None:
-    """Rimuove agente CheckMK e sua configurazione socket."""
+    """Removes CheckMK agent and its socket configuration."""
     print("[INFO] Rimozione agente CheckMK...")
     if os_info["pkg_type"] == "openwrt":
         initd = Path("/etc/init.d/check_mk_agent")
@@ -444,10 +436,10 @@ def uninstall_agent(os_info: Dict[str, str]) -> None:
     print("[OK] Agente rimosso")
 
 
-# FRPC – installazione ────────────────────────────────────────────────────────
+# FRPC – installation ──────────────────────────── ────────────────────────────
 
 def install_frpc(frp_version: str) -> None:
-    """Scarica e installa il binario frpc."""
+    """Download and install the frpc binary."""
     import platform
     machine = platform.machine().lower()
     arch = "amd64"
@@ -478,17 +470,16 @@ _FRPC_CONF_TPL = """\
 server_addr = "{server}"
 server_port = 7000
 auth.method = "token"
-auth.token  = "{token}"
-tls.enable  = true
-log.to      = "/var/log/frpc.log"
-log.level   = "debug"
+auth.token = "{token}"
+tls.enable = true
+log.to = "/var/log/frpc.log"
+log.level = "debug"
 
 [{hostname}]
-type        = "tcp"
-local_ip    = "127.0.0.1"
-local_port  = 6556
-remote_port = {remote_port}
-"""
+type = "tcp"
+local_ip = "127.0.0.1"
+local_port = 6556
+remote_port = {remote_port}"""
 
 _FRPC_INITD_OPENWRT = """\
 #!/bin/sh /etc/rc.common
@@ -505,8 +496,7 @@ start_service() {
 
 stop_service() {
     killall frpc >/dev/null 2>&1 || true
-}
-"""
+}"""
 
 _FRPC_SYSTEMD_SERVICE = """\
 [Unit]
@@ -522,13 +512,12 @@ RestartSec=5s
 User=root
 
 [Install]
-WantedBy=multi-user.target
-"""
+WantedBy=multi-user.target"""
 
 
 def configure_frpc(hostname: str, server: str, remote_port: int,
                    auth_token: str, os_info: Dict[str, str]) -> None:
-    """Scrive frpc.toml e installa il servizio/init.d."""
+    """Writes frpc.toml and installs service/init.d."""
     FRPC_CONF_DIR.mkdir(parents=True, exist_ok=True)
     write_text(FRPC_CONF_FILE, _FRPC_CONF_TPL.format(
         server=server,
@@ -555,7 +544,7 @@ def configure_frpc(hostname: str, server: str, remote_port: int,
 # FRPC – uninstall ────────────────────────────────────────────────────────────
 
 def uninstall_frpc(os_info: Dict[str, str]) -> None:
-    """Rimuove FRPC e sua configurazione."""
+    """Removes FRPC and its configuration."""
     print("[INFO] Rimozione FRPC...")
     if os_info["pkg_type"] == "openwrt":
         initd = Path("/etc/init.d/frpc")
@@ -620,14 +609,13 @@ REPO_DIR="{repo_dir}"
 LOG_FILE="{log}"
 cd "$REPO_DIR" || exit 0
 if ! git fetch origin main >> "$LOG_FILE" 2>&1; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARN: git fetch fallito" >> "$LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARN: git fetch failed" >> "$LOG_FILE"
     exit 0
 fi
 git reset --hard origin/main >> "$LOG_FILE" 2>&1
 git clean -fd >> "$LOG_FILE" 2>&1
 SHA=$(git rev-parse --short HEAD 2>/dev/null)
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Sync OK ($SHA)" >> "$LOG_FILE"
-"""
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Sync OK ($SHA)" >> "$LOG_FILE""""
 
 _GIT_SYNC_SERVICE_TPL = """\
 [Unit]
@@ -643,12 +631,11 @@ Group={user}
 ExecStart=/bin/bash {script}
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=auto-git-sync
-"""
+SyslogIdentifier=auto-git-sync"""
 
 _GIT_SYNC_TIMER_TPL = """\
 [Unit]
-Description=Auto Git Sync timer - ogni {interval}s
+Description=Auto Git Sync timer - every {interval}s
 
 [Timer]
 OnBootSec=30s
@@ -656,20 +643,19 @@ OnUnitActiveSec={interval}s
 Persistent=false
 
 [Install]
-WantedBy=timers.target
-"""
+WantedBy=timers.target"""
 
 
 def install_git_sync_systemd(repo_path: Path, interval: int, owner: str) -> None:
-    """Installa auto-git-sync come systemd service + timer."""
-    # Prepara log file
+    """Install auto-git-sync as systemd service + timer."""
+    # Prepare log files
     try:
         Path(GIT_SYNC_LOG).touch(exist_ok=True)
         run_capture(["chown", f"{owner}:{owner}", GIT_SYNC_LOG])
     except Exception:
         pass
 
-    # Scrivi wrapper script bash (evita problemi ExecStart multi-riga in systemd)
+    # Write bash script wrappers (avoid multi-line ExecStart problems in systemd)
     wrapper_content = _GIT_SYNC_WRAPPER.format(repo_dir=str(repo_path), log=GIT_SYNC_LOG)
     write_text(Path(_GIT_SYNC_SCRIPT), wrapper_content)
     Path(_GIT_SYNC_SCRIPT).chmod(0o755)
@@ -687,7 +673,7 @@ def install_git_sync_systemd(repo_path: Path, interval: int, owner: str) -> None
     run(["systemctl", "enable", GIT_SYNC_TIMER_NAME])
     run(["systemctl", "start", GIT_SYNC_TIMER_NAME])
 
-    # Primo sync immediato (non fatale)
+    # First sync immediate (non-fatal)
     result = run_capture(["systemctl", "start", GIT_SYNC_SERVICE_NAME])
     if result.returncode == 0:
         print(f"[OK] Primo sync eseguito")
@@ -700,7 +686,7 @@ def install_git_sync_systemd(repo_path: Path, interval: int, owner: str) -> None
 
 
 def install_git_sync_cron(repo_path: Path) -> None:
-    """Installa git sync via cron (OpenWrt / sistemi senza systemd)."""
+    """Install git sync via cron (OpenWrt / systems without systemd)."""
     cron_line = (
         f"* * * * * cd {repo_path} && "
         f"git fetch origin main >> {GIT_SYNC_LOG} 2>&1 && "
@@ -724,12 +710,11 @@ Type=oneshot
 ExecStart={cmd}
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=checkmk-python-full-sync
-"""
+SyslogIdentifier=checkmk-python-full-sync"""
 
 _PYTHON_SYNC_TIMER_CONTENT = """\
 [Unit]
-Description=CheckMK Python Full Checks Sync - ogni 5 minuti
+Description=CheckMK Python Full Checks Sync - every 5 minutes
 
 [Timer]
 OnBootSec=1min
@@ -737,8 +722,7 @@ OnUnitActiveSec=5min
 Persistent=true
 
 [Install]
-WantedBy=timers.target
-"""
+WantedBy=timers.target"""
 
 
 def _build_sync_cmd(py_bin: str, sync_script: Path, repo_path: Path,
@@ -769,7 +753,7 @@ def _find_sync_script(repo_path: Path) -> Path:
 def install_python_sync_systemd(repo_path: Path, target: str,
                                  category: str, all_categories: bool,
                                  scripts: str = "", temp_dir: str = "") -> None:
-    """Installa checkmk-python-full-sync come systemd service + timer."""
+    """Install checkmk-python-full-sync as systemd service + timer."""
     py_bin = shutil.which("python3")
     if not py_bin:
         print("[ERROR] python3 non trovato nel PATH", file=sys.stderr)
@@ -816,7 +800,7 @@ def install_python_sync_systemd(repo_path: Path, target: str,
 def install_python_sync_cron(repo_path: Path, target: str,
                               category: str, all_categories: bool,
                               scripts: str = "", temp_dir: str = "") -> None:
-    """Installa python full sync via cron."""
+    """Install python full sync via cron."""
     py_bin = shutil.which("python3")
     if not py_bin:
         print("[ERROR] python3 non trovato", file=sys.stderr)
@@ -851,10 +835,8 @@ def install_python_sync_cron(repo_path: Path, target: str,
 # ─── Add scripts to existing sync ───────────────────────────────────────────────
 
 def add_scripts_to_sync(new_scripts_arg: str, use_systemd: bool) -> int:
-    """
-    Aggiunge script alla lista del timer/cron senza reinstallare.
-    Legge la configurazione attuale, fa il merge, riscrive e riavvia.
-    """
+    """Adds scripts to timer/cron list without reinstalling.
+    Reads the current configuration, merges, rewrites and reboots."""
     new_set = {s.strip() for s in new_scripts_arg.split(",") if s.strip()}
     if not new_set:
         print("[ERROR] --add-scripts: nessuno script specificato", file=sys.stderr)
@@ -888,7 +870,7 @@ def add_scripts_to_sync(new_scripts_arg: str, use_systemd: bool) -> int:
             print(f"[INFO] Lista completa: {merged}")
         else:
             # ExecStart esiste ma senza --scripts (usa --category o --all-categories)
-            # Aggiunge --scripts in coda alla riga ExecStart
+            # Append --scripts to the ExecStart line
             new_scripts_str = ",".join(sorted(new_set))
             new_content = re.sub(
                 r'(ExecStart=.+)',
@@ -909,7 +891,7 @@ def add_scripts_to_sync(new_scripts_arg: str, use_systemd: bool) -> int:
         print(f"[OK] --add-scripts completato. Timer aggiornato.")
 
     else:
-        # cron (OpenWrt / sistemi senza systemd)
+        # cron (OpenWrt / systems without systemd)
         cron_result = run_capture(["crontab", "-l"] if not is_openwrt() else ["cat", str(OPENWRT_CRONTAB)])
         cron_lines = (cron_result.stdout or "").splitlines()
         updated = False
@@ -964,11 +946,9 @@ def add_scripts_to_sync(new_scripts_arg: str, use_systemd: bool) -> int:
 # ─── Prompt interattivi ───────────────────────────────────────────────────────
 
 def _ask(prompt: str) -> str:
-    """
-    Legge input da /dev/tty se stdin non è un tty (es. curl | python3 -).
-    Apre /dev/tty in r+w così prompt e risposta usano entrambi il terminale reale.
-    Fallback a input() standard.
-    """
+    """Reads input from /dev/tty if stdin is not a tty (e.g. curl | python3 -).
+    Opens /dev/tty in r+w so prompt and response both use the real terminal.
+    Fallback to standard input()."""
     import sys
     if not sys.stdin.isatty():
         try:
@@ -977,7 +957,7 @@ def _ask(prompt: str) -> str:
                 tty.flush()
                 return tty.readline().rstrip("\n")
         except OSError:
-            # /dev/tty non disponibile: scrivi prompt su stderr e usa default
+            # /dev/tty not available: write prompt to stderr and use default
             sys.stderr.write(prompt + " [auto-default]\n")
             sys.stderr.flush()
             return ""
@@ -999,12 +979,10 @@ def ask_frpc_install() -> bool:
 
 
 def ask_frpc_config() -> Tuple[str, str, int, str]:
-    """
-    Raccoglie i parametri FRPC in modo interattivo.
+    """Collects FRPC parameters interactively.
 
     Returns:
-        (hostname, frp_server, remote_port, auth_token)
-    """
+        (hostname, frp_server, remote_port, auth_token)"""
     import socket as _socket
     default_hostname = _socket.gethostname()
 
@@ -1075,19 +1053,17 @@ def ask_category(repo_path: Path) -> Tuple[str, bool]:
 
 
 def ask_scripts(repo_path: Path) -> Tuple[str, bool, str]:
-    """
-    Selezione interattiva script e modalità deploy.
+    """Interactive script selection and deployment mode.
 
-    Passo 1 → scelta categoria (OS)
-    Passo 2 → scelta script dentro la categoria
-    Passo 3 → modalità deploy (reale / anteprima)
+    Step 1 → choose category (OS)
+    Step 2 → choose script within the category
+    Step 3 → deploy mode (real/preview)
 
     Returns:
         (scripts_csv, all_categories, temp_dir)
-        scripts_csv:    stringa "nome1,nome2,..." oppure "" (tutte le categorie)
-        all_categories: True se l'utente ha scelto tutto (nessun filtro)
-        temp_dir:       path temp se anteprima, altrimenti ""
-    """
+        scripts_csv: string "name1,name2,..." or "" (all categories)
+        all_categories: True if the user chose all (no filters)
+        temp_dir: path temp if preview, otherwise """""
     # ── Passo 1: Selezione categoria (OS) ────────────────────────────────────
     categories = sorted([
         d.name for d in repo_path.iterdir()
@@ -1172,11 +1148,11 @@ def ask_scripts(repo_path: Path) -> Tuple[str, bool, str]:
     all_cat = False
     if not selected_indices or selected_indices == list(range(len(all_launchers))):
         if filter_cat is None:
-            # Nessun filtro OS E tutti gli script → all_categories=True
+            # No OS filters AND all scripts → all_categories=True
             all_cat = True
             print(f"  → Tutti gli script di tutte le categorie ({len(all_launchers)} script)")
         else:
-            # Categoria specifica, tutti i suoi script → passa lista esplicita
+            # Specific category, all its scripts → pass explicit list
             chosen = [all_launchers[i][0] for i in range(len(all_launchers))]
             scripts_csv = ",".join(chosen)
             print(f"  → Tutti i {len(chosen)} script di {filter_cat}")
@@ -1208,26 +1184,24 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=f"install-checkmk-sync.py v{VERSION} - Installer unificato Agent + git-sync + deploy check Python",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Esempi:
-  # Installazione interattiva completa (consigliato)
+        epilog="""Examples:
+  # Full interactive installation (recommended)
   python3 install-checkmk-sync.py
 
-  # Modalità rapida (tutti i default, installa anche agent)
+  # Quick mode (all defaults, also install agents)
   python3 install-checkmk-sync.py --quick
 
-  # Solo sync (salta installazione agent)
+  # Sync only (skip agent installation)
   python3 install-checkmk-sync.py --skip-agent
 
-  # Disinstalla tutto
+  # Uninstall everything
   python3 install-checkmk-sync.py --uninstall
 
-  # Disinstalla solo FRPC
+  # Uninstall FRPC only
   python3 install-checkmk-sync.py --uninstall-frpc
 
-  # Con categoria specifica e intervallo git custom
-  python3 install-checkmk-sync.py --category script-check-ubuntu --git-interval 60
-        """,
+  # With specific category and custom git range
+  python3 install-checkmk-sync.py --category script-check-ubuntu --git-interval 60""",
     )
     # Repository e target
     p.add_argument("--repo", default=str(REPO_DEFAULT_PATH),
@@ -1279,7 +1253,7 @@ Esempi:
     p.add_argument("--uninstall", action="store_true",
                    help="Disinstalla agente + FRPC ed esce")
 
-    # Aggiunta script post-installazione
+    # Added post-installation script
     p.add_argument("--add-scripts", default="", metavar="SCRIPT1,SCRIPT2",
                    help="Aggiunge script al timer/cron senza reinstallare (es: check_arp_watch,check_disk_space)")
 
@@ -1355,7 +1329,7 @@ def main() -> int:
         os_info = detect_os_info()
         print("[INFO] STEP A saltato (--skip-agent)")
 
-    # FRPC (solo se agente installato o forzato da flag)
+    # FRPC (only if agent installed or forced by flag)
     do_frpc = args.install_frpc
     if not skip_agent and not do_frpc and not args.quick:
         do_frpc = ask_frpc_install()

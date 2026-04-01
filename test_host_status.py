@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""
-Test check_host_status su host reali di produzione.
-"""
+"""Test check_host_status on real production hosts."""
 import subprocess, concurrent.futures, time
 
 PLUGIN = "/omd/sites/monitoring/local/lib/nagios/plugins/check_host_status"
 
 TESTS = [
     # (label,              ip,              type,     extra_args)
-    # --- Server con agente CMK ---
+    # --- Server with CMK agent ---
     ("fw.studiopaci.info", "192.168.32.1",   "server",  ""),
     ("ns8",                "192.168.33.223", "server",  ""),
     ("DC01",               "192.168.33.221", "server",  ""),
@@ -19,7 +17,7 @@ TESTS = [
     # --- AP UniFi ---
     ("AP-AreaProgettazione","192.168.33.246","switch",  ""),
     ("AP-AreaGare",        "192.168.33.250", "switch",  ""),
-    # --- Client (no agente) ---
+    # --- Client (no agent) ---
     ("PC03",               "192.168.32.138", "client",  ""),
     ("WKS01",              "192.168.32.145", "client",  ""),
     # --- NAS ---
@@ -67,7 +65,7 @@ for label, htype, rc, out, elapsed in results:
     elif rc == 1: warn += 1
     elif rc == 2: crit += 1
     else: unk += 1
-    # tronca output se troppo lungo
+    # truncate output if too long
     out_short = out[:60] + "..." if len(out) > 63 else out
     print(f"{label:<25} {htype:<8} {s:<5} {elapsed:>5.1f}s  {out_short}")
 

@@ -1,820 +1,817 @@
 # GitHub Copilot Instructions - checkmk-tools
 
-##  REGOLA PRELIMINARE OBBLIGATORIA
+## MANDATORY PRELIMINARY RULE
 
-** PRIMA DI INIZIARE QUALSIASI LAVORO:**
+** BEFORE STARTING ANY WORK:**
 
--  **SEMPRE leggere QUESTO file** (`.github/copilot-instructions.md`) all'inizio di OGNI conversazione
--  **SEMPRE consultare** questo file prima di iniziare qualsiasi task
--  Questo file contiene **TUTTE le regole, workflow e procedure obbligatorie**
--  **NON iniziare a lavorare** senza aver letto e compreso le istruzioni
--  In caso di dubbio su come procedere → **rileggi questo file**
+- **ALWAYS read THIS file** (`.github/copilot-instructions.md`) at the beginning of EVERY conversation
+- **ALWAYS consult** this file before starting any task
+- This file contains **ALL rules, workflows and mandatory procedures**
+- **DO NOT start work** without reading and understanding the instructions
+- If in doubt about how to proceed → **reread this file**
 
-**File correlati:**
-- `.copilot-preferences.md` → Sommario/quick reference (220 righe)
-- `.github/copilot-instructions.md` → **QUESTO FILE** - Regole complete (~2250 righe, aggiornato automaticamente)
+**Related files:**
+- `.copilot-preferences.md` → Summary/quick reference (220 lines)
+- `.github/copilot-instructions.md` → **THIS FILE** - Complete rules (~2250 lines, automatically updated)
 
 ---
 
-##  REGOLE GENERALI OBBLIGATORIE
+## MANDATORY GENERAL RULES
 
-### Lingua dei file (script, codice, commenti, documentazione)
+### File language (script, code, comments, documentation)
 
--  **TUTTO il testo nei file deve essere in inglese**: commenti, docstring, messaggi log, variabili descrittive, README, doc
--  **Nuovi file**: scrivere direttamente in inglese
--  **File esistenti modificati**: tradurre in inglese le parti che si toccano
--  **Migrazione graduale**: quando si modifica uno script vecchio, tradurre l'intero file in inglese
--  **MAI aggiungere testo in italiano** in file di codice o documentazione
+- **ALL text in files must be in English**: comments, docstrings, log messages, descriptive variables, README, doc
+- **New files**: write directly in English
+- **Modified existing files**: Translate the touching parts into English
+- **Gradual migration**: When editing an old script, translate the entire file into English
+- **NEVER add Italian text** to code or documentation files
 
-### Emoji nei file
+### Emojis in files
 
--  **ZERO emoji nei file** — nessuna eccezione: script, codice, commenti, markdown, file di istruzioni Copilot
--  **File esistenti modificati**: rimuovere tutte le emoji dall'intero file quando si tocca
--  **Nuovi file**: non inserire mai emoji
+- **ZERO emojis in files** — no exceptions: scripts, code, comments, markdown, Copilot instruction files
+- **Existing files modified**: Remove all emoji from entire file when tapping
+- **New files**: never insert emojis
 
 ### Chat communications
 
--  **Communications between us in chat always remain in Italian**
+- **Communications between us in chat always remain in Italian**
 
 ### No personal names or brand names in files
 
--  **NEVER include names of people** (real names, usernames, GitHub handles, etc.) in any file
--  **NEVER include internal brand names, customer names, or project codenames** in files
--  Use generic references: "Nethesis style", "upstream standard", "reference codebase"
--  If a person or brand must be referenced → use only the company name (e.g. "Nethesis")
--  This rule applies to: code, comments, docstrings, markdown, instructions files — no exceptions
+- **NEVER include names of people** (real names, usernames, GitHub handles, etc.) in any file
+- **NEVER include internal brand names, customer names, or project codenames** in files
+- Use generic references: "Nethesis style", "upstream standard", "reference codebase"
+- If a person or brand must be referenced → use only the company name (e.g. "Nethesis")
+- This rule applies to: code, comments, docstrings, markdown, instructions files — no exceptions
 
 ### No hardcoded environment data in files
 
--  **NEVER hardcode** IP addresses, hostnames, domain names, ports, URLs that refer to a specific environment
--  **NEVER hardcode** credentials, tokens, API keys, passwords, secrets of any kind
--  **NEVER hardcode** filesystem paths that are environment-specific (e.g. `/omd/sites/monitoring/`, specific usernames)
--  **NEVER hardcode** site names, tenant names, customer-specific identifiers
--  **ALWAYS use** environment variables, config files, or parameters passed at runtime
--  **ALWAYS use** placeholder values in examples: `YOUR_TOKEN_HERE`, `<hostname>`, `<ip_address>`
--  If a default is needed → use a clearly fake/generic value that cannot be mistaken for real data
--  This rule applies to ALL file types: scripts, config templates, markdown, instructions — no exceptions
+- **NEVER hardcode** IP addresses, hostnames, domain names, ports, URLs that refer to a specific environment
+- **NEVER hardcode** credentials, tokens, API keys, passwords, secrets of any kind
+- **NEVER hardcode** filesystem paths that are environment-specific (e.g. `/omd/sites/monitoring/`, specific usernames)
+- **NEVER hardcode** site names, tenant names, customer-specific identifiers
+- **ALWAYS use** environment variables, config files, or parameters passed at runtime
+- **ALWAYS use** placeholder values in examples: `YOUR_TOKEN_HERE`, `<hostname>`, `<ip_address>`
+- If a default is needed → use a clearly fake/generic value that cannot be mistaken for real data
+- This rule applies to ALL file types: scripts, config templates, markdown, instructions — no exceptions
 
 ### No archived/ folders — delete replaced scripts
 
--  **NO `archived/` folders** — scripts that are replaced must be deleted, not archived
--  **NEVER move superseded scripts to `archived/`** — delete them directly with `git rm`
--  **NEVER keep old versions alongside new ones** — one version only, the current one
--  Git history preserves the old versions — no need to keep them in the tree
--  When replacing a script with a new one → `git rm` the old one in the same commit
--  If `archived/` folders are found → delete them immediately
+- **NO `archived/` folders** — scripts that are replaced must be deleted, not archived
+- **NEVER move superseded scripts to `archived/`** — delete them directly with `git rm`
+- **NEVER keep old versions alongside new ones** — one version only, the current one
+- Git history preserves the old versions — no need to keep them in the tree
+- When replacing a script with a new one → `git rm` the old one in the same commit
+- If `archived/` folders are found → delete them immediately
 
 ---
 
-##  FILOSOFIA DI LAVORO FONDAMENTALE
+## FUNDAMENTAL WORKING PHILOSOPHY
 
-** REGOLA ZERO - QUALITÀ PRIMA DI TUTTO:**
+** ZERO RULE - QUALITY FIRST: **
 
-> **"LA PRESCIA VUOLE TEMPO!!"**  
-> _Fare le cose di fretta = rifarle 10 volte invece di 1 volta fatta per bene_
+> **"PRICE TAKES TIME!!"**  
+> _Doing things in a hurry = doing them 10 times instead of doing them right once_
 
--  **FARE LE COSE PER BENE** - Usare tutto il tempo necessario
--  **NESSUNA SCORCIATOIA** - Mai saltare step senza esplicita autorizzazione utente
--  **COMPLETEZZA ASSOLUTA** - Seguire workflow completi fino in fondo
--  **NON C'È FRETTA** - Non ho impegni che mi costringano a velocizzare
--  **WORKFLOW OBBLIGATORI** - Seguire SEMPRE tutti gli step documentati
--  **NON "OTTIMIZZARE" VIA STEP** - Ogni step del workflow ha un motivo di esistere
--  **MEGLIO LENTO E CORRETTO** - Che veloce e da rifare 10 volte
+- **DO THINGS RIGHT** - Use all the time necessary
+- **NO SHORTCUTS** - Never skip steps without explicit user permission
+- **ABSOLUTE COMPLETENESS** - Follow complete workflows to the end
+- **THERE IS NO RUSH** - I have no commitments that force me to speed up
+- **MANDATORY WORKFLOWS** - ALWAYS follow all documented steps
+- **DO NOT "OPTIMIZE" VIA STEP** - Each workflow step has a reason to exist
+- **BETTER SLOW AND CORRECT** - How fast and to be done 10 times
 
-**Esempi di ciò che NON fare:**
--  Committare senza testare su host remoti → poi rifare 10 volte
--  Saltare validazioni "tanto funziona" → poi debug ore per trovare l'errore
--  Omettere step "per velocità" → poi perdere tempo a recuperare
--  Assumere che qualcosa funzioni senza verificare → poi scoprire che non funziona in produzione
--  **LA PRESCIA**: fare veloce = rifare 10 volte
+**Examples of what NOT to do:**
+- Commit without testing on remote hosts → then redo 10 times
+- Skip validations "it works anyway" → then debug for hours to find the error
+- Omit steps "for speed" → then waste time recovering
+- Assuming something works without testing → then discovering that it doesn't work in production
+- **LA PRESCIA**: do it quickly = do it again 10 times
 
-**Esempi di ciò che FARE:**
--  Seguire ogni step del workflow documentato → fatto bene la prima volta
--  Testare su host remoti SEMPRE → nessuna sorpresa in produzione
--  Validare OGNI modifica → bug trovati subito, non dopo
--  Prendere il tempo necessario per fare bene → risparmiare tempo totale
--  **NESSUNA FRETTA**: fare bene = fatto 1 volta sola
+**Examples of what to DO:**
+- Follow every step of the documented workflow → done right the first time
+- ALWAYS test on remote hosts → no surprises in production
+- Validate EVERY change → bugs found immediately, not later
+- Take the time to do it right → save total time
+- **NO HURRY**: do well = done only 1 time
 
-** REGOLA ASSOLUTA - SE L'UTENTE CHIEDE, FALLO E BASTA:**
+** ABSOLUTE RULE - IF THE USER ASKS, JUST DO IT:**
 
-> **"Se me lo chiedi, è perché sai che posso farlo"**
+> **"If you ask me, it's because you know I can do it"**
 
--  **MAI** rispondere con "non posso perché..." quando l'utente chiede di eseguire qualcosa
--  **MAI** dare comandi da incollare quando l'utente ha chiesto di eseguire in autonomia
--  **MAI** spiegare limitazioni tecniche senza prima aver tentato DAVVERO di eseguire
--  **TENTARE SEMPRE** di eseguire ciò che viene chiesto, qualunque sia la difficoltà
--  Se ci sono ostacoli tecnici reali → risolverli autonomamente, non delegare all'utente
--  L'utente conosce già le tue capacità: fidati della sua richiesta e agisci
+- **NEVER** respond with "I can't because..." when the user asks to do something
+- **NEVER** give commands to paste when the user has asked to execute them independently
+- **NEVER** explain technical limitations without REALLY trying to execute first
+- **ALWAYS ATTEMPT** to do what you are asked, whatever the difficulty
+- If there are real technical obstacles → solve them yourself, do not delegate to the user
+- The user already knows your capabilities: trust their request and take action
 
 ---
 
-##  WORKFLOW GIT - Fork e Upstream
+## WORKFLOW GIT - Fork and Upstream
 
-### Struttura repository
+### Repository structure
 
-| Remote | URL | Ruolo |
-|--------|-----|-------|
-| `origin` | `git@github.com:Coverup20/checkmk-tools.git` | **Fork di lavoro** — push quotidiani |
-| `upstream` | `git@github.com:nethesis/checkmk-tools.git` | **Repo ufficiale Nethesis** — push a rilascio |
+| Remote | URL | Role |
+|--------|-----|------|
+| `origin` | `git@github.com:Coverup20/checkmk-tools.git` | **Work forks** — daily pushes |
+| `upstream` | `git@github.com:nethesis/checkmk-tools.git` | **Official Nethesis Repo** — push upon release |
 
-### Regola OBBLIGATORIA - Due-push workflow
+### MANDATORY rule - Due-push workflow
 
-**Tutto il lavoro quotidiano va su `origin` (fork). Solo a lavoro completato si pusha su `upstream`.**
+**All day-to-day work goes on `origin` (fork). Only when the job is completed does it push to `upstream`.**
 
-**Workflow completo:**
+**Complete Workflow:**
 
 ```bash
-# 1. Lavora normalmente, commit su fork
+#1. Work normally, commit on fork
 git add .
-git commit -m "type(scope): vX.Y.Z - descrizione"
+git commit -m "type(scope): vX.Y.Z - description"
 git push origin main
 
-# 2. Solo quando il lavoro è FINITO e testato → push su upstream Nethesis
+# 2. Only when the work is FINISHED and tested → push to upstream Nethesis
 git push upstream main
 ```
 
-**Regole:**
+**Rules:**
 
--  **Durante lo sviluppo**: push SOLO su `origin` (fork Coverup20)
--  **A lavoro completato**: stesso commit → push anche su `upstream` (nethesis)
--  **Commit message uguale** su entrambi i push (stesso commit, stesso tag/versione)
--  **MAI** push su `upstream` senza aver prima testato su `origin`
--  **MAI** `git push` senza specificare `origin` o `upstream` (potrebbero andare su quello sbagliato)
--  **Default push**: sempre `origin` se non specificato diversamente dall'utente
+- **During development**: push ONLY to `origin` (Coverup20 fork)
+- **When work is completed**: same commit → push also on `upstream` (nethesis)
+- **Same commit message** on both pushes (same commit, same tag/version)
+- **NEVER** push on `upstream` without first testing on `origin`
+- **NEVER** `git push` without specifying `origin` or `upstream` (may go to the wrong one)
+- **Default push**: always `origin` unless otherwise specified by the user
 
-**Quando fare il push su upstream:**
+**When to push upstream:**
 
--  Feature/fix completata + testata su host remoti
--  Utente da il via libera esplicito ("ok, pusha anche su nethesis")
--  MAI durante iterazioni di sviluppo/debug
+- Feature/fix completed + tested on remote hosts
+- User gives explicit green light ("ok, push on nethesis too")
+- NEVER during development/debug iterations
 
 ---
 
-##  REGOLE DI SICUREZZA OBBLIGATORIE
+## MANDATORY SAFETY RULES
 
-###  Protezione Dati e Conferme
+### Data Protection and Confirmations
 
-**SEMPRE rispettare queste regole:**
+**ALWAYS respect these rules:**
 
-1. **Un comando alla volta** _(vale per operazioni DISTRUTTIVE o su sistemi remoti)_
-   -  NON eseguire comandi distruttivi multipli senza conferma
-   -  Eseguire un comando distruttivo, attendere conferma utente
-   -  SPECIALMENTE per: cancellazioni, modifiche file, deploy, comandi SSH
-   -  **ECCEZIONE**: tool read-only in parallelo sono OK (grep, read_file, file_search, etc.)
-   -  **ECCEZIONE**: `multi_replace_string_in_file` è OK per edit batch sullo stesso file/progetto
+1. **One command at a time** _(valid for DESTRUCTIVE operations or on remote systems)_
+   - DO NOT execute multiple destructive commands without confirmation
+   - Execute a destructive command, wait for user confirmation
+   - ESPECIALLY for: deletions, file modifications, deployments, SSH commands
+   - **EXCEPTION**: read-only tools in parallel are OK (grep, read_file, file_search, etc.)
+   - **EXCEPTION**: `multi_replace_string_in_file` is OK for batch edit on the same file/project
 
-    **Regola aggiuntiva (OBBLIGATORIA): pausa a fine comando**
-    -  Dopo OGNI comando lanciato in terminale, aggiungere una pausa breve per permettere di leggere l’output.
-    - Default: **3 secondi**.
-    - PowerShell (locale): aggiungere sempre `; Start-Sleep -Seconds 3`
-       - Esempio: `wsl -d kali-linux ssh host "uptime"; Start-Sleep -Seconds 3`
-    - Bash (remoto / dentro SSH): aggiungere `; sleep 3`
-       - Esempio: `ssh host "uptime; sleep 3"`
-    - Obiettivo: evitare che l’output “sparisca” subito e ridurre errori/timeout percepiti.
+    **Additional rule (MANDATORY): pause at the end of the command**
+    - After EVERY command launched in terminal, add a short pause to allow the output to be read.
+    - Default: **3 seconds**.
+    - PowerShell (local): always add `; Start-Sleep -Seconds 3`
+       - Example: `wsl -d kali-linux ssh host "uptime"; Start-Sleep -Seconds 3`
+    - Bash (remote / inside SSH): add `; sleep 3`
+       - Example: `ssh host "uptime; sleep 3"`
+    - Objective: to prevent the output from "disappearing" immediately and reduce perceived errors/timeouts.
 
-2. **Backup prima di cancellare**
-   -  NON cancellare mai file/directory senza backup
-   -  SEMPRE creare backup prima di operazioni distruttive
-   -  Formato backup: `NOME_ORIGINALE.backup_YYYY-MM-DD_HH-MM-SS`
-   -  Confermare path backup all'utente prima di procedere
+2. **Backup before deleting**
+   - NEVER delete files/directories without backup
+   - ALWAYS create backups before destructive operations
+   - Backup format: `ORIGINAL_NAME.backup_YYYY-MM-DD_HH-MM-SS`
+   - Confirm path backup with user before proceeding
 
-3. **Conferma operazioni critiche**
-   - Cancellazioni
-   - Modifiche massive (>10 file)
-   - Deploy su produzione
-   - Comandi su sistemi remoti
+3. **Confirm critical operations**
+   - Cancellations
+   - Massive changes (>10 files)
+   - Deploy on production
+   - Commands on remote systems
 
-4. **Verifica preferenze Copilot periodicamente**
-   -  Controllare `.github/copilot-instructions.md` regolarmente
-   -  Assicurarsi di seguire sempre le ultime istruzioni
-   -  Suggerire aggiornamenti quando necessario
+4. **Check Copilot preferences periodically**
+   - Check `.github/copilot-instructions.md` regularly
+   - Make sure you always follow the latest instructions
+   - Suggest updates when necessary
 
-5. **Memorizza informazioni utili**
-   -  Se scopri pattern/comandi/procedure utili → aggiungili alle copilot-instructions
-   -  Workflow che funzionano bene vanno documentati
-   -  Path comuni, configurazioni standard, troubleshooting tips
+5. **Stores useful information**
+   - If you discover useful patterns/commands/procedures → add them to the copilot-instructions
+- Workflows that work well must be documented
+   - Common paths, standard configurations, troubleshooting tips
 
-6. **Pulizia backup dopo test**
-   -  Quando i test su file backuppati terminano con successo
-   -  Proporre rimozione dei file backup creati
-   -  ATTENDERE conferma utente prima di eliminare
-   -  Non eliminare mai backup senza conferma esplicita
+6. **Clean backup after test**
+   - When tests on backed up files finish successfully
+   - Propose removal of created backup files
+   - WAIT for user confirmation before deleting
+   - Never delete backups without explicit confirmation
 
-7. **Controllo integrità periodico automatico**
-   -  Durante le conversazioni, proporre periodicamente `.\script-ps-tools\check-integrity.ps1 -SendEmail`
-   -  Eseguire il controllo in momenti opportuni (dopo modifiche, commit importanti, richieste utente)
-   -  Inviare email se anche solo 1 file corrotto viene trovato
-   -  Email include: lista file corrotti, percentuale errori, dettagli
-   -  Non inviare email se tutto OK (solo output console)
+7. **Automatic periodic integrity check**
+   - During conversations, periodically propose `.\script-ps-tools\check-integrity.ps1 -SendEmail`
+   - Check at appropriate times (after changes, major commits, user requests)
+   - Send email if even 1 corrupt file is found
+   - Email includes: list of corrupt files, error percentage, details
+   - Don't send email if everything OK (console output only)
 
-8. ** CONTROLLO DATI SENSIBILI OBBLIGATORIO**
-   -  **SEMPRE** verificare presenza dati sensibili quando si crea/modifica uno script
-   -  Scansionare per:
+8. ** MANDATORY SENSITIVE DATA CONTROL **
+   - **ALWAYS** check for sensitive data when creating/modifying a script
+   - Scan for:
      - **Token**: API keys, auth tokens, access tokens
      - **Password**: hardcoded passwords, default credentials
-     - **Secrets**: chiavi SSH/GPG, certificati privati
-     - **Credenziali**: username+password, connection strings
-     - **Indirizzi IP privati**: se espongono infrastruttura critica
-     - **Domini interni**: se riservati/confidenziali
-   -  **PATTERN CRITICI da cercare**:
+     - **Secrets**: SSH/GPG keys, private certificates
+     - **Credentials**: username+password, connection strings
+     - **Private IP addresses**: if they expose critical infrastructure
+     - **Internal domains**: if reserved/confidential
+   - **CRITICAL PATTERNS to look for**:
      - `token=`, `password=`, `secret=`, `key=`
      - `AUTH_TOKEN=`, `API_KEY=`, `PRIVATE_KEY=`
-     - Stringhe lunghe alfanumeriche hardcoded (token-like)
-     - Default credentials con valori reali
-   -  **Azioni correttive**:
-     - Rimuovere valori hardcoded
-     - Usare variabili d'ambiente senza default sensibili
-     - Forzare input manuale utente (con validazione)
-     - Usare placeholder generici (`INSERISCI_TOKEN_QUI`)
-   -  **Workflow obbligatorio**:
-     1. Prima di commit → scansiona script modificati
-     2. Se trovati dati sensibili → avvisa utente
-     3. Proponi fix immediato (rimozione/variabili env)
-     4. Valida che fix non rompa funzionalità
-     5. Ricorda all'utente di **rotare credenziali** se già pubblicate
+     - Hardcoded alphanumeric long strings (token-like)
+     - Default credentials with real values
+   - **Corrective actions**:
+     - Remove hardcoded values
+     - Use environment variables without sensitive defaults
+     - Force manual user input (with validation)
+     - Use generic placeholders (`INSERT_TOKEN_HERE`)
+   - **Mandatory workflow**:
+     1. Before commit → scan modified scripts
+     2. If sensitive data found → notify user
+     3. Propose immediate fix (removal/env variables)
+     4. Validate that the fix does not break functionality
+     5. Remind the user to **rotate credentials** if already published
 
-9. ** EFFICIENZA E CONTENIMENTO TOKEN - Pensare Prima di Agire**
-   -  **BUDGET MENSILE**: 1500 token/mese utilizzabili
-   -  **Budget extra disponibili MA preferire NON usarli** - mantenerli come riserva emergenza
-   -  **SEMPRE pensare e pianificare** prima di eseguire azioni
-   -  **Autonomia decisionale**: Prendere decisioni ovvie senza chiedere conferma per banalità
-   -  **Ragionamento profondo**: Analizzare contesto disponibile, dedurre risposte, inferire intent utente
-   -  **Capitalizzare token prima richiesta**: Usare informazioni già fornite, evitare domande ridondanti
-   -  **Chiedere solo se necessario**: Solo per decisioni con reale impatto o ambiguità sostanziali
-   -  **Limite tentativi fix**: Max 3 iterazioni per stesso problema
-   -  **Se 3 tentativi falliscono** → FERMARSI e chiedere aiuto utente
-   -  **Evitare loop infiniti**: Non ripetere stesso approccio se fallisce
-   -  **Approccio incrementale**: Fix piccoli e testati, non modifiche massive senza validazione
-   -  **Sessioni lunghe**: Ogni 15-20 interazioni → breve recap e conferma direzione
-   -  **Operazioni massive**: Prima di modifiche >20 file → chiedere conferma strategia
-   -  **NON iterare ciecamente**: Se un comando fallisce 2 volte → cambiare approccio
-   -  **Valutare costo/beneficio**: Per operazioni lunghe → proporre alternative più efficienti
-   -  **Ragionamento esplicito**: Per problemi complessi → spiegare piano d'azione prima di eseguire
+9. ** EFFICIENCY AND TOKEN CONTAINMENT - Think Before Acting**
+   - **MONTHLY BUDGET**: 1500 usable tokens/month
+   - **Extra budgets available BUT prefer NOT to use them** - keep them as an emergency reserve
+   - **ALWAYS think and plan** before taking actions
+   - **Decisional autonomy**: Making obvious decisions without asking for confirmation out of banality
+   - **Deep reasoning**: Analyze available context, infer answers, infer user intent
+   - **Capitalize first request token**: Use information already provided, avoid redundant questions
+   - **Ask only if necessary**: Only for decisions with real impact or substantial ambiguity
+   - **Fix attempt limit**: Max 3 iterations for the same problem
+   - **If 3 attempts fail** → STOP and ask user for help
+   - **Avoid infinite loops**: Don't repeat the same approach if it fails
+   - **Incremental approach**: Small, tested fixes, not massive changes without validation
+   - **Long sessions**: Every 15-20 interactions → short recap and confirmation of direction
+   - **Massive operations**: Before modifications >20 files → ask for strategy confirmation
+   - **DO NOT blindly iterate**: If a command fails 2 times → change approach
+   - **Evaluate cost/benefit**: For long operations → propose more efficient alternatives
+   - **Explicit reasoning**: For complex problems → explain action plan before executing
 
-   **Esempio decisioni AUTONOME (NON chiedere):**
+   **Example of AUTONOMOUS decisions (DO NOT ask):**
    ```text
-    Fix sintassi ovvia (parentesi mancante, virgola, etc.)
-    Rinumerare liste dopo inserimento elemento
-    Aggiornare timestamp nei backup
-    Correggere path relativo → assoluto (workspace noto)
-    Rendere eseguibile script .sh con git update-index
-    Commit message descrittivo da modifiche ovvie
+    Fix obvious syntax (missing parenthesis, comma, etc.)
+    Renumber lists after element insertion
+    Update timestamps in backups
+    Correct relative path → absolute (known workspace)
+    Make .sh script executable with git update-index
+    Descriptive commit message from obvious changes
    ```
 
-   **Esempio decisioni che RICHIEDONO conferma:**
+   **Example decisions that REQUIRE confirmation:**
    ```text
-    Cancellare dati/file (anche con backup)
-    Deploy su produzione
-    Scelta tra approcci tecnici diversi con trade-off
-    Modifiche che impattano sicurezza/performace
-    Scelta tra più host per test quando non ovvio
+    Delete data/files (even with backup)
+    Deploy on production
+    Choice between different technical approaches with trade-offs
+    Changes that impact security/performance
+    Choice between multiple hosts for testing when not obvious
    ```
 
-   **Esempio gestione tentativi:**
+   **Retry management example:**
    ```text
-   Tentativo 1: wsl bash -n script.sh → ERRORE linea 45
-   Fix 1: correggi sintassi → testa
+   Attempt 1: wsl bash -n script.sh → ERROR line 45
+   Fix 1: Fix syntax → test
    
-   Tentativo 2: wsl bash -n script.sh → ERRORE linea 67
-   Fix 2: correggi secondo errore → testa
-   
-   Tentativo 3: wsl bash -n script.sh → ERRORE linea 45 (stessa linea!)
-    STOP: Approccio non funziona, pattern non chiaro
-   → Chiedi aiuto: "Ho provato 3 volte, errore persiste. Posso vedere il contesto completo della linea 45?"
+   Attempt 2: wsl bash -n script.sh → ERROR line 67
+   Fix 2: fix second error → test
+Attempt 3: wsl bash -n script.sh → ERROR line 45 (same line!)
+    STOP: Approach doesn't work, pattern unclear
+   → Ask for help: "I tried 3 times, error persists. Can I see the full context of line 45?"
    ```
 
-   **Quando fermarsi e chiedere aiuto:**
-   -  Loop fix sullo stesso errore (>2 tentativi)
-   -  Approccio teoricamente corretto ma fallisce ripetutamente
-   -  Errori non chiari o ambigui dopo 2 tentativi
-   -  Problema fuori dal tuo controllo (permessi, configurazione sistema, etc.)
-   -  Soluzione richiede conoscenza specifica che non hai
+   **When to stop and ask for help:**
+   - Loop fix on the same error (>2 attempts)
+   - Theoretically correct approach but fails repeatedly
+   - Unclear or ambiguous errors after 2 attempts
+   - Problem out of your control (permissions, system configuration, etc.)
+   - Solution requires specific knowledge that you don't have
 
-10. ** APPROCCIO INCREMENTALE - Spezzare Problemi Complessi**
-   -  **Per situazioni complesse**: NON riscrivere tutto lo script/codice immediatamente
-   -  **Spezzare problema grande** in tanti micro-problemi gestibili
-   -  **Risolvere on the fly**: Affrontare un micro-problema alla volta
-   -  **Validare step-by-step**: Solo quando micro-problema risolto → passare al prossimo
-   -  **Approccio scalare**: Iterare fino a risolvere tutti i micro-problemi
-   -  **Riscrivere codice** solo quando TUTTI i micro-problemi sono risolti
-   -  **NON fare rewrites massivi** senza aver prima scomposto e validato ogni pezzo
+10. ** INCREMENTAL APPROACH - Breaking Complex Problems **
+   - **For complex situations**: DO NOT rewrite the entire script/code immediately
+   - **Break large problem** into many manageable micro-problems
+   - **Solve on the fly**: Tackle one micro-problem at a time
+   - **Validate step-by-step**: Only when micro-problem solved → move on to the next one
+   - **Scalar approach**: Iterate until all micro-problems are solved
+   - **Rewrite code** only when ALL micro-issues are resolved
+   - **DO NOT do massive rewrites** without first breaking down and validating each piece
 
-   **Workflow corretto per problemi complessi:**
+   **Correct workflow for complex problems:**
    ```text
-   Problema: Script fallisce con 5 errori diversi
+   Problem: Script fails with 5 different errors
    
-    SBAGLIATO: Riscrivere intero script subito
+    WRONG: Rewrite entire script right away
    
-    CORRETTO: Approccio incrementale
-   1. Identifica micro-problema 1 (es: sintassi bash linea 45)
-   2. Fix micro-problema 1 on the fly (singola modifica)
-   3. Test validazione (wsl bash -n)
-   4. Conferma risoluzione → passa a micro-problema 2
-   5. Identifica micro-problema 2 (es: path file errato)
-   6. Fix micro-problema 2 on the fly
-   7. Test validazione
-   8. Ripeti fino a risolvere tutti i micro-problemi
-   9. SOLO ORA: considera refactoring/rewrite completo se necessario
+    CORRECT: Incremental approach
+   1. Identify micro-issue 1 (e.g. bash syntax line 45)
+   2. Fix micro-issue 1 on the fly (single change)
+   3. Validation test (wsl bash -n)
+   4. Confirm resolution → move to micro-problem 2
+   5. Identify micro-problem 2 (e.g. incorrect file path)
+   6. Fix micro-issue 2 on the fly
+   7. Validation test
+   8. Repeat until all micro-issues are resolved
+   9. NOW ONLY: Consider full refactoring/rewriting if necessary
    ```
 
-   **Benefici approccio incrementale:**
-   -  Riduce rischio di introdurre nuovi bug
-   -  Facilita debugging (ogni step isolato)
-   -  Mantiene funzionalità esistenti durante fix
-   -  Permette rollback parziale se necessario
-   -  Costo token ridotto (fix mirati vs rewrite massiccio)
+   **Incremental approach benefits:**
+   - Reduces risk of introducing new bugs
+   - Facilitates debugging (each step isolated)
+   - Maintains existing functionality during fixes
+   - Allows partial rollback if necessary
+   - Reduced token cost (targeted fixes vs massive rewrites)
 
-11. ** CONTROLLO PROBLEMS OBBLIGATORIO**
-   -  **SEMPRE** controllare pannello PROBLEMS prima di considerare completato un task
-   -  Eseguire `get_errors()` dopo modifiche a file markdown/script
-   -  Priorità correzione errori:
-     - **MD051** (link fragments invalidi) → Fix OBBLIGATORIO
-     - **MD042** (empty links) → Rimuovere link o renderli validi
-     - **MD022/MD031/MD032** (spacing) → Fix per qualità codice
-     - **MD060** (table style) → Fix se facile, altrimenti ignorare
-     - **MD024** (duplicate headings) → Valutare caso per caso
-   -  Se >50 errori: fixare batch con `multi_replace_string_in_file`
-   -  Confermare "0 errors" prima di dichiarare task completato
-   -  **NON** ignorare problemi senza consultare utente
+11. ** MANDATORY PROBLEM CHECK **
+   - **ALWAYS** check the PROBLEMS panel before considering a task complete
+   - Run `get_errors()` after changes to markdown/script files
+   - Error correction priority:
+     - **MD051** (invalid link fragments) → MANDATORY fix
+     - **MD042** (empty links) → Remove links or make them valid
+     - **MD022/MD031/MD032** (spacing) → Fix for code quality
+     - **MD060** (table style) → Fix if easy, ignore otherwise
+     - **MD024** (duplicate headings) → Evaluate on a case-by-case basis
+   - If >50 errors: fix batch with `multi_replace_string_in_file`
+   - Confirm "0 errors" before declaring task completed
+   - **DO NOT** ignore issues without consulting user
 
-12. ** TEST OBBLIGATORIO - TUTTI GLI SCRIPT MODIFICATI**
-   -  **MAI** dire "test completato" senza testare TUTTI gli script modificati
-   -  **SEMPRE** testare OGNI script modificato nella sessione corrente
-   -  Lista script modificati → test CIASCUNO separatamente
-   -  **CRITICO**: Se modifichi 3 script → testa tutti e 3, non solo 1!
-   -  Validare sintassi bash: `wsl bash -n script.sh`
-   -  Test esecuzione: eseguire su host remoto (nsec8-stable, laboratorio, etc.)
-   -  Verificare output/log per confermare funzionamento
-   -  Non dare per scontato che "se uno funziona, funzionano tutti"
+12. **MANDATORY TEST - ALL SCRIPTS MODIFIED**
+   - **NEVER** say "test completed" without testing ALL modified scripts
+   - **ALWAYS** test EVERY script modified in the current session
+   - List of modified scripts → test EACH separately
+   - **CRITICAL**: If you edit 3 scripts → test all 3, not just 1!
+   - Validate bash syntax: `wsl bash -n script.sh`
+   - Test execution: run on remote host (nsec8-stable, laboratory, etc.)
+   - Check output/log to confirm operation
+   - Don't assume that "if one works, they all work"
 
-**Esempio workflow test CORRETTO:**
+**CORRECT test workflow example:**
 
 ```bash
-# Modificati: install-script.sh, rocksolid-startup.sh, altro-script.sh
+# Changed: install-script.sh, rocksolid-startup.sh, other-script.sh
 
-# OBBLIGATORIO: Testa TUTTI E 3 separatamente
-wsl bash -n install-script.sh          #  Validazione 1
-wsl bash -n rocksolid-startup.sh       #  Validazione 2
-wsl bash -n altro-script.sh            #  Validazione 3
+# REQUIRED: Test ALL 3 separately
+wsl bash -n install-script.sh # Validation 1
+wsl bash -n rocksolid-startup.sh # Validation 2
+wsl bash -n other-script.sh # Validation 3
 
-# Test esecuzione TUTTI E 3 su host remoto
-wsl -d kali-linux ssh nsec8-stable "curl -fsSL .../install-script.sh | bash"      #  Test 1
-wsl -d kali-linux ssh nsec8-stable "curl -fsSL .../rocksolid-startup.sh | bash"   #  Test 2
-wsl -d kali-linux ssh nsec8-stable "curl -fsSL .../altro-script.sh | bash"        #  Test 3
+# Test running ALL 3 on remote host
+wsl -d kali-linux ssh nsec8-stable "curl -fsSL .../install-script.sh | bash" # Test 1
+wsl -d kali-linux ssh nsec8-stable "curl -fsSL .../rocksolid-startup.sh | bash" # Test 2
+wsl -d kali-linux ssh nsec8-stable "curl -fsSL .../other-script.sh | bash" # Test 3
 
-# SOLO ORA puoi dire "test completato"
+# ONLY NOW can you say "test completed"
 
 ```text
 
-**Esempio workflow test SBAGLIATO:**
+**Example of WRONG test workflow:**
 
 ```bash
-# Modificati: install-script.sh, rocksolid-startup.sh
+# Changed: install-script.sh, rocksolid-startup.sh
 
-# Test solo rocksolid
-wsl -d kali-linux ssh nsec8-stable "rocksolid-startup.sh"  #  Test 1
-#  NON testato install-script.sh!
+# Rocksolid testing only
+wsl -d kali-linux ssh nsec8-stable "rocksolid-startup.sh" # Test 1
+# NOT tested install-script.sh!
 
-#  ERRORE: Dici "test completato" senza testare install-script.sh
-
+# ERROR: You say "test completed" without testing install-script.sh
 ```text
 
-**Esempio workflow corretto:**
+**Correct workflow example:**
 
 ```bash
-# 1. Backup
+#1. Backups
 cp file.txt file.txt.backup_2026-01-27_20-30-00
 
-# 2. Chiedi conferma
-"Ho creato backup in file.txt.backup_2026-01-27_20-30-00. Procedo con cancellazione?"
+#2. Ask for confirmation
+"I created backups in file.txt.backup_2026-01-27_20-30-00. Do I proceed with deletion?"
 
-# 3. Solo dopo OK utente
+#3. Only after OK user
 rm file.txt
 
 ```text
 
-13. ** MARKDOWN QUALITY - Prevenzione Errori Markdownlint**
-   -  **WORKFLOW OBBLIGATORIO per OGNI file .md creato/modificato:**
-     1. **PRIMA**: Segui best practices markdownlint (vedi sotto)
-     2. **SUBITO DOPO modifica**: Esegui `markdownlint file.md` (exit code 0=OK)
-     3. **SE ERRORI**: Fix immediato e ri-esegui `markdownlint`
-     4. **RIPETI**: Finché non ottieni exit code 0
-     5. **OPZIONALE**: `get_errors()` per check VSCode (file path errors)
-     6. **SOLO ALLORA**: Considera task completato
-   -  **Regole obbligatorie da rispettare:**
-     - **Heading spacing**: Riga vuota SEMPRE dopo heading `###`
+13. ** MARKDOWN QUALITY - Markdownlint Error Prevention**
+   - **MANDATORY WORKFLOW for EVERY .md file created/modified:**
+     1. **BEFORE**: Follow markdownlint best practices (see below)
+     2. **IMMEDIATELY AFTER modification**: Run `markdownlint file.md` (exit code 0=OK)
+     3. **IF ERRORS**: Fix immediately and re-run `markdownlint`
+     4. **REPEAT**: Until you get exit code 0
+     5. **OPTIONAL**: `get_errors()` to check VSCode (file path errors)
+     6. **ONLY THEN**: Consider task complete
+   - **Mandatory rules to be respected:**
+     - **Heading spacing**: Empty line ALWAYS after heading `###`
 
-     - **List spacing**: Riga vuota dopo ultima voce lista prima di paragrafo/heading
-     - **Code block spacing**: Riga vuota prima E dopo blocchi ` ``` `
-     - **Code language**: Specificare SEMPRE linguaggio nei code block (bash, powershell, python, json, text)
-     - **No empty links**: Mai usare link vuoti con anchor #, usare URL valido o rimuovere link
-     - **Link fragments**: Se usi TOC con emoji negli heading, usa testo bold invece di link
-   -  **Esempi corretti:**
-     - Heading con riga vuota sotto
-     - Lista con riga vuota dopo ultima voce
-     - Code block con linguaggio specificato (bash/powershell/json)
-     - Code block con righe vuote prima e dopo
-   -  **Esempi SBAGLIATI:**
-     - Heading senza riga vuota sotto
-     - Lista senza riga vuota prima di paragrafo/heading
-     - Code block senza linguaggio specificato
-     - Code block senza righe vuote intorno
-   -  Dopo creazione/modifica file .md → `get_errors()` per validazione immediata
-   -  Preferire TOC senza link se heading hanno emoji (usa **testo bold** invece)
+     - **List spacing**: Empty line after last list item before paragraph/heading
+     - **Code block spacing**: Empty line before AND after ` ``` ` blocks
+     - **Code language**: ALWAYS specify language in code blocks (bash, powershell, python, json, text)
+     - **No empty links**: Never use empty links with anchor #, use valid URL or remove links
+     - **Link fragments**: If you use TOC with emoji in headings, use bold text instead of links
+   - **Correct examples:**
+     - Heading with empty line below
+     - List with empty line after last entry
+     - Code block with specified language (bash/powershell/json)
+     - Code block with empty lines before and after
+   - **WRONG Examples:**
+     - Heading without empty line below
+     - List without empty line before paragraph/heading
+     - Code block without specified language
+     - Code block without empty lines around it
+   - After creating/modifying .md file → `get_errors()` for immediate validation
+   - Prefer TOC without links if headings have emojis (use **bold text** instead)
 
-14. **Recupero script corrotti o persi**
-   -  **Metodo 1**: Git history - `git log`, `git show`, `git checkout`
-   -  **Metodo 2**: Backup locali - `C:\CheckMK-Backups\<timestamp>\`
-   -  **Metodo 3**: Backup rete - `\\192.168.10.132\usbshare\CheckMK-Backups\<timestamp>\`
-   -  Verificare **sempre** disponibilità backup prima di modifiche massive
-   -  Backup automatici eseguiti daily: job00 (locale+rete), ultra-minimal (locale)
+14. **Recover corrupt or lost scripts**
+   - **Method 1**: Git history - `git log`, `git show`, `git checkout`
+   - **Method 2**: Local Backups - `C:\CheckMK-Backups\<timestamp>\`
+   - **Method 3**: Network Backup - `\\192.168.10.132\usbshare\CheckMK-Backups\<timestamp>\`
+   - **always** check backup availability before massive changes
+   - Automatic backups performed daily: job00 (local+network), ultra-minimal (local)
 
-**Esempio recupero file:**
+**File recovery example:**
 
 ```powershell
-# Da Git (commit precedente)
+# From Git (previous commit)
 git show HEAD~1:script-tools/full/script.sh > script.sh.recovered
 
-# Da backup locale
+# From local backup
 Copy-Item "C:\CheckMK-Backups\2026-01-29_03-00-00\script-tools\full\script.sh" -Destination ".\"
 
-# Da backup rete
+# From network backup
 Copy-Item "\\192.168.10.132\usbshare\CheckMK-Backups\2026-01-29_00-00-00\script-tools\full\script.sh" -Destination ".\"
 
 ```text
 
-15. **Test-Fix-Validate Loop Automatico**
-   -  Quando modifichiamo uno script E abbiamo accesso a host di test
-   -  **SEMPRE** seguire questo ciclo automatico dopo ogni modifica:
-     1. **Modifica** script
-     2. **Valida** sintassi (`bash -n` o PSParser)
-     3. **Testa** su host remoto (esecuzione reale)
-     4. **Se fallisce** → Fix errore
-     5. **Ri-valida** sintassi
-     6. **Ri-testa** su host
-     7. **Ripeti** finché non funziona o finché utente non ferma
-   -  **NON fermarsi** dopo validazione sintassi se test fallisce
-   -  **NON aspettare** comando utente per fixare - fallo automaticamente
-   -  **Continuare** a iterare fino a successo completo
+15. **Test-Fix-Validate Automatic Loop**
+   - When we edit a script AND we have access to test hosts
+   - **ALWAYS** follow this automatic cycle after each change:
+     1. **Edit** script
+     2. **Valid** syntax (`bash -n` or PSParser)
+     3. **Test** on remote host (real run)
+     4. **If it fails** → Fix error
+     5. **Re-validate** syntax
+     6. **Re-test** on host
+     7. **Repeat** until it works or until user stops
+   - **DO NOT stop** after syntax validation if test fails
+   - **DO NOT wait** user command to fix - do it automatically
+   - **Continue** iterating until complete success
 
-**Esempio workflow test-driven:**
+**Example test-driven workflow:**
 
 ```powershell
-# 1. Modifica script
+#1. Edit scripts
 # ... edit file ...
 
-# 2. Valida sintassi
-wsl bash -n script.sh  # EXIT CODE: 0 
+#2. Valid syntax
+wsl bash -n script.sh # EXIT CODE: 0 
 
-# 3. Testa su host
+#3. Test on host
 wsl -d kali-linux ssh nsec8-stable "bash /opt/checkmk-tools/script.sh"
-# Output: ERROR line 45: comando non trovato
+# Output: ERROR line 45: command not found
 
-# 4. Fix automatico (NON fermarsi!)
-# ... correggi errore linea 45 ...
+#4. Auto Fix (DO NOT Stop!)
+# ... fix error line 45 ...
 
-# 5. Ri-valida
-wsl bash -n script.sh  # EXIT CODE: 0 
+#5. Re-validate
+wsl bash -n script.sh # EXIT CODE: 0 
 
-# 6. Ri-testa
+#6. Re-test
 wsl -d kali-linux ssh nsec8-stable "bash /opt/checkmk-tools/script.sh"
 # Output: SUCCESS 
 
-# 7. Solo ora committa
-git commit -m "fix: risolto errore comando"
+#7. Only now does he commit
+git commit -m "fix: fixed command error"
 
 ```text
 
-**Host disponibili per test:**
+**Hosts available for testing:**
 - `nsec8-stable` (10.155.100.100) - NethSecurity 8 test environment
 - `checkmk-vps-02` (monitor01.nethlab.it) - CheckMK staging/test
-- `checkmk-z1plus` (192.168.10.128) - CheckMK locale test
+- `checkmk-z1plus` (192.168.10.128) - CheckMK local test
 
-16. ** WORKFLOW OBBLIGATORIO - Sviluppo e Test Script**
-   -  **SEMPRE seguire questo workflow completo** per modifiche a script bash/shell
-   -  **MAI** saltare step o dichiarare "completato" senza test reale
-   -  **LOOP finché non funziona tutto** - non uscire fino a successo completo
+16. ** MANDATORY WORKFLOW - Development and Test Script**
+   - **ALWAYS follow this complete workflow** for bash/shell script changes
+   - **NEVER** skip steps or declare "completed" without real testing
+- **LOOP until everything works** - don't exit until completely successful
 
-**WORKFLOW OBBLIGATORIO (da seguire SEMPRE):**
+**MANDATORY WORKFLOW (to ALWAYS be followed):**
 
 ```text
 
-┌─────────────────────────────────────────────────────────┐
-│ 1. MODIFICA/SCRITTURA SCRIPT                            │
-│    - Implementa funzionalità richiesta                  │
-│    - Segui best practices bash/PowerShell               │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────── ─────────────────────────────┐
+│ 1. EDITING/WRITING SCRIPT │
+│ - Implement requested functionality │
+│ - Follow bash/PowerShell best practices │
+└──────────────────────────── ─────────────────────────────┘
                          ↓
-┌─────────────────────────────────────────────────────────┐
-│ 2. TEST SINTASSI                                        │
-│    Bash: wsl bash -n script.sh                          │
-│    PowerShell: PSParser validation                      │
-│     Exit code DEVE essere 0                            │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────── ─────────────────────────────┐
+│ 2. SYNTAX TEST │
+│ Bash: wsl bash -n script.sh │
+│ PowerShell: PSParser validation │
+│ Exit code MUST be 0 │
+└──────────────────────────── ─────────────────────────────┘
                          ↓
-┌─────────────────────────────────────────────────────────┐
-│ 3. VERIFICA ESEGUIBILITÀ                                │
-│    git ls-files -s script.sh                            │
-│     DEVE mostrare 100755 (eseguibile)                  │
-│    Se 100644 → git update-index --chmod=+x script.sh    │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────── ─────────────────────────────┐
+│ 3. EXECUTABILITY CHECK │
+│ git ls-files -s script.sh │
+│ MUST show 100755 (executable) │
+│ If 100644 → git update-index --chmod=+x script.sh │
+└──────────────────────────── ─────────────────────────────┘
                          ↓
-┌─────────────────────────────────────────────────────────┐
-│ 4. ALLINEA REPO E COMMIT (sul fork)                     │
-│    git add script.sh                                    │
-│    git commit -m "type(scope): vX.Y.Z - descrizione"   │
-│    git push origin main   ← SOLO sul fork!              │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────── ─────────────────────────────┐
+│ 4. ALIGN REPO AND COMMIT (on the fork) │
+│ git add script.sh │
+│ git commit -m "type(scope): vX.Y.Z - description" │
+│ git push origin main ← ONLY on the fork!              │
+└──────────────────────────── ─────────────────────────────┘
                          ↓
-┌─────────────────────────────────────────────────────────┐
-│ 5. CHIEDI HOST PER TEST                                 │
-│    "Su quale host vuoi testare?"                        │
-│    Host disponibili: nsec8-stable, laboratorio, etc.    │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────── ─────────────────────────────┐
+│ 5. ASK HOST FOR TEST │
+│ "Which host do you want to test on?"                        │
+│ Available hosts: nsec8-stable, laboratory, etc.    │
+└──────────────────────────── ─────────────────────────────┘
                          ↓
-┌─────────────────────────────────────────────────────────┐
-│ 6. VERIFICA E AGGIORNA REPO LOCALE                      │
-│    - Verifica esistenza /opt/checkmk-tools/             │
-│    - Se NON esiste → git clone                          │
-│    - Se esiste → cd /opt/checkmk-tools && git pull      │
-│     OBBLIGATORIO prima di ogni test                    │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────── ─────────────────────────────┐
+│ 6. CHECK AND UPDATE LOCAL REPO │
+│ - Check existence /opt/checkmk-tools/ │
+│ - If it does NOT exist → git clone │
+│ - If exists → cd /opt/checkmk-tools && git pull │
+│ MANDATORY before each test │
+└──────────────────────────── ─────────────────────────────┘
                          ↓
-┌─────────────────────────────────────────────────────────┐
-│ 7. TEST FUNZIONAMENTO COMPLETO                          │
-│    - Esegui script da REPO LOCALE                       │
-│    - Path: /opt/checkmk-tools/script-check-*/full/xxx   │
-│    - Verifica output/log                                │
-│    - Controlla exit code                                │
-│    - Valida risultato atteso                            │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────── ─────────────────────────────┐
+│ 7. COMPLETE OPERATION TEST │
+│ - Run script from LOCAL REPO │
+│ - Path: /opt/checkmk-tools/script-check-*/full/xxx │
+│ - Check output/log │
+│ - Check exit code │
+│ - Valid expected result │
+└──────────────────────────── ─────────────────────────────┘
                          ↓
               ┌──────────────────┐
-              │ FUNZIONA TUTTO?  │
+              │ DOES EVERYTHING WORK?  │
               └──────────────────┘
-                    /    \
-                   /      \
-              NO ↙        ↘ SI
-                /          \
-    ┌──────────────┐    ┌──────────────────────┐
-    │ TORNA A 1.   │    │  ESCI DAL LOOP     │
-    │ FIX + RITEST │    │ Task completato!     │
-    └──────────────┘    └──────────────────────┘
+                    / \
+                   / \
+              NO ↙ ↘ YES
+                / \
+    ┌──────────────┐ ┌──────────────────────┐
+    │ RETURN TO 1. │ │ EXIT LOOP │
+    │ FIX + RITEST │ │ Task completed!     │
+    └──────────────┘ └──────────────────────┘
 
 ```text
 
-** REGOLE CRITICHE:**
--  **MAI** dire "test completato" senza test REALE su host remoto
--  **MAI** uscire dal loop se ci sono errori
--  **MAI** saltare step del workflow senza autorizzazione esplicita utente
--  **MAI** assumere che funzioni senza testare
--  **SEMPRE** fixare errori e ri-testare automaticamente
--  **SEMPRE** testare TUTTI gli script modificati nella sessione
--  **SEMPRE** seguire TUTTI gli step 1-7 del workflow
--  **LOOP infinito** finché non funziona o utente ferma
--  **NESSUNA FRETTA** - Prendere tutto il tempo necessario per fare bene
--  **STEP 7 SU HOST PASSWORD**: se l'host target richiede password (es. ns-lab00, laboratorio)
-  → NON eseguire il test in autonomia → dare i comandi da incollare all'utente
+**CRITICAL RULES:**
+- **NEVER** say "test completed" without REAL testing on remote host
+- **NEVER** exit the loop if there are errors
+- **NEVER** skip workflow steps without explicit user authorization
+- **NEVER** assume it works without testing
+- **ALWAYS** fix errors and re-test automatically
+- **ALWAYS** test ALL scripts modified in the session
+- **ALWAYS** follow ALL steps 1-7 of the workflow
+- **Infinite LOOP** until it works or user stops
+- **NO RUSH** - Take all the time you need to do well
+- **STEP 7 ON HOST PASSWORD**: if the target host requires password (e.g. ns-lab00, laboratory)
+  → DO NOT carry out the test yourself → give the commands to paste to the user
 
-**Esempio completo:**
+**Full example:**
 
 ```bash
-# 1. Modifica
+#1. Edit
 vi install-script.sh
 
-# 2. Test sintassi
-wsl bash -n install-script.sh  # Exit: 0 
+#2. Syntax Test
+wsl bash -n install-script.sh # Exit: 0 
 
-# 3. Verifica eseguibilità
-git ls-files -s install-script.sh  # 100755 
+#3. Check executable
+git ls-files -s install-script.sh #100755 
 
-# 4. Commit
+#4. Commit
 git add install-script.sh
-git commit -m "fix: correzione download dinamico"
+git commit -m "fix: dynamic download fix"
 git push
 
-# 5. Chiedi host
-"Su quale host testo? [nsec8-stable]"
+#5. Ask for hosts
+"On which host do I text? [nsec8-stable]"
 
-# 6. Verifica e aggiorna repo locale
+#6. Check and update local repo
 wsl -d kali-linux ssh nsec8-stable "[ -d /opt/checkmk-tools ] && echo 'EXISTS' || echo 'MISSING'"
-# Se MISSING → git clone https://github.com/Coverup20/checkmk-tools.git /opt/checkmk-tools
-# Se EXISTS → wsl -d kali-linux ssh nsec8-stable "cd /opt/checkmk-tools && git pull"
+# If MISSING → git clone https://github.com/Coverup20/checkmk-tools.git /opt/checkmk-tools
+# If EXISTS → wsl -d kali-linux ssh nsec8-stable "cd /opt/checkmk-tools && git pull"
 
-# 7. Test da REPO LOCALE (NON GitHub!)
+#7. Test from LOCAL REPO (NOT GitHub!)
 wsl -d kali-linux ssh nsec8-stable "/opt/checkmk-tools/script-tools/full/install-script.sh"
-# Output: ERRORE linea 45
+# Output: ERROR line 45
 
-#  ERRORE → TORNA A 1 (fix + ritest)
-# Fix errore linea 45, ricommit, ritest...
+# ERROR → RETURN TO 1 (fix + retest)
+# Fix error line 45, recommit, retest...
 
-#  OK → Test completato, ESCI DAL LOOP
+# OK → Test completed, EXIT LOOP
 ```
 
-17. **Script eseguibili - Verifica SEMPRE permessi Git**
-   -  **Windows (NTFS) NON preserva il bit eseguibile Unix**
-   -  **SEMPRE** quando crei/modifichi script bash/shell (.sh):
-     1. Crea/modifica il file
-     2. Verifica permessi: `git ls-files -s script.sh`
-     3. Se mostra `100644` (NON eseguibile) → FIX:
+17. **Executable scripts - ALWAYS check Git permissions**
+   - **Windows (NTFS) does NOT preserve the Unix executable bit**
+   - **ALWAYS** when creating/editing bash/shell scripts (.sh):
+     1. Create/edit the file
+     2. Check permissions: `git ls-files -s script.sh`
+     3. If it shows `100644` (NOT executable) → FIX:
         ```bash
         git update-index --chmod=+x script.sh
         ```
 
-     4. Verifica: `git ls-files -s script.sh` → deve mostrare `100755`
-     5. Committo e push normalmente
-   -  **Controllo batch** su directory:
+     4. Check: `git ls-files -s script.sh` → should show `100755`
+     5. I commit and push normally
+   - **Batch control** on directories:
      ```bash
-     # Trova script NON eseguibili
-     git ls-files -s script-tools/full/*.sh | Select-String "100644"
+     # Find NON-executable scripts
+     git ls-files -s script-tools/full/*.sh | Select String "100644"
 
-     # Rendi tutti eseguibili
+     # Make all executable
      git update-index --chmod=+x script-tools/full/*.sh
      ```
 
-   -  **NON fare affidamento** su `wsl -- test -x` su Windows → usa `git ls-files -s`
-   -  Quando proponi nuovi script bash → renderli subito eseguibili con git update-index
+   - **DO NOT rely** on `wsl -- test -x` on Windows → use `git ls-files -s`
+   - When you propose new bash scripts → make them immediately executable with git update-index
 
-**Esempio workflow creazione script:**
+**Example script creation workflow:**
 
 ```powershell
-# 1. Crea script
+#1. Create scripts
 New-Item script-tools/full/nuovo-script.sh
 
-# 2. Scrivi contenuto
+#2. Write content
 # ... edit file ...
 
-# 3. OBBLIGATORIO: Rendi eseguibile
-git add script-tools/full/nuovo-script.sh
-git update-index --chmod=+x script-tools/full/nuovo-script.sh
+#3. REQUIRED: Make executable
+git add script-tools/full/new-script.sh
+git update-index --chmod=+x script-tools/full/new-script.sh
 
-# 4. Verifica (deve mostrare 100755)
-git ls-files -s script-tools/full/nuovo-script.sh
+#4. Verify (must show 100755)
+git ls-files -s script-tools/full/new-script.sh
 
-# 5. Commit
-git commit -m "feat: nuovo script"
+#5. Commit
+git commit -m "feat: new script"
 
 ```
 
-18. ** VERSIONING SCRIPT OBBLIGATORIO**
-   -  **SEMPRE aggiungere variabile VERSION** all'inizio di ogni script bash/PowerShell/Python
-   -  Rendere **versione visibile nell'output/header** dello script
-   -  **Aggiornare versione ad OGNI modifica** committata
-   -  Permette identificazione immediata versione in esecuzione su host remoti
+18. ** MANDATORY VERSIONING SCRIPT **
+   - **ALWAYS add VERSION variable** at the beginning of every bash/PowerShell/Python script
+   - Make **version visible in the output/header** of the script
+   - **Update version with EVERY change** committed
+   - Allows immediate identification of version running on remote hosts
    
-   **Schema versionamento:**
-   - `MAJOR.MINOR.PATCH` (es: `2.0.5`)
-   - MAJOR: cambio architettura/breaking changes
-   - MINOR: nuove funzionalità backwards-compatible
-   - PATCH: bugfix/miglioramenti minori
+   **Version scheme:**
+   - `MAJOR.MINOR.PATCH` (e.g. `2.0.5`)
+   - MAJOR: architecture change/breaking changes
+   - MINOR: new backwards-compatible features
+   - PATCH: minor bugfixes/improvements
    
-   **Template Python (PREFERITO - policy Python-first):**
+   **Python Template (PREFERRED - Python-first policy):**
    ```python
    #!/usr/bin/env python3
-   VERSION = "1.0.0"   # Versione script (aggiornare ad ogni modifica)
+   VERSION = "1.0.0" # Script version (update with each change)
    
-   # Mostra versione in output/help
+   # Show version in output/help
    print(f"Script Name - Version v{VERSION}")
    ```
    
-   **Template Bash:**
+   **Bash Templates:**
    ```bash
    #!/bin/bash
-   VERSION="1.0.0"   # Versione script (aggiornare ad ogni modifica)
+   VERSION="1.0.0" # Script version (update with each change)
    
-   # Mostra versione in output/help
+   # Show version in output/help
    echo "Script Name - Version v${VERSION}"
    ```
    
-   **Template PowerShell:**
+   **PowerShell Templates:**
    ```powershell
    # Script Name
-   $VERSION = "1.0.0"   # Versione script (aggiornare ad ogni modifica)
+   $VERSION = "1.0.0" # Script version (update with each change)
    
    Write-Host "Script Name - Version v$VERSION"
    ```
    
-   **Esempio commit message con bump versione:**
+   **Example commit message with version bump:**
    ```bash
-   git commit -m "fix(script): v1.0.1 - corregge bug parsing ACL"
+   git commit -m "fix(script): v1.0.1 - fixes ACL parsing bug"
    ```
    
-   **Workflow modifica script:**
-   1. Modifica codice
-   2. **OBBLIGATORIO**: Bump VERSION variable
-   3. Test validazione
-   4. Commit con versione nel message
+   **Script editing workflow:**
+   1. Edit code
+   2. **MANDATORY**: Bump VERSION variable
+   3. Validation test
+   4. Commit with versioned message
    5. Push
 
 ---
-##  NethSecurity 8 - Local Checks CheckMK
+## NethSecurity 8 - Local Checks CheckMK
 
-###  REGOLA DEPLOYMENT - Mantenere estensione .sh
+### DEPLOYMENT RULE - Keep .sh extension
 
-**Local checks devono mantenere l'estensione `.sh` anche quando deployed:**
+**Local checks must maintain the `.sh` extension even when deployed:**
 
 ```bash
-#  CORRETTO - Mantieni estensione
+# CORRECT - Keep extension
 cp /opt/checkmk-tools/script-check-nsec8/full/check_vpn_tunnels.sh \
    /usr/lib/check_mk_agent/local/check_vpn_tunnels.sh
-#                                                    ^^^ CON .sh
+# ^^^ WITH .sh
 
-#  SBAGLIATO - Non rimuovere estensione
-cp script.sh /usr/lib/check_mk_agent/local/script  # NO!
+# WRONG - Do not remove extension
+cp script.sh /usr/lib/check_mk_agent/local/script # NO!
 
 ```text
 
-**Motivo preferenza utente:**
-- Coerenza con repository (tutti gli script .sh)
-- Più facile identificare tipo file
-- CheckMK esegue comunque file con estensione
+**User preference reason:**
+- Consistency with repositories (all .sh scripts)
+- Easier to identify file type
+- CheckMK still runs files with extension
 
-**Auto-restore deve usare nome completo con estensione:**
+**Auto-restore must use full name with extension:**
 
 ```bash
 # In rocksolid-startup-check.sh
-basename_script=$(basename "$script")  # NON rimuovere .sh
+basename_script=$(basename "$script") # DO NOT remove .sh
 cp "$script" "/usr/lib/check_mk_agent/local/$basename_script"
 
 ```text
 
 ---
-## � NethServer - Gestione Configurazione
+## � NethServer - Configuration Management
 
-###  REGOLA CRITICA - NON modificare file di configurazione manualmente
+### CRITICAL RULE - DO NOT edit configuration files manually
+**NethServer (NS7/NS8) uses e-smith/template system:**
+- **NEVER directly edit** files in `/etc/` (fail2ban, httpd, postfix, etc.)
+- **ALWAYS use web interface** or `config` commands
+- Manual file changes = **lost at next `signal-event`**
 
-**NethServer (NS7/NS8) usa sistema e-smith/template:**
--  **MAI modificare direttamente** file in `/etc/` (fail2ban, httpd, postfix, etc.)
--  **SEMPRE usare interfaccia web** o comandi `config`
--  Modifiche manuali ai file = **perse al prossimo `signal-event`**
-
-**Esempio configurazioni gestite da template:**
+**Example configurations managed by template:**
 
 ```bash
-/etc/fail2ban/fail2ban.conf          # Gestito da templates
-/etc/fail2ban/jail.conf              # Gestito da templates
-/etc/httpd/conf.d/*                  # Gestito da templates
-/etc/postfix/main.cf                 # Gestito da templates
-/etc/shorewall/*                     # Gestito da templates
+/etc/fail2ban/fail2ban.conf # Managed by templates
+/etc/fail2ban/jail.conf # Managed by templates
+/etc/httpd/conf.d/* # Managed by templates
+/etc/postfix/main.cf # Managed by templates
+/etc/shorewall/* # Managed by templates
 
 ```text
 
-**Metodi corretti per modificare configurazioni:**
+**Correct methods to change configurations:**
 
-1. **Via interfaccia web NethServer**
-   - Server Manager → sezione specifica
-   - Modifiche persistenti e validate
+1. **Via NethServer web interface**
+   - Server Manager → specific section
+   - Persistent and validated changes
 
-2. **Via comandi config (CLI)**
+2. **Via config commands (CLI)**
 
 ```bash
-# Visualizza configurazione
+# View configuration
 config show fail2ban
 
-# Modifica proprietà
+# Edit properties
 config setprop fail2ban LogLevel NOTICE
 config setprop fail2ban DbPurgeAge 30d
 
-# Applica modifiche
+# Apply changes
 signal-event nethserver-fail2ban-save
 
 ```text
 
-3. **Via template custom** (avanzato)
+3. **Via custom template** (advanced)
 
 ```bash
-# Crea template custom in /etc/e-smith/templates-custom/
-# Le modifiche sopravvivono ai signal-event
+# Create custom templates in /etc/e-smith/templates-custom/
+# Changes survive signal-events
 
 ```text
 
-** Conseguenze modifiche manuali:**
-- `signal-event nethserver-<servizio>-save` → configurazione ripristinata
-- Riavvio servizio → configurazione ripristinata
-- Aggiornamenti sistema → configurazione ripristinata
+** Consequences of manual changes:**
+- `signal-event nethserver-<service>-save` → configuration restored
+- Service restart → configuration restored
+- System updates → configuration restored
 
-** SEMPRE chiedere conferma utente** prima di suggerire modifiche manuali a file su NethServer!
+**ALWAYS ask user confirmation** before suggesting manual changes to files on NethServer!
 
 ---
 
-##  NethSecurity 8 - NGINX Web UI Major Upgrade Issue
+## NethSecurity 8 - NGINX Web UI Major Upgrade Issue
 
-###  PROBLEMA CRITICO - Symlink /etc/nginx/uci.conf cancellato durante upgrade
+### CRITICAL ISSUE - Symlink /etc/nginx/uci.conf deleted during upgrade
 
-**Sintomo:**
-- Post major upgrade: nginx non parte, Web UI (porta 9090) non disponibile
+**Symptom:**
+- Post major upgrade: nginx doesn't start, Web UI (port 9090) not available
 - Log error: `open() "/etc/nginx/nginx.conf" failed (2: No such file or directory)`
-- Directory `/etc/nginx/` esiste e protetta, ma manca symlink
+- Directory `/etc/nginx/` exists and is protected, but symlink is missing
 
-**Causa ROOT:**
-- NethSecurity usa `/var/lib/nginx/uci.conf` come configurazione nginx principale
-- `/etc/nginx/uci.conf` è un **symlink** → `/var/lib/nginx/uci.conf`
-- Durante major upgrade: symlink cancellato anche se `/etc/nginx/` è protetto in sysupgrade.conf
-- Nginx cerca `uci.conf` ma non lo trova → fallisce avvio
+**ROOT cause:**
+- NethSecurity uses `/var/lib/nginx/uci.conf` as the main nginx configuration
+- `/etc/nginx/uci.conf` is a **symlink** → `/var/lib/nginx/uci.conf`
+- During major upgrade: symlink deleted even if `/etc/nginx/` is protected in sysupgrade.conf
+- Nginx searches for `uci.conf` but doesn't find it → fails to start
 
-**Soluzione implementata (commit 6107753 + 1986623):**
+**Solution implemented (commit 6107753 + 1986623):**
 
-1. **Protezione directory** (`install-checkmk-agent-persistent-nsec8.sh`):
+1. **Directory Protection** (`install-checkmk-agent-persistent-nsec8.sh`):
 
 ```bash
 # In protect_checkmk_installation()
@@ -822,519 +819,519 @@ add_to_sysupgrade "/etc/nginx/" "NGINX configuration (Web UI NethSecurity)"
 
 ```text
 
-2. **Ripristino automatico symlink** (`rocksolid-startup-check.sh`):
+2. **Symlink Automatic Repair** (`rocksolid-startup-check.sh`):
 
 ```bash
-# Prima di verificare nginx
+# Before checking nginx
 if [ ! -L /etc/nginx/uci.conf ] && [ -f /var/lib/nginx/uci.conf ]; then
-    log "[Nginx] Ripristino symlink uci.conf..."
+    log "[Nginx] Restoring symlink uci.conf..."
     ln -sf /var/lib/nginx/uci.conf /etc/nginx/uci.conf 2>/dev/null || true
 fi
 
 ```text
 
-**Fix manuale emergenza:**
+**Emergency manual fix:**
 
 ```bash
-# Su sistema già upgradato con nginx rotto
+# On already upgraded system with broken nginx
 ln -sf /var/lib/nginx/uci.conf /etc/nginx/uci.conf
 /etc/init.d/nginx restart
-# Web UI torna disponibile su porta 9090
+# Web UI is available again on port 9090
 
 ```text
 
-**Verifica soluzione:**
+**Check solution:**
 
 ```bash
-# Dopo upgrade/reboot
-ls -la /etc/nginx/uci.conf  # Deve essere symlink
-/etc/init.d/nginx status    # Deve essere "running"
-netstat -tlnp | grep :9090  # Deve mostrare nginx in ascolto
+# After upgrade/reboot
+ls -la /etc/nginx/uci.conf # Must be symlink
+/etc/init.d/nginx status # Must be "running"
+netstat -tlnp | grep :9090 # Must show nginx listening
 
 ```text
 
-**Note tecniche:**
-- `/var/lib/nginx/uci.conf` generato dinamicamente da nginx-ssl-util
-- Contiene configurazioni server blocks per porte 80/443/9090
-- Symlink necessario perché nginx include `/etc/nginx/uci.conf` nel main config
-- Backup laboratorio disponibile: `C:\Users\Marzio\Desktop\CheckMK\nginx-backup-laboratorio.tar.gz`
+**Technical notes:**
+- `/var/lib/nginx/uci.conf` dynamically generated by nginx-ssl-util
+- Contains server blocks configurations for ports 80/443/9090
+- Symlink needed because nginx includes `/etc/nginx/uci.conf` in main config
+- Lab backup available: `C:\Users\Marzio\Desktop\CheckMK\nginx-backup-laboratorio.tar.gz`
 
 ---
 
-## � Strumenti di Controllo Qualità
+## � Quality Control Tools
 
-### check-integrity.ps1 - Controllo Integrità Repository
+### check-integrity.ps1 - Repository Integrity Check
 
-**Quando usare questo strumento:**
-- Quando l'utente chiede di "controllare l'integrità" o "verificare la corruzione"
-- Dopo modifiche massive a script bash o PowerShell
-- Prima di merge importanti
-- Quando sospetti corruzione file nel repository
+**When to use this tool:**
+- When user asks to "check integrity" or "check corruption"
+- After massive changes to bash or PowerShell scripts
+- Before major merges
+- When you suspect file corruption in the repository
 
-**Comandi disponibili:**
+**Commands available:**
 
 ```powershell
-# Controllo standard con riepilogo
+# Standard check with summary
 .\script-ps-tools\check-integrity.ps1
 
-# Controllo dettagliato con lista completa errori
+# Detailed check with complete error list
 .\script-ps-tools\check-integrity.ps1 -Detailed
 
-# Esporta report completo su file
+# Export complete report to file
 .\script-ps-tools\check-integrity.ps1 -ExportReport
 
-# Cambia soglia di corruzione (default: 15%)
+# Change corruption threshold (default: 15%)
 .\script-ps-tools\check-integrity.ps1 -Threshold 20
 
 ```text
 
-**Funzionalità:**
--  Verifica sintassi **PowerShell** tramite `[System.Management.Automation.Language.Parser]::ParseFile()`
--  Verifica sintassi **Bash/Shell** tramite WSL `bash -n`
--  Rileva **corruzione massiva** (soglia default: 15%)
--  Report dettagliato per tipo di file (PS1, Bash, Batch, Python)
--  Exit codes: 0=OK, 1=Warning (<15%), 2=Critical (>15%)
+**Features:**
+- Check **PowerShell** syntax via `[System.Management.Automation.Language.Parser]::ParseFile()`
+- Check **Bash/Shell** syntax via WSL `bash -n`
+- Detects **massive corruption** (default threshold: 15%)
+- Detailed report by file type (PS1, Bash, Batch, Python)
+- Exit codes: 0=OK, 1=Warning (<15%), 2=Critical (>15%)
 
-**Integrazione con Sistema di Backup:**
-- `backup-simple.ps1` usa la stessa logica di validazione
-- Il backup viene **bloccato** se la corruzione supera il 15%
-- Le email di backup includono report dettagliato degli errori rilevati
+**Integration with Backup System:**
+- `backup-simple.ps1` uses the same validation logic
+- Backup is **blocked** if corruption exceeds 15%
+- Backup emails include detailed reports of errors detected
 
-**Struttura Repository Verificata:**
+**Verified Repository Structure:**
 
 ```text
 
 checkmk-tools/
-├── script-check-ns7/full/         # Script NethServer 7
-├── script-check-ns8/full/         # Script NethServer 8
-├── script-check-proxmox/full/     # Script Proxmox
-├── script-check-ubuntu/full/      # Script Ubuntu
-├── script-tools/full/             # Tools vari
-├── script-notify-checkmk/full/    # Notifiche CheckMK
-└── Ydea-Toolkit/full/             # Integrazione Ydea
+├── script-check-ns7/full/ # NethServer 7 script
+├── script-check-ns8/full/ # NethServer 8 script
+├── script-check-proxmox/full/ # Proxmox script
+├── script-check-ubuntu/full/ # Ubuntu Script
+├── script-tools/full/ # Various tools
+├── script-notify-checkmk/full/ # CheckMK Notifications
+└── Ydea-Toolkit/full/ # Ydea integration
 
 ```text
 
-**Output Esempio:**
+**Example Output:**
 
 ```text
 
-================================================================
-    RISULTATI VERIFICA INTEGRITÀ
-================================================================
+=======================================================================================
+    INTEGRITY CHECK RESULTS
+=======================================================================================
 
-RIEPILOGO GENERALE:
-  Script verificati:    451
-  Script validi:        387
-  Script con errori:    64
-  Percentuale errori:   14.19%
-  Soglia corruzione:    15%
+GENERAL SUMMARY:
+  Verified scripts: 451
+  Valid scripts: 387
+  Script with errors: 64
+  Error rate: 14.19%
+  Corruption threshold: 15%
 
-DETTAGLIO PER TIPO:
+DETAIL BY TYPE:
   Bash/Shell
-    Totale:      416
-    Validi:      352
-    Errori:      64 (15.4%)
+    Total: 416
+    Valid: 352
+    Errors: 64 (15.4%)
 
-[STATO] WARNING - Errori rilevati ma sotto soglia
+[STATUS] WARNING - Errors detected but below threshold
 
 ```text
 
 ---
 
-##  Workflow Consigliato
+## Recommended Workflow
 
-###  REGOLA OBBLIGATORIA - Validazione Script
+### MANDATORY RULE - Script Validation
 
 #### Bash/Shell Script
 
-**SEMPRE quando crei o modifichi uno script Bash/Shell:**
-1.  Testa con `wsl bash -n <file_path>`
-2.  Verifica che `$LASTEXITCODE -eq 0`
-3.  Se exit code ≠ 0, correggi gli errori e ritesta
-4.  Ripeti finché non ottieni exit code 0
-5.  Solo allora considera il file completato
+**ALWAYS when creating or editing a Bash/Shell script:**
+1. Test with `wsl bash -n <file_path>`
+2. Verify that `$LASTEXITCODE -eq 0`
+3. If exit code ≠ 0, correct the errors and test again
+4. Repeat until you get exit code 0
+5. Only then consider the file completed
 
-**Comando PowerShell da usare:**
+**PowerShell command to use:**
 
 ```powershell
 wsl bash -n "path/to/script.sh"; echo "EXIT CODE: $LASTEXITCODE"
 
 ```text
 
-**Non procedere mai senza exit code 0!**
+**Never proceed without exit code 0!**
 
 #### PowerShell Script (.ps1)
 
-**SEMPRE quando crei o modifichi uno script PowerShell:**
-1.  Valida con PSParser
-2.  Verifica che errori count = 0
-3.  Se errori presenti, correggi e ritesta
-4.  Ripeti finché non ottieni 0 errori
-5.  Solo allora considera il file completato
+**ALWAYS when creating or editing a PowerShell script:**
+1. Valid with PSParser
+2. Verify that error count = 0
+3. If errors exist, correct and retest
+4. Repeat until you get 0 errors
+5. Only then consider the file completed
 
-**Comando validazione da usare:**
+**Validation command to use:**
 
 ```powershell
-$errors = $null; $null = [System.Management.Automation.PSParser]::Tokenize((Get-Content "path/to/script.ps1" -Raw), [ref]$errors); if ($errors.Count -eq 0) { Write-Host "Sintassi OK" -ForegroundColor Green } else { Write-Host "ERRORI:" -ForegroundColor Red; $errors }; Write-Host "EXIT CODE: $LASTEXITCODE"
+$errors = $null; $null = [System.Management.Automation.PSParser]::Tokenize((Get-Content "path/to/script.ps1" -Raw), [ref]$errors); if ($errors.Count -eq 0) { Write-Host "Syntax OK" -ForegroundColor Green } else { Write-Host "ERRORS:" -ForegroundColor Red; $errors }; Write-Host "EXIT CODE: $LASTEXITCODE"
 
 ```text
 
-**Errori comuni PowerShell:**
--  Carattere `%` non escaped in stringhe → Usare `$($variabile)%`
--  Regex anchor `\z` → Preferire `$` (più compatibile)
--  Apici/virgolette non chiuse correttamente
+**Common PowerShell Errors:**
+- `%` character not escaped in strings → Use `$($variable)%`
+- Regex anchor `\z` → Prefer `$` (more compatible)
+- Superscripts/quotes not closed correctly
 
-**Non procedere mai se PSParser riporta errori!**
+**Never proceed if PSParser reports errors!**
 
-### � REGOLA OBBLIGATORIA - Pulizia Script Temporanei su Host Remoti
+### � MANDATORY RULE - Cleaning Temporary Scripts on Remote Hosts
 
-**Script creati su host remoti (via WSL/SSH) per eseguire azioni puntuali → DEVONO essere cancellati al termine del lavoro.**
+**Scripts created on remote hosts (via WSL/SSH) to perform punctual actions → MUST be deleted when the job is finished.**
 
--  **NON lasciare script temporanei** in `/tmp/`, `/root/`, `/home/`, o qualsiasi altra directory degli host remoti
--  **SEMPRE cancellare** lo script appena il task è completato (o fallito)
--  **Cancellazione automatica**: includere `rm -f /tmp/script.py` nello stesso comando SSH dove si esegue lo script
--  Questo vale per: script Python, bash, file `.py`, `.sh` e qualsiasi altro file creato ad-hoc
+- **DO NOT leave temporary scripts** in `/tmp/`, `/root/`, `/home/`, or any other remote host directory
+- **ALWAYS delete** the script as soon as the task is completed (or failed)
+- **Automatic deletion**: Include `rm -f /tmp/script.py` in the same SSH command where you run the script
+- This applies to: Python scripts, bash, `.py` files, `.sh` and any other ad-hoc created files
 
-**Pattern corretto (esegui e cancella in un colpo solo):**
+**Corrected pattern (execute and delete in one go):**
 
 ```bash
-#  CORRETTO - esegui e cancella
+# CORRECT - run and delete
 ssh host 'python3 /tmp/fix.py; rm -f /tmp/fix.py'
 
-#  CORRETTO - via base64 (non lascia file)
+# CORRECT - via base64 (leaves no files)
 ssh host 'echo <base64> | base64 -d | python3'
 
-#  SBAGLIATO - script lasciato sull'host
+# WRONG - script left on host
 ssh host 'python3 /tmp/fix.py'
-# ... lavoro completato ...
-# (nessuna pulizia)
+# ... job completed ...
+# (no cleaning)
 ```
 
-**Il metodo base64 è preferito** perché non crea mai file temporanei sull'host.
-Se per forza devi creare un file → cancellalo subito dopo con `rm -f`.
+**The base64 method is preferred** because it never creates temporary files on the host.
+If you absolutely have to create a file → delete it immediately afterwards with `rm -f`.
 
-### � REGOLA DEPLOYMENT - Path Script Repository
+### � DEPLOYMENT RULE - Path Script Repository
 
-** IMPORTANTE: Repository già clonato su tutte le macchine**
+** IMPORTANT: Repository already cloned on all machines **
 
-**Path repository locale:**
--  **TUTTE le macchine (server e host) hanno git clone in `/opt/checkmk-tools/`**
--  Repository aggiornato automaticamente (git pull automatico)
--  Preferire esecuzione locale quando disponibile (più comodo/veloce)
--  **ATTENZIONE: Il clone locale è READ-ONLY** - qualsiasi modifica viene sovrascritta dal git pull automatico
--  **MAI modificare file in `/opt/checkmk-tools/`** - modifiche si perdono sistematicamente
+**Local repository path:**
+- **ALL machines (servers and hosts) have git clone in `/opt/checkmk-tools/`**
+- Automatically updated repository (automatic git pull)
+- Prefer local execution when available (more convenient/faster)
+- **WARNING: Local clone is READ-ONLY** - any changes are overwritten by automatic git pull
+- **NEVER edit files in `/opt/checkmk-tools/`** - changes are systematically lost
 
-**Ordine di priorità:**
-1. **Locale (se disponibile)**: `/opt/checkmk-tools/script-tools/full/script-name.sh` (più comodo)
-2. **GitHub raw**: `https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/...` (funziona ugualmente bene)
+**Order of priority:**
+1. **Local (if available)**: `/opt/checkmk-tools/script-tools/full/script-name.sh` (most convenient)
+2. **GitHub raw**: `https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/...` (works equally well)
 
-**Esempi esecuzione locale:**
+**Local execution examples:**
 
 ```bash
-# Esecuzione diretta da repo locale
+# Direct execution from local repo
 /opt/checkmk-tools/script-tools/full/installation/install-agent-interactive.sh
 
-# Cron job - usa repo locale
+# Cron job - use local repo
 0 3 * * * /opt/checkmk-tools/script-tools/full/backup_restore/cleanup-checkmk-retention.sh >> /var/log/script.log 2>&1
 
-# Con bash esplicito
+# With explicit bash
 bash /opt/checkmk-tools/script-tools/full/script-name.sh
 
 ```text
 
-**Esempi esecuzione da GitHub (fallback o host remoti):**
+**Examples running from GitHub (fallback or remote hosts):**
 
 ```bash
-# Cron job - esecuzione diretta da GitHub
+# Cron job - direct execution from GitHub
 0 3 * * * curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash >> /var/log/script.log 2>&1
 
-# Esecuzione manuale remota
+# Remote manual execution
 curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/script-name.sh | bash
 
 ```text
 
-**Vantaggi path locale:**
--  Più veloce (no download)
--  Funziona offline
--  Stesso codice su tutti i server (git pull auto)
+**Local path benefits:**
+- Faster (no download)
+- Works offline
+- Same code on all servers (git pull auto)
 
-**Vantaggi GitHub raw (curl/wget):**
--  Funziona ugualmente bene
--  Sempre ultima versione GitHub
--  Utile per host remoti o bootstrap
+**GitHub raw (curl/wget) benefits:**
+- Works equally well
+- Always latest GitHub version
+- Useful for remote or bootstrap hosts
 
-** WORKFLOW TEST OBBLIGATORIO - Repository Locale**
+** MANDATORY WORKFLOW TEST - Local Repository**
 
-**REGOLA FONDAMENTALE (da seguire SEMPRE durante test):**
+**FUNDAMENTAL RULE (to ALWAYS be followed during tests):**
 
-1. **PRIMA di ogni test su host remoto**:
-   -  Verifica presenza `/opt/checkmk-tools/`
-   -  Se NON esiste → clonalo manualmente
-   -  Se esiste → aggiornalo con `git pull`
-   -  Usa SEMPRE path locale per test (NO GitHub raw)
+1. **BEFORE any remote host testing**:
+   - Check for `/opt/checkmk-tools/`
+   - If it does NOT exist → clone it manually
+   - If it exists → update it with `git pull`
+   - ALWAYS use local path for testing (NO GitHub raw)
 
-2. **Workflow corretto test:**
+2. **Correct test workflow:**
 
 ```bash
-# STEP 1: Verifica + crea/aggiorna repo locale
+# STEP 1: Verify + create/update local repo
 wsl -d kali-linux ssh <host> "[ -d /opt/checkmk-tools ] && echo 'REPO EXISTS' || echo 'REPO MISSING'"
 
-# Se REPO MISSING → clona
+# If REPO MISSING → clone
 wsl -d kali-linux ssh <host> "git clone https://github.com/Coverup20/checkmk-tools.git /opt/checkmk-tools"
 
-# Se REPO EXISTS → aggiorna
+# If REPO EXISTS → update
 wsl -d kali-linux ssh <host> "cd /opt/checkmk-tools && git pull"
 
-# STEP 2: Esegui test da repo LOCALE (NON da GitHub!)
+# STEP 2: Run tests from LOCAL repo (NOT from GitHub!)
 wsl -d kali-linux ssh <host> "/opt/checkmk-tools/script-check-ns7/full/check-sos-ns7.py"
 
-#  VANTAGGI:
-# - Nessun problema cache GitHub
-# - Versione garantita post-commit
-# - Più veloce (no download)
+# ADVANTAGES:
+# - No GitHub cache issues
+# - Post-commit guaranteed version
+# - Faster (no download)
 ```
 
-3. **Test con launcher remoto:**
+3. **Test with remote launcher:**
 
 ```bash
-# Aggiorna repo
+# Update repo
 wsl -d kali-linux ssh <host> "cd /opt/checkmk-tools && git pull"
 
-# Test launcher da repo locale
+# Test launcher from local repo
 wsl -d kali-linux ssh <host> "/opt/checkmk-tools/script-check-ns7/remote/rcheck-sos-ns7.py"
 
-#  Launcher scarica full/ da GitHub (comportamento normale)
-#  Ma launcher stesso viene da repo locale aggiornato
+# Launcher downloads full/ from GitHub (normal behavior)
+# But launcher itself comes from updated local repo
 ```
 
-** QUANDO usare GitHub raw:**
--  **MAI** per test durante sviluppo (cache 5 min!)
--  Solo per bootstrap iniziale (host senza repo)
--  Solo per esempi documentazione
+** WHEN to use GitHub raw: **
+- **NEVER** for testing during development (cache 5 min!)
+- Only for initial bootstrap (host without repo)
+- For documentation examples only
 
-** REGOLA IMPORTANTE: Modifiche al repository**
--  Modifiche SOLO su VSCode locale (Windows)
--  Commit e push da VSCode
--  Git pull manuale/automatico distribuisce a tutti i server
--  **MAI modificare file in `/opt/checkmk-tools/` sui server remoti**
--  Modifiche locali vengono perse al prossimo git pull
+**IMPORTANT RULE: Repository Changes**
+- Changes ONLY on local VSCode (Windows)
+- Commit and push from VSCode
+- Manual/automatic Git pull deploys to all servers
+- **NEVER edit files in `/opt/checkmk-tools/` on remote servers**
+- Local changes are lost on next git pull
 
-### Prima di ogni commit importante:
+### Before every major commit:
 
-1. Eseguire `.\script-ps-tools\check-integrity.ps1` per verificare lo stato
-2. Se errori >15%, indagare prima di committare
-3. Verificare che tutti gli script .sh siano eseguibili
+1. Run `.\script-ps-tools\check-integrity.ps1` to check the status
+2. If errors >15%, investigate before committing
+3. Verify that all .sh scripts are executable
 
-### Dopo modifiche massive:
+### After massive changes:
 
-1. Eseguire `.\script-ps-tools\check-integrity.ps1 -Detailed` per vedere tutti gli errori
-2. Valutare se è necessario riparare script corrotti
-3. Usare `.\script-ps-tools\repair-corrupted-scripts.ps1` se disponibile
+1. Run `.\script-ps-tools\check-integrity.ps1 -Detailed` to see all errors
+2. Consider whether you need to repair corrupt scripts
+3. Use `.\script-ps-tools\repair-corrupted-scripts.ps1` if available
 
-### Monitoraggio periodico:
+### Periodic monitoring:
 
-- **Settimanale**: `.\script-ps-tools\check-integrity.ps1 -ExportReport` per storico
-- **Mensile**: Analizzare trend corruzione nel tempo
+- **Weekly**: `.\script-ps-tools\check-integrity.ps1 -ExportReport` for history
+- **Monthly**: Analyze corruption trends over time
 
 ---
 
-##  Strumenti di Backup Repository
+## Repository Backup Tools
 
-### backup-simple.ps1 - Backup Completo con Controllo Integrità
+### backup-simple.ps1 - Full Backup with Integrity Check
 
-**Quando usare:**
-- Backup scheduled automatici (task schedulato)
-- Backup periodici completi con validazione
-- Quando non è stato eseguito recentemente `check-integrity.ps1`
+**When to use:**
+- Automatic scheduled backups (scheduled task)
+- Complete periodic backups with validation
+- When `check-integrity.ps1` has not been run recently
 
-**Caratteristiche:**
--  Controllo integrità completo di tutti gli script (PS1, Bash, Python)
--  Validazione sintassi con PSParser e `bash -n`
--  Blocco automatico se corruzione >15% (protezione propagazione errori)
--  Report dettagliato errori via email
--  Backup locale + rete
--  Retention policy automatica (20 backup)
+**Features:**
+- Full integrity check of all scripts (PS1, Bash, Python)
+- Syntax validation with PSParser and `bash -n`
+- Automatic blocking if corruption >15% (error propagation protection)
+- Detailed error report via email
+- Local + network backup
+- Automatic retention policy (20 backups)
 
-**Comandi:**
+**Commands:**
 
 ```powershell
-# Modalità interattiva
+# Interactive mode
 .\script-ps-tools\backup-simple.ps1
 
-# Modalità automatica (scheduled task)
+# Automatic mode (scheduled task)
 .\script-ps-tools\backup-simple.ps1 -Unattended
 ```
 
-**Tempo esecuzione:** ~2-5 minuti (dipende da numero script)
+**Execution time:** ~2-5 minutes (depends on script number)
 
 ---
 
-### backup-quick.ps1 - Backup Veloce senza Controllo Integrità
+### backup-quick.ps1 - Fast Backup without Integrity Check
 
-**Quando usare:**
-- Durante workflow conversione Python (dopo ogni categoria completata)
-- Backup rapidi post-commit quando integrità già verificata
-- Situazioni dove velocità è prioritaria
+**When to use:**
+- During Python conversion workflow (after each completed category)
+- Fast post-commit backups when integrity is already verified
+- Situations where speed is a priority
 
-**Caratteristiche:**
--  Backup immediato senza validazione sintassi
--  Backup locale + rete
--  Retention policy automatica (20 backup)
--  Report via email (senza sezione integrità)
--  Presuppone che `check-integrity.ps1` sia stato eseguito separatamente
+**Features:**
+- Immediate backup without syntax validation
+- Local + network backup
+- Automatic retention policy (20 backups)
+- Report via email (without health section)
+- Assumes `check-integrity.ps1` has been run separately
 
-**Comandi:**
+**Commands:**
 
 ```powershell
-# Modalità interattiva
+# Interactive mode
 .\script-ps-tools\backup-quick.ps1
 
-# Modalità automatica (workflow Python)
+# Automatic mode (Python workflow)
 .\script-ps-tools\backup-quick.ps1 -Unattended
 ```
 
-**Tempo esecuzione:** ~30-60 secondi
+**Execution time:** ~30-60 seconds
 
 ---
 
-### Confronto Script Backup
+### Backup Script Comparison
 
-| Caratteristica | backup-simple.ps1 | backup-quick.ps1 |
-|----------------|-------------------|------------------|
-| Controllo integrità |  Sì |  No |
-| Validazione sintassi |  PSParser + bash -n |  No |
-| Blocco corruzione >15% |  Sì |  No |
-| Backup locale |  Sì |  Sì |
-| Backup rete |  Sì |  Sì |
-| Retention policy |  Sì |  Sì |
-| Email report |  Con integrità |  Senza integrità |
-| Tempo esecuzione | 2-5 min | 30-60 sec |
-| Uso consigliato | Task periodici | Workflow conversione |
+| Feature | backup-simple.ps1 | backup-quick.ps1 |
+|----------------|-----------------------|------------------|
+| Integrity check |  Yes |  No |
+| Syntax validation |  PSParser + bash -n |  No |
+| Corruption block >15% |  Yes |  No |
+| Local backup |  Yes |  Yes |
+| Network Backup |  Yes |  Yes |
+| Retention policy |  Yes |  Yes |
+| Email reports |  With integrity |  Without integrity |
+| Execution time | 2-5 min | 30-60 sec |
+| Recommended use | Periodic tasks | Conversion Workflow |
 
 ---
 
-### Workflow Consigliato
+### Recommended Workflow
 
-**Conversione Python (categoria completa):**
+**Python conversion (full category):**
 ```powershell
-# 1. Converti tutti gli script della categoria
-# 2. Testa e deploya tutti
-# 3. Backup veloce
+#1. Convert all category scripts
+#2. Test and deploy everyone
+#3. Fast backup
 .\script-ps-tools\backup-quick.ps1 -Unattended
 ```
 
-**Backup periodico completo:**
+**Full periodic backup:**
 ```powershell
-# Task schedulato (es: ogni notte)
+# Scheduled task (e.g. every night)
 .\script-ps-tools\backup-simple.ps1 -Unattended
 ```
 
-**Verifica integrità on-demand:**
+**On-demand integrity check:**
 ```powershell
-# Controllo manuale senza backup
+# Manual control without backup
 .\script-ps-tools\check-integrity.ps1 -Detailed
 ```
 
 ---
 
-##  Strumenti Correlati
+## Related Tools
 
-- **check-integrity.ps1**: Controllo integrità senza backup
-- **repair-corrupted-scripts.ps1**: Riparazione automatica script corrotti
-- **WSL**: Necessario per validazione Bash (`bash -n`)
+- **check-integrity.ps1**: Integrity check without backup
+- **repair-corrupted-scripts.ps1**: Automatically repair corrupted scripts
+- **WSL**: Required for Bash validation (`bash -n`)
 
 ---
 
-##  Agent CheckMK - Installazione/Aggiornamento
+## Agent CheckMK - Installation/Update
 
-** IMPORTANTE: Usare sempre lo script dedicato per agent CheckMK**
+** IMPORTANT: Always use the dedicated CheckMK agent script**
 
-### Script da usare:
+### Script to use:
 
 ```bash
-# Su server remoti CheckMK
+# On remote CheckMK servers
 /opt/checkmk-tools/script-tools/full/installation/install-agent-interactive.sh
 
-# Da GitHub (se repo non clonato)
+# From GitHub (if repo not cloned)
 curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/installation/install-agent-interactive.sh | bash
 
 ```text
 
-### Cosa fa lo script:
+### What the script does:
 
--  Rileva OS automaticamente (Debian/Ubuntu/RHEL/OpenWrt)
--  Scarica agent corretto dalla versione CheckMK server
--  **Disabilita automaticamente `cmk-agent-ctl-daemon.service`** (causa conflitti porta 6556)
--  Configura socket TCP plain su porta 6556
--  Gestisce correttamente systemd/xinetd/procd
--  Opzionale: configura FRPC per tunnel
+- Detect OS automatically (Debian/Ubuntu/RHEL/OpenWrt)
+- Download correct agent from CheckMK version server
+- **Automatically disable `cmk-agent-ctl-daemon.service`** (due to port 6556 conflicts)
+- Configure plain TCP socket on port 6556
+- Properly handles systemd/xinetd/procd
+- Optional: Configure FRPC for tunnels
 
-### Problema comune:
+### Common problem:
 
-**NON usare solo `dpkg -i check-mk-agent.deb`** perché:
--  Lascia attivo `cmk-agent-ctl-daemon` che va in conflitto
--  Non configura correttamente il socket TCP
--  Causa errore "Address in use (os error 98)"
+**DO NOT just use `dpkg -i check-mk-agent.deb`** because:
+- Leave `cmk-agent-ctl-daemon` active which conflicts
+- Does not configure the TCP socket correctly
+- Causes "Address in use (os error 98)" error
 
-### Fix se già installato manualmente:
+### Fix if already installed manually:
 
 ```bash
-# Disabilita daemon problematico
+# Disable problematic daemon
 systemctl disable --now cmk-agent-ctl-daemon.service
 systemctl reset-failed cmk-agent-ctl-daemon.service
 
-# L'agent continua a funzionare via check-mk-agent.socket
+# The agent continues to run via check-mk-agent.socket
 
 ```text
 
 ---
 
-##  Conversione Script Bash → Python - Best Practices
+## Bash Script Conversion → Python - Best Practices
 
-** POLICY PYTHON-FIRST (dal 13 Febbraio 2026):**
+** PYTHON-FIRST POLICY (from February 13, 2026):**
 
--  **TUTTI i nuovi script DEVONO essere scritti in Python**
--  Python è la lingua ufficiale per nuovi check/tool/automation
--  Bash solo per wrapper minimali o casi eccezionali giustificati
--  Script bash esistenti vanno gradualmente convertiti in Python
--  Launcher remoti: SEMPRE Python puri (urllib + exec), NO bash+curl
+- **ALL new scripts MUST be written in Python**
+- Python is the official language for new check/tool/automation
+- Bash only for minimal wrappers or justified exceptional cases
+- Existing bash scripts should be gradually converted to Python
+- Remote launchers: ALWAYS pure Python (urllib + exec), NO bash+curl
 
-**Motivazioni:**
+**Reasons:**
 
-- Robustezza parsing e error handling superiore
-- Type hints per sicurezza e manutenibilità
-- Testing più facile e completo
-- Portabilità e consistenza codebase
-- Unico linguaggio significa unica expertise da mantenere
+- Superior parsing robustness and error handling
+- Type hints for security and maintainability
+- Easier and more complete testing
+- Portability and codebase consistency
+- Single language means single expertise to maintain
 
-** WORKFLOW COMPLETO per conversione script esistenti:**
+** COMPLETE WORKFLOW for converting existing scripts:**
 
-### 1. Strategia Conversione
+### 1. Conversion Strategy
 
-**Quando convertire bash → Python:**
--  Script con parsing complesso (output comandi, regex, testo strutturato)
--  Script con logica condizionale articolata
--  Necessità di error handling robusto
--  Script che beneficiano di type hints e modularità
--  Script destinati a evolversi (più feature nel tempo)
+**When to convert bash → Python:**
+- Script with complex parsing (command output, regex, structured text)
+- Script with complex conditional logic
+- Need for robust error handling
+- Scripts that benefit from type hints and modularity
+- Scripts intended to evolve (more features over time)
 
-**Vantaggi Python:**
--  Parsing più robusto (regex, split, strip vs sed/awk/grep)
--  Error handling elegante (try/except vs if/then)
--  Type hints per sicurezza e documentazione
--  Modularità con funzioni documentate (docstring)
--  Testing più facile (unit tests, mock)
--  Libreria standard ricca (subprocess, urllib, json, etc.)
+**Python Advantages:**
+- More robust parsing (regex, split, strip vs sed/awk/grep)
+- Elegant error handling (try/except vs if/then)
+- Type hints for security and documentation
+- Modularity with documented functions (docstring)
+- Easier testing (unit tests, mocks)
+- Rich standard library (subprocess, urllib, json, etc.)
 
-### 2. Template Script Python CheckMK Local Check
+### 2. CheckMK Local Check Python Script Template
 
 ```python
 #!/usr/bin/env python3
 """
-check_service_name.py - CheckMK Local Check per <descrizione>
+check_service_name.py - CheckMK Local Check for <description>
 
-<Descrizione funzionalità dettagliata>
+<Detailed feature description>
 
 Version: 1.0.0
 """
@@ -1396,7 +1393,7 @@ if __name__ == "__main__":
 
 ### 3. Pattern CheckMK Output
 
-**Format obbligatorio local check:**
+**Required local check format:**
 
 ```text
 <STATE> <SERVICE_NAME> - <message>
@@ -1404,75 +1401,75 @@ if __name__ == "__main__":
 
 **State codes:**
 
-- `0` = OK (verde)
-- `1` = WARNING (giallo)
-- `2` = CRITICAL (rosso)
-- `3` = UNKNOWN (arancione)
+- `0` = OK (green)
+- `1` = WARNING (yellow)
+- `2` = CRITICAL (red)
+- `3` = UNKNOWN (orange)
 
 **Exit code script:**
 
-- SEMPRE `0` per local checks (CheckMK ignora exit code, legge solo primo campo output)
+- ALWAYS `0` for local checks (CheckMK ignores exit code, reads only first output field)
 
-### 4. Deploy Diretto da Repo Locale (NO Launcher)
+### 4. Deploy Directly from Local Repo (NO Launcher)
 
- **LAUNCHER DEPRECATI** - Non creare più script `remote/rssh_*.py`
+ **DEPRECATED LAUNCHERS** - No longer create `remote/rssh_*.py` scripts
 
- **POLICY ATTUALE: Deploy diretto dello script `full/` da `/opt/checkmk-tools/`**
+ **CURRENT POLICY: Direct deployment of `full/` script from `/opt/checkmk-tools/`**
 
-**Motivazione:**
-- Il repo `/opt/checkmk-tools/` è già presente su tutti gli host (git pull automatico ogni minuto)
-- Deploy diretto = nessun download HTTP in runtime, funziona offline
-- Meno file da mantenere, meno complessità
-- Nessun doppio step (launcher → download → exec)
+**Reason:**
+- The `/opt/checkmk-tools/` repo is already present on all hosts (automatic git pull every minute)
+- Direct deployment = no HTTP downloads at runtime, works offline
+- Fewer files to maintain, less complexity
+- No double steps (launcher → download → exec)
 
-**Metodo deploy:**
+**Deployment method:**
 
 ```bash
-# Aggiorna repo locale
+# Update local repo
 cd /opt/checkmk-tools && git pull
 
-# Copia script full/ nella directory local checks (SENZA estensione)
-cp script-check-<categoria>/full/check_service_name.py /usr/lib/check_mk_agent/local/check_service_name
+# Copy full/ script to local checks directory (WITHOUT extension)
+cp script-check-<category>/full/check_service_name.py /usr/lib/check_mk_agent/local/check_service_name
 chmod +x /usr/lib/check_mk_agent/local/check_service_name
 
-# Test immediato
+# Immediate test
 /usr/lib/check_mk_agent/local/check_service_name
 ```
 
-**Nome file deployato:**
-- SENZA estensione `.py` (CheckMK esegue tutti i file eseguibili)
-- Usa direttamente il nome del check: `check_nethvoice_trunks`, `check_fail2ban_status`, etc.
--  Niente più prefisso `rssh_`
+**Deployed file name:**
+- WITHOUT `.py` extension (CheckMK runs all executable files)
+- Use the check name directly: `check_nethvoice_trunks`, `check_fail2ban_status`, etc.
+- No more `rssh_` prefix
 
-### 5. Workflow Completo Conversione/Nuovo Script
+### 5. Complete Workflow Conversion/New Script
 
-**Step OBBLIGATORI (seguire SEMPRE):**
+**MANDATORY Steps (ALWAYS follow):**
 
 ```bash
-# 1. Crea script Python completo (full/)
+#1. Create full Python script (full/)
 vim script-check-ubuntu/full/check_service_name.py
-# Implementa funzionalità con template sopra
+# Implement functionality with template above
 
-# 2. Valida sintassi Python
+#2. Valid Python syntax
 python -m py_compile script-check-ubuntu/full/check_service_name.py
-# EXIT CODE deve essere 0
+# EXIT CODE must be 0
 
-# 3. Rendi eseguibile e aggiungi a git
+#3. Make executable and add to git
 git add script-check-ubuntu/full/check_service_name.py
 git update-index --chmod=+x script-check-ubuntu/full/check_service_name.py
 
-# 4. Verifica permessi (devono mostrare 100755)
+#4. Check permissions (must show 100755)
 git ls-files -s script-check-ubuntu/full/check_service_name.py
 
-# 5. Commit & Push
-git commit -m "feat(ubuntu): check_service_name v1.0.0 - descrizione"
+#5. Commit & Push
+git commit -m "feat(ubuntu): check_service_name v1.0.0 - description"
 git push
 
-# 6. Deploy su host remoto (aggiorna repo + copia direttamente)
-# HOST CON CHIAVE SSH (vps-01, vps-02):
+#6. Deploy to remote host (update repo + copy directly)
+# HOST WITH SSH KEY (vps-01, vps-02):
 wsl -d kali-linux ssh <host> "cd /opt/checkmk-tools && git pull && cp script-check-ubuntu/full/check_service_name.py /usr/lib/check_mk_agent/local/check_service_name && chmod +x /usr/lib/check_mk_agent/local/check_service_name"
 
-# HOST CON PASSWORD (tutti gli altri): dare i comandi da incollare:
+# HOST WITH PASSWORD (all others): give the commands to paste:
 # cd /opt/checkmk-tools && git pull
 # cp script-check-ubuntu/full/check_service_name.py /usr/lib/check_mk_agent/local/check_service_name
 # chmod +x /usr/lib/check_mk_agent/local/check_service_name
@@ -1480,77 +1477,77 @@ wsl -d kali-linux ssh <host> "cd /opt/checkmk-tools && git pull && cp script-che
 # 7. Test local check
 wsl -d kali-linux ssh <host> "/usr/lib/check_mk_agent/local/check_service_name"
 
-# 8. Verifica output agent CheckMK
+#8. Check CheckMK agent output
 wsl -d kali-linux ssh <host> "check_mk_agent 2>/dev/null | grep ServiceName"
-# Deve mostrare UNA SOLA riga con output check
+# Must show ONLY ONE line with output check
 ```
 
- **NON creare cartella `remote/` né file `rssh_*.py`** - non servono più.
+ **DO NOT create `remote/` folder or `rssh_*.py` file** - they are no longer needed.
 
 ### 6. Naming Convention
 
-**File nel repository:**
+**Files in repository:**
 
-- `script-check-<categoria>/full/check_service_name.py` → Script completo Python (unico file da creare)
-- `script-check-<categoria>/full/check_service_name.sh` → Script bash OLD (deprecato, non creare nuovi)
--  `script-check-<categoria>/remote/` → NON creare più questa cartella/file
+- `script-check-<category>/full/check_service_name.py` → Full Python script (only file to create)
+- `script-check-<category>/full/check_service_name.sh` → OLD bash script (deprecated, do not create new)
+- `script-check-<category>/remote/` → DO NOT create this folder/file again
 
-**File deployati su host (local checks):**
+**Files deployed on host (local checks):**
 
-- `/usr/lib/check_mk_agent/local/check_service_name` → Script deployato SENZA estensione `.py`
-- Nome uguale al file `full/` senza `.py` (es: `check_nethvoice_trunks`)
-- CheckMK esegue tutti i file eseguibili nella directory
+- `/usr/lib/check_mk_agent/local/check_service_name` → Script deployed WITHOUT `.py` extension
+- Name same as `full/` file without `.py` (e.g. `check_nethvoice_trunks`)
+- CheckMK runs all executable files in the directory
 
-### 7. Migrazione Graduale
+### 7. Gradual Migration
 
-**Quando converti uno script bash esistente:**
+**When converting an existing bash script:**
 
-1.  Mantieni versione bash originale (`.sh`) nel repository durante transizione
-2.  Crea nuova versione Python (`.py`) in `full/`
-3.  Testa script Python direttamente su host pilota
-4.  Se tutto OK → sostituisci il file deployato in `/usr/lib/check_mk_agent/local/` con la versione Python
-5.  OPZIONALE: Rimuovi `.sh` dal repository dopo periodo transizione
+1. Keep original bash version (`.sh`) in repository during transition
+2. Create new Python version (`.py`) in `full/`
+3. Test Python scripts directly on pilot hosts
+4. If all OK → replace the deployed file in `/usr/lib/check_mk_agent/local/` with the Python version
+5. OPTIONAL: Remove `.sh` from repository after transition period
 
-**NON eliminare mai script bash senza test completo Python!**
- **NON creare launcher `remote/rssh_*`** - deploy diretto da repo locale.
+**NEVER delete bash scripts without full Python testing!**
+ **DO NOT create `remote/rssh_*` launcher** - direct deployment from local repo.
 
-### 8. Testing Obbligatorio
+### 8. Mandatory Testing
 
-**Checklist test prima di dichiarare conversione completata:**
+**Test checklist before declaring conversion complete:**
 
--  Validazione sintassi Python (py_compile)
--  Esecuzione script completo su host remoto
--  Output compatibile CheckMK format (`<STATE> <SERVICE> - <msg>`)
--  Check appare in `check_mk_agent` output
--  NO duplicati (solo 1 istanza del check nell'output agent)
--  Comportamento identico a versione bash (stessi state codes, stessi messaggi)
+- Python syntax validation (py_compile)
+- Full script execution on remote host
+- CheckMK compatible output format (`<STATE> <SERVICE> - <msg>`)
+- Check appears in `check_mk_agent` output
+- NO duplicates (only 1 instance of the check in the output agent)
+- Behavior identical to the bash version (same state codes, same messages)
 
-** BACKUP A FINE CATEGORIA:**
+** BACKUP AT THE END OF THE CATEGORY:**
 
--  **BACKUP OBBLIGATORIO**: A fine conversione **intera categoria/cartella**
--  Esempio: dopo aver completato TUTTI gli script di `script-check-ubuntu/` → `.\script-ps-tools\backup-quick.ps1 -Unattended`
--  NON eseguire backup dopo ogni singolo script
--  Eseguire backup solo quando categoria completa è testata e deployata
--  `script-ps-tools\backup-quick.ps1` è ottimizzato per workflow conversione (NO controllo integrità)
-- ℹ Controllo integrità eseguito separatamente con `.\script-ps-tools\check-integrity.ps1` quando necessario
+- **MANDATORY BACKUP**: At the end of the conversion **entire category/folder**
+- Example: After completing ALL scripts from `script-check-ubuntu/` → `.\script-ps-tools\backup-quick.ps1 -Unattended`
+- DO NOT run backups after every single script
+- Perform backups only when complete category is tested and deployed
+- `script-ps-tools\backup-quick.ps1` is optimized for conversion workflow (NO integrity check)
+- ℹ Integrity check performed separately with `.\script-ps-tools\check-integrity.ps1` when needed
 
-### 9. Esempio Completo Real World
+### 9. Complete Real World Example
 
-**Caso studio: check_fail2ban_status.sh → check_fail2ban_status.py**
+**Case study: check_fail2ban_status.sh → check_fail2ban_status.py**
 
 **Commit History:**
 
-- `c0e26d5`: Creazione `check_fail2ban_status.py` (script completo)
-- `64bfdee`: Creazione `rssh_fail2ban_status_py.sh` (launcher bash - deprecato)
-- `f108044`: Refactor `rssh_fail2ban_status.py` (launcher Python puro)
+- `c0e26d5`: Create `check_fail2ban_status.py` (complete script)
+- `64bfdee`: Creating `rssh_fail2ban_status_py.sh` (bash launcher - deprecated)
+- `f108044`: Refactor `rssh_fail2ban_status.py` (pure Python launcher)
 
-**Path finali:**
+**Final Paths:**
 
-- Repository: `script-check-ubuntu/full/check_fail2ban_status.py` (script completo)
-- Repository: `script-check-ubuntu/remote/rssh_fail2ban_status.py` (launcher Python)
-- Deployato: `/usr/lib/check_mk_agent/local/rssh_fail2ban_status` (launcher senza .py)
+- Repository: `script-check-ubuntu/full/check_fail2ban_status.py` (full script)
+- Repository: `script-check-ubuntu/remote/rssh_fail2ban_status.py` (Python launcher)
+- Deployed: `/usr/lib/check_mk_agent/local/rssh_fail2ban_status` (launcher without .py)
 
-**Output produzione:**
+**Production output:**
 
 ```text
 0 Fail2ban - running, no banned IPs
@@ -1579,12 +1576,12 @@ import sys
 import json
 import subprocess
 
-## Utils
+## Useful
 
 def utility_function():
     ...
 
-## Check   (or ## APIs for rpcd scripts)
+## Check (or ## APIs for rpcd scripts)
 
 def check():
     ...
@@ -1644,7 +1641,7 @@ import subprocess
 
 SERVICE = "ServiceName"
 
-## Utils
+## Useful
 
 def run(cmd):
     try:
@@ -1667,476 +1664,474 @@ check()
 
 ---
 
-## Accesso Remoto SSH - VPS e Server Locali
+## SSH Remote Access - VPS and Local Servers
 
-### Setup WSL SSH
+### WSL SSH setup
 
-**Environment configurato:**
--  WSL: **Kali Linux** su Windows (`wsl -d kali-linux bash -c "command"`)
--  SSH Keys: `~/.ssh/checkmk` (protetta da passphrase)
--  SSH Config: `~/.ssh/config` con alias host
--  SSH ControlMaster: Riutilizzo connessioni (passphrase 1 volta, poi 1 min attiva)
+**Environment configured:**
+- WSL: **Kali Linux** on Windows (`wsl -d kali-linux bash -c "command"`)
+- SSH Keys: `~/.ssh/checkmk` (passphrase protected)
+- SSH Config: `~/.ssh/config` with host alias
+- SSH ControlMaster: Reuse connections (passphrase 1 time, then 1 min active)
 
-** REGOLA FORMATO COMANDI - Quando l'utente chiede "comandi da incollare":**
+**ADJUST COMMAND FORMAT - When the user asks for "commands to paste":**
 
-- Passare il comando **nudo**, senza wrapper `wsl -d kali-linux ssh ...`
-- L'utente lo incolla direttamente nel terminale remoto già aperto
-- SBAGLIATO: `wsl -d kali-linux ssh -tt -o ControlMaster=no -J sos -p 2333 root@45.33.235.86 "apt-get install -y git"`
-- CORRETTO: `apt-get install -y git`
-- Usare il wrapper `wsl -d kali-linux ssh ...` SOLO quando si esegue da VS Code terminal in modo autonomo
+- Pass the command **naked**, without wrapper `wsl -d kali-linux ssh ...`
+- The user pastes it directly into the already opened remote terminal
+- WRONG: `wsl -d kali-linux ssh -tt -o ControlMaster=no -J sos -p 2333 root@45.33.235.86 "apt-get install -y git"`
+- FIXED: `apt-get install -y git`
+- Use `wsl -d kali-linux ssh ...` wrapper ONLY when running from VS Code terminal standalone
 
-** REGOLA PRATICA - Password SSH (no “pausa continua”):**
+** RULE OF PRACTICE - SSH password (no “continuous pause”):**
 
--  Usa `ssh -tt` quando prevedi prompt (password/confirm)
--  Se compare davvero un prompt `password for ...:`/`[sudo] password for ...:` → fermarsi solo finché la password non viene inserita
--  Non forzare `sudo`/`sudo -v` “di default”: usare `sudo` solo quando serve e quando l’utente lo sta effettivamente facendo (o lo richiede)
+- Use `ssh -tt` when expecting prompts (password/confirm)
+- If a `password for ...:`/`[sudo] password for ...:` prompt actually appears → stop only until the password is entered
+- Don't force `sudo`/`sudo -v` “by default”: use `sudo` only when needed and when the user is actually doing it (or requests it)
 
-** REGOLA CRITICA - Timeout Comandi SSH Remoti:**
--  **PROBLEMA**: Agent SSH va troppo veloce e pensa che utente abbia interrotto (^C), ma in realtà comando stava ancora elaborando
--  **SOLUZIONE**: Usare timeout GENEROSI per comandi remoti
--  **Timeout consigliati**:
-  - Comandi semplici (ls, cat, echo): `timeout: 10000` (10 sec)
-  - Comandi SSH normali (script execution): `timeout: 30000` (30 sec)
-  - Comandi SSH complessi (check_mk_agent, git operations): `timeout: 60000` (60 sec)
-  - Backup/restore/operazioni massive: `timeout: 120000` (2 min)
--  **MAI usare timeout < 10000** per comandi SSH
--  **ASPETTARE completamento** anche se sembra lento - il comando sta lavorando
--  **NON assumere** che ^C nell'output significhi interruzione utente - potrebbe essere timeout tool troppo breve
+** CRITICAL RULE - Remote SSH Command Timeout:**
+- **ISSUE**: Agent SSH runs too fast and thinks user has aborted (^C), but in reality command was still processing
+- **SOLUTION**: Use GENEROUS timeouts for remote commands
+- **Recommended timeouts**:
+  - Simple commands (ls, cat, echo): `timeout: 10000` (10 sec)
+  - Normal SSH commands (script execution): `timeout: 30000` (30 sec)
+  - Complex SSH commands (check_mk_agent, git operations): `timeout: 60000` (60 sec)
+  - Backup/restore/massive operations: `timeout: 120000` (2 min)
+- **NEVER use timeout < 10000** for SSH commands
+- **WAIT for completion** even if it seems slow - the command is working
+- **DO NOT assume** that ^C in the output means user abort - it may be tool timeout too short
 
-** REGOLA CRITICA - NON lanciare un secondo comando SSH prima dell'output del primo:**
--  **MAI** lanciare un nuovo comando SSH mentre il precedente è ancora in attesa di password o output
--  **MAI** usare `get_terminal_output` subito dopo e poi lanciare un secondo comando "perché il primo non ha risposto"
--  **SEMPRE** usare `terminal_last_command` per leggere l'output del comando in corso
--  **NON** lanciare un comando alternativo "più semplice" se il primo non risponde subito - ASPETTARE
+** CRITICAL RULE - DO NOT issue a second SSH command before the first one outputs:**
+- **NEVER** launch a new SSH command while the previous one is still waiting for password or output
+- **NEVER** use `get_terminal_output` immediately after and then run a second command "because the first one didn't respond"
+- **ALWAYS** use `terminal_last_command` to read the output of the current command
+- **DO NOT** issue an alternative "simpler" command if the first one does not respond immediately - WAIT
 
-** REGOLA CRITICA - Leggere SEMPRE l'output prima di parlare:**
--  **PRIMA di dire qualsiasi cosa** dopo un comando → controlla exit code nel context
--  **Se exit code = 0** → chiama `terminal_last_command` immediatamente e leggi l'output
--  **Solo se exit code = unknown / comando ancora in esecuzione** → aspetta o chiedi
--  **MAI** dire "inserisci la password" o "aspetta il completamento" se exit code è già 0
--  **MAI** rilanciate un comando se il precedente ha già exit code 0 — l'output è già disponibile
--  **Se la password viene sbagliata una volta** (output "Permission denied, please try again") → il comando SSH rimane in attesa della seconda password → continuare a monitorare con `terminal_last_command` finché non esce, NON abbandonare
+**CRITICAL RULE - ALWAYS read the output before speaking:**
+- **BEFORE saying anything** after a command → check exit code in context
+- **If exit code = 0** → call `terminal_last_command` immediately and read the output
+- **Only if exit code = unknown / command still running** → wait or ask
+- **NEVER** say "enter password" or "wait for completion" if exit code is already 0
+- **NEVER** reissue a command if the previous one already has exit code 0 — the output is already available
+- **If password is wrong once** (output "Permission denied, please try again") → SSH command waits for second password → continue monitoring with `terminal_last_command` until it exits, DO NOT abandon
 
-** REGOLA GENERALE - Host con autenticazione PASSWORD (checkmk-z1plus, ns-lab00, laboratorio, srv-monitoring, etc.):**
--  **MAI** tentare connessioni SSH autonome via `run_in_terminal` su host con password
-  → il tool non può inserire la password → fallisce sempre con `^C` o timeout
--  **SE il primo tentativo `run_in_terminal` su host-password fallisce** (output `^C` o vuoto):
-  → NON riprovare
-  → Dare IMMEDIATAMENTE i comandi da incollare nel terminale dell'utente
--  **ECCEZIONE**: checkmk-vps-01 e checkmk-vps-02 usano chiave SSH → run_in_terminal funziona
--  **NOTA CRITICA**: avere l'alias host in `~/.ssh/config` NON significa accesso senza password!
-  → La config WSL definisce parametri di connessione, NON autentica automaticamente
-  → Se l'host usa password, il tool va in `^C` indipendentemente dall'alias configurato
--  **Classificazione host per metodo auth**:
-  -  **CHIAVE SSH** (run_in_terminal OK): checkmk-vps-01, checkmk-vps-02, ubntmarzio
-    → checkmk-vps-01/02: chiave ~/.ssh/checkmk (passphrase) - usare SEMPRE via WSL
-    → Comando: `wsl -d kali-linux bash -c "ssh checkmk-vps-02 'cmd'"`
-    → ControlMaster 30m attivo in WSL: dopo la prima connessione (passphrase), tutte le successive sono autonome
-    →  Se il socket è scaduto (>30min), chiedere all'utente di riaprire: `wsl -d kali-linux ssh checkmk-vps-02`
-    → ubntmarzio: chiave ~/.ssh/copilot_ubntmarzio (ed25519, NO passphrase, installata 2026-03-28) - autonomo sempre
-  -  **CHIAVE SSH** (run_in_terminal OK): srv-monitoring
-    → Chiave: ~/.ssh/copilot_srv_monitoring (ed25519, installata 2026-03-10)
-    → Comando: `wsl -d kali-linux bash -c "ssh srv-monitoring 'cmd'"` (NO -tt!)
-    → Accesso completamente autonomo, zero password
-  -  **PASSWORD** (dare comandi da incollare): checkmk-z1plus, checkmk-testfrp, nodo-proxmox, ns-lab00, box-lab00, rl94ns8, rl94ns81, nsec8-stable, laboratorio, marziodemo, fwlab, redteam
+** GENERAL RULE - Host with PASSWORD authentication (checkmk-z1plus, ns-lab00, laboratory, srv-monitoring, etc.):**
+- **NEVER** attempt standalone SSH connections via `run_in_terminal` on hosts with passwords
+  → the tool cannot enter the password → always fails with `^C` or timeout
+- **IF first attempt `run_in_terminal` on host-password fails** (output `^C` or empty):
+  → DO NOT try again
+  → IMMEDIATELY issue the commands to paste into the user's terminal
+- **EXCEPTION**: checkmk-vps-01 and checkmk-vps-02 use SSH key → run_in_terminal works
+- **CRITICAL NOTE**: Having the host alias in `~/.ssh/config` does NOT mean passwordless access!
+  → The WSL config defines connection parameters, it does NOT automatically authenticate
+  → If the host uses passwords, the tool goes to `^C` regardless of the configured alias
+- **Host classification by auth method**:
+  - **SSH KEY** (run_in_terminal OK): checkmk-vps-01, checkmk-vps-02, ubntmarzio
+    → checkmk-vps-01/02: key ~/.ssh/checkmk (passphrase) - ALWAYS use via WSL
+    → Command: `wsl -d kali-linux bash -c "ssh checkmk-vps-02 'cmd'"`
+    → ControlMaster 30m active in WSL: after the first connection (passphrase), all subsequent ones are autonomous
+    → If the socket has expired (>30min), ask the user to reopen: `wsl -d kali-linux ssh checkmk-vps-02`
+    → ubntmarzio: key ~/.ssh/copilot_ubntmarzio (ed25519, NO passphrase, installed 2026-03-28) - autonomous always
+  - **SSH KEY** (run_in_terminal OK): srv-monitoring
+    → Key: ~/.ssh/copilot_srv_monitoring (ed25519, installed 2026-03-10)
+    → Command: `wsl -d kali-linux bash -c "ssh srv-monitoring 'cmd'"` (NO -tt!)
+    → Completely autonomous access, zero passwords
+  - **PASSWORD** (give commands to paste): checkmk-z1plus, checkmk-testfrp, nodo-proxmox, ns-lab00, box-lab00, rl94ns8, rl94ns81, nsec8-stable, laboratory, marziodemo, fwlab, redteam
 
-**Host disponibili:**
+**Available hosts:**
 
 ```bash
-# VPS CheckMK (chiave: ~/.ssh/checkmk + passphrase)
-checkmk-vps-01    # monitor.nethlab.it (CheckMK 2.4.0p19.cre) - PRODUZIONE
-                  #  rclone configurato dentro il site OMD (non root)
+# VPS CheckMK (key: ~/.ssh/checkmk + passphrase)
+checkmk-vps-01 # monitor.nethlab.it (CheckMK 2.4.0p19.cre) - PRODUCTION
+                  # rclone configured inside the OMD site (not root)
                   # Path: /opt/omd/sites/monitoring/.config/rclone/rclone.conf
-                  # Comandi: omd su monitoring -c "rclone ..."
-checkmk-vps-02    # monitor01.nethlab.it -  TEST CRITICI / STAGING
+                  # Commands: omd on monitoring -c "rclone ..."
+checkmk-vps-02 # monitor01.nethlab.it - CRITICAL TESTS / STAGING
 
-# Server locali CheckMK (autenticazione password)
-checkmk-z1plus    # 192.168.10.128 (locale)
-checkmk-testfrp   # 192.168.10.126 (user: admin_nethesis)
+# CheckMK local servers (password authentication)
+checkmk-z1plus #192.168.10.128 (local)
+checkmk-testfrp #192.168.10.126 (user: admin_nethesis)
 
-# Server locali altri (autenticazione password)
-nodo-proxmox      # 10.155.100.20:22 (root, Proxmox VE)
-ns-lab00          # 192.168.10.100:2222 (root, NethServer 7)
-box-lab00         # 192.168.10.132:22 (root) - Host share \\192.168.10.132\usbshare
-rl94ns8           # 10.155.100.40:22 (root, NethServer 8)
-                  # Moduli: samba1, mail2, webtop1, webtop3
-                  # Nodo completo per test report quindicinale NS8 (AD + Mail + WebTop)
-rl94ns81          # 10.155.100.41:22 (root, NethServer 8)
-                  # Moduli: webtop1 (con Postgres attivo)
-                  # Nodo WebTop per test condivisioni email
-nsec8-stable      # 10.155.100.100:22 (root, NethSecurity 8)
-                  # Agent CheckMK installato con: install-checkmk-agent-persistent-nsec8.sh
+# Other local servers (password authentication)
+proxmox-node #10.155.100.20:22 (root, Proxmox VE)
+ns-lab00 #192.168.10.100:2222 (root, NethServer 7)
+box-lab00 # 192.168.10.132:22 (root) - Host share \\192.168.10.132\usbshare
+rl94ns8 #10.155.100.40:22 (root, NethServer 8)
+                  # Modules: samba1, mail2, webtop1, webtop3
+                  # Full node for NS8 fortnightly report testing (AD + Mail + WebTop)
+rl94ns81 #10.155.100.41:22 (root, NethServer 8)
+                  # Modules: webtop1 (with Postgres active)
+                  # WebTop node for testing email shares
+nsec8-stable #10.155.100.100:22 (root, NethSecurity 8)
+                  # CheckMK agent installed with: install-checkmk-agent-persistent-nsec8.sh
                   # Path: /opt/checkmk-tools/script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh
-laboratorio       # 10.155.100.1:2222 (root, NethSecurity 8)
-                  # ROCKSOLID Mode validato - resistente major upgrade
-marziodemo        # 10.155.100.61:22 (root, Demo environment)
-ubntmarzio        # 10.155.100.108:22 (user: marzio) -  CHIAVE SSH (accesso autonomo OK, NO sudo senza password)
-                  # Chiave: ~/.ssh/copilot_ubntmarzio (ed25519, installata 2026-03-28)
-                  # Comando: ssh ubntmarzio 'cmd'  (alias in ~/.ssh/config)
-srv-monitoring    # 45.33.235.86:2333 (root, Monitoring)
-                  #  USARE SEMPRE root@45.33.235.86 - MAI admin-nethesis o altri utenti!
-                  #  NON usare sudo (connessione già come root - sudo non serve)
-                  #  OMD installato: sito 'monitoring' in /omd/sites/monitoring/
-                  #  rclone configurato: /opt/omd/sites/monitoring/.config/rclone/rclone.conf (remote 'do', bucket 'testmonbck')
-                  #  Backup locali in: /var/backups/checkmk/
-                  #  Cloud push: checkmk-cloud-backup-push@monitoring.timer (ogni minuto)
-                  #  Comandi OMD come root: su - monitoring -c "comando"
-                  # Firewall pubblico 45.33.235.86 porta 2333 → DNAT → 127.0.0.1:2222 interno
-                  #  fail2ban attivo sul firewall - NON fare tentativi multipli di connessione
-                  #  Firewall whitelist solo IP 159.65.203.113 (alias sos) - OBBLIGATORIO jump via sos
-                  #  Autenticazione PASSWORD (non chiave SSH) - NON installare chiavi SSH
-                  #  Comando accesso diretto (da WSL):
-                  #   wsl -d kali-linux ssh srv-monitoring          (usa alias ~/.ssh/config in WSL)
-                  #  Config WSL ~/.ssh/config entry OBBLIGATORIA:
-                  #   Host srv-monitoring
-                  #       HostName 45.33.235.86
-                  #       Port 2333
-                  #       User root
-                  #       ProxyJump sos
-                  #       ControlMaster auto
-                  #       ControlPath ~/.ssh/sockets/%r@%h:%p
-                  #       ControlPersist 60m
-                  #  Comando corretto: wsl -d kali-linux bash -c "ssh srv-monitoring 'cmd'"  (NO -tt!)
-                  #  Prima connessione chiede password, poi socket attivo per 60 minuti (ControlPersist 60m)
+lab #10.155.100.1:2222 (root, NethSecurity 8)
+                  # ROCKSOLID Mode validated - resistant to major upgrades
+marziodemo # 10.155.100.61:22 (root, Demo environment)
+ubntmarzio # 10.155.100.108:22 (user: marzio) - SSH KEY (self-access OK, NO sudo without password)
+                  # Key: ~/.ssh/copilot_ubntmarzio (ed25519, installed 2026-03-28)
+                  # Command: ssh ubntmarzio 'cmd' (alias in ~/.ssh/config)
+srv-monitoring #45.33.235.86:2333 (root, Monitoring)
+                  # ALWAYS USE root@45.33.235.86 - NEVER admin-nethesis or other users!
+                  # DO NOT use sudo (already logged in as root - sudo is not needed)
+# OMD installed: site 'monitoring' in /omd/sites/monitoring/
+                  # rclone configured: /opt/omd/sites/monitoring/.config/rclone/rclone.conf (remote 'do', bucket 'testmonbck')
+                  # Local backups in: /var/backups/checkmk/
+                  # Cloud push: checkmk-cloud-backup-push@monitoring.timer (every minute)
+                  # OMD commands as root: su - monitoring -c "command"
+                  # Public firewall 45.33.235.86 port 2333 → DNAT → 127.0.0.1:2222 internal
+                  # fail2ban active on firewall - DO NOT make multiple connection attempts
+                  # Firewall whitelist only IP 159.65.203.113 (alias sos) - MANDATORY jump via sos
+                  # PASSWORD authentication (not SSH key) - DO NOT install SSH keys
+                  # Direct access command (from WSL):
+                  # wsl -d kali-linux ssh srv-monitoring (use alias ~/.ssh/config in WSL)
+                  # Config WSL ~/.ssh/config entry REQUIRED:
+                  # Host srv-monitoring
+                  # HostName 45.33.235.86
+                  # Port 2333
+                  # User root
+                  # ProxyJump sus
+                  # ControlMaster auto
+                  # ControlPath ~/.ssh/sockets/%r@%h:%p
+                  # ControlPersist 60m
+                  # Correct command: wsl -d kali-linux bash -c "ssh srv-monitoring 'cmd'" (NO -tt!)
+                  # First connection asks for password, then socket active for 60 minutes (ControlPersist 60m)
                   #
-                  #  REGOLA - srv-monitoring: ESEGUIRE AUTONOMAMENTE con run_in_terminal
-                  #    → Il socket ControlMaster funziona, abbiamo eseguito comandi più volte autonomamente
-                  #    → Comando base: wsl -d kali-linux bash -c "ssh srv-monitoring 'cmd'"
-                  #    →  NON usare -tt flag (causa ^C), usare senza -tt
-                  #    →  Per rclone con su - monitoring: usare escape backslash per spazi nel -c
-                  #       CORRETTO: wsl -d kali-linux bash -c "ssh srv-monitoring 'su - monitoring -c rclone\ ls\ do:testmonbck/...'"
-                  #       SBAGLIATO: wsl -d kali-linux bash -c "ssh srv-monitoring 'su - monitoring -c \"rclone ls ...\"'"
-                  #    → Se il socket è scaduto → ritentare eseguendo comunque, non delegare all'utente
-                  #    → Timeout consigliato: 60000ms (60 sec)
-                  #  Non usare più di un blocco per operazione (evitare back-and-forth inutile)
+                  # RULE - srv-monitoring: RUN SELF with run_in_terminal
+                  # → The ControlMaster socket works, we ran commands several times on our own
+                  # → Basic command: wsl -d kali-linux bash -c "ssh srv-monitoring 'cmd'"
+                  # → DO NOT use -tt flag (causes ^C), use without -tt
+                  # → For rclone with su - monitoring: escape backslashes for spaces in -c
+                  # FIXED: wsl -d kali-linux bash -c "ssh srv-monitoring 'su - monitoring -c rclone\ ls\ do:testmonbck/...'"
+                  # WRONG: wsl -d kali-linux bash -c "ssh srv-monitoring 'su - monitoring -c \"rclone ls ...\"'"
+                  # → If socket has expired → retry executing anyway, don't delegate to user
+                  # → Recommended timeout: 60000ms (60 sec)
+                  # Don't use more than one block per operation (avoid unnecessary back-and-forth)
 
-# Altri server
-fwlab             # 192.168.5.117:2222 (root)
-redteam           # redteam.security.nethesis.it (root)
+# Other servers
+fwlab #192.168.5.117:2222 (root)
+redteam # redteam.security.nethesis.it (root)
 
 ```text
 
-###  Workflow Accesso Remoto
+### Remote Access Workflow
 
-** IMPORTANTE - Ambiente Test:**
-- **checkmk-vps-02** (monitor01.nethlab.it) è dedicato ai **TEST CRITICI**
-- Usare **SEMPRE** vps-02 per testare:
-  - Nuovi script di disaster recovery
-  - Modifiche agli script di backup/restore
-  - Upgrade CheckMK con cambiamenti critici
-  - Test di procedure che potrebbero compromettere il sistema
-- **NON testare direttamente su vps-01 (produzione)**
+** IMPORTANT - Test Environment:**
+- **checkmk-vps-02** (monitor01.nethlab.it) is dedicated to **CRITICAL TESTS**
+- **ALWAYS** use vps-02 to test:
+  - New disaster recovery scripts
+  - Changes to backup/restore scripts
+  - CheckMK upgrade with critical changes
+  - Test procedures that could compromise the system
+- **DO NOT test directly on vps-01 (production)**
 
-**1. Comando singolo SSH:**
+**1. SSH Single Command:**
 
 ```powershell
-# Da PowerShell → esegui comando su VPS (con timeout generoso)
+# From PowerShell → run command on VPS (with generous timeout)
 wsl -d kali-linux ssh checkmk-vps-01 "omd version"
-# timeout: 30000 (30 sec) - comando SSH normale
+# timeout: 30000 (30 sec) - normal SSH command
 
 wsl -d kali-linux ssh checkmk-vps-02 "omd sites"
 # timeout: 30000 (30 sec)
 
-# Comando complesso (check_mk_agent, git pull)
+# Complex command (check_mk_agent, git pull)
 wsl -d kali-linux ssh ns-lab00 "check_mk_agent"
-# timeout: 60000 (60 sec) - comando complesso, output lungo
+# timeout: 60000 (60 sec) - complex command, long output
 
 wsl -d kali-linux ssh ns-lab00 "cd /opt/checkmk-tools && git pull"
-# timeout: 60000 (60 sec) - operazione git remota
+# timeout: 60000 (60 sec) - remote git operation
 ```
 
-**2. Esecuzione script da GitHub:**
+**2. Script execution from GitHub:**
 
 ```powershell
-# Download ed esecuzione diretta script dal repository
+# Direct download and execution of scripts from the repository
 wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash"
 
-# Con parametri
+# With parameters
 wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/script.sh | bash -s -- arg1 arg2"
 
 ```text
 
-**3. Verifica stato CheckMK remoto:**
+**3. Check Remote CheckMK Status:**
 
 ```powershell
-# Check rapido su tutti i VPS
+# Quick check on all VPS
 wsl -d kali-linux ssh checkmk-vps-01 "omd status"
 wsl -d kali-linux ssh checkmk-vps-02 "omd status"
 
-# Verifica backup
+# Verify backup
 wsl -d kali-linux ssh checkmk-vps-01 "ls -lh /opt/omd/sites/monitoring/var/check_mk/notify-backup/"
-
 ```text
 
-**4. Deploy script su VPS:**
+**4. Deploy script on VPS:**
 
 ```powershell
-# NON copiare file, eseguire sempre da GitHub!
-#  SBAGLIATO: scp script.sh checkmk-vps-01:/usr/local/bin/
-#  CORRETTO: esegui da GitHub con curl
+# DO NOT copy files, always run from GitHub!
+# WRONG: scp script.sh checkmk-vps-01:/usr/local/bin/
+# FIXED: Run from GitHub with curl
 
 wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash"
 
 ```text
 
-###  Note Sicurezza
+### Security Notes
 
-- **Passphrase**: Le chiavi richiedono passphrase ad ogni comando
-  - Non è un problema: inserire passphrase quando richiesta
-  - Protegge accesso non autorizzato
+- **Passphrase**: Keys require passphrase with each command
+  - Not a problem: enter passphrase when prompted
+  - Protects unauthorized access
 
-- **StrictHostKeyChecking no**: Disabilitato per automazione
-  - OK per ambiente lab/interno
-  - Valutare riabilitazione per produzione
+- **StrictHostKeyChecking no**: Disabled for automation
+  - OK for lab/indoor environment
+  - Evaluate rehabilitation for production
 
-###  Use Cases Comuni
+### Common Use Cases
 
-**Controllo integrità remoto:**
+**Remote health check:**
 
 ```powershell
-# Esegui check-integrity su VPS
+# Run integrity check on VPS
 wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash -n"
 
 ```text
 
-**Verifica logs:**
+**Check logs:**
 
 ```powershell
 wsl -d kali-linux ssh checkmk-vps-01 "tail -100 /omd/sites/monitoring/var/log/notify.log"
 
 ```text
 
-**Raccolta info sistema:**
+**System information collection:**
 
 ```powershell
 wsl -d kali-linux ssh checkmk-vps-01 "df -h && free -h && uptime"
 
 ```text
 
-###  Path Chiavi e Config
+### Path Keys and Config
 
 ```bash
 # WSL paths
-~/.ssh/checkmk              # Chiave privata VPS (con passphrase)
-~/.ssh/config               # Configurazione SSH
-~/.ssh/known_hosts          # Host verificati
+~/.ssh/checkmk # VPS private key (with passphrase)
+~/.ssh/config # SSH configuration
+~/.ssh/known_hosts # Verified hosts
 
-# Windows paths originali (backup)
+# Original Windows paths (backup)
 C:\Users\Marzio\.ssh\checkmk
 
 ```text
 
 ---
 
-##  Backup Cloud - rclone su CheckMK
+## Cloud Backup - rclone on CheckMK
 
-** IMPORTANTE - Configurazione rclone su checkmk-vps-01:**
--  rclone è configurato **dentro il site OMD**, NON come utente root
--  Path config: `/opt/omd/sites/monitoring/.config/rclone/rclone.conf`
--  Remote configurato: `do` (DigitalOcean Spaces)
--  Bucket: `testmonbck`
--  Struttura: `checkmk-backups/job00-daily/`, `checkmk-backups/job01-weekly/`, `checkmk-backups/monitoring-minimal/`
+** IMPORTANT - Configuring rclone on checkmk-vps-01:**
+- rclone is configured **inside the OMD site**, NOT as root user
+- Path config: `/opt/omd/sites/monitoring/.config/rclone/rclone.conf`
+- Remote configured: `do` (DigitalOcean Spaces)
+- Bucket: `testmonbck`
+- Structure: `checkmk-backups/job00-daily/`, `checkmk-backups/job01-weekly/`, `checkmk-backups/monitoring-minimal/`
 
-**Comandi corretti per accesso rclone:**
+**Correct commands for rclone access:**
 
 ```bash
-#  SBAGLIATO (comando errato)
+# WRONG (incorrect command)
 ssh checkmk-vps-01 'rclone ls do:testmonbck'
-ssh checkmk-vps-01 'omd su monitoring -c "rclone ..."'
+ssh checkmk-vps-01 'omd on monitoring -c "rclone ..."'
 
-#  CORRETTO (su - monitoring -c)
+# CORRECT (su - monitoring -c)
 ssh checkmk-vps-01 'su - monitoring -c "rclone ls do:testmonbck"'
 
-# Lista ultimi backup
+# List of latest backups
 ssh checkmk-vps-01 'su - monitoring -c "rclone ls do:testmonbck"' | tail -20
 
-# Lista cartella specifica
+# Specific folder list
 ssh checkmk-vps-01 'su - monitoring -c "rclone ls do:testmonbck/checkmk-backups/job00-daily/"'
 
-# Verifica spazio bucket
+# Check bucket space
 ssh checkmk-vps-01 'su - monitoring -c "rclone size do:testmonbck"'
 
-# Download backup specifico
+# Specific backup download
 ssh checkmk-vps-01 'su - monitoring -c "rclone copy do:testmonbck/checkmk-backups/job00-daily/file.tar.gz /tmp/"'
 
 ```text
 
-**Backup disponibili:**
-- **job00-daily**: Backup daily completi (~1.2 MB)
-- **job01-weekly**: Backup weekly completi con history (~378 MB)
-- **monitoring-minimal**: Backup ultra-minimali (~115 KB)
+**Backups available:**
+- **job00-daily**: Complete daily backups (~1.2 MB)
+- **job01-weekly**: Complete weekly backups with history (~378 MB)
+- **monitoring-minimal**: Ultra-minimal backups (~115 KB)
 
-**Script backup automatico:**
+**Automatic backup script:**
 - Script: `/opt/checkmk-tools/script-tools/full/backup_restore/checkmk_rclone_space_dyn.sh`
-- Eseguito da: site monitoring (non root)
-- Cron: Configurato dentro il site OMD
+- Run by: site monitoring (not root)
+- Cron: Configured within the OMD site
 
 ---
 
-## � REGOLE ASSOLUTE - CheckMK Active/Passive Checks
+## � ABSOLUTE RULES - CheckMK Active/Passive Checks
 
-** LEZIONE APPRESA IL 23 MARZO 2026 — COSTO: RESTORE COMPLETO DEL SITE**
+** LESSON LEARNED MARCH 23, 2026 — COST: COMPLETE SITE RESTORE**
 
-### MAI fare queste cose senza conferma esplicita utente:
+### NEVER do these things without explicit user confirmation:
 
--  **MAI** `ENABLE_SVC_CHECK` o `DISABLE_SVC_CHECK` su qualsiasi servizio
--  **MAI** `DISABLE_SVC_CHECK` su `Check_MK` o `Check_MK Discovery` → causa stale massivo su TUTTI i servizi
--  **MAI** interpretare "rimuovi active check" come `DISABLE_SVC_CHECK` — sono cose DIVERSE:
-  - "Rimuovere active check" = `active_checks_enabled=0` + `passive_checks_enabled=1` (servizio riceve push)
-  - "Disabilitare check" = `DISABLE_SVC_CHECK` → il check non viene MAI eseguito/aggiornato → stale
--  **MAI** usare `ENABLE_SVC_CHECK` per "fixare" stali → causa override active su servizi passivi → rompe tutto
--  **MAI** `STOP_EXECUTING_SVC_CHECKS` o `STOP_EXECUTING_HOST_CHECKS` globalmente
--  **MAI** modificare la nagios pipe (`/tmp/run/nagios.cmd`) con comandi bulk senza approvazione esplicita
+- **NEVER** `ENABLE_SVC_CHECK` or `DISABLE_SVC_CHECK` on any service
+- **NEVER** `DISABLE_SVC_CHECK` on `Check_MK` or `Check_MK Discovery` → causes massive crash on ALL services
+- **NEVER** interpret "remove active check" as `DISABLE_SVC_CHECK` — they are DIFFERENT things:
+  - "Remove active check" = `active_checks_enabled=0` + `passive_checks_enabled=1` (service receives push)
+  - "Disable check" = `DISABLE_SVC_CHECK` → check is NEVER executed/updated → stale
+- **NEVER** use `ENABLE_SVC_CHECK` to "fix" stali → causes active override on passive services → breaks everything
+- **NEVER** `STOP_EXECUTING_SVC_CHECKS` or `STOP_EXECUTING_HOST_CHECKS` globally
+- **NEVER** modify the nagios pipe (`/tmp/run/nagios.cmd`) with bulk commands without explicit approval
 
-### Se ci sono stali:
+### If there are states:
 
--  **DIAGNOSTICARE PRIMA** — perché il collector non gira?
--  Verificare che `Check_MK` e `Check_MK Discovery` siano `active_checks_enabled=1`
--  Se il collector gira ma i servizi sono stale → aspettare il prossimo ciclo (max 1-2 min)
--  Se il problema persiste → `cmk --check <host>` come monitoring user (NON pipe nagios)
--  **MAI** iterare con enable/disable/enable/disable → causa flapping e peggiora tutto
--  **STOP e chiedi all'utente** prima di fare qualsiasi azione correttiva
+- **DIAGNOSE FIRST** — why doesn't the collector spin?
+- Verify that `Check_MK` and `Check_MK Discovery` are `active_checks_enabled=1`
+- If the collector runs but the services are off → wait for the next cycle (max 1-2 min)
+- If the problem persists → `cmk --check <host>` as monitoring user (NOT pipe nagios)
+- **NEVER** iterate with enable/disable/enable/disable → causes flapping and makes everything worse
+- **STOP and ask user** before taking any corrective action
 
 ---
 
-## � INCIDENTI E TROUBLESHOOTING
+## � ACCIDENTS AND TROUBLESHOOTING
 
-### 30 Gennaio 2026 - Update Windows + VSCode Crash
+### January 30, 2026 - Update Windows + VSCode Crash
 
-**PROBLEMA INIZIALE:**
-- Aggiornamento Microsoft Windows ha causato errori all'avvio di VSCode
-- Errore principale: `EPIPE: broken pipe, write` su processi interni
-- Stack trace mostra crash in `console.value`, `Writable.write`, socket communication
+**INITIAL PROBLEM:**
+- Microsoft Windows update caused errors when starting VSCode
+- Major error: `EPIPE: broken pipe, write` on internal processes
+- Stack trace shows crash in `console.value`, `Writable.write`, socket communication
 
-**COSA È STATO FATTO (E PEGGIORATO):**
-1.  Tentato reset cache VSCode
-2.  Tentato riavvio multipli
-3.  **Modificata modalità login in "basic" - QUESTO HA ROTTO TUTTO**
-4.  Modifiche a configurazioni interne
-5.  Update Windows rimosso (TARDI)
-6.  Situazione peggiorata invece di migliorare
-7.  **Uninstall approfondito con Revo Uninstaller + Reinstall VSCode** - NON ha risolto
-8.  Reset cache post-reinstall - NON ha risolto
-9.  Riabilitato github.gitAuthentication - NON ha risolto
-10.  Restart Windows Explorer - NON ha risolto
-11.  Ricreato chiavi registro VSCode (Applications\Code.exe, DefaultIcon) - NON ha risolto
+**WHAT HAS BEEN DONE (AND WORSEN):**
+1. Attempted to reset VSCode cache
+2. Attempted multiple reboots
+3. **Changed login mode to "basic" - THIS BROKE EVERYTHING**
+4. Changes to internal configurations
+5. Update Windows removed (LATE)
+6. Situation got worse instead of better
+7. **Thorough Uninstall with Revo Uninstaller + Reinstall VSCode** - Did NOT solve
+8. Reset cache post-reinstall - did NOT solve
+9. Re-enabled github.gitAuthentication - did NOT fix
+10. Restart Windows Explorer - NOT fixed
+11. Recreated VSCode registry keys (Applications\Code.exe, DefaultIcon) - did NOT solve
 
-**STATO ATTUALE (30/01/2026 ore ~19:00):**
-- VSCode non si avvia o non mostra nulla
-- Ultimo danno non risolto
-- Necessario ripristino completo
--  **PATTERN CRITICO**:
-  - Start-Process da PowerShell → VSCode SI AVVIA
-  - Click su Code.exe con mouse → NON SI AVVIA
-  - Click su collegamento menu Start → NON SI AVVIA
-  - Comando `code .` da terminale → SI AVVIA
-  - Qualunque azione MANUALE utente → FALLISCE
-  - Qualunque azione via COMANDO → FUNZIONA
--  **Problema SPECIFICO di VSCode** - altri exe (notepad, ecc.) funzionano normalmente con doppio click
--  **NON è problema generale Windows** - circoscritto solo a Code.exe
+**CURRENT STATUS (30/01/2026 ~19:00):**
+- VSCode doesn't start or shows anything
+- Last damage not resolved
+- Full recovery required
+- **CRITICAL PATTERN**:
+  - Start-Process from PowerShell → VSCode START
+  - Click on Code.exe with mouse → IT DOES NOT START
+  - Click on the Start menu shortcut → IT DOES NOT START
+  - Command `code .` from terminal → START
+  - Any user MANUAL action → FAILS
+  - Any action via COMMAND → WORKS
+- **VSCode SPECIFIC problem** - other exe (notepad, etc.) work normally with double click
+- **NOT general Windows problem** - limited to Code.exe only
 
-**SOLUZIONE TROVATA (30/01/2026 ore ~19:15):**
--  VSCode si avvia correttamente con:
+**SOLUTION FOUND (01/30/2026 ~7.15pm):**
+- VSCode starts correctly with:
   ```powershell
   cd C:\Users\Marzio\Desktop\CheckMK\checkmk-tools
-  code .
+  queues .
   ```
 
--  Importante fare `cd` nella directory workspace PRIMA di lanciare `code .`
--  Non lanciare `code` senza parametri o da directory diversa
--  **Collegamento desktop/start menu NON funziona** - lanciare sempre da terminale
--  **NESSUNA SOLUZIONE TROVATA** per ripristinare funzionamento normale
--  Problema causato da Revo Uninstaller che ha cancellato chiavi registro critiche
--  Ricreare chiavi registro NON ha risolto - problema più profondo
--  **WORKAROUND TEMPORANEO**: Aprire PowerShell e usare `code .`
+- Important to `cd` into the workspace directory BEFORE running `code .`
+- Don't launch `code` without parameters or from a different directory
+- **Desktop/start menu link DOES NOT work** - always launch from terminal
+- **NO SOLUTION FOUND** to restore normal operation
+- Issue caused by Revo Uninstaller deleting critical registry keys
+- Recreating registry keys did NOT solve - deeper problem
+- **TEMPORARY WORKAROUND**: Open PowerShell and use `code .`
 
-**CAUSA ROOT (30/01/2026 ore ~19:45):**
+**ROOT CAUSE (01/30/2026 ~7.45pm):**
 
--  Diagnostica con `Code.exe --verbose` rivela:
+- Diagnostics with `Code.exe --verbose` reveals:
 
   ```text
   Sending some foreground love to the running instance: 17752
   Sent env to running instance. Terminating...
   ```
 
--  **VSCode si connette a istanza zombie nascosta/corrotta** invece di aprire nuova finestra
-- Quando lanciato dal collegamento, VSCode rileva istanza esistente (PID 17752) e le invia il comando
-- Ma quella finestra è nascosta o corrotta dall'update Windows
-- `code .` con workspace funziona perché forza apertura in quel contesto specifico
-- Soluzione: killare TUTTI i processi VSCode prima di riaprire dal collegamento
+- **VSCode connects to hidden/corrupted zombie instance** instead of opening new window
+- When launched from link, VSCode detects existing instance (PID 17752) and sends command to it
+- But that window is hidden or corrupted by the Windows update
+- `code .` works with workspace because it forces opening in that specific context
+- Solution: kill ALL VSCode processes before reopening from the connection
 
-**CAUSA ROOT (30/01/2026 ore ~19:45):**
+**ROOT CAUSE (01/30/2026 ~7.45pm):**
 
--  Diagnostica con `Code.exe --verbose` rivela:
+- Diagnostics with `Code.exe --verbose` reveals:
 
   ```text
   Sending some foreground love to the running instance: 17752
   Sent env to running instance. Terminating...
   ```
 
--  **Problema reale: VSCode aperto come ADMINISTRATOR**
-- Windows impedisce apertura multiple istanze Administrator di VSCode
-- Tentativo di aprire da collegamento/menu Start → errore "Another instance of Code is already running as administrator"
-- `code .` da terminale integrato funziona perché usa stessa istanza admin già aperta
-- L'update Windows potrebbe aver forzato VSCode a girare sempre come admin
-- **Soluzione da testare**: Chiudere VSCode admin, riaprire senza privilegi elevati
+- **Real issue: VSCode opened as ADMINISTRATOR**
+- Windows prevents opening multiple VSCode Administrator instances
+- Attempt to open from shortcut/Start menu → error "Another instance of Code is already running as administrator"
+- `code .` from the integrated terminal works because it uses the same admin instance that is already open
+- The Windows update may have forced VSCode to always run as admin
+- **Solution to test**: Close VSCode admin, reopen without elevated privileges
 
-** SOLUZIONE DEFINITIVA (30/01/2026 ore ~22:30) - PROBLEMA RISOLTO:**
+** FINAL SOLUTION (30/01/2026 ~10.30 pm) - PROBLEM SOLVED:**
 
-**Causa ROOT reale:**
+**Real ROOT cause:**
 
--  **Variabile d'ambiente `ELECTRON_RUN_AS_NODE` presente nel sistema**
+- **Environment variable `ELECTRON_RUN_AS_NODE` present in the system**
 
--  **Variabile d'ambiente `ELECTRON_RUN_AS_NODE` presente nel sistema**
-- Questa variabile (anche se impostata a "0") causa malfunzionamento di Electron/VSCode
-- L'update Windows potrebbe averla introdotta o riattivata
-- Sintomi: VSCode si avvia da CLI ma NON da GUI (doppio click/menu Start)
+- **Environment variable `ELECTRON_RUN_AS_NODE` present in the system**
+- This variable (even if set to "0") causes Electron/VSCode to malfunction
+- The Windows update may have introduced or reactivated it
+- Symptoms: VSCode starts from CLI but NOT from GUI (double click/Start menu)
 
-**Fix definitivo (persistente):**
+**Permanent fix (persistent):**
 
-**1. Verifica variabile in cmd.exe:**
+**1. Check variable in cmd.exe:**
 
 ```cmd
 set ELECTRON_RUN_AS_NODE
 
 ```text
 
-Se mostra qualcosa tipo `ELECTRON_RUN_AS_NODE=0` o altro valore → **va rimossa completamente**
+If it shows something like `ELECTRON_RUN_AS_NODE=0` or other value → **must be removed completely**
 
-**2A. Rimozione via GUI (consigliato):**
+**2A. Removal via GUI (recommended):**
+```text
+
+1. Win + R → run: SystemPropertiesAdvanced
+2. "Advanced" tab → "Environment variables..." button
+3. Search ELECTRON_RUN_AS_NODE in:
+   - "User variables" (top section)
+   - "System variables" (bottom section)
+4. If present → Select → "Delete" button
+5. OK on all windows
+6. Logout/Login Windows (or restart)
 
 ```text
 
-1. Win + R → esegui: SystemPropertiesAdvanced
-2. Tab "Avanzate" → pulsante "Variabili d'ambiente..."
-3. Cerca ELECTRON_RUN_AS_NODE in:
-   - "Variabili utente" (sezione superiore)
-   - "Variabili di sistema" (sezione inferiore)
-4. Se presente → Seleziona → pulsante "Elimina"
-5. OK su tutte le finestre
-6. Logout/Login Windows (o riavvio)
-
-```text
-
-**2B. Rimozione via CLI (rapido):**
+**2B. Removal via CLI (fast):**
 
 ```cmd
-# Apri cmd.exe come Amministratore ed esegui:
+# Open cmd.exe as Administrator and run:
 reg delete "HKCU\Environment" /v ELECTRON_RUN_AS_NODE /f
 reg delete "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v ELECTRON_RUN_AS_NODE /f
 
 ```text
 
-Poi **logout/login** (o riavvio) Windows.
+Then **logout/login** (or restart) Windows.
 
-**3. Verifica dopo logout/login:**
+**3. Check after logout/login:**
 
 ```cmd
 set ELECTRON_RUN_AS_NODE
 
 ```text
 
-Deve mostrare:
+Must show:
 
 ```text
 
@@ -2144,7 +2139,7 @@ Environment variable ELECTRON_RUN_AS_NODE not defined
 
 ```text
 
-**4. Verifica finale VSCode:**
+**4. VSCode final check:**
 
 ```cmd
 "C:\Program Files\Microsoft VS Code\Code.exe" --version
@@ -2152,187 +2147,187 @@ Environment variable ELECTRON_RUN_AS_NODE not defined
 
 ```text
 
-Atteso:
-- `--version` **NON deve mostrare** output strano tipo "v22.x.x"
-- `--disable-extensions` avvia VSCode correttamente
-- Log "Extension host ... exited with code: 0" è normale con estensioni disabilitate
+Expected:
+- `--version` **MUST NOT show** strange output like "v22.x.x"
+- `--disable-extensions` starts VSCode correctly
+- Log "Extension host ... exited with code: 0" is normal with extensions disabled
 
-**5. Avvio normale:**
+**5. Normal startup:**
 
 ```cmd
 "C:\Program Files\Microsoft VS Code\Code.exe"
 
 ```text
 
- Doppio click su Code.exe, collegamento menu Start, tutto **funziona correttamente**
+ Double click on Code.exe, shortcut Start menu, everything **works correctly**
 
-**6. Note reinstallazione VSCode (se necessaria):**
--  Usare sempre: **System Installer x64** → `VSCodeSetup-x64-<versione>.exe`
--  Evitare: `VSCodeUserSetup-...` (User Installer), soprattutto dopo feature update Windows
+**6. VSCode reinstallation notes (if necessary):**
+- Always use: **System Installer x64** → `VSCodeSetup-x64-<version>.exe`
+- Avoid: `VSCodeUserSetup-...` (User Installer), especially after Windows feature update
 
-**7. Recupero settings (opzionale):**
-Se avevi rinominato `%APPDATA%\Code` (es. `Code.old`):
+**7. Settings recovery (optional):**
+If you had renamed `%APPDATA%\Code` (e.g. `Code.old`):
 
 ```powershell
-# Chiudi VSCode completamente
-# Rinomina per test:
+# Close VSCode completely
+# Rename for testing:
 Rename-Item "$env:APPDATA\Code" "$env:APPDATA\Code.new"
 Rename-Item "$env:APPDATA\Code.old" "$env:APPDATA\Code"
-# Avvia VSCode
-# Se problemi ritornano, rollback:
+# Start VSCode
+# If problems return, rollback:
 # Rename-Item "$env:APPDATA\Code" "$env:APPDATA\Code.problem"
 # Rename-Item "$env:APPDATA\Code.new" "$env:APPDATA\Code"
 
 ```text
 
-** CHECKPOINT CRITICO:**
-- **Variabile ELECTRON_RUN_AS_NODE = poison** per VSCode/Electron
-- Sempre verificare con `set ELECTRON_RUN_AS_NODE` in caso di problemi VSCode
-- Rimuoverla COMPLETAMENTE (non basta impostarla a "0")
-- Logout/login Windows **obbligatorio** dopo rimozione
+**CRITICAL CHECKPOINT:**
+- **Variable ELECTRON_RUN_AS_NODE = poison** for VSCode/Electron
+- Always check with `set ELECTRON_RUN_AS_NODE` in case of VSCode problems
+- Remove it COMPLETELY (don't just set it to "0")
+- Windows logout/login **required** after removal
 
-**LEZIONI APPRESE:**
--  Errori `EPIPE: broken pipe` sono **transitori** - NON richiedono riavvio
--  Stack trace con path `Microsoft%20VS%20Code/resources.../` indicano problemi **interni VSCode**
--  Prima azione: **rimuovere update Windows SUBITO** (non dopo vari tentativi)
--  Seconda azione: **reset cache minimale** (non modifiche aggressive)
--  **MAI** modificare configurazioni interne senza backup completo
--  Creare **System Restore Point PRIMA** di troubleshooting aggressivo
+**LESSONS LEARNED:**
+- `EPIPE: broken pipe` errors are **transient** - DO NOT require reboot
+- Stack traces with path `Microsoft%20VS%20Code/resources.../` indicate problems **internal VSCode**
+- First action: **remove Windows update IMMEDIATELY** (not after several attempts)
+- Second action: **minimal cache reset** (not aggressive changes)
+- **NEVER** modify internal configurations without complete backup
+- Create **System Restore Point BEFORE** aggressive troubleshooting
 
-**PROCEDURE DI RIPRISTINO EMERGENZA VSCode:**
+**VSCode EMERGENCY RESTORATION PROCEDURES:**
 
-**Step 1 - Reset cache leggero (SEMPRE provare prima):**
+**Step 1 - Soft cache reset (ALWAYS try first):**
 
 ```powershell
-# Chiudi VSCode
+# Close VSCode
 taskkill /F /IM Code.exe
 
-# Cancella solo cache volatile
+# Clear volatile cache only
 Remove-Item -Recurse -Force "$env:APPDATA\Code\Cache\*" -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force "$env:APPDATA\Code\CachedData\*" -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force "$env:APPDATA\Code\logs\*" -ErrorAction SilentlyContinue
 
-# Riavvia
-code
+# Restart
+queues
 
 ```text
 
-**Step 2 - Reset estensioni (se Step 1 fallisce):**
+**Step 2 - Reset extensions (if Step 1 fails):**
 
 ```powershell
-# Backup lista estensioni
+# Backup extension list
 code --list-extensions > "$env:USERPROFILE\Desktop\vscode-extensions-backup.txt"
 
-# Disabilita tutte le estensioni
+# Disable all extensions
 code --disable-extensions
 
 ```text
 
-**Step 3 - Reinstallazione pulita (ultimo resort):**
+**Step 3 - Clean Reinstall (Last Resort):**
 
 ```powershell
-# Backup configurazioni utente
+# Backup user configurations
 Copy-Item -Recurse "$env:APPDATA\Code\User" "$env:USERPROFILE\Desktop\VSCode-User-Backup"
 
-# Disinstalla VSCode (mantieni dati utente)
-# Reinstalla versione stabile da https://code.visualstudio.com/
+# Uninstall VSCode (keep user data)
+# Reinstall stable version from https://code.visualstudio.com/
 
-# Ripristina configurazioni
+# Restore configurations
 Copy-Item -Recurse "$env:USERPROFILE\Desktop\VSCode-User-Backup\*" "$env:APPDATA\Code\User"
 
 ```text
 
-** REGOLA CRITICA PER FUTURO:**
-- Errori `EPIPE`, `broken pipe`, socket errors = **IGNORARE E CONTINUARE**
-- Non sono critici, sono comunicazioni IPC interne che si ripristinano da sole
-- Riavvio VSCode window (Ctrl+R) sufficiente se proprio necessario
-- **NON FARE** troubleshooting aggressivo per errori transitori
+**CRITICAL RULE FOR THE FUTURE:**
+- `EPIPE`, `broken pipe`, socket errors = **IGNORE AND CONTINUE**
+- They are not critical, they are internal IPC communications that reset themselves
+- Restart VSCode window (Ctrl+R) sufficient if really necessary
+- **DO NOT** aggressively troubleshoot transient errors
 
-**BACKUP PATH CRITICI:**
+**CRITICAL BACKUP PATH:**
 - Settings: `$env:APPDATA\Code\User\settings.json`
 - Keybindings: `$env:APPDATA\Code\User\keybindings.json`
 - Extensions list: `code --list-extensions`
-- Workspace: `.vscode/` dentro ogni progetto
+- Workspace: `.vscode/` inside each project
 
 ---
 
-##  CHECKPOINT - Sistema ROCKSOLID NethSecurity 8
+## CHECKPOINT - ROCKSOLID NethSecurity 8 system
 
-###  STATO ATTUALE (2026-02-10): SISTEMA DISMESSO
+### CURRENT STATUS (2026-02-10): SYSTEM DECOMMITED
 
-**ATTENZIONE:**
--  **Sistema ROCKSOLID rimosso da nsec8-stable e laboratorio** (10 febbraio 2026)
--  **NON eseguire install-checkmk-agent-persistent-nsec8.sh** su nsec8-stable (10.155.100.100) e laboratorio (10.155.100.1)
--  CheckMK Agent e FRP rimangono attivi e funzionanti
--  Repository /opt/checkmk-tools ancora presente (auto-sync git funzionante)
--  Rimossi: /opt/checkmk-backups/, /etc/checkmk-post-upgrade.sh, autocheck rc.local, protezioni sysupgrade.conf
+**ATTENTION:**
+- **ROCKSOLID system removed from nsec8-stable and lab** (February 10, 2026)
+- **DO NOT run install-checkmk-agent-persistent-nsec8.sh** on nsec8-stable (10.155.100.100) and lab (10.155.100.1)
+- CheckMK Agent and FRP remain up and running
+- Repository /opt/checkmk-tools still present (git auto-sync working)
+- Removed: /opt/checkmk-backups/, /etc/checkmk-post-upgrade.sh, autocheck rc.local, sysupgrade.conf protections
 
-**Componenti rimosse:**
-- Backup binari critici (/opt/checkmk-backups/binaries/)
-- Script post-upgrade (/etc/checkmk-post-upgrade.sh)
-- Autocheck all'avvio (rocksolid-startup-check.sh)
-- Protezioni sysupgrade.conf (CheckMK, FRP, QEMU-GA entries)
-- Marker FRP (/etc/.frp-installed)
+**Components removed:**
+- Critical binary backups (/opt/checkmk-backups/binaries/)
+- Post-upgrade script (/etc/checkmk-post-upgrade.sh)
+- Autocheck on startup (rocksolid-startup-check.sh)
+- sysupgrade.conf protections (CheckMK, FRP, QEMU-GA entries)
+- FRP Marker (/etc/.frp-installed)
 
-**Componenti mantenuti:**
-- CheckMK Agent (porta 6556) - funzionante
-- FRP Client + configurazione tunnel
+**Components retained:**
+- CheckMK Agent (port 6556) - working
+- FRP Client + tunnel configuration
 - QEMU Guest Agent
-- Repository /opt/checkmk-tools + auto-sync git (cron ogni minuto)
+- Repository /opt/checkmk-tools + auto-sync git (cron every minute)
 
 ---
 
-###  Implementazione Completata (2026-02-04) - STORICO
+### Implementation Complete (2026-02-04) - HISTORY
 
-**Obiettivo raggiunto:**
--  Eliminazione di TUTTI gli URL statici/hardcoded dagli script di installazione
--  Download dinamico dei pacchetti da repository OpenWrt/NethSecurity
--  Sistema auto-riparante post major-upgrade
--  Validazione completa su host production
+**Goal achieved:**
+- Removed ALL static/hardcoded URLs from installation scripts
+- Dynamic download of packages from OpenWrt/NethSecurity repositories
+- Post major-upgrade self-healing system
+- Complete validation on host production
 
-**Script validati e production-ready:**
+**Validated and production-ready scripts:**
 
 1. **install-checkmk-agent-persistent-nsec8.sh** (commit b29a2cf)
    - Path: `script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh`
-   - Funzione: Installazione completa CheckMK Agent + FRP Client + QEMU-GA + Auto Git Sync
-   - Fix implementati:
-     -  Dynamic package download via `download_openwrt_package()`
-     -  Pattern fix: `grep "${package_name}_"` (corregge rilevamento pacchetti)
-     -  Dependencies chain: libbfd → ar → objdump → binutils con `--force-depends`
-     -  Gestione corruzione binari (ar corrotto durante upgrade)
-   - Test:  nsec8-stable,  laboratorio (da GitHub)
+   - Function: Full Installation CheckMK Agent + FRP Client + QEMU-GA + Auto Git Sync
+   - Fixes implemented:
+     - Dynamic package download via `download_openwrt_package()`
+     - Pattern fix: `grep "${package_name}_"` (fixes packet detection)
+     - Dependencies chain: libbfd → ar → objdump → binutils with `--force-depends`
+     - Binary corruption management (AR corrupted during upgrade)
+   - Test: nsec8-stable, lab (from GitHub)
 
 2. **rocksolid-startup-check.sh** (commit ea67364)
    - Path: `script-tools/full/upgrade_maintenance/rocksolid-startup-check.sh`
-   - Funzione: Verifica e auto-remediation all'avvio sistema
-   - Fix implementati:
-     -  Logic reordering: backup restore → corruption check → dependencies install
-     -  Git auto-install: download git + git-http da OpenWrt se mancante
-     -  Pattern fix identico a install script
-     -  Verifica DOPO ripristino backup (non prima)
-   - Test:  nsec8-stable,  laboratorio (da GitHub)
+   - Function: Verification and auto-remediation at system startup
+   - Fixes implemented:
+     - Logic reordering: backup restore → corruption check → dependencies install
+     - Git auto-install: download git + git-http from OpenWrt if missing
+     - Pattern fix identical to install script
+     - Check AFTER backup restore (not before)
+   - Test: nsec8-stable, lab (from GitHub)
 
-**Host validati (production):**
+**Validated hosts (production):**
 
-| Host | IP | OS | Status | Packages |
+| Hosts | IP | OS | Status | Packages |
 |------|----|----|--------|----------|
 | **nsec8-stable** | 10.155.100.100:22 | NethSecurity 8.7.1 |  ROCKSOLID | ar 2.40-1, git 2.43.2-1, libbfd 2.40-1 |
-| **laboratorio** | 10.155.100.1:2222 | NethSecurity 8.7.1 |  ROCKSOLID | ar 2.40-1, git 2.43.2-1, libbfd 2.40-1 |
+| **laboratory** | 10.155.100.1:2222 | NethSecurity 8.7.1 |  ROCKSOLID | ar 2.40-1, git 2.43.2-1, libbfd 2.40-1 |
 
-**Componenti attivi:**
--  CheckMK Agent 2.4.0p20 (porta 6556)
--  FRP Client (tunnel verso monitor.nethlab.it:7000)
--  Auto Git Sync (cron ogni minuto, /opt/checkmk-tools)
--  Rocksolid startup check (rc.local, log: /var/log/rocksolid-startup.log)
--  12 local checks deployed
+**Active components:**
+- CheckMK Agent 2.4.0p20 (port 6556)
+- FRP Client (tunnel to monitor.nethlab.it:7000)
+- Auto Git Sync (cron every minute, /opt/checkmk-tools)
+- Rocksolid startup check (rc.local, log: /var/log/rocksolid-startup.log)
+- 12 local checks deployed
 
-**Protezioni major upgrade:**
--  File critici in `/etc/sysupgrade.conf`
--  Binari backuppati in `/opt/checkmk-backups/binaries/`
--  Nginx configuration (`/etc/nginx/`) protetta
--  Script auto-ripristino: `/etc/checkmk-post-upgrade.sh`
+**Major upgrade protections:**
+- Critical files in `/etc/sysupgrade.conf`
+- Binaries backed up in `/opt/checkmk-backups/binaries/`
+- Nginx configuration (`/etc/nginx/`) protected
+- Self-recovery script: `/etc/checkmk-post-upgrade.sh`
 
-###  Dettagli Tecnici
+### Technical Details
 
 **Dynamic Package Download:**
 
@@ -2345,7 +2340,7 @@ download_openwrt_package() {
     # Download Packages.gz index
     wget -q -O /tmp/Packages.gz "$repo_url/Packages.gz"
 
-    # Parse package filename (fix: grep "${package_name}_" non "/$package_name")
+    # Parse package filename (fix: grep "${package_name}_" not "/$package_name")
     local package_file=$(gunzip -c /tmp/Packages.gz | grep "^Filename:" | grep "${package_name}_" | head -1 | awk '{print $2}')
 
     # Download package
@@ -2370,7 +2365,7 @@ opkg install --force-depends /tmp/binutils.ipk
 ```bash
 # STEP 1: Restore backups FIRST
 for backup in /opt/checkmk-backups/binaries/*.backup; do
-    cp -p "$backup" "$dest" 2>/dev/null || true
+cp -p "$backup" "$dest" 2>/dev/null || true
 done
 
 # STEP 2: Check corruption AFTER restore (not before!)
@@ -2390,85 +2385,85 @@ fi
 
 ```text
 
-###  Testing Workflow Validato
+### Testing Workflow Validated
 
-**Workflow obbligatorio seguito:**
-1.  Modifica script (dynamic download, pattern fix, logic reorder, git auto-install)
-2.  Test sintassi: `wsl bash -n script.sh` (exit code 0)
-3.  Verifica eseguibilità: `git ls-files -s` (100755)
-4.  Commit + push: b29a2cf, ea67364, 68661c1, 67f3cbc
-5.  Test su nsec8-stable: `curl -fsSL https://raw.githubusercontent.com/.../script.sh | bash`
-6.  Test su laboratorio: `curl -fsSL https://raw.githubusercontent.com/.../script.sh | bash`
-7.  Validazione output: ar/git/libbfd versioni corrette installate
+**Mandatory workflow followed:**
+1. Edit script (dynamic download, pattern fix, logic reorder, git auto-install)
+2. Syntax test: `wsl bash -n script.sh` (exit code 0)
+3. Check executable: `git ls-files -s` (100755)
+4. Commit + push: b29a2cf, ea67364, 68661c1, 67f3cbc
+5. Test on nsec8-stable: `curl -fsSL https://raw.githubusercontent.com/.../script.sh | bash`
+6. Lab testing: `curl -fsSL https://raw.githubusercontent.com/.../script.sh | bash`
+7. Output validation: ar/git/libbfd correct versions installed
 
-**Test reali eseguiti:**
--  Post major upgrade scenario (ar corrotto, git mancante)
--  Fresh install su sistema pulito
--  Re-install su sistema già configurato (idempotenza)
--  Esecuzione da GitHub (non repo locale)
+**Real tests performed:**
+- Post major upgrade scenario (corrupt ar, missing git)
+- Fresh install on clean system
+- Re-install on an already configured system (idempotence)
+- Running from GitHub (not local repo)
 
-###  Lessons Learned
+### Lessons Learned
 
 **Pattern Matching:**
--  `grep "/$package_name"` → Non trova "package_name_version.ipk"
--  `grep "${package_name}_"` → Corretto per formato Packages.gz
+- `grep "/$package_name"` → Can't find "package_name_version.ipk"
+- `grep "${package_name}_"` → Fixed for Packages.gz format
 
 **Circular Dependencies:**
--  `opkg install binutils` → "cannot find dependency ar"
--  Install chain: libbfd → ar → objdump → binutils con `--force-depends`
+- `opkg install binutils` → "cannot find dependency ar"
+- Install chain: libbfd → ar → objdump → binutils with `--force-depends`
 
 **Backup Restore Timing:**
--  Check corruption BEFORE backup restore → Binari mancanti post-upgrade mai rilevati
--  Restore backups FIRST, THEN check corruption → Rileva problemi anche se binario presente ma corrotto
+- Check corruption BEFORE backup restore → Missing post-upgrade binaries never detected
+- Restore backups FIRST, THEN check corruption → Detects problems even if binary present but corrupt
 
 **Testing:**
--  Test solo 1 script di 3 modificati → Script non testati falliscono in production
--  Test TUTTI gli script modificati nella sessione → 100% coverage
--  Test da repo locale → Potrebbe essere stale
--  Test da GitHub raw URL → Garantisce production source
+- Test only 1 of 3 modified scripts → Untested scripts fail in production
+- Test ALL scripts modified in the session → 100% coverage
+- Test from local repo → May be bad
+- Test from GitHub raw URL → Guarantees production source
 
 **Git Auto-Install:**
--  Git può essere rimosso durante major upgrade
--  Auto-sync repository richiede git funzionante
--  Rocksolid deve auto-installare git se mancante
--  Necessari: git + git-http (dipendenza)
+- Git can be removed during major upgrades
+- Auto-sync repository requires working git
+- Rocksolid must auto-install git if missing
+- Required: git + git-http (dependency)
 
-###  Sistema Production-Ready
+### Production-Ready system
 
-**Status finale:**
--  Entrambi gli host (nsec8-stable, laboratorio) ROCKSOLID mode attivo
--  Tutti i binari critici protetti e auto-riparabili
--  CheckMK Agent, FRP Client, QEMU-GA operativi
--  Auto Git Sync funzionante (repository aggiornato ogni minuto)
--  Sistema resiliente a major upgrade NethSecurity/OpenWrt
--  Zero hardcoded URLs - tutto dinamico da repository upstream
+**Final status:**
+- Both hosts (nsec8-stable, laboratory) ROCKSOLID mode active
+- All critical tracks protected and self-repairable
+- CheckMK Agent, FRP Client, QEMU-GA operational
+- Auto Git Sync working (repository updated every minute)
+- System resilient to NethSecurity/OpenWrt major upgrades
+- Zero hardcoded URLs - all dynamic from upstream repositories
 
-**Prossimi major upgrade:**
-- Sistema auto-ripristina binari corrotti (ar, tar, gzip, libbfd)
-- Sistema auto-installa git se rimosso
-- Sistema verifica e riavvia servizi critici (CheckMK, FRP)
-- Log dettagliato in `/var/log/rocksolid-startup.log`
-- **Zero intervento manuale richiesto**
-
----
-
-**Ultimo aggiornamento**: 2026-02-04
+**Upcoming major upgrades:**
+- System auto-repairs corrupt binaries (ar, tar, gzip, libbfd)
+- System auto-installs git if removed
+- System checks and restarts critical services (CheckMK, FRP)
+- Detailed log in `/var/log/rocksolid-startup.log`
+- **Zero manual intervention required**
 
 ---
 
-##  Ydea-Toolkit - Integrazione CheckMK su srv-monitoring
+**Last update**: 2026-02-04
 
-### Path script (notification scripts CheckMK, senza estensione)
+---
+
+## Ydea-Toolkit - CheckMK integration on srv-monitoring
+
+### Path script (CheckMK notification scripts, without extension)
 
 ```bash
 /omd/sites/monitoring/local/share/check_mk/notifications/ydea_la
 /omd/sites/monitoring/local/share/check_mk/notifications/ydea_ag
 ```
 
-### Test manuale notifica
+### Manual notification test
 
 ```bash
-su - monitoring -c "
+su -monitoring -c"
   cd /omd/sites/monitoring/local/share/check_mk/notifications/ && \
   NOTIFY_WHAT=PROBLEM \
   NOTIFY_HOSTNAME=ns8.ad.studiopaci.info \
@@ -2478,11 +2473,11 @@ su - monitoring -c "
   NOTIFY_NOTIFICATIONTYPE=PROBLEM \
   python3 ydea_la
 "
-# Verifica cache
+# Check cache
 cat /opt/ydea-toolkit/cache/ydea_checkmk_tickets.json
 ```
 
-### Cache Ydea (percorso corretto post fix installer commit b8f2090)
+### Ydea Cache (correct path post fix installer commit b8f2090)
 
 ```text
 /opt/ydea-toolkit/cache/ydea_checkmk_tickets.json
@@ -2490,7 +2485,7 @@ cat /opt/ydea-toolkit/cache/ydea_checkmk_tickets.json
 /opt/ydea-toolkit/cache/ydea_cache.lock
 ```
 
-### Fix manuale rapido su host già installati
+### Quick manual fix on already installed hosts
 
 ```bash
 mkdir -p /opt/ydea-toolkit/cache
@@ -2503,7 +2498,7 @@ chmod 640 /opt/ydea-toolkit/.env.la /opt/ydea-toolkit/.env.ag
 chown monitoring:monitoring /opt/ydea-toolkit/.env.la /opt/ydea-toolkit/.env.ag
 ```
 
-### Note
+### Notes
 
-- API key `Y_KEY_8c814108a0345fdeace7fb9c637fb6c9` → **scaduta** (febbraio 2026) - attendere nuova key
-- Log: `tail -f /var/log/ydea_health.log` e `tail -f /var/log/ydea_cache_validator.log`
+- API key `Y_KEY_8c814108a0345fdeace7fb9c637fb6c9` → **expired** (February 2026) - wait for new key
+- Log: `tail -f /var/log/ydea_health.log` and `tail -f /var/log/ydea_cache_validator.log`

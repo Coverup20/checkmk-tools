@@ -1,5 +1,5 @@
 # CheckMK Agent + FRPC Interactive Installer for Windows
-> **Categoria:** Operativo
+> **Category:** Operational
 
 **Version:** 1.1 (2025-11-07)  
 **Compatibility:** Windows 10, 11, Server 2019, Server 2022  
@@ -59,11 +59,11 @@ The script will:
 
 When prompted, provide:
 
-| Parameter | Description | Example |
+| Parameters | Description | Example |
 |-----------|-------------|---------|
 | **Hostname** | Display name for the tunnel | `ws-server-01` |
 | **FRP Server** | Remote FRP server address | `monitor.nethlab.it` |
-| **Remote Port** | Tunnel remote port | `20001` |
+| **Remote Port** | Remote port tunnel | `20001` |
 | **Auth Token** | Security token (optional) | `secret-token-string` |
 
 ### Example FRPC Configuration
@@ -73,15 +73,15 @@ When prompted, provide:
 server_addr = "monitor.nethlab.it"
 server_port = 7000
 auth.method = "token"
-auth.token  = "your-secret-token"
+auth.token = "your-secret-token"
 tls.enable = true
 log.to = "C:\ProgramData\frp\logs\frpc.log"
 log.level = "debug"
 
 [ws-server-01]
-type        = "tcp"
-local_ip    = "127.0.0.1"
-local_port  = 6556
+type = "tcp"
+local_ip = "127.0.0.1"
+local_port = 6556
 remote_port = 20001
 ```
 
@@ -128,7 +128,7 @@ remote_port = 20001
 .\install-agent-interactive.ps1 --uninstall
 ```
 
-### Show Help
+### ShowHelp
 
 ```powershell
 .\install-agent-interactive.ps1 --help
@@ -190,7 +190,6 @@ Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser -Force
    ```powershell
    Get-Content "$env:TEMP\CheckMK-Setup\checkmk-install.log" -Tail 50
    ```
-
 ### FRPC Service Won't Start
 
 1. Check configuration file:
@@ -284,15 +283,15 @@ Add additional tunnel sections to `frpc.toml`:
 
 ```toml
 [rdp-tunnel]
-type        = "tcp"
-local_ip    = "127.0.0.1"
-local_port  = 3389
+type = "tcp"
+local_ip = "127.0.0.1"
+local_port = 3389
 remote_port = 20002
 
 [ssh-tunnel]
-type        = "tcp"
-local_ip    = "127.0.0.1"
-local_port  = 22
+type = "tcp"
+local_ip = "127.0.0.1"
+local_port = 22
 remote_port = 20022
 ```
 
@@ -308,7 +307,7 @@ Then restart: `Restart-Service -Name 'frpc'`
 
 ## Uninstallation
 
-### Remove Everything
+### RemoveEverything
 
 ```powershell
 .\install-agent-interactive.ps1 --uninstall
@@ -330,13 +329,13 @@ Remove-Item -Path 'C:\ProgramData\checkmk' -Recurse -Force
 
 ## Comparison with Linux/OpenWrt Installer
 
-| Feature | Windows | Linux/OpenWrt |
+| Features | Windows | Linux/OpenWrt |
 |---------|---------|---------------|
 | **Installation Method** | MSI | Package from source |
 | **Service Manager** | Windows Services (sc.exe) | systemd / init.d |
 | **Config Location** | `C:\ProgramData\*` | `/etc/checkmk/` |
 | **FRPC Config Format** | TOML (.toml) | TOML (.toml) |
-| **Package Manager** | Manual download | apt / opkg |
+| **Package Manager** | Manual download | apt/opkg |
 
 ## Version History
 
@@ -371,4 +370,4 @@ MIT License - See LICENSE file for details
 ---
 
 **Last Updated:** 2025-11-07  
-**Status:**  Production Ready - Fully Tested
+**Status:** Production Ready - Fully Tested

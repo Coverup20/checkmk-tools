@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-checkmk_restore_compressed.py
+"""checkmk_restore_compressed.py
 
-Script per ripristino backup CheckMK compressi.
-Version: 1.0.0
-"""
+Script to restore compressed CheckMK backups.
+Version: 1.0.0"""
 
 import argparse
 import datetime as dt

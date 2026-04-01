@@ -2,8 +2,8 @@
 # ssh-cleanup.ps1 - Pulisce socket ControlMaster WSL e job SSH attivi
 
 Write-Host "=== SSH CLEANUP ===" -ForegroundColor Cyan
-Write-Host "ATTENZIONE: questo script chiude i socket ControlMaster WSL." -ForegroundColor Red
-Write-Host "Dopo il cleanup dovrai reinserire la passphrase per checkmk-vps-01/02." -ForegroundColor Yellow
+Write-Host "WARNING: This script closes ControlMaster WSL sockets." -ForegroundColor Red
+Write-Host "After cleanup you will need to re-enter the passphrase for checkmk-vps-01/02." -ForegroundColor Yellow
 Write-Host ""
 
 # 1. Job PowerShell SSH attivi
@@ -15,7 +15,7 @@ if ($jobs) {
     $jobs | Remove-Job -Force -ErrorAction SilentlyContinue
     Write-Host "     Rimossi $($jobs.Count) job" -ForegroundColor Green
 } else {
-    Write-Host "     Nessun job attivo" -ForegroundColor Gray
+    Write-Host "No active jobs" -ForegroundColor Gray
 }
 
 # 2. Socket ControlMaster WSL
@@ -27,17 +27,17 @@ if ($sockets) {
     wsl -d kali-linux bash -c "for s in ~/.ssh/sockets/*; do ssh -O exit -o ControlPath=\$s dummy 2>/dev/null; done; rm -f ~/.ssh/sockets/*; echo 'Rimossi'"
     Write-Host "     Socket chiusi e rimossi" -ForegroundColor Green
 } else {
-    Write-Host "     Nessun socket attivo" -ForegroundColor Gray
+    Write-Host "No active sockets" -ForegroundColor Gray
 }
 
-# 3. Porte locali in ascolto (1443, 8080, tunnel comuni)
-Write-Host "`n[3/3] Porte tunnel locali in ascolto..." -ForegroundColor Yellow
+# 3. Local ports listening (1443, 8080, common tunnels)
+Write-Host "`n[3/3] Local tunnel ports listening..." -ForegroundColor Yellow
 $ports = netstat -an | Select-String "127\.0\.0\.1:(1443|8080|8443|4430|2222|2333)\s"
 if ($ports) {
     $ports | ForEach-Object { Write-Host "     $_" -ForegroundColor Yellow }
-    Write-Host "     (chiuse tramite rimozione job sopra)" -ForegroundColor Gray
+    Write-Host "(closed via job removal above)" -ForegroundColor Gray
 } else {
-    Write-Host "     Nessuna porta tunnel attiva" -ForegroundColor Gray
+    Write-Host "No active tunnel ports" -ForegroundColor Gray
 }
 
 Write-Host "`nDone." -ForegroundColor Cyan

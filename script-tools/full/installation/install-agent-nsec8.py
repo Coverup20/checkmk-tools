@@ -1,31 +1,29 @@
 #!/usr/bin/env python3
-"""
-install-agent-nsec8.py  —  CheckMK Agent Installer — PERSISTENT Edition
+"""install-agent-nsec8.py — CheckMK Agent Installer — PERSISTENT Edition
 
-Installa e configura CheckMK Agent su NethSecurity 8 / OpenWrt in modo
-persistente e resistente ai major upgrade.
+Install and configure CheckMK Agent on NethSecurity 8 / OpenWrt properly
+persistent and resistant to major upgrades.
 
-Funzionalità:
-  - Installa prerequisiti (wget, socat, ar, tar, gzip)
-  - Installa ns-checkmk-agent via opkg (con fallback a URL diretto)
-  - Scarica script check direttamente da GitHub (NO git, NO clone intero)
-  - Deploya local checks da /opt/checkmk-checks/
-  - Configura sync-checks.py ogni 5 minuti (footprint minimo)
-  - Protegge installazione in sysupgrade.conf
-  - Backup binari critici (tar/ar/gzip/libbfd)
-  - Script di ripristino post-upgrade automatico
-  - Autocheck all'avvio (persistent-startup-check.py)
+Features:
+  - Install prerequisites (wget, socat, ar, tar, gzip)
+  - Install ns-checkmk-agent via opkg (with fallback to direct URL)
+  - Download script check directly from GitHub (NO git, NO full clone)
+  - Deploy local checks from /opt/checkmk-checks/
+  - Configure sync-checks.py every 5 minutes (minimum footprint)
+  - Protect installation in sysupgrade.conf
+  - Critical binary backups (tar/ar/gzip/libbfd)
+  - Automatic post-upgrade recovery script
+  - Autocheck on startup (persistent-startup-check.py)
 
-Uso:
+Usage:
   python3 install-agent-nsec8.py [--uninstall] [--help]
 
-Variabili d'ambiente:
-  CHECKMK_AGENT_IPK_URL  URL diretto .ipk agente (fallback opkg)
-  OPENWRT_REPO_BASE      Repository OpenWrt base per download dinamico
-  OPENWRT_REPO_PACKAGES  Repository OpenWrt packages per download dinamico
+Environment Variables:
+  CHECKMK_AGENT_IPK_URL Direct URL .ipk agent (opkg fallback)
+  OPENWRT_REPO_BASE OpenWrt base repository for dynamic download
+  OPENWRT_REPO_PACKAGES OpenWrt packages repository for dynamic download
 
-Version: 2.3.0
-"""
+Version: 2.3.0"""
 
 import gzip as _gzip
 import io
@@ -60,7 +58,7 @@ SYNC_SCRIPT_URL = (
     "/script-tools/full/upgrade_maintenance/sync-checks.py"
 )
 
-# URL diretto pacchetto agente (fallback se opkg non trova ns-checkmk-agent)
+# Agent package direct URL (fallback if opkg doesn't find ns-checkmk-agent)
 AGENT_IPK_URL = os.environ.get(
     "CHECKMK_AGENT_IPK_URL",
     "https://updates.nethsecurity.nethserver.org/checkmk_agent/"
@@ -68,10 +66,10 @@ AGENT_IPK_URL = os.environ.get(
     "ns-checkmk-agent_0.0.1-r1_all.ipk",
 )
 
-# File dove salvare l'URL per il startup check post-upgrade
+# File where to save the URL for the post-upgrade startup check
 AGENT_PKG_URL_FILE = "/opt/checkmk-backups/agent-pkg-url.conf"
 
-# Repository OpenWrt per download dinamico pacchetti
+# OpenWrt repository for dynamic package download
 REPO_BASE = os.environ.get(
     "OPENWRT_REPO_BASE",
     "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base",
@@ -100,7 +98,7 @@ def die(msg: str) -> None:
 
 
 def run(cmd: List[str], check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
-    """Esegue un comando, stampa output in tempo reale se non capture."""
+    """Execute a command, print output in real time if not capture."""
     if capture:
         return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     result = subprocess.run(cmd)
@@ -118,17 +116,15 @@ def is_root() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Download dinamico pacchetti OpenWrt
+# Dynamic download of OpenWrt packages
 # ---------------------------------------------------------------------------
 
 
 def download_openwrt_package(
     package_name: str, repo_url: str, output_file: str
 ) -> bool:
-    """
-    Scarica un pacchetto OpenWrt in modo dinamico dall'index Packages.gz.
-    Evita URL statici fragili: trova il filename dalla lista aggiornata.
-    """
+    """Download an OpenWrt package dynamically from the Packages.gz index.
+    Avoid fragile static URLs: find the filename from the updated list."""
     log(f"Download dinamico pacchetto: {package_name}")
     packages_url = f"{repo_url}/Packages.gz"
 
@@ -170,12 +166,12 @@ def download_openwrt_package(
 
 
 # ---------------------------------------------------------------------------
-# 1. Rilevamento sistema
+# 1. System detection
 # ---------------------------------------------------------------------------
 
 
 def detect_system() -> Tuple[str, str]:
-    """Rileva versione OS e architettura. Restituisce (version, arch)."""
+    """Detect OS version and architecture. Returns (version, arch)."""
     version = "unknown"
     arch = "x86_64"
 
@@ -209,7 +205,7 @@ def detect_system() -> Tuple[str, str]:
 
 
 def install_prereqs() -> None:
-    """Installa tool necessari: wget, socat, ca-certificates, ar, tar, gzip."""
+    """Install necessary tools: wget, socat, ca-certificates, ar, tar, gzip."""
     if not cmd_exists("opkg"):
         die("opkg non trovato — questo script richiede OpenWrt / NethSecurity")
 
@@ -260,17 +256,17 @@ def install_prereqs() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 3. Installazione agente CheckMK
+# 3. CheckMK agent installation
 # ---------------------------------------------------------------------------
 
 
 def install_agent() -> None:
-    """Installa ns-checkmk-agent via opkg, con fallback a URL diretto."""
+    """Install ns-checkmk-agent via opkg, with fallback to direct URL."""
     log("Installazione ns-checkmk-agent via opkg...")
     r = run(["opkg", "install", "ns-checkmk-agent"], check=False)
     if r.returncode == 0:
         log("ns-checkmk-agent installato da repository opkg")
-        # Salva URL come fallback per startup check post-upgrade
+        # Save URL as fallback for startup check post-upgrade
         Path(AGENT_PKG_URL_FILE).parent.mkdir(parents=True, exist_ok=True)
         Path(AGENT_PKG_URL_FILE).write_text(AGENT_IPK_URL + "\n")
         return
@@ -281,13 +277,13 @@ def install_agent() -> None:
     )
     run(["opkg", "install", AGENT_IPK_URL])
     log("ns-checkmk-agent installato da URL diretto")
-    # Salva URL come fallback per startup check post-upgrade
+    # Save URL as fallback for startup check post-upgrade
     Path(AGENT_PKG_URL_FILE).parent.mkdir(parents=True, exist_ok=True)
     Path(AGENT_PKG_URL_FILE).write_text(AGENT_IPK_URL + "\n")
 
 
 def start_agent_service() -> None:
-    """Abilita e avvia il servizio check_mk_agent."""
+    """Enable and start the check_mk_agent service."""
     init = "/etc/init.d/check_mk_agent"
     if not os.path.exists(init):
         die(
@@ -313,14 +309,14 @@ def start_agent_service() -> None:
 
 
 def setup_checks_sync() -> None:
-    """Scarica sync-checks.py da GitHub, lo salva in /opt/checkmk-backups/,
-    poi esegue sync iniziale per popolare /opt/checkmk-checks/."""
+    """Download sync-checks.py from GitHub, save it in /opt/checkmk-backups/,
+    then performs initial sync to populate /opt/checkmk-checks/."""
     import json
 
     backup_base = Path("/opt/checkmk-backups")
     backup_base.mkdir(parents=True, exist_ok=True)
 
-    # 1. Scarica sync-checks.py da GitHub
+    # 1. Download sync-checks.py from GitHub
     log("Download sync-checks.py da GitHub...")
     try:
         urllib.request.urlretrieve(SYNC_SCRIPT_URL, SYNC_SCRIPT)
@@ -332,7 +328,7 @@ def setup_checks_sync() -> None:
         warn(f"Download sync-checks.py fallito: {exc} — skip auto-sync")
         return
 
-    # 2. Esegui sync iniziale per popolare /opt/checkmk-checks/
+    # 2. Run initial sync to populate /opt/checkmk-checks/
     log("Sync iniziale script check da GitHub...")
     r = run(["python3", SYNC_SCRIPT], check=False)
     if r.returncode == 0:
@@ -348,7 +344,7 @@ def setup_checks_sync() -> None:
 
 
 def deploy_local_checks() -> None:
-    """Copia i local check da /opt/checkmk-checks/ in LOCAL_DIR."""
+    """Copy local checks from /opt/checkmk-checks/ to LOCAL_DIR."""
     src = Path(CHECKS_DIR)
     dst = Path(LOCAL_DIR)
     dst.mkdir(parents=True, exist_ok=True)
@@ -368,8 +364,8 @@ def deploy_local_checks() -> None:
 
     log(f"Deploy local checks: {deployed} file in {LOCAL_DIR}")
 
-    # Rimuovi i vecchi .sh dalla cartella plugins (installati dal pacchetto ns-checkmk-agent)
-    # I check aggiornati in Python sono già in local/ - i .sh in plugins/ sono doppioni obsoleti
+    # Remove old .sh from plugins folder (installed from ns-checkmk-agent package)
+    # The updated checks in Python are already in local/ - the .sh in plugins/ are obsolete duplicates
     plugins_dir = Path(PLUGINS_DIR)
     removed = 0
     if plugins_dir.is_dir():
@@ -389,7 +385,7 @@ def deploy_local_checks() -> None:
 
 
 def setup_cron() -> None:
-    """Aggiunge cron job ogni 5 minuti per sync-checks.py."""
+    """Adds cron job every 5 minutes for sync-checks.py."""
     if not Path(SYNC_SCRIPT).exists():
         log("sync-checks.py non presente — skip configurazione cron")
         return
@@ -415,7 +411,7 @@ def setup_cron() -> None:
 
 
 def _add_to_sysupgrade(path: str, comment: str) -> None:
-    """Aggiunge un path a sysupgrade.conf se non gia' presente."""
+    """Adds a path to sysupgrade.conf if not already present."""
     conf = Path(SYSUPGRADE_CONF)
     if not conf.exists():
         conf.write_text("## File e directory preservati durante upgrade\n\n")
@@ -425,7 +421,7 @@ def _add_to_sysupgrade(path: str, comment: str) -> None:
 
 
 def setup_sysupgrade() -> None:
-    """Aggiunge tutti i path critici a sysupgrade.conf."""
+    """Adds all critical paths to sysupgrade.conf."""
     entries = [
         ("/usr/bin/check_mk_agent",         "CheckMK Agent - Binary"),
         ("/etc/init.d/check_mk_agent",       "CheckMK Agent - Init Script"),
@@ -434,7 +430,7 @@ def setup_sysupgrade() -> None:
         ("/usr/lib/check_mk_agent/plugins/", "CheckMK Agent Plugins"),
         (f"{CHECKS_DIR}/",                   "Script check (sync da GitHub, NO git)"),
         ("/opt/checkmk-backups/",            "Backup binari critici + sync-checks.py"),
-        # /etc/nginx/ NON protetta: preservarla causa conflitti moduli nginx tra versioni
+        # /etc/nginx/ NOT protected: preserving it causes nginx module conflicts between versions
         (CRON_FILE,                          "Cron Jobs (include sync-checks)"),
         ("/etc/cron.d/",                     "Cron Jobs Directory"),
         ("/var/spool/cron/crontabs/",        "User Crontabs"),
@@ -464,13 +460,13 @@ def setup_sysupgrade() -> None:
 
 
 def create_post_upgrade_script() -> None:
-    """Crea /etc/checkmk-post-upgrade.py — eseguito manualmente dopo major upgrade."""
+    """Create /etc/checkmk-post-upgrade.py — run manually after major upgrade."""
     log(f"Creo script di ripristino post-upgrade: {POST_UPGRADE_SCRIPT}")
 
     script_lines = [
         '#!/usr/bin/env python3',
-        '"""checkmk-post-upgrade.py - ripristino automatico dopo major upgrade.',
-        'Generato da install-agent-nsec8.py',
+        '"""checkmk-post-upgrade.py - automatic recovery after major upgrade.',
+        'Generated by install-agent-nsec8.py',
         '"""',
         'import os, subprocess, sys, time',
         '',
@@ -524,12 +520,12 @@ def create_post_upgrade_script() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 11. Autocheck all'avvio (PERSISTENT)
+# 11. Autocheck at startup (PERSISTENT)
 # ---------------------------------------------------------------------------
 
 
 def install_autocheck() -> None:
-    """Scarica persistent-startup-check.py e lo configura in rc.local."""
+    """Download persistent-startup-check.py and configure it in rc.local."""
     log("Installazione script autocheck all'avvio")
 
     Path(AUTOCHECK_SCRIPT).parent.mkdir(parents=True, exist_ok=True)
@@ -538,7 +534,7 @@ def install_autocheck() -> None:
     log("Download persistent-startup-check.py da GitHub...")
     try:
         urllib.request.urlretrieve(AUTOCHECK_URL, AUTOCHECK_SCRIPT)
-        # Strip CRLF (file potrebbe venire da Windows)
+        # Strip CRLF (file may come from Windows)
         content = Path(AUTOCHECK_SCRIPT).read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
         Path(AUTOCHECK_SCRIPT).write_bytes(content)
         Path(AUTOCHECK_SCRIPT).chmod(
@@ -552,7 +548,7 @@ def install_autocheck() -> None:
     if not downloaded:
         warn("ATTENZIONE: download persistent-startup-check.py fallito — skip autocheck")
 
-    # Configura rc.local
+    # Configure rc.local
     rc_path = Path(RC_LOCAL)
     if not rc_path.exists():
         rc_path.write_text(
@@ -598,7 +594,7 @@ def install_autocheck() -> None:
 
 
 def uninstall() -> None:
-    """Rimuove agente, cron, sync script e post-upgrade. NON rimuove /opt/checkmk-backups/."""
+    """Removes agent, cron, sync script and post-upgrade. DOES NOT remove /opt/checkmk-backups/."""
     log("Disinstallazione CheckMK Agent...")
 
     init = "/etc/init.d/check_mk_agent"
@@ -624,7 +620,7 @@ def uninstall() -> None:
             os.remove(p)
             log(f"Rimosso: {p}")
 
-    # Rimuovi voce autocheck da rc.local
+    # Remove autocheck entry from rc.local
     if os.path.exists(RC_LOCAL):
         lines = [
             l for l in Path(RC_LOCAL).read_text().splitlines()

@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-check_ns8_container_inventory.py - Inventario container NS8 per CheckMK
+"""check_ns8_container_inventory.py - NS8 container inventory for CheckMK
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys

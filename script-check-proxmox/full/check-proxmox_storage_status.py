@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-check-proxmox_storage_status.py - CheckMK Local Check for Proxmox Storage
+"""check-proxmox_storage_status.py - CheckMK Local Check for Proxmox Storage
 
 Monitor storage usage with thresholds (WARN 80%, CRIT 90%).
 
 Proxmox VE
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import subprocess
 import sys

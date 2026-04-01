@@ -1,28 +1,26 @@
 #!/usr/bin/env python3
-"""
-setup-persistent-nsec8.py  —  CheckMK Persistent Setup (NO agent install)
+"""setup-persistent-nsec8.py — CheckMK Persistent Setup (NO agent install)
 
-Configura tutto il necessario per la persistenza di CheckMK su
-NethSecurity 8 / OpenWrt, SENZA installare né toccare l'agente.
+Configure everything needed for CheckMK persistence on
+NethSecurity 8 / OpenWrt, WITHOUT installing or touching the agent.
 
-Usare quando l'agente CheckMK è già installato e si vuole solo:
-  - Installare prerequisiti (wget, socat, ar, tar, gzip)
-  - Scaricare sync-checks.py e popolare /opt/checkmk-checks/
-  - Deployare local checks da /opt/checkmk-checks/
-  - Configurare cron sync ogni 5 minuti
-  - Proteggere installazione in sysupgrade.conf
-  - Creare script di ripristino post-upgrade automatico
-  - Installare autocheck all'avvio (persistent-startup-check.py)
+Use when the CheckMK agent is already installed and you just want to:
+  - Install prerequisites (wget, socat, ar, tar, gzip)
+  - Download sync-checks.py and populate /opt/checkmk-checks/
+  - Deploy local checks from /opt/checkmk-checks/
+  - Configure cron sync every 5 minutes
+  - Protect installation in sysupgrade.conf
+  - Create automatic post-upgrade recovery scripts
+  - Install autocheck on startup (persistent-startup-check.py)
 
-Uso:
+Usage:
   python3 setup-persistent-nsec8.py [--uninstall] [--help]
 
-Variabili d'ambiente:
-  OPENWRT_REPO_BASE      Repository OpenWrt base per download dinamico
-  OPENWRT_REPO_PACKAGES  Repository OpenWrt packages per download dinamico
+Environment Variables:
+  OPENWRT_REPO_BASE OpenWrt base repository for dynamic download
+  OPENWRT_REPO_PACKAGES OpenWrt packages repository for dynamic download
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import gzip as _gzip
 import io
@@ -57,7 +55,7 @@ SYNC_SCRIPT_URL = (
     "/script-tools/full/upgrade_maintenance/sync-checks.py"
 )
 
-# Repository OpenWrt per download dinamico pacchetti
+# OpenWrt repository for dynamic package download
 REPO_BASE = os.environ.get(
     "OPENWRT_REPO_BASE",
     "https://downloads.openwrt.org/releases/23.05.0/packages/x86_64/base",
@@ -86,7 +84,7 @@ def die(msg: str) -> None:
 
 
 def run(cmd: List[str], check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
-    """Esegue un comando, stampa output in tempo reale se non capture."""
+    """Execute a command, print output in real time if not capture."""
     if capture:
         return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     result = subprocess.run(cmd)
@@ -104,17 +102,15 @@ def is_root() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Download dinamico pacchetti OpenWrt
+# Dynamic download of OpenWrt packages
 # ---------------------------------------------------------------------------
 
 
 def download_openwrt_package(
     package_name: str, repo_url: str, output_file: str
 ) -> bool:
-    """
-    Scarica un pacchetto OpenWrt in modo dinamico dall'index Packages.gz.
-    Evita URL statici fragili: trova il filename dalla lista aggiornata.
-    """
+    """Download an OpenWrt package dynamically from the Packages.gz index.
+    Avoid fragile static URLs: find the filename from the updated list."""
     log(f"Download dinamico pacchetto: {package_name}")
     packages_url = f"{repo_url}/Packages.gz"
 
@@ -156,12 +152,12 @@ def download_openwrt_package(
 
 
 # ---------------------------------------------------------------------------
-# 1. Rilevamento sistema
+# 1. System detection
 # ---------------------------------------------------------------------------
 
 
 def detect_system() -> Tuple[str, str]:
-    """Rileva versione OS e architettura. Restituisce (version, arch)."""
+    """Detect OS version and architecture. Returns (version, arch)."""
     version = "unknown"
     arch = "x86_64"
 
@@ -195,7 +191,7 @@ def detect_system() -> Tuple[str, str]:
 
 
 def install_prereqs() -> None:
-    """Installa tool necessari: wget, socat, ca-certificates, ar, tar, gzip."""
+    """Install necessary tools: wget, socat, ca-certificates, ar, tar, gzip."""
     if not cmd_exists("opkg"):
         die("opkg non trovato — questo script richiede OpenWrt / NethSecurity")
 
@@ -251,12 +247,12 @@ def install_prereqs() -> None:
 
 
 def setup_checks_sync() -> None:
-    """Scarica sync-checks.py da GitHub, lo salva in /opt/checkmk-backups/,
-    poi esegue sync iniziale per popolare /opt/checkmk-checks/."""
+    """Download sync-checks.py from GitHub, save it in /opt/checkmk-backups/,
+    then performs initial sync to populate /opt/checkmk-checks/."""
     backup_base = Path("/opt/checkmk-backups")
     backup_base.mkdir(parents=True, exist_ok=True)
 
-    # 1. Scarica sync-checks.py da GitHub
+    # 1. Download sync-checks.py from GitHub
     log("Download sync-checks.py da GitHub...")
     try:
         urllib.request.urlretrieve(SYNC_SCRIPT_URL, SYNC_SCRIPT)
@@ -268,7 +264,7 @@ def setup_checks_sync() -> None:
         warn(f"Download sync-checks.py fallito: {exc} — skip auto-sync")
         return
 
-    # 2. Esegui sync iniziale per popolare /opt/checkmk-checks/
+    # 2. Run initial sync to populate /opt/checkmk-checks/
     log("Sync iniziale script check da GitHub...")
     r = run(["python3", SYNC_SCRIPT], check=False)
     if r.returncode == 0:
@@ -284,7 +280,7 @@ def setup_checks_sync() -> None:
 
 
 def deploy_local_checks() -> None:
-    """Copia i local check da /opt/checkmk-checks/ in LOCAL_DIR."""
+    """Copy local checks from /opt/checkmk-checks/ to LOCAL_DIR."""
     src = Path(CHECKS_DIR)
     dst = Path(LOCAL_DIR)
     dst.mkdir(parents=True, exist_ok=True)
@@ -304,7 +300,7 @@ def deploy_local_checks() -> None:
 
     log(f"Deploy local checks: {deployed} file in {LOCAL_DIR}")
 
-    # Rimuovi i vecchi .sh dalla cartella plugins
+    # Remove the old .sh files from the plugins folder
     plugins_dir = Path(PLUGINS_DIR)
     removed = 0
     if plugins_dir.is_dir():
@@ -324,7 +320,7 @@ def deploy_local_checks() -> None:
 
 
 def setup_cron() -> None:
-    """Aggiunge cron job ogni 5 minuti per sync-checks.py."""
+    """Adds cron job every 5 minutes for sync-checks.py."""
     if not Path(SYNC_SCRIPT).exists():
         log("sync-checks.py non presente — skip configurazione cron")
         return
@@ -349,7 +345,7 @@ def setup_cron() -> None:
 
 
 def _add_to_sysupgrade(path: str, comment: str) -> None:
-    """Aggiunge un path a sysupgrade.conf se non gia' presente."""
+    """Adds a path to sysupgrade.conf if not already present."""
     conf = Path(SYSUPGRADE_CONF)
     if not conf.exists():
         conf.write_text("## File e directory preservati durante upgrade\n\n")
@@ -359,7 +355,7 @@ def _add_to_sysupgrade(path: str, comment: str) -> None:
 
 
 def setup_sysupgrade() -> None:
-    """Aggiunge tutti i path critici a sysupgrade.conf."""
+    """Adds all critical paths to sysupgrade.conf."""
     entries = [
         ("/usr/bin/check_mk_agent",         "CheckMK Agent - Binary"),
         ("/etc/init.d/check_mk_agent",       "CheckMK Agent - Init Script"),
@@ -397,13 +393,13 @@ def setup_sysupgrade() -> None:
 
 
 def create_post_upgrade_script() -> None:
-    """Crea /etc/checkmk-post-upgrade.py — eseguito manualmente dopo major upgrade."""
+    """Create /etc/checkmk-post-upgrade.py — run manually after major upgrade."""
     log(f"Creo script di ripristino post-upgrade: {POST_UPGRADE_SCRIPT}")
 
     script_lines = [
         '#!/usr/bin/env python3',
-        '"""checkmk-post-upgrade.py - ripristino automatico dopo major upgrade.',
-        'Generato da setup-persistent-nsec8.py',
+        '"""checkmk-post-upgrade.py - automatic recovery after major upgrade.',
+        'Generated by setup-persistent-nsec8.py',
         '"""',
         'import os, subprocess, sys, time',
         '',
@@ -457,12 +453,12 @@ def create_post_upgrade_script() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 8. Autocheck all'avvio (PERSISTENT)
+# 8. Autocheck at startup (PERSISTENT)
 # ---------------------------------------------------------------------------
 
 
 def install_autocheck() -> None:
-    """Scarica persistent-startup-check.py e lo configura in rc.local."""
+    """Download persistent-startup-check.py and configure it in rc.local."""
     log("Installazione script autocheck all'avvio")
 
     Path(AUTOCHECK_SCRIPT).parent.mkdir(parents=True, exist_ok=True)
@@ -484,7 +480,7 @@ def install_autocheck() -> None:
     if not downloaded:
         warn("ATTENZIONE: download persistent-startup-check.py fallito — skip autocheck")
 
-    # Configura rc.local
+    # Configure rc.local
     rc_path = Path(RC_LOCAL)
     if not rc_path.exists():
         rc_path.write_text(
@@ -530,7 +526,7 @@ def install_autocheck() -> None:
 
 
 def uninstall() -> None:
-    """Rimuove cron, sync script e post-upgrade. NON tocca l'agente."""
+    """Removes cron, sync script and post-upgrade. DO NOT touch the agent."""
     log("Rimozione configurazione persistent setup...")
 
     # Rimuovi cron entry
@@ -548,7 +544,7 @@ def uninstall() -> None:
             os.remove(p)
             log(f"Rimosso: {p}")
 
-    # Rimuovi voce autocheck da rc.local
+    # Remove autocheck entry from rc.local
     if os.path.exists(RC_LOCAL):
         lines = [
             l for l in Path(RC_LOCAL).read_text().splitlines()

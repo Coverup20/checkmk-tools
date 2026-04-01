@@ -52,8 +52,8 @@ def _try_install_agent_via_interactive_script(cfg: InstallerConfig, repo_root: P
             "bash",
             "-lc",
             # Auto-answer prompts:
-            # 1) Procedi con l'installazione? [s/N] -> s
-            # 2) Vuoi installare anche FRPC? [s/N] -> N
+            # 1) Do you proceed with the installation? [y/N] -> y
+            # 2) Do you also want to install FRPC? [y/N] -> N
             f"set -euo pipefail; export CHECKMK_BASE_URL={base_url}; printf 's\\nN\\n' | bash {installer}",
         ]
         run_cmd(cmd, check=False)
@@ -83,7 +83,7 @@ def _ensure_agent_and_local_dir(cfg: InstallerConfig, repo_root: Path | None) ->
 
 
 def _wait_for_local_dir(timeout: int = _WAIT_TIMEOUT_SEC) -> bool:
-    """Aspetta polling finché /usr/lib/check_mk_agent/local non compare (creato dall'agent CheckMK)."""
+    """Wait polling until /usr/lib/check_mk_agent/local appears (created by the CheckMK agent)."""
     local_dir = Path("/usr/lib/check_mk_agent/local")
     if local_dir.exists():
         return True
@@ -111,7 +111,7 @@ def run_step(cfg: InstallerConfig) -> None:
 
     repo_root = _find_repo_root()
 
-    # Prima tenta installazione agent, poi aspetta in polling
+    # First try agent installation, then wait for polling
     if not Path("/usr/lib/check_mk_agent/local").exists():
         _ensure_agent_and_local_dir(cfg, repo_root)
 

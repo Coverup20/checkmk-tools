@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""
-notify_ticket_watcher_sp.py - Watcher notifiche Telegram ticket - Studio Paci
-Legge notify.log, intercetta [TICKET-EVENT] [CREATO] e manda messaggio Telegram.
-Completamente indipendente dal sistema di notifica CheckMK.
+"""notify_ticket_watcher_sp.py - Telegram ticket notification watcher - Studio Paci
+Reads notify.log, intercepts [TICKET-EVENT] [CREATED] and sends Telegram message.
+Completely independent of the CheckMK notification system.
 
-Variante Studio Paci: server CheckMK non esposto pubblicamente, nessun link.
+Studio Paci variant: CheckMK server not publicly exposed, no links.
 
-Version: 1.0.0
-"""
+Version: 1.0.0"""
 
 import os
 import re
@@ -27,7 +25,7 @@ CHAT_ID = "-1003770828164"
 
 LIVESTATUS_SOCK = "/omd/sites/monitoring/tmp/run/live"
 
-# Matcha solo le righe [cmk.base.notify] Output: per evitare duplicati
+# Match only lines [cmk.base.notify] Output: to avoid duplicates
 PATTERN = re.compile(
     r'\[cmk\.base\.notify\].*Output:.*\[TICKET-EVENT\] \[CREATO\] #(\d+) ([^/\n]+)/(.+?) (CRIT\w*|DOWN\w*|CRITICAL)'
 )
@@ -47,7 +45,7 @@ def save_state(state: dict):
 
 
 def get_service_info(hostname: str, service: str) -> tuple[str, str]:
-    """Interroga Livestatus per ottenere (host_address, plugin_output)."""
+    """Query Livestatus to get (host_address, plugin_output)."""
     try:
         query = (
             f"GET services\n"
@@ -74,10 +72,10 @@ def send_telegram(ticket_id: str, hostname: str, service: str, state_str: str,
                   host_address: str = "", svc_output: str = ""):
     emoji = "\U0001f534" if "CRIT" in state_str.upper() else "\U0001f7e0"
 
-    # Riga host: «Hostname (IP)» se l'IP è disponibile
+    # Host line: «Hostname (IP)» if the IP is available
     host_line = f"{hostname} ({host_address})" if host_address else hostname
 
-    # Output: tronca a 300 caratteri
+    # Output: truncate to 300 characters
     output_line = ""
     if svc_output:
         truncated = svc_output[:300]
@@ -110,13 +108,13 @@ def main():
     pos = state.get("pos", 0)
     sent = set(state.get("sent", []))
 
-    # Pulisci sent vecchi (tieni solo ultimi 500)
+    # Clear old sent (only keep last 500)
     if len(sent) > 500:
         sent = set(list(sent)[-500:])
 
     file_size = os.path.getsize(LOG_FILE)
 
-    # Log ruotato (file più piccolo di pos)
+    # Rotated log (file smaller than pos)
     if file_size < pos:
         pos = 0
 
