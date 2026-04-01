@@ -19,7 +19,7 @@ from pathlib import Path
 
 VERSION = "1.2.0"
 
-REPO = "Coverup20/checkmk-tools"
+REPO = "nethesis/checkmk-tools"
 BRANCH = "main"
 CHECKS_PATH = "script-check-nsec8/full"
 SELF_PATH = "script-tools/full/upgrade_maintenance/sync-checks.py"

@@ -11,7 +11,7 @@ MECHANISM:
 USE:
   python3 fix_stale_checkmk.py # sample mode (3 hosts)
   python3 fix_stale_checkmk.py --all # all stale hosts
-  python3 fix_stale_checkmk.py --host DC01 fw.studiopaci.info ns8
+  python3 fix_stale_checkmk.py --host DC01 <hostname> ns8
 
 Version: 1.4.0"""
 import subprocess, json, time, sys, os

@@ -46,7 +46,7 @@ Assets and script for the rebranding of the CheckMK interface with Nethesis visu
 
 **Deployment script**: `deploy-nethesis-brand.sh` (root repo)
 - Usage: `bash deploy-nethesis-brand.sh` (all servers) or `bash deploy-nethesis-brand.sh <host>`
-- Configured target servers: `ubntmarzio-root`, `checkmk-vps-01`, `checkmk-vps-02`, `srv-monitoring-sp`, `srv-monitoring-us`
+- Configured target servers: `checkmk-vps-01`, `checkmk-vps-02`, `srv-monitoring-sp`, `srv-monitoring-us`
 
 ### **Fix/** - Fix and troubleshooting script
 Troubleshooting CheckMK and components.
@@ -91,14 +91,14 @@ Script for automatic deployment.
 
 ```bash
 # Run full script directly from GitHub
-curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/installation/install-auto-git-sync.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/installation/install-auto-git-sync.sh | bash
 ```
 
 ### I use Local Scripts
 
 ```bash
 # Clone repository
-git clone https://github.com/Coverup20/checkmk-tools.git
+git clone https://github.com/nethesis/checkmk-tools.git
 cd checkmk-tools
 
 # Run complete script
@@ -120,8 +120,8 @@ The `remote/` directories have been removed: the repository only uses full scrip
 
 ## Useful Links
 
-- **GitHub**: https://github.com/Coverup20/checkmk-tools
-- **GitLab**: https://gitlab.com/coverup20-group/checkmk-tools
+- **GitHub**: https://github.com/nethesis/checkmk-tools
+- **GitLab**: https://gitlab.com/nethesis/checkmk-tools
 - **CheckMK documentation**: https://docs.checkmk.com/
 
 ---
@@ -148,6 +148,5 @@ PowerShell Script for Windows Automation:
 
 ---
 
-**Author**: Marzio Bordin  
-**Support**: ChatGPT / GitHub Copilot  
+**Maintainer**: Nethesis  
 **License**: MIT (unless otherwise specified)

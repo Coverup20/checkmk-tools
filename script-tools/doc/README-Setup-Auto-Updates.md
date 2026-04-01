@@ -41,7 +41,7 @@ sudo bash setup-auto-updates.sh
 
 ```bash
 # Download and run in one command
-bash <(curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/remote/rsetup-auto-updates.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/remote/rsetup-auto-updates.sh)
 ```
 
 ### Running from Cloned Repository
@@ -253,10 +253,10 @@ sudo chmod 644 /var/log/auto-updates.log
 
 ```bash
 # Check connection
-curl -I https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/upgrade_maintenance/setup-auto-updates.sh
+curl -I https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/upgrade_maintenance/setup-auto-updates.sh
 
 # Use local version
-git clone https://github.com/Coverup20/checkmk-tools.git
+git clone https://github.com/nethesis/checkmk-tools.git
 cd checkmk-tools/script-tools/full
 sudo bash setup-auto-updates.sh
 ```
@@ -336,8 +336,8 @@ sudo rm -rf /root/crontab_backups/
 
 ## Support and Contributions
 
-- **Repository:** https://github.com/Coverup20/checkmk-tools
-- **Issues:** https://github.com/Coverup20/checkmk-tools/issues
+- **Repository:** https://github.com/nethesis/checkmk-tools
+- **Issues:** https://github.com/nethesis/checkmk-tools/issues
 - **Documentation:** `script-tools/doc/`
 
 ## Changelog

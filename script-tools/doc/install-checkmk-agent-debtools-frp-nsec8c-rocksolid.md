@@ -45,7 +45,7 @@ ROCKSOLID installation script for CheckMK Agent and FRP Client on NethSecurity/O
 
 ```bash
 # Download and install in one command
-curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh -o /tmp/install-rocksolid.sh
+curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh -o /tmp/install-rocksolid.sh
 bash /tmp/install-rocksolid.sh
 ```
 
@@ -177,7 +177,7 @@ bash install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh --uninstall
    - DO NOT copy local file (it would be corrupted)
    - Configure `/etc/rc.local` to run from GitHub:
      ```bash
-   curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/upgrade_maintenance/rocksolid-startup-check.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/upgrade_maintenance/rocksolid-startup-check.sh | bash
      ```
 
 2. **rc.local protection**
@@ -364,7 +364,7 @@ cat /etc/frp/frpc.toml
 
 ```bash
 # Run autocheck manually
-curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/upgrade_maintenance/rocksolid-startup-check.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/upgrade_maintenance/rocksolid-startup-check.sh | bash
 
 # Check log
 tail -50 /var/log/rocksolid-startup.log
@@ -495,7 +495,7 @@ The FRP token is stored in `/etc/frp/frpc.toml` which is:
 
 Autocheck script run via curl from GitHub:
 - Use HTTPS (TLS encryption)
-- Checked repository (github.com/Coverup20/checkmk-tools)
+- Checked repository (github.com/nethesis/checkmk-tools)
 - No local execution (no corrupt files)
 
 Considerations:
@@ -537,7 +537,7 @@ CheckMK provides agents as a `.deb` package (Debian). OpenWrt uses `opkg` (not c
 - **FRP**: https://github.com/fatedier/frp
 - **OpenWrt**: https://openwrt.org/
 - **NethSecurity**: https://www.nethsecurity.org/
-- **Repository**: https://github.com/Coverup20/checkmk-tools
+- **Repository**: https://github.com/nethesis/checkmk-tools
 
 ---
 

@@ -37,7 +37,7 @@ VERSION = "2.1.0"
 # ─── Costanti ─────────────────────────────────────────────────────────────────
 
 REPO_DEFAULT_PATH = Path("/opt/checkmk-tools")
-REPO_URL_DEFAULT = "https://github.com/Coverup20/checkmk-tools.git"
+REPO_URL_DEFAULT = "https://github.com/nethesis/checkmk-tools.git"
 SYSTEMD_DIR = Path("/etc/systemd/system")
 LOCAL_TARGET_DEFAULT = "/usr/lib/check_mk_agent/local"
 
@@ -620,7 +620,7 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Sync OK ($SHA)" >> "$LOG_FILE""""
 _GIT_SYNC_SERVICE_TPL = """\
 [Unit]
 Description=Auto Git Sync - checkmk-tools
-Documentation=https://github.com/Coverup20/checkmk-tools
+Documentation=https://github.com/nethesis/checkmk-tools
 After=network-online.target
 Wants=network-online.target
 

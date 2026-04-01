@@ -107,7 +107,7 @@ DESCRIPTION:
 Remote wrapper for check-sos.sh
 
 SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ns8/nopolling/check-sos.sh
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-check-ns8/nopolling/check-sos.sh
 
 Install Path: /usr/local/bin/
 
@@ -118,7 +118,7 @@ DESCRIPTION:
 Remote wrapper for monitor_podman_events.sh
 
 SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ns8/nopolling/monitor_podman_events.sh
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-check-ns8/nopolling/monitor_podman_events.sh
 
 Install Path: /usr/local/bin/
 
@@ -406,7 +406,7 @@ OPERATION:
 bash <(curl -fsSL "$SCRIPT_URL") "$@"
 
 BASE SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ns8/polling/
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-check-ns8/polling/
 
 Install Path: /usr/lib/check_mk_agent/local/
 
@@ -750,8 +750,8 @@ DIFFERENCES NS7 vs NS8
 AUTHOR AND LICENSE
 ========================================================================================
 
-Author: NethLab / Marzio Project
-Repository: https://github.com/Coverup20/checkmk-tools
+Author: Nethesis
+Repository: https://github.com/nethesis/checkmk-tools
 License: [Specify license]
 
 Tested compatibility:

@@ -18,7 +18,7 @@ Date: October 27, 2025
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Version: 1.6
 Lines: 59
-Author: NethLab / Marzio Project
+Author: Nethesis
 Compatibility: Proxmox VE 8.x + CheckMK Raw 2.4.x
 
 DESCRIPTION:
@@ -49,7 +49,7 @@ COMMANDS USED:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Version: 3.5 (2025-10-07)
 Lines: 98
-Author: Marzio Project
+Author: Nethesis Project
 
 DESCRIPTION:
 Monitor the complete status of all LXC VMs and containers on the Proxmox node.
@@ -208,7 +208,7 @@ ADVANTAGES:
 6. rcheck-proxmox-vm-snapshot-status.sh
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/Proxmox/nopolling/check-proxmox-vm-snapshot-status.sh
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/Proxmox/nopolling/check-proxmox-vm-snapshot-status.sh
 
 DESCRIPTION:
 Remote wrapper for check-proxmox-vm-snapshot-status.sh
@@ -218,7 +218,7 @@ Remote wrapper for check-proxmox-vm-snapshot-status.sh
 7. rcheck-proxmox-vm-status.sh
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/Proxmox/nopolling/check-proxmox-vm-status.sh
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/Proxmox/nopolling/check-proxmox-vm-status.sh
 
 DESCRIPTION:
 Remote wrapper for check-proxmox-vm-status.sh
@@ -228,7 +228,7 @@ Remote wrapper for check-proxmox-vm-status.sh
 8. rproxmox_vm_api.sh
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/Proxmox/nopolling/proxmox_vm_api.sh
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/Proxmox/nopolling/proxmox_vm_api.sh
 
 DESCRIPTION:
 Remote wrapper for proxmox_vm_api.sh
@@ -238,7 +238,7 @@ Remote wrapper for proxmox_vm_api.sh
 9. rproxmox_vm_disks.sh
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/Proxmox/nopolling/proxmox_vm_disks.sh
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/Proxmox/nopolling/proxmox_vm_disks.sh
 
 DESCRIPTION:
 Remote wrapper for proxmox_vm_disks.sh
@@ -248,7 +248,7 @@ Remote wrapper for proxmox_vm_disks.sh
 10. rproxmox_vm_monitor.sh
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/Proxmox/nopolling/proxmox_vm_monitor.sh
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/Proxmox/nopolling/proxmox_vm_monitor.sh
 
 DESCRIPTION:
 Remote wrapper for proxmox_vm_monitor.sh
@@ -373,8 +373,8 @@ check-proxmox-vm-status.sh
 AUTHOR AND LICENSE
 ========================================================================================
 
-Author: NethLab / Marzio Project
-Repository: https://github.com/Coverup20/checkmk-tools
+Author: Nethesis
+Repository: https://github.com/nethesis/checkmk-tools
 License: [Specify license]
 
 ========================================================================================

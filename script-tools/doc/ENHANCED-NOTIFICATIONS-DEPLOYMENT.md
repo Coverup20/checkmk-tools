@@ -98,7 +98,7 @@ on - monitoring
 cd ~/local/share/check_mk/notifications/
 
 # Copy the new ydea_ag_host_down from GitHub
-curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-notify-checkmk/full/ydea_ag_host_down\
+curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-notify-checkmk/full/ydea_ag_host_down\
   -o ydea_ag_host_down && chmod +x ydea_ag_host_down
 
 # Verify that it is executable
@@ -113,7 +113,7 @@ on - monitoring
 cd ~/local/share/check_mk/notifications/
 
 # Copy the remote launcher
-curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-notify-checkmk/remote/rydea_ag_host_down\
+curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-notify-checkmk/remote/rydea_ag_host_down\
   -o rydea_ag_host_down && chmod +x rydea_ag_host_down
 
 # Check
@@ -278,7 +278,7 @@ All files are in the repository:
 
 ## Support
 
-- **GitHub**: https://github.com/Coverup20/checkmk-tools
+- **GitHub**: https://github.com/nethesis/checkmk-tools
 - **Repository**: checkmk-tools - branch main
 
 ---

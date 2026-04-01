@@ -68,7 +68,7 @@ sudo bash setup-auto-upgrade-checkmk.sh
 
 ```bash
 # Download and run in one command
-bash <(curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/remote/rsetup-auto-upgrade-checkmk.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/remote/rsetup-auto-upgrade-checkmk.sh)
 ```
 
 ## Scheduling Options
@@ -469,8 +469,8 @@ fi
 
 ## Support and Contributions
 
-- **Repository:** https://github.com/Coverup20/checkmk-tools
-- **Issues:** https://github.com/Coverup20/checkmk-tools/issues
+- **Repository:** https://github.com/nethesis/checkmk-tools
+- **Issues:** https://github.com/nethesis/checkmk-tools/issues
 - **Documentation:** `script-tools/doc/`
 
 ## Changelog

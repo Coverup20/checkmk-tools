@@ -8,7 +8,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 # === CONFIGURATION ===
-$REPO_PATH = "C:\Users\Marzio\Desktop\CheckMK\checkmk-tools"
+$REPO_PATH = (Split-Path $PSScriptRoot -Parent)
 $LOCAL_BACKUP_BASE = "C:\CheckMK-Backups"
 $NETWORK_BACKUP_BASE = "\\192.168.10.132\usbshare\CheckMK-Backups"
 $TIMESTAMP = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
@@ -21,7 +21,7 @@ $SMTP_SERVER = "smtp-relay.nethesis.it"
 $SMTP_PORT = 587
 $SMTP_USE_SSL = $true
 $EMAIL_FROM = "checkmk@nethesis.it"
-$EMAIL_TO = "marzio@nethesis.it"
+$EMAIL_TO = if ($env:NOTIFY_EMAIL) { $env:NOTIFY_EMAIL } else { "admin@example.com" }
 $EMAIL_CREDENTIAL_FILE = Join-Path $LOCAL_BACKUP_BASE "smtp_credential.xml"  # File credenziali crittografato
 $SEND_EMAIL = $true  # Email attivata
 

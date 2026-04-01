@@ -59,7 +59,7 @@ foreach ($url in $CHECKMK_MSI_URLS) { ... }
 
 ```powershell
 # Navigate to script directory
-cd 'C:\Users\Marzio\Desktop\CheckMK\Script\script-tools'
+cd '<REPO_PATH>\Script\script-tools'
 
 # Run as Administrator (right-click PowerShell)
 .\install-agent-interactive.ps1

@@ -50,11 +50,11 @@ POST_UPGRADE_SCRIPT = "/etc/checkmk-post-upgrade.py"
 RC_LOCAL = "/etc/rc.local"
 AUTOCHECK_SCRIPT = "/opt/checkmk-backups/persistent-startup-check.py"
 AUTOCHECK_URL = (
-    "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main"
+    "https://raw.githubusercontent.com/nethesis/checkmk-tools/main"
     "/script-tools/full/upgrade_maintenance/persistent-startup-check.py"
 )
 SYNC_SCRIPT_URL = (
-    "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main"
+    "https://raw.githubusercontent.com/nethesis/checkmk-tools/main"
     "/script-tools/full/upgrade_maintenance/sync-checks.py"
 )
 

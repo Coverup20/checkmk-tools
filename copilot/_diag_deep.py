@@ -40,8 +40,8 @@ r = live("GET hosts\nFilter: name = ns8\nColumns: name active_checks_enabled pas
 print(f"  ns8: {r}")
 r = live("GET hosts\nFilter: name = DC01\nColumns: name active_checks_enabled passive_checks_enabled check_interval\n")
 print(f"  DC01: {r}")
-r = live("GET hosts\nFilter: name = fw.studiopaci.info\nColumns: name active_checks_enabled passive_checks_enabled check_interval\n")
-print(f"  fw.studiopaci.info: {r}")
+r = live("GET hosts\nFilter: name = <hostname>\nColumns: name active_checks_enabled passive_checks_enabled check_interval\n")
+print(f"  <hostname>: {r}")
 
 # 4. How long ago was Check_MK scheduled for ns8
 print("\n[4] SCHEDULING info per ns8 Check_MK:")

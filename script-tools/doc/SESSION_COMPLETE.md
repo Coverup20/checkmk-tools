@@ -77,8 +77,8 @@ $CHECKMK_MSI_URLS = @(
 **Log Output (manual FRPC run):**
 ```
 2025-11-07 16:29:34.354 [I] login to server success
-2025-11-07 16:29:34.355 [I] proxy added: [NB-Marzio]
-2025-11-07 16:29:34.450 [I] [NB-Marzio] start proxy success
+2025-11-07 16:29:34.355 [I] proxy added: [<tunnel-name>]
+2025-11-07 16:29:34.450 [I] [<tunnel-name>] start proxy success
 ```
 
 ### Issue Identified & Fixed
@@ -112,7 +112,7 @@ Latest commits:
   f22dd2e docs: Add current status and continuation summary
 ```
 
-All commits **pushed to GitHub**: https://github.com/Coverup20/checkmk-tools
+All commits **pushed to GitHub**: https://github.com/nethesis/checkmk-tools
 
 ---
 
@@ -130,7 +130,7 @@ All commits **pushed to GitHub**: https://github.com/Coverup20/checkmk-tools
 
 ```powershell
 # Navigate to directory
-cd 'C:\Users\Marzio\Desktop\CheckMK\Script\script-tools'
+cd '<REPO_PATH>\Script\script-tools'
 
 # Run as Administrator
 .\install-agent-interactive.ps1
@@ -267,7 +267,7 @@ Get-Content 'C:\ProgramData\frp\logs\frpc.log' -Tail 50 -Wait
 
 ---
 
-**Repository:** https://github.com/Coverup20/checkmk-tools  
+**Repository:** https://github.com/nethesis/checkmk-tools  
 **Branch:** main  
 **Last Commit:** 8f48008  
 **Last Update:** 2025-11-07

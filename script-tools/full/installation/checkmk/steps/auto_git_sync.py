@@ -21,12 +21,12 @@ def _find_repo_root() -> Path | None:
 
 def _write_service_file(cfg: InstallerConfig) -> None:
     interval = max(5, int(cfg.auto_git_sync_interval_sec))
-    repo_url = cfg.auto_git_sync_repo_url.strip() or "https://github.com/Coverup20/checkmk-tools.git"
+    repo_url = cfg.auto_git_sync_repo_url.strip() or "https://github.com/nethesis/checkmk-tools.git"
     target_dir = cfg.auto_git_sync_target_dir.strip() or "/opt/checkmk-tools"
 
     content = f"""[Unit]
 Description=Auto Git Sync Service
-Documentation=https://github.com/Coverup20/checkmk-tools
+Documentation=https://github.com/nethesis/checkmk-tools
 After=network-online.target
 Wants=network-online.target
 

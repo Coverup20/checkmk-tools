@@ -23,7 +23,7 @@ scp install-agent-frpc-qnap.sh admin@IP_QNAP:/tmp/
 # Or download directly to the NAS
 ssh admin@IP_QNAP
 cd /tmp
-wget https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/install-agent-frpc-qnap.sh
+wget https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/install-agent-frpc-qnap.sh
 chmod +x install-agent-frpc-qnap.sh
 ```
 

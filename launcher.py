@@ -14,7 +14,7 @@ from typing import Dict, List, Tuple, Optional
 import json
 
 VERSION = "1.0.0"
-REPO_URL = "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main"
+REPO_URL = "https://raw.githubusercontent.com/nethesis/checkmk-tools/main"
 SCRIPT_DIR = Path(__file__).parent.absolute()
 HOME = Path.home()
 FAVORITES_FILE = HOME / ".launcher-favorites.json"

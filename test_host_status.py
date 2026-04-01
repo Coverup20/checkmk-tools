@@ -7,7 +7,7 @@ PLUGIN = "/omd/sites/monitoring/local/lib/nagios/plugins/check_host_status"
 TESTS = [
     # (label,              ip,              type,     extra_args)
     # --- Server with CMK agent ---
-    ("fw.studiopaci.info", "192.168.32.1",   "server",  ""),
+    ("<hostname>", "192.168.32.1",   "server",  ""),
     ("ns8",                "192.168.33.223", "server",  ""),
     ("DC01",               "192.168.33.221", "server",  ""),
     ("HV01eth1",           "192.168.33.220", "server",  ""),

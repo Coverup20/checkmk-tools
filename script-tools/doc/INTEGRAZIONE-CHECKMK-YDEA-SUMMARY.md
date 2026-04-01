@@ -150,14 +150,14 @@
 ### **1. Deploy on CheckMK Server**
 ```bash
 # On your Windows PC, commit and push
-cd "C:\Users\Marzio\Desktop\CheckMK\Script"
+cd "<REPO_PATH>\Script"
 git add .
 git commit -m "feat: CheckMK integration → Ydea automatic ticketing"
 git push origin main
 
 # On the CheckMK server
 cd /opt
-git clone https://github.com/Coverup20/checkmk-tools.git
+git clone https://github.com/nethesis/checkmk-tools.git
 cd checkmk-tools
 
 # Run installer

@@ -23,8 +23,8 @@ from pathlib import Path
 from typing import Optional, Dict, List, Tuple
 
 VERSION = "2.1.0"  # Aggiunto filtro automatico script NS8 per moduli installati
-REPO_URL = "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main"
-GITHUB_API = "https://api.github.com/repos/Coverup20/checkmk-tools/contents"
+REPO_URL = "https://raw.githubusercontent.com/nethesis/checkmk-tools/main"
+GITHUB_API = "https://api.github.com/repos/nethesis/checkmk-tools/contents"
 CHECKMK_LOCAL_PATH = Path("/usr/lib/check_mk_agent/local")
 
 # Colori ANSI

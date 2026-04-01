@@ -1,6 +1,6 @@
 # Fix Python 3.6 compatibility - remove unsupported reconfigure()
 
-$scriptDir = "C:\Users\Marzio\Desktop\CheckMK\checkmk-tools\script-check-ns7\remote"
+$scriptDir = Join-Path (Split-Path $PSScriptRoot -Parent) "script-check-ns7emote"
 $files = Get-ChildItem "$scriptDir\*.py" -File
 
 foreach ($file in $files) {

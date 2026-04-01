@@ -205,7 +205,7 @@ Latest commits:
   18f882c refactor: Complete rewrite of Windows installer - fix all PowerShell syntax errors
 
 Status: All pushed to GitHub
-Repository: https://github.com/Coverup20/checkmk-tools
+Repository: https://github.com/nethesis/checkmk-tools
 Branch: main
 ```
 
@@ -215,7 +215,7 @@ Branch: main
 
 ```powershell
 # 1. Navigate to directory
-cd 'C:\Users\Marzio\Desktop\CheckMK\Script\script-tools'
+cd '<REPO_PATH>\Script\script-tools'
 
 #2. Run as Administrator
 .\install-agent-interactive.ps1
@@ -348,7 +348,7 @@ QUICK REFERENCES:
   • Project Summary ................ COMPLETION_SUMMARY.md
 
 EXTERNAL LINKS:
-  • GitHub Repository .............. https://github.com/Coverup20/checkmk-tools
+  • GitHub Repository .............. https://github.com/nethesis/checkmk-tools
   • Main Branch .................... main
   • Latest Version ................. v1.1 (Fixed)
 ```

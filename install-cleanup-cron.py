@@ -24,7 +24,7 @@ from typing import Optional
 VERSION = "1.0.0"
 
 SCRIPT_URL = (
-    "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/"
+    "https://raw.githubusercontent.com/nethesis/checkmk-tools/main/"
     "script-tools/full/backup_restore/cleanup-checkmk-retention.py"
 )
 LOG_FILE = "/var/log/cleanup-checkmk-retention.log"

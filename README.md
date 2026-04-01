@@ -4,7 +4,7 @@
 [![CheckMK](https://img.shields.io/badge/CheckMK-Compatible-green.svg)](https://checkmk.com/)
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1+-blue.svg)](https://github.com/PowerShell/PowerShell)
 [![Bash](https://img.shields.io/badge/Bash-4.0+-green.svg)](https://www.gnu.org/software/bash/)
-[![Language](https://img.shields.io/badge/Lingua-Italiano%20-green.svg)](https://github.com/Coverup20/checkmk-tools)
+[![Language](https://img.shields.io/badge/Lingua-Italiano%20-green.svg)](https://github.com/nethesis/checkmk-tools)
 
 Complete collection of scripts for monitoring and managing infrastructures with CheckMK. Includes check scripts for multiple platforms, custom notification systems, automated deployment tools, cloud backup, and full automation.
 
@@ -498,7 +498,7 @@ Interactive script for selective deployment of monitoring scripts on remote host
 
 ```bash
 # Download and run directly
-curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/deploy/deploy-monitoring-scripts.sh -o /tmp/deploy.sh && bash /tmp/deploy.sh
+curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/deploy/deploy-monitoring-scripts.sh -o /tmp/deploy.sh && bash /tmp/deploy.sh
 
 ```text
 
@@ -557,7 +557,7 @@ Intelligent system for multi-host deployment with auto-update.
 ./smart-deploy-hybrid.sh \
     --host ns7-server.local \
     --scripts check_cockpit_sessions,check_dovecot_status \
-    --github-repo Coverup20/checkmk-tools
+    --github-repo nethesis/checkmk-tools
 
 ```text
 
@@ -620,7 +620,7 @@ Installation and configuration CheckMK Agent.
 
 ```bash
 # Download and run directly
-curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh | bash
 
 # Optional: interactive mode
 bash install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh
@@ -914,7 +914,7 @@ Automated system for repository backup and sync.
 
 ```powershell
 #1. Clone repository
-git clone https://github.com/Coverup20/checkmk-tools.git
+git clone https://github.com/nethesis/checkmk-tools.git
 cd checkmk-tools
 
 #2. Deploy desired script
@@ -934,7 +934,7 @@ Copy-Item "$scriptPath\ransomware_config.json" `
 
 ```bash
 #1. Clone repository
-git clone https://github.com/Coverup20/checkmk-tools.git
+git clone https://github.com/nethesis/checkmk-tools.git
 cd checkmk-tools
 
 #2. Deploy with smart-deploy
@@ -959,7 +959,7 @@ check_mk_agent | grep -A5 "cockpit"
 ```bash
 # On CheckMK server (as root)
 cd /tmp
-git clone https://github.com/Coverup20/checkmk-tools.git
+git clone https://github.com/nethesis/checkmk-tools.git
 cd checkmk-tools/script-notify-checkmk
 
 # Automatic Backup + Deploy
@@ -1250,7 +1250,7 @@ The repository uses an **automatic synchronization** system on CheckMK servers:
 
 ```text
 
-GitHub (Coverup20/checkmk-tools)
+GitHub (nethesis/checkmk-tools)
     ↓ [auto-git-sync.service - every 5-15 minutes]
 /opt/checkmk-tools/ (on servers)
     ↓ [execute script]
@@ -1387,7 +1387,6 @@ Open issue on GitHub with:
 ### Community
 
 - GitHub Discussions
-- Email: coverup20@github.com
 
 ---
 
@@ -1403,8 +1402,7 @@ Developed with for the CheckMK community.
 
 ### Main Authors
 
-- **Marzio** (@Coverup20) - Repository owner and maintainer
-
+- 
 ### Contributors
 
 Thanks to all the contributors who helped improve this collection!

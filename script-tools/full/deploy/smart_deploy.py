@@ -22,7 +22,7 @@ from pathlib import Path
 VERSION = "1.0.0"
 
 # --- Configuration ---
-GITHUB_REPO = "Coverup20/checkmk-tools"
+GITHUB_REPO = "nethesis/checkmk-tools"
 BASE_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main"
 CACHE_DIR = Path("/var/cache/checkmk-scripts")
 # Adjust paths based on environment

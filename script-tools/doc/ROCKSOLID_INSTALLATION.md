@@ -84,7 +84,7 @@ The `rocksolid-startup-check.sh` script runs **automatically on every reboot**:
 bash /opt/checkmk-tools/script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh
 
 # From GitHub
-curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh | bash
 ```
 
 ### Non-Interactive Mode (Automatic Boot)

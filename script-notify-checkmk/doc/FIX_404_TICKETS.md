@@ -269,8 +269,6 @@ With this fix:
 
 ## Author
 
-Marzio - 2025-11-14
-
 ## References
 
 - Issue: 404 errors on closed tickets (#1502113, #1501974)

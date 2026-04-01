@@ -19,7 +19,7 @@ An intelligent system that combines:
 ### **1. Initial Deployment**
 ```bash
 # On the target server
-curl -s https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-Tools/smart-deploy-hybrid.sh | sudo bash
+curl -s https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-Tools/smart-deploy-hybrid.sh | sudo bash
 ```
 
 ### **2. Structure Created**
@@ -72,7 +72,7 @@ ls -la /var/cache/checkmk-scripts/
 cat /var/cache/checkmk-scripts/check_cockpit_sessions.sh.info
 
 # Manual download test
-curl -s https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ns7/check_cockpit_sessions.sh
+curl -s https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-check-ns7/check_cockpit_sessions.sh
 ```
 
 ## **Monitoring**

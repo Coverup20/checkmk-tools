@@ -8,7 +8,7 @@ param(
 
 $ErrorActionPreference = "Continue"
 
-$REPO_PATH = "C:\Users\Marzio\Desktop\CheckMK\checkmk-tools"
+$REPO_PATH = (Split-Path $PSScriptRoot -Parent)
 
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Cyan

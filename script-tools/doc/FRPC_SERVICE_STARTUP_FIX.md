@@ -24,8 +24,8 @@ After running the installer, CheckMK Agent installed successfully, but **FRPC se
 2025-11-07 16:29:33.916 [I] start frpc service
 2025-11-07 16:29:34.004 [I] trying to connect to server...
 2025-11-07 16:29:34.354 [I] login to server success
-2025-11-07 16:29:34.355 [I] proxy added: [NB-Marzio]
-2025-11-07 16:29:34.450 [I] [NB-Marzio] start proxy success
+2025-11-07 16:29:34.355 [I] proxy added: [<tunnel-name>]
+2025-11-07 16:29:34.450 [I] [<tunnel-name>] start proxy success
 ```
 
 **Problem:**
@@ -149,7 +149,7 @@ if (-not $serviceRunning) {
    
    [OK] FRPC Configuration:
        Server: monitor.nethlab.it:7000
-       Tunnel: NB-Marzio
+       Tunnel: <tunnel-name>
        Remote port: 6010
        Local port: 6556
        Config: C:\ProgramData\frp\frpc.toml
@@ -165,7 +165,7 @@ Log: C:\ProgramData\frp\logs\frpc.log
 5. **Check Connectivity:**
    ```powershell
    Get-Content 'C:\ProgramData\frp\logs\frpc.log' -Tail 20
-   # Should show: "proxy added: [NB-Marzio]" and "start proxy success"
+   # Should show: "proxy added: [<tunnel-name>]" and "start proxy success"
    ```
 
 ---
@@ -212,7 +212,7 @@ If service fails to start immediately:
 
 ```
 Commit: 90229ce
-Author: Marzio
+Author: Nethesis
 Dates: 2025-11-07
 
 Message: fix: Improve FRPC service startup with retry logic and better error handling
@@ -271,8 +271,8 @@ If the service still doesn't start automatically, you can:
 Successful connection shows:
 ```
 [I] login to server success, get run id [xxxxx]
-[I] proxy added: [NB-Marzio]
-[I] [NB-Marzio] start proxy success
+[I] proxy added: [<tunnel-name>]
+[I] [<tunnel-name>] start proxy success
 ```
 
 Error scenarios:

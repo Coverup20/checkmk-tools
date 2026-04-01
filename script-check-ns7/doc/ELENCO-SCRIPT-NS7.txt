@@ -448,7 +448,7 @@ OPERATION:
 bash <(curl -fsSL "$SCRIPT_URL") "$@"
 
 BASE SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ns7/nopolling/
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-check-ns7/nopolling/
 
 
 ========================================================================================
@@ -506,7 +506,7 @@ DESCRIPTION:
 Remote wrapper for check_ransomware_ns7.sh
 
 SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ns7/polling/check_ransomware_ns7.sh
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-check-ns7/polling/check_ransomware_ns7.sh
 
 
 ========================================================================================
@@ -750,8 +750,8 @@ RECOMMENDED PERMISSIONS:
 AUTHOR AND LICENSE
 ========================================================================================
 
-Author: NethLab / Marzio Project
-Repository: https://github.com/Coverup20/checkmk-tools
+Author: Nethesis
+Repository: https://github.com/nethesis/checkmk-tools
 License: [Specify license]
 
 Tested compatibility:

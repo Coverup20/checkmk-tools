@@ -165,7 +165,7 @@ def load_config(*, env_file: Path, interactive: bool) -> InstallerConfig:
     deploy_local_checks = parse_bool(getv("DEPLOY_LOCAL_CHECKS", "true"), default=True)
     enable_auto_git_sync = parse_bool(getv("ENABLE_AUTO_GIT_SYNC", "true"), default=True)
     auto_git_sync_interval_sec = int(getv("AUTO_GIT_SYNC_INTERVAL_SEC", "60") or "60")
-    auto_git_sync_repo_url = getv("AUTO_GIT_SYNC_REPO_URL", "https://github.com/Coverup20/checkmk-tools.git")
+    auto_git_sync_repo_url = getv("AUTO_GIT_SYNC_REPO_URL", "https://github.com/nethesis/checkmk-tools.git")
     auto_git_sync_target_dir = getv("AUTO_GIT_SYNC_TARGET_DIR", "/opt/checkmk-tools")
     smtp_relayhost = getv("SMTP_RELAYHOST", "")
     smtp_relay_user = getv("SMTP_RELAY_USER", "")

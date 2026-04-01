@@ -23,7 +23,7 @@ def _detect_latest_raw_version(timeout_sec: int = 20) -> str:
     req = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "Mozilla/5.0 (compatible; checkmk-tools-installer/1.0; +https://github.com/Coverup20/checkmk-tools)",
+            "User-Agent": "Mozilla/5.0 (compatible; checkmk-tools-installer/1.0; +https://github.com/nethesis/checkmk-tools)",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
     )
@@ -42,7 +42,7 @@ def _probe_url_ok(url: str, timeout_sec: int = 20) -> bool:
     req = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "Mozilla/5.0 (compatible; checkmk-tools-installer/1.0; +https://github.com/Coverup20/checkmk-tools)",
+            "User-Agent": "Mozilla/5.0 (compatible; checkmk-tools-installer/1.0; +https://github.com/nethesis/checkmk-tools)",
             "Accept": "application/octet-stream,*/*",
             "Range": "bytes=0-0",
         },

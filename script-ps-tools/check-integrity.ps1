@@ -10,14 +10,14 @@ param(
 
 $ErrorActionPreference = "Continue"
 
-$REPO_PATH = "C:\Users\Marzio\Desktop\CheckMK\checkmk-tools"
+$REPO_PATH = (Split-Path $PSScriptRoot -Parent)
 
 # === EMAIL CONFIGURATION ===
 $SMTP_SERVER = "smtp-relay.nethesis.it"
 $SMTP_PORT = 587
 $SMTP_USE_SSL = $true
 $EMAIL_FROM = "checkmk@nethesis.it"
-$EMAIL_TO = "marzio@nethesis.it"
+$EMAIL_TO = if ($env:NOTIFY_EMAIL) { $env:NOTIFY_EMAIL } else { "admin@example.com" }
 $EMAIL_CREDENTIAL_FILE = "C:\CheckMK-Backups\smtp_credential.xml"
 
 Write-Host ""

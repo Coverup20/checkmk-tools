@@ -5,7 +5,7 @@ Usage:
     python3 force-reschedule-checks.py # force Check_MK on all hosts
     python3 force-reschedule-checks.py --service "PING" # force PING on all hosts
     python3 force-reschedule-checks.py --all # force ALL services on ALL hosts
-    python3 force-reschedule-checks.py --host fw.studiopaci.info # only a specific host
+    python3 force-reschedule-checks.py --host <hostname> # only a specific host
 
 To be run as the 'monitoring' user on the CheckMK server.
 Or from root: su - monitoring -c "python3 /opt/checkmk-tools/script-tools/full/force-reschedule-checks.py"

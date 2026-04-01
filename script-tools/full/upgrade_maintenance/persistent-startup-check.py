@@ -27,7 +27,7 @@ SYSUPGRADE_CONF = "/etc/sysupgrade.conf"
 CHECKS_SRC = "/opt/checkmk-checks"           # Script check (NO git clone)
 SYNC_SCRIPT = "/opt/checkmk-backups/sync-checks.py"
 SYNC_SCRIPT_URL = (
-    "https://raw.githubusercontent.com/Coverup20/checkmk-tools/main"
+    "https://raw.githubusercontent.com/nethesis/checkmk-tools/main"
     "/script-tools/full/upgrade_maintenance/sync-checks.py"
 )
 LOCAL_DIR = "/usr/lib/check_mk_agent/local"

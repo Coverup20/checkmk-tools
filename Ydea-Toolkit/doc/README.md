@@ -451,4 +451,4 @@ Contributions are welcome! Please:
 
 **Version**: 1.0.0  
 **Last update**: 2025-11-11  
-**Author**: Marzio
+**Author**: Nethesis

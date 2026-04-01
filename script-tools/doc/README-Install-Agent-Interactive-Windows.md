@@ -28,7 +28,7 @@ Interactive installation script for CheckMK Agent and FRPC Client on Windows sys
 
 ```powershell
 # Clone the repository
-git clone https://github.com/Coverup20/checkmk-tools.git
+git clone https://github.com/nethesis/checkmk-tools.git
 cd checkmk-tools/script-tools
 ```
 
@@ -354,9 +354,8 @@ Remove-Item -Path 'C:\ProgramData\checkmk' -Recurse -Force
 ## Support and Issues
 
 For bug reports and feature requests:
-- **GitHub Issues:** https://github.com/Coverup20/checkmk-tools/issues
-- **Author:** Marzio
-
+- **GitHub Issues:** https://github.com/nethesis/checkmk-tools/issues
+- **Author:** Nethesis
 ## License
 
 MIT License - See LICENSE file for details

@@ -4,14 +4,14 @@
 #
 # Usage:
 #   bash deploy-nethesis-brand.sh                  # deploy to all servers
-# bash deploy-nethesis-brand.sh ubntmarzio-root # deploy to a single server
+# bash deploy-nethesis-brand.sh <target-server> # deploy to a single server
 #
 # Requirements: SSH access configured in ~/.ssh/config for each target.
 
 set -e
 
 ALL_TARGETS=(
-    "ubntmarzio-root"
+    "<ubuntu-test-server>"
     "checkmk-vps-01"
     "checkmk-vps-02"
     "srv-monitoring-sp"

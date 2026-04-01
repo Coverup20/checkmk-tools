@@ -370,11 +370,11 @@ PARAMETERS:
 -TimeWindowMinutes Analysis window (default: 30)
 -AlertThreshold Alert threshold (default: 50)
 -VerboseLog Enable verbose logging
--GitHubRepo GitHub Repository (default: Coverup20/checkmk-tools)
+-GitHubRepo GitHub Repository (default: nethesis/checkmk-tools)
 -Branch Branch to use (default: main)
 
 SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-windows/nopolling/ransomware_detection/check_ransomware_activity.ps1
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-check-windows/nopolling/ransomware_detection/check_ransomware_activity.ps1
 
 LOGIC:
 1. Build URLs with cache bypass: ?t={timestamp}
@@ -1090,17 +1090,17 @@ CHECKMK DOCUMENTATION:
 - Agent Plugins: https://docs.checkmk.com/latest/en/agent_windows.html
 
 GITHUB REPOSITORY:
-- Project: https://github.com/Coverup20/checkmk-tools
-- Issues: https://github.com/Coverup20/checkmk-tools/issues
-- Wiki: https://github.com/Coverup20/checkmk-tools/wiki
+- Project: https://github.com/nethesis/checkmk-tools
+- Issues: https://github.com/nethesis/checkmk-tools/issues
+- Wiki: https://github.com/nethesis/checkmk-tools/wiki
 
 
 ========================================================================================
 AUTHOR AND LICENSE
 ========================================================================================
 
-Author: Marzio / NethLab Project
-Repository: https://github.com/Coverup20/checkmk-tools
+Author: Nethesis
+Repository: https://github.com/nethesis/checkmk-tools
 License: [Specify license]
 
 Tested compatibility:

@@ -182,7 +182,7 @@ db30f4d - docs: Add comprehensive Windows installer documentation
 ```
 
 **All commits successfully pushed to GitHub**  
-Repository: https://github.com/Coverup20/checkmk-tools
+Repository: https://github.com/nethesis/checkmk-tools
 
 ---
 
@@ -305,7 +305,7 @@ Repository: https://github.com/Coverup20/checkmk-tools
 - **Technical Details:** See `Windows_Installer_Syntax_Fix_Summary.md`
 
 ### Repositories
-- **GitHub:** https://github.com/Coverup20/checkmk-tools
+- **GitHub:** https://github.com/nethesis/checkmk-tools
 - **Branch:** main
 - **Script:** `script-tools/install-agent-interactive.ps1`
 

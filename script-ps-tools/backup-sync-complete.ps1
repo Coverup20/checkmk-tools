@@ -7,7 +7,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$REPO_PATH = "C:\Users\Marzio\Desktop\CheckMK\checkmk-tools"
+$REPO_PATH = (Split-Path $PSScriptRoot -Parent)
 $LOCAL_BACKUP_BASE = "C:\CheckMK-Backups"
 $NETWORK_BACKUP_BASE = "\\192.168.10.132\usbshare\CheckMK-Backups"
 $TIMESTAMP = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"

@@ -226,7 +226,7 @@ DESCRIPTION:
 Remote wrapper for check_disk_space.sh
 
 SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ubuntu/polling/check_disk_space.sh
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-check-ubuntu/polling/check_disk_space.sh
 
 
 7. rssh_sessions_count
@@ -235,7 +235,7 @@ DESCRIPTION:
 Remote wrapper for ssh_sessions_count
 
 SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ubuntu/polling/ssh_sessions_count
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-check-ubuntu/polling/ssh_sessions_count
 
 
 8. rssh_all_sessions_count
@@ -244,7 +244,7 @@ DESCRIPTION:
 Remote wrapper for ssh_all_sessions_count
 
 SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ubuntu/polling/ssh_all_sessions_count
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-check-ubuntu/polling/ssh_all_sessions_count
 
 
 9. rssh_root_session
@@ -253,7 +253,7 @@ DESCRIPTION:
 Remote wrapper for ssh_root_session
 
 SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ubuntu/polling/ssh_root_session
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-check-ubuntu/polling/ssh_root_session
 
 
 10. rssh_fail2ban_status
@@ -262,7 +262,7 @@ DESCRIPTION:
 Remote wrapper for ssh_fail2ban_status
 
 SCRIPT_URL:
-https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ubuntu/polling/ssh_fail2ban_status
+https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-check-ubuntu/polling/ssh_fail2ban_status
 
 
 WRAPPER OPERATION:
@@ -586,8 +586,8 @@ LOCAL FORMAT ADVANTAGES:
 AUTHOR AND LICENSE
 ========================================================================================
 
-Author: NethLab / Marzio Project
-Repository: https://github.com/Coverup20/checkmk-tools
+Author: Nethesis
+Repository: https://github.com/nethesis/checkmk-tools
 License: [Specify license]
 
 Tested compatibility:
