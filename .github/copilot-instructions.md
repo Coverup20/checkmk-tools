@@ -1530,7 +1530,116 @@ wsl -d kali-linux ssh <host> "check_mk_agent 2>/dev/null | grep ServiceName"
 
 ---
 
-## �🔌 Accesso Remoto SSH - VPS e Server Locali
+## Python Style - gsanchietti Standard
+
+Reference style analyzed from `NethServer/nethsecurity` (`packages/ns-api/files/`).
+Apply this style to ALL new Python scripts in this project.
+
+### Structure (mandatory)
+
+```python
+#!/usr/bin/python3
+#
+# Copyright (C) 2025 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-2.0-only
+#
+
+# <One-line module description>
+
+import os
+import sys
+import json
+import subprocess
+
+## Utils
+
+def utility_function():
+    ...
+
+## Check   (or ## APIs for rpcd scripts)
+
+def check():
+    ...
+
+check()
+```
+
+### Rules
+
+**Entrypoint:**
+- No `if __name__ == "__main__"` — code runs at module level
+- For CheckMK local checks: call the main function directly at bottom
+- For rpcd scripts: `sys.argv[1]` / `sys.argv[2]` dispatch, zero argparse
+
+**Functions:**
+- Flat functions only — no classes ever
+- Short variable names for local scope: `u`, `r`, `t`, `p`, `rc`
+- `snake_case` everywhere
+- Prefix `ns_` on UCI sections created by the script
+
+**Error handling:**
+- Bare `except:` is acceptable in utility functions (silently swallow)
+- For CheckMK checks: print the CRITICAL/UNKNOWN line and return, do not raise
+- No logging module — output via print or return value only
+
+**subprocess:**
+- Always `subprocess.run([...], capture_output=True, text=True, timeout=N)`
+- Never `shell=True`
+- Check `returncode` explicitly
+
+**Return / output format:**
+- rpcd scripts: `{"result": "success"}` / `{"id": name}` / `{"items": [...]}`
+- rpcd errors: `utils.generic_error("snake_case_message")`
+- CheckMK checks: `print(f"<STATE> <SERVICE> - <message>")` then return
+
+**Type hints:** never
+
+**Docstrings:** only on non-obvious utility functions, nowhere else
+
+**Sections:** use `## Utils` and `## Check` (or `## APIs`) as block separators
+
+**Imports:** stdlib first, then third-party/platform libs — no blank lines between groups
+
+### CheckMK local check template (gsanchietti style)
+
+```python
+#!/usr/bin/python3
+#
+# Copyright (C) 2025 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-2.0-only
+#
+
+# Check <service> status
+
+import sys
+import subprocess
+
+SERVICE = "ServiceName"
+
+## Utils
+
+def run(cmd):
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        return p.returncode, p.stdout, p.stderr
+    except Exception as e:
+        return 1, "", str(e)
+
+## Check
+
+def check():
+    rc, out, err = run(["systemctl", "is-active", "myservice"])
+    if rc != 0:
+        print(f"2 {SERVICE} - CRITICAL: service not running")
+        return
+    print(f"0 {SERVICE} - OK: running")
+
+check()
+```
+
+---
+
+## Accesso Remoto SSH - VPS e Server Locali
 
 ### Setup WSL SSH
 
