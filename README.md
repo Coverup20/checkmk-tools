@@ -211,7 +211,7 @@ checkmk-tools/
     ├── distributed-monitoring-setup.sh # Distributed monitoring setup
     └── .copilot-context.md # Context file for AI (auto-sync, preferences)
 
-```text
+`
 
 > **Important Note**: The `.copilot-context.md` file contains critical information about the auto-sync system architecture and preferences for AI assistants. Read it before editing files or running commands.
 
@@ -255,7 +255,7 @@ notepad C:\ProgramData\checkmk\agent\local\ransomware_config.json
 # Manual testing
 .\check_ransomware_activity.ps1 -VerboseLog
 
-```text
+`
 
 ---
 
@@ -352,7 +352,7 @@ Generic script checks for Ubuntu/Debian distributions.
 # Automatic SSH check deployment
 ./deploy-ssh-checks.sh
 
-```text
+`
 
 ---
 
@@ -417,7 +417,7 @@ if 'NOTIFY_HOSTLABEL_real_ip' in os.environ:
     real_ip = os.environ['NOTIFY_HOSTLABEL_real_ip']
     # Use real_ip instead of HOSTADDRESS
 
-```text
+`
 
 #### Integrated Charts
 
@@ -464,7 +464,7 @@ HTML email with performance graphs automatically included:
 up - $(cat /etc/omd/site)
 ls -la local/share/check_mk/notifications/
 
-```text
+`
 
 **Documentation**: [TESTING_GUIDE.md](script-notify-checkmk/TESTING_GUIDE.md)
 
@@ -500,7 +500,7 @@ Interactive script for selective deployment of monitoring scripts on remote host
 # Download and run directly
 curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/deploy/deploy-monitoring-scripts.sh -o /tmp/deploy.sh && bash /tmp/deploy.sh
 
-```text
+`
 
 **Manual use**:
 
@@ -509,7 +509,7 @@ curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-
 cd /opt/checkmk-tools
 ./script-tools/full/deploy/deploy-monitoring-scripts.sh
 
-```text
+`
 
 **Example output**:
 
@@ -530,7 +530,7 @@ Available scripts:
   
 Selection (numbers separated by spaces, 'a' for all, 'q' for exit): 1 3 5
 
-```text
+`
 
 ---
 
@@ -559,7 +559,7 @@ Intelligent system for multi-host deployment with auto-update.
     --scripts check_cockpit_sessions,check_dovecot_status \
     --github-repo nethesis/checkmk-tools
 
-```text
+`
 
 ### Deploy Agent CheckMK
 
@@ -625,14 +625,14 @@ curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-
 # Optional: interactive mode
 bash install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh
 
-```text
+`
 
 **Post-Upgrade** (after major manual upgrade):
 
 ```bash
 /etc/checkmk-post-upgrade.sh
 
-```text
+`
 
 **Full documentation**: [install-checkmk-agent-debtools-frp-nsec8c-rocksolid.md](script-tools/doc/install-checkmk-agent-debtools-frp-nsec8c-rocksolid.md)
 
@@ -749,7 +749,7 @@ vim .env
 #5. Monitor health integration
 ./ydea-health-monitor.sh
 
-```text
+`
 
 ### Documentation
 
@@ -770,7 +770,7 @@ YDEA_ID="your_company_id"
 YDEA_API_KEY="your_api_key"
 YDEA_CONTRATTO_ID="171734" # Contract that applies SLA automatically
 
-```text
+`
 
 **Contract-Based SLA**: As of February 2026, the system uses `contractId` to automatically apply Premium_Mon SLA. You no longer need to explicitly specify `serviceLevelAgreement` - the contract handles everything.
 
@@ -887,7 +887,7 @@ Automated system for repository backup and sync.
 #3. Manual testing
 .\quick-backup.ps1
 
-```text
+`
 
 ---
 
@@ -928,7 +928,7 @@ Copy-Item "$scriptPath\ransomware_config.json" `
 & "C:\Program Files (x86)\checkmk\service\check_mk_agent.exe" test | 
     Select-String -Pattern "Ransomware"
 
-```text
+`
 
 #### Linux (NethServer / Ubuntu)
 
@@ -952,7 +952,7 @@ sudo chmod +x /usr/lib/check_mk_agent/local/rcheck_cockpit_sessions.sh
 #3. Test
 check_mk_agent | grep -A5 "cockpit"
 
-```text
+`
 
 ### Notification Script Installation
 
@@ -974,7 +974,7 @@ omd start
 # Configure in Web GUI
 # Setup -> Notifications -> New Rule -> Notification Method: mail_realip_hybrid
 
-```text
+`
 
 ---
 
@@ -1020,7 +1020,7 @@ cd script-check-windows\nopolling\ransomware_detection
 # Test via CheckMK Agent
 & "C:\Program Files (x86)\checkmk\service\check_mk_agent.exe" test
 
-```text
+`
 
 ### Linux tests
 
@@ -1034,7 +1034,7 @@ check_mk_agent | head -50
 # Test with debugging
 bash -x /usr/lib/check_mk_agent/local/rcheck_cockpit_sessions.sh
 
-```text
+`
 
 ### Test Notifications
 
@@ -1048,7 +1048,7 @@ os.environ['NOTIFY_HOSTADDRESS'] = '127.0.0.1:5000'
 exec(open('mail_realip_hybrid').read())
 "
 
-```text
+`
 
 ---
 
@@ -1157,7 +1157,7 @@ Get-ExecutionPolicy
 # Manual testing
 & "C:\Program Files (x86)\checkmk\service\check_mk_agent.exe" test
 
-```text
+`
 
 **Problem**: Network share timeout error
 
@@ -1165,7 +1165,7 @@ Get-ExecutionPolicy
 # Check ransomware_config.json
 # Increase timeout if necessary (default 30s)
 
-```text
+`
 
 ### Linux
 
@@ -1174,7 +1174,7 @@ Get-ExecutionPolicy
 ```bash
 sudo chmod +x /usr/lib/check_mk_agent/local/*.sh
 
-```text
+`
 
 **Problem**: Script cache not updating
 
@@ -1186,7 +1186,7 @@ rm -f /tmp/*_cache.sh
 # Force re-download
 /usr/lib/check_mk_agent/local/rcheck_script.sh
 
-```text
+`
 
 **Problem**: Notification script not working
 
@@ -1199,7 +1199,7 @@ on - SITENAME
 cd local/share/check_mk/notifications
 python3 -c "exec(open('./mail_realip_hybrid').read())"
 
-```text
+`
 
 ---
 
@@ -1227,7 +1227,7 @@ File `.gitignore` includes:
 *.token
 *_password.txt
 
-```text
+`
 
 Always use:
 
@@ -1238,7 +1238,7 @@ export API_TOKEN="your-token"
 #Windows
 $env:API_TOKEN = "your-token"
 
-```text
+`
 
 ---
 
@@ -1256,7 +1256,7 @@ GitHub (nethesis/checkmk-tools)
     ↓ [execute script]
 Production
 
-```text
+`
 
 ### Workflow Changes
 
@@ -1280,7 +1280,7 @@ sudo journalctl -u auto-git-sync.service -n 50
 # Force manual sync
 sudo bash /opt/checkmk-tools/script-tools/full/sync_update/auto-git-sync.sh
 
-```text
+`
 
 **Full documentation**: [.copilot-context.md](.copilot-context.md)
 
@@ -1319,7 +1319,7 @@ cd /opt/checkmk-tools/script-tools/full
 systemctl status checkmk-cloud-backup-push@monitoring.timer
 journalctl -u checkmk-cloud-backup-push@monitoring.service -n 50
 
-```text
+`
 
 ### RClone configuration
 
@@ -1332,7 +1332,7 @@ rclone config
 # Endpoint: ams3.digitaloceanspaces.com
 # Remote name: do
 
-```text
+`
 
 **File**: `script-tools/full/backup_restore/checkmk_rclone_space_dyn.sh` (794 lines)
 
@@ -1367,7 +1367,7 @@ cd /opt/checkmk-tools/script-tools/full
 # Check history
 crontab -l
 
-```text
+`
 
 **File**: `script-tools/full/upgrade_maintenance/setup-auto-upgrade-checkmk.sh` (270 lines)
 
@@ -1402,7 +1402,8 @@ Developed with for the CheckMK community.
 
 ### Main Authors
 
-- 
+- Marzio Boldrin
+
 ### Contributors
 
 Thanks to all the contributors who helped improve this collection!
