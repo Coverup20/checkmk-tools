@@ -1,13 +1,13 @@
-# 🔧 FRPC Service Creation Fix - sc.exe Quoting Issue
+#  FRPC Service Creation Fix - sc.exe Quoting Issue
 > **Categoria:** Storico
 
 **Date:** 2025-11-07  
-**Status:** ✅ RESOLVED  
+**Status:**  RESOLVED  
 **Problem:** FRPC service wasn't starting due to incorrect sc.exe command syntax
 
 ---
 
-## 🔴 Problem Identified
+##  Problem Identified
 
 When the script tried to create the FRPC service using `sc.exe`, it failed with:
 ```
@@ -44,7 +44,7 @@ sc.exe create frpc binPath= "C:\Program Files\frp\frpc.exe -c C:\ProgramData\frp
 
 ---
 
-## ✅ Solution Implemented
+##  Solution Implemented
 
 The script now uses a **two-tier approach**:
 
@@ -56,11 +56,11 @@ nssm.exe set frpc Start SERVICE_AUTO_START
 ```
 
 **Advantages:**
-- ✅ More robust than sc.exe
-- ✅ Better error handling
-- ✅ Automatic restart on crash
-- ✅ Proper working directory support
-- ✅ Pre-installed on Windows (System32\nssm.exe)
+-  More robust than sc.exe
+-  Better error handling
+-  Automatic restart on crash
+-  Proper working directory support
+-  Pre-installed on Windows (System32\nssm.exe)
 
 ### 2. Fallback: sc.exe via cmd.exe
 ```powershell
@@ -74,9 +74,9 @@ nssm.exe set frpc Start SERVICE_AUTO_START
 
 ---
 
-## 📋 Prerequisites for Service Creation
+##  Prerequisites for Service Creation
 
-⚠️ **CRITICAL:** Your PowerShell session must be running **AS ADMINISTRATOR**
+ **CRITICAL:** Your PowerShell session must be running **AS ADMINISTRATOR**
 
 To verify you're admin:
 ```powershell
@@ -98,7 +98,7 @@ whoami /groups | Select-String "Administrators"
 
 ---
 
-## 🧪 Testing the Fix
+##  Testing the Fix
 
 Once you have the correct privileges, here's how to manually test:
 
@@ -128,22 +128,22 @@ Get-Content "C:\ProgramData\frp\logs\frpc.log" -Tail 20 -Wait
 
 ---
 
-## 📊 Comparison: sc.exe vs NSSM
+##  Comparison: sc.exe vs NSSM
 
 | Feature | sc.exe | NSSM |
 |---------|--------|------|
-| **Pre-installed** | ✅ Yes | ✅ Yes (Windows 8+) |
-| **Reliability** | ⚠️ Basic | ✅ Excellent |
-| **Auto-restart** | ❌ No | ✅ Yes |
-| **Quote handling** | ⚠️ Tricky | ✅ Easy |
-| **Working dir** | ❌ No | ✅ Yes |
-| **Env variables** | ❌ No | ✅ Yes |
-| **Logging** | ⚠️ Basic | ✅ Advanced |
-| **Priority** | ❌ No | ✅ Configurable |
+| **Pre-installed** |  Yes |  Yes (Windows 8+) |
+| **Reliability** |  Basic |  Excellent |
+| **Auto-restart** |  No |  Yes |
+| **Quote handling** |  Tricky |  Easy |
+| **Working dir** |  No |  Yes |
+| **Env variables** |  No |  Yes |
+| **Logging** |  Basic |  Advanced |
+| **Priority** |  No |  Configurable |
 
 ---
 
-## 🔍 Debugging Service Issues
+##  Debugging Service Issues
 
 If the service still won't start:
 
@@ -182,7 +182,7 @@ Get-WinEvent -LogName System -MaxEvents 50 | Where-Object {
 
 ---
 
-## 🎯 Key Takeaways
+##  Key Takeaways
 
 1. **sc.exe requires simple quotes**, not escaped quotes
 2. **The entire binPath (exe + args) must be in one quoted string**
@@ -193,7 +193,7 @@ Get-WinEvent -LogName System -MaxEvents 50 | Where-Object {
 
 ---
 
-## 🔗 Related Files
+##  Related Files
 
 - **Main Script:** `script-tools/install-agent-interactive.ps1`
 - **Config File:** `C:\ProgramData\frp\frpc.toml`
@@ -202,7 +202,7 @@ Get-WinEvent -LogName System -MaxEvents 50 | Where-Object {
 
 ---
 
-## 📝 Commit Information
+##  Commit Information
 
 **Commit:** (pending)  
 **Message:** "fix: Use NSSM for FRPC service creation with sc.exe fallback"  
@@ -214,7 +214,7 @@ Get-WinEvent -LogName System -MaxEvents 50 | Where-Object {
 
 ---
 
-**Status:** ✅ **FIX READY FOR TESTING**
+**Status:**  **FIX READY FOR TESTING**
 
 Next steps:
 1. Open PowerShell **AS ADMINISTRATOR**

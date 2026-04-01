@@ -41,17 +41,17 @@ def log(message: str) -> None:
 
 def success(message: str) -> None:
     """Print success message."""
-    print(f"{GREEN}✅ {message}{NC}")
+    print(f"{GREEN} {message}{NC}")
 
 
 def warn(message: str) -> None:
     """Print warning message."""
-    print(f"{YELLOW}⚠️  {message}{NC}")
+    print(f"{YELLOW}  {message}{NC}")
 
 
 def error(message: str) -> None:
     """Print error message and exit."""
-    print(f"{RED}❌ {message}{NC}", file=sys.stderr)
+    print(f"{RED} {message}{NC}", file=sys.stderr)
     sys.exit(1)
 
 
@@ -132,7 +132,7 @@ def run_command(cmd: List[str], check: bool = True, capture_output: bool = False
 
 def install_rclone() -> None:
     """Install rclone if not present."""
-    title("📦 Verifica rclone")
+    title(" Verifica rclone")
     
     if shutil.which("rclone"):
         success("rclone già installato")
@@ -157,7 +157,7 @@ def find_rclone_config() -> str:
     Returns:
         Path to rclone.conf
     """
-    title("⚙️  Configurazione rclone")
+    title("  Configurazione rclone")
     
     possible_configs = [
         "/root/.config/rclone/rclone.conf",
@@ -189,12 +189,12 @@ def select_job_type() -> Tuple[str, bool]:
     Returns:
         Tuple of (rclone_path, is_compressed)
     """
-    title("🗂️  Selezione Job")
+    title("  Selezione Job")
     
     print("Quale tipo di backup vuoi ripristinare?")
     print("")
-    print("  1) 📦 job00-daily  - Backup compressi giornalieri (1.2M, retention 90)")
-    print("  2) 📦 job01-weekly - Backup completi settimanali (362M, retention 5)")
+    print("  1)  job00-daily  - Backup compressi giornalieri (1.2M, retention 90)")
+    print("  2)  job01-weekly - Backup completi settimanali (362M, retention 5)")
     print("")
     
     choice = input("Selezione [1-2]: ").strip()
@@ -220,7 +220,7 @@ def list_available_backups(rclone_config: str, rclone_path: str) -> Dict[int, st
     Returns:
         Dictionary mapping index to backup name
     """
-    title("📦 Backup Disponibili")
+    title(" Backup Disponibili")
     
     log(f"Recupero lista da {RCLONE_REMOTE}/{rclone_path}...")
     
@@ -263,7 +263,7 @@ def list_available_backups(rclone_config: str, rclone_path: str) -> Dict[int, st
         if match:
             timestamp = f" [{match.group(1)}]"
         
-        print(f"{i:2d}) 📁 {dirname:<60}{timestamp}")
+        print(f"{i:2d})  {dirname:<60}{timestamp}")
     
     return backup_map
 
@@ -325,18 +325,18 @@ def confirm_disaster_recovery(selected_backup: str, rclone_path: str,
         is_compressed: Whether backup is compressed
         site_name: Site name
     """
-    title("⚠️  CONFERMA DISASTER RECOVERY")
+    title("  CONFERMA DISASTER RECOVERY")
     
     backup_type = "Backup compresso (job00)" if is_compressed else "Backup completo (job01)"
     
     print("")
     print("ATTENZIONE! Stai per eseguire:")
     print("")
-    print(f"  📥 Download:  {selected_backup}")
-    print(f"  📂 Da:        {RCLONE_REMOTE}/{rclone_path}/")
-    print(f"  💾 Tipo:      {backup_type}")
-    print(f"  🎯 Site:      {site_name}")
-    print("  ⚠️  Azione:   RIMOZIONE e RESTORE completo del site")
+    print(f"   Download:  {selected_backup}")
+    print(f"   Da:        {RCLONE_REMOTE}/{rclone_path}/")
+    print(f"   Tipo:      {backup_type}")
+    print(f"   Site:      {site_name}")
+    print("    Azione:   RIMOZIONE e RESTORE completo del site")
     print("")
     warn(f"Il site '{site_name}' verrà COMPLETAMENTE RIMOSSO e RIPRISTINATO!")
     print("")
@@ -358,7 +358,7 @@ def download_backup(rclone_config: str, rclone_path: str,
     Returns:
         Path to downloaded backup tar.gz file
     """
-    title("📂 Preparazione Directory Download")
+    title(" Preparazione Directory Download")
     
     download_path = Path(DOWNLOAD_DIR)
     download_path.mkdir(parents=True, exist_ok=True)
@@ -370,7 +370,7 @@ def download_backup(rclone_config: str, rclone_path: str,
         log("Rimuovo download precedente...")
         shutil.rmtree(backup_dir)
     
-    title("📥 Download Backup")
+    title(" Download Backup")
     
     log(f"Scarico {selected_backup}...")
     log("Questo potrebbe richiedere alcuni minuti...")
@@ -423,7 +423,7 @@ def remove_existing_site(site_name: str) -> None:
     Args:
         site_name: Site name to check/remove
     """
-    title("🔍 Verifica Site Esistente")
+    title(" Verifica Site Esistente")
     
     # Check if site exists
     result = run_command(["omd", "sites"], capture_output=True, check=False)
@@ -437,7 +437,7 @@ def remove_existing_site(site_name: str) -> None:
         print("")
         run_command(["omd", "status", site_name], check=False)
         print("")
-        warn("⚠️  Per procedere con il restore, il site deve essere rimosso!")
+        warn("  Per procedere con il restore, il site deve essere rimosso!")
         print("")
         
         if not confirm(f"Vuoi RIMUOVERE il site esistente '{site_name}' e continuare?", "n"):
@@ -463,7 +463,7 @@ def restore_backup(tarfile: Path) -> None:
     Args:
         tarfile: Path to backup tar.gz file
     """
-    title("🔄 Restore Backup")
+    title(" Restore Backup")
     
     log(f"Ripristino backup da {tarfile}...")
     
@@ -481,7 +481,7 @@ def post_restore_compressed(site_name: str) -> None:
     Args:
         site_name: Site name
     """
-    title("📁 Post-Restore: Backup Compresso (job00-daily)")
+    title(" Post-Restore: Backup Compresso (job00-daily)")
     
     log("Backup compresso rilevato - creo directory mancanti...")
     
@@ -507,13 +507,13 @@ def post_restore_compressed(site_name: str) -> None:
     
     for dir_path in required_dirs:
         if not dir_path.exists():
-            log(f"  ✓ Creo: {dir_path.name}")
+            log(f"   Creo: {dir_path.name}")
             dir_path.mkdir(parents=True, exist_ok=True)
     
     success("Directory mancanti create")
     
     # Fix ownership
-    title("🔧 Correzione Ownership e Permessi (job00)")
+    title(" Correzione Ownership e Permessi (job00)")
     
     log("Correggo ownership ricorsivo...")
     run_command(["chown", "-R", f"{site_name}:{site_name}", str(site_dir / "var/log")], check=False)
@@ -537,7 +537,7 @@ def post_restore_full(site_name: str) -> None:
     Args:
         site_name: Site name
     """
-    title("✅ Post-Restore: Backup Completo (job01-weekly)")
+    title(" Post-Restore: Backup Completo (job01-weekly)")
     
     log("Backup completo rilevato - nessuna directory da ricreare")
     log("Verifico solo ownership base...")
@@ -555,7 +555,7 @@ def start_site(site_name: str) -> None:
     Args:
         site_name: Site name
     """
-    title("🚀 Avvio Site")
+    title(" Avvio Site")
     
     log(f"Avvio site '{site_name}'...")
     
@@ -573,7 +573,7 @@ def verify_site_status(site_name: str) -> None:
     Args:
         site_name: Site name
     """
-    title("✅ Verifica Status Finale")
+    title(" Verifica Status Finale")
     
     print("")
     run_command(["omd", "status", site_name], check=False)
@@ -587,10 +587,10 @@ def change_cmkadmin_password(site_name: str) -> None:
         site_name: Site name
     """
     print("")
-    title("🔐 Cambio Password cmkadmin (OBBLIGATORIO)")
+    title(" Cambio Password cmkadmin (OBBLIGATORIO)")
     
     print("")
-    warn("⚠️  Per motivi di sicurezza, DEVI cambiare la password di cmkadmin")
+    warn("  Per motivi di sicurezza, DEVI cambiare la password di cmkadmin")
     print("")
     log(f"Imposta ora la nuova password per l'utente 'cmkadmin' del site '{site_name}'")
     print("")
@@ -617,7 +617,7 @@ def print_final_summary(selected_backup: str, is_compressed: bool,
         backup_size_mb: Backup size in MB
     """
     print("")
-    title("🎉 DISASTER RECOVERY COMPLETATO!")
+    title(" DISASTER RECOVERY COMPLETATO!")
     
     backup_type = "Compresso (job00-daily)" if is_compressed else "Completo (job01-weekly)"
     hostname = run_command(["hostname"], capture_output=True).stdout.strip()
@@ -627,15 +627,15 @@ def print_final_summary(selected_backup: str, is_compressed: bool,
     print("║                    RIEPILOGO OPERAZIONE                    ║")
     print("╚════════════════════════════════════════════════════════════╝")
     print("")
-    print(f"  ✅ Backup:      {selected_backup}")
-    print(f"  ✅ Tipo:        {backup_type}")
-    print(f"  ✅ Site:        {site_name}")
-    print(f"  ✅ Dimensione:  {backup_size_mb:.1f} MB")
-    print("  ✅ Status:      RUNNING")
+    print(f"   Backup:      {selected_backup}")
+    print(f"   Tipo:        {backup_type}")
+    print(f"   Site:        {site_name}")
+    print(f"   Dimensione:  {backup_size_mb:.1f} MB")
+    print("   Status:      RUNNING")
     print("")
-    print(f"  🌐 Web UI:      http://{hostname}/{site_name}/")
-    print(f"  📁 Site dir:    /opt/omd/sites/{site_name}")
-    print(f"  📋 Logs:        /opt/omd/sites/{site_name}/var/log/")
+    print(f"   Web UI:      http://{hostname}/{site_name}/")
+    print(f"   Site dir:    /opt/omd/sites/{site_name}")
+    print(f"   Logs:        /opt/omd/sites/{site_name}/var/log/")
     print("")
     print("╔════════════════════════════════════════════════════════════╗")
     print("║                      PROSSIMI PASSI                        ║")
@@ -647,7 +647,7 @@ def print_final_summary(selected_backup: str, is_compressed: bool,
     print(f"  4. Rimuovi backup temporaneo: rm -rf {DOWNLOAD_DIR}")
     print("")
     
-    success("Disaster recovery completato con successo! 🎉")
+    success("Disaster recovery completato con successo! ")
 
 
 def main() -> int:
@@ -661,16 +661,16 @@ def main() -> int:
     
     # Clear screen and show banner
     os.system('clear')
-    title("🚨 CHECKMK DISASTER RECOVERY 🚨")
+    title(" CHECKMK DISASTER RECOVERY ")
     
     print("")
     print("Questo script eseguirà:")
-    print("  1️⃣  Lista backup disponibili su cloud")
-    print("  2️⃣  Download backup selezionato")
-    print("  3️⃣  Restore automatico del backup")
-    print("  4️⃣  Verifica stato servizi CheckMK")
+    print("  1⃣  Lista backup disponibili su cloud")
+    print("  2⃣  Download backup selezionato")
+    print("  3⃣  Restore automatico del backup")
+    print("  4⃣  Verifica stato servizi CheckMK")
     print("")
-    warn("⚠️  ATTENZIONE: Questa operazione RIMUOVERÀ il site esistente!")
+    warn("  ATTENZIONE: Questa operazione RIMUOVERÀ il site esistente!")
     print("")
     
     if not confirm("Vuoi procedere con il disaster recovery?", "n"):

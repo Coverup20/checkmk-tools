@@ -162,7 +162,7 @@ def create_ticket(title: str, description: str, priority: str = "normal", tags: 
         if status_code in [200, 201]:
             ticket_id = response.get("id")
             if ticket_id:
-                Logger.success(f"✓ Ticket creato: #{ticket_id}")
+                Logger.success(f" Ticket creato: #{ticket_id}")
                 return ticket_id
         
         Logger.error("Creazione ticket fallita")
@@ -195,7 +195,7 @@ def check_cpu_usage(hostname: Optional[str] = None):
             Logger.warn(f"CPU usage elevato: {cpu_usage}%")
             
             title = f"[HIGH] CPU usage elevato su {hostname}"
-            description = f"""🔥 CPU Alert
+            description = f""" CPU Alert
 
 **Dettagli:**
 - Hostname: {hostname}
@@ -248,7 +248,7 @@ def check_memory_usage(hostname: Optional[str] = None):
             Logger.warn(f"Memory usage elevato: {mem_usage}%")
             
             title = f"[HIGH] Memory usage elevato su {hostname}"
-            description = f"""💾 Memory Alert
+            description = f""" Memory Alert
 
 **Dettagli:**
 - Hostname: {hostname}
@@ -306,7 +306,7 @@ def check_disk_usage(hostname: Optional[str] = None, mount_point: str = "/"):
                 Logger.warn(f"Disk usage elevato su {mount_point}: {disk_usage}%")
                 
                 title = f"[HIGH] Disk usage elevato su {hostname}:{mount_point}"
-                description = f"""💿 Disk Alert
+                description = f""" Disk Alert
 
 **Dettagli:**
 - Hostname: {hostname}
@@ -373,7 +373,7 @@ def check_service_status(service_name: str, hostname: Optional[str] = None):
                 Logger.error(f"Servizio {service_name} non attivo")
                 
                 title = f"[CRITICAL] Servizio {service_name} non attivo su {hostname}"
-                description = f"""🔴 Service Down Alert
+                description = f""" Service Down Alert
 
 **Dettagli:**
 - Hostname: {hostname}

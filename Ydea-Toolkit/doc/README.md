@@ -1,8 +1,8 @@
-# 🛠️ Ydea API Toolkit
+#  Ydea API Toolkit
 
 Sistema completo per la gestione delle API Ydea v2, con focus su creazione e gestione ticket, integrazione con sistemi di monitoraggio, e automazione dei workflow.
 
-## 📋 Indice
+##  Indice
 
 - [Caratteristiche](#caratteristiche)
 - [Requisiti](#requisiti)
@@ -13,18 +13,18 @@ Sistema completo per la gestione delle API Ydea v2, con focus su creazione e ges
 - [Integrazione Monitoraggio](#integrazione-monitoraggio)
 - [Best Practices](#best-practices)
 
-## ✨ Caratteristiche
+##  Caratteristiche
 
-- ✅ **Gestione automatica token** con refresh automatico
-- ✅ **Funzioni helper** per operazioni comuni sui ticket
-- ✅ **Retry automatico** su errori 401
-- ✅ **Integrazione sistemi di monitoraggio** (Netdata, custom)
-- ✅ **Prevenzione duplicati** tramite cache intelligente
-- ✅ **Export dati** in formati CSV/JSON
-- ✅ **Logging strutturato** con timestamp e emoji
-- ✅ **Script di esempio** per casi d'uso comuni
+-  **Gestione automatica token** con refresh automatico
+-  **Funzioni helper** per operazioni comuni sui ticket
+-  **Retry automatico** su errori 401
+-  **Integrazione sistemi di monitoraggio** (Netdata, custom)
+-  **Prevenzione duplicati** tramite cache intelligente
+-  **Export dati** in formati CSV/JSON
+-  **Logging strutturato** con timestamp e emoji
+-  **Script di esempio** per casi d'uso comuni
 
-## 📦 Requisiti
+##  Requisiti
 
 - **bash** >= 4.0
 - **curl**
@@ -43,7 +43,7 @@ sudo yum install curl jq
 brew install curl jq
 ```
 
-## 🚀 Installazione
+##  Installazione
 
 ```bash
 # 1. Scarica i file
@@ -58,7 +58,7 @@ cp .env.example .env
 nano .env  # Inserisci YDEA_ID e YDEA_API_KEY
 ```
 
-## ⚙️ Configurazione
+##  Configurazione
 
 ### 1. Ottieni le credenziali API
 
@@ -89,10 +89,10 @@ source .env
 
 ```bash
 ./ydea-toolkit.sh login
-# Output atteso: ✅ Login effettuato (token valido ~1h)
+# Output atteso:  Login effettuato (token valido ~1h)
 ```
 
-## 📖 Utilizzo
+##  Utilizzo
 
 ### Comandi Base
 
@@ -131,7 +131,7 @@ source .env
 ./ydea-toolkit.sh api <METHOD> </path> [json_body]
 ```
 
-## 💡 Esempi Pratici
+##  Esempi Pratici
 
 ### Esempio 1: Lista ultimi 10 ticket aperti
 
@@ -206,7 +206,7 @@ ID=$(echo "$TICKET" | jq -r '.id')
 ' > tickets_export.csv
 ```
 
-## 🔧 Integrazione Monitoraggio
+##  Integrazione Monitoraggio
 
 ### Monitoring Automatico
 
@@ -285,7 +285,7 @@ if ! curl -f -s -o /dev/null "$SITE"; then
 fi
 ```
 
-## 📚 Script di Esempio Inclusi
+##  Script di Esempio Inclusi
 
 ### esempi-ydea.sh
 
@@ -308,7 +308,7 @@ esempio_report_giornaliero
 esempio_workflow_completo
 ```
 
-## 🎯 Best Practices
+##  Best Practices
 
 ### 1. Gestione Token
 
@@ -371,21 +371,21 @@ Gestisci sempre gli errori negli script:
 ```bash
 if RESULT=$(./ydea-toolkit.sh create "..." "..." 2>&1); then
   TICKET_ID=$(echo "$RESULT" | jq -r '.id')
-  echo "✅ Ticket #$TICKET_ID creato"
+  echo " Ticket #$TICKET_ID creato"
 else
-  echo "❌ Errore: $RESULT" >&2
+  echo " Errore: $RESULT" >&2
   # Invia notifica, scrivi log, etc.
 fi
 ```
 
-## 🔐 Sicurezza
+##  Sicurezza
 
 - **Mai committare** il file `.env` con credenziali
 - Usa permessi restrittivi: `chmod 600 .env`
 - Il token file ha permessi `644` di default
 - Considera l'uso di vault per produzione (Hashicorp Vault, AWS Secrets Manager)
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### Login fallisce
 
@@ -418,17 +418,17 @@ jq --version
 echo '{"test": "value"}' | jq .
 ```
 
-## 📞 Supporto
+##  Supporto
 
 - **Documentazione API Ydea**: https://my.ydea.cloud/api/doc/v2
 - **Issues**: Apri una issue su GitHub
 - **Email**: support@example.com
 
-## 📝 Licenza
+##  Licenza
 
 MIT License - Vedi file LICENSE
 
-## 🙏 Contributi
+##  Contributi
 
 I contributi sono benvenuti! Per favore:
 
@@ -438,7 +438,7 @@ I contributi sono benvenuti! Per favore:
 4. Push al branch (`git push origin feature/nuova-funzione`)
 5. Apri Pull Request
 
-## 📈 Roadmap
+##  Roadmap
 
 - [ ] Supporto webhook bidirezionale
 - [ ] Dashboard web per visualizzazione ticket

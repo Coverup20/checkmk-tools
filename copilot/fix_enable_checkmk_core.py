@@ -84,7 +84,7 @@ else:
     print(f"\n[STEP 1] Invio ENABLE_SVC_CHECK per {len(hosts)} host...")
     for host in hosts:
         send_cmd(f"ENABLE_SVC_CHECK;{host};Check_MK")
-        print(f"  ✓ ENABLE_SVC_CHECK: {host}")
+        print(f"   ENABLE_SVC_CHECK: {host}")
     time.sleep(1)
 
     print(f"\n[STEP 2] Eseguo cmk --check su tutti gli host...")
@@ -97,10 +97,10 @@ else:
         )
         rc = result.returncode
         if rc == 0:
-            print(f"  ✓ cmk --check {host} → OK")
+            print(f"   cmk --check {host} → OK")
             ok_count += 1
         else:
-            print(f"  ⚠ cmk --check {host} → RC={rc} (potrebbe essere host irraggiungibile)")
+            print(f"   cmk --check {host} → RC={rc} (potrebbe essere host irraggiungibile)")
             err_count += 1
 
     print(f"\n[STEP 3] Attendo 15 secondi e verifico staleness...")
@@ -112,10 +112,10 @@ else:
     for host in hosts:
         stale, active = get_staleness(host, "Check_MK")
         if stale < 2.0:
-            print(f"  ✓ {host} | staleness={stale:.2f} | active={active} → OK")
+            print(f"   {host} | staleness={stale:.2f} | active={active} → OK")
             resolved += 1
         else:
-            print(f"  ✗ {host} | staleness={stale:.2f} | active={active} → ANCORA STALE")
+            print(f"   {host} | staleness={stale:.2f} | active={active} → ANCORA STALE")
             still_stale += 1
 
     print(f"\n{'='*65}")

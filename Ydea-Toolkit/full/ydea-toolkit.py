@@ -25,7 +25,7 @@ try:
     import requests
     from dotenv import load_dotenv
 except ImportError:
-    print("❌ Dipendenze mancanti. Installa con:")
+    print(" Dipendenze mancanti. Installa con:")
     print("   pip3 install requests python-dotenv")
     sys.exit(127)
 
@@ -139,23 +139,23 @@ class YdeaLogger:
     
     def debug(self, message: str):
         if self.debug_enabled:
-            print(f"🔧 {message}", file=sys.stderr)
+            print(f" {message}", file=sys.stderr)
         self.write("DEBUG", message)
     
     def info(self, message: str):
-        print(f"ℹ️  {message}", file=sys.stderr)
+        print(f"ℹ  {message}", file=sys.stderr)
         self.write("INFO", message)
     
     def success(self, message: str):
-        print(f"✅ {message}", file=sys.stderr)
+        print(f" {message}", file=sys.stderr)
         self.write("INFO", f"SUCCESS: {message}")
     
     def warn(self, message: str):
-        print(f"⚠️  {message}", file=sys.stderr)
+        print(f"  {message}", file=sys.stderr)
         self.write("WARN", message)
     
     def error(self, message: str):
-        print(f"❌ {message}", file=sys.stderr)
+        print(f" {message}", file=sys.stderr)
         self.write("ERROR", message)
     
     def api_call(self, method: str, url: str, status: Optional[int] = None):
@@ -727,7 +727,7 @@ class TrackingSystem:
             ticket_data = all_tickets.get(ticket_id, {})
             
             if not ticket_data:
-                logger.warn(f"⚠️ Ticket #{ticket_id} non trovato, potrebbe essere stato eliminato - contrassegnato come risolto")
+                logger.warn(f" Ticket #{ticket_id} non trovato, potrebbe essere stato eliminato - contrassegnato come risolto")
                 ticket_entry['stato'] = 'Eliminato'
                 ticket_entry['resolved_at'] = now
                 ticket_entry['last_update'] = now
@@ -751,7 +751,7 @@ class TrackingSystem:
             
             # Controlla se risolto
             if stato in ['Effettuato', 'Chiuso', 'Completato', 'Risolto']:
-                logger.success(f"✔️  Ticket #{ticket_id} RISOLTO (stato: {stato})")
+                logger.success(f"  Ticket #{ticket_id} RISOLTO (stato: {stato})")
                 ticket_entry['stato'] = stato
                 ticket_entry['descrizione_ticket'] = descrizione_ticket
                 ticket_entry['priorita'] = priorita
@@ -820,21 +820,21 @@ class TrackingSystem:
         open_tickets = [t for t in tracking['tickets'] if not t.get('resolved_at')]
         resolved_tickets = [t for t in tracking['tickets'] if t.get('resolved_at')]
         
-        print("📊 Statistiche Ticket Tracking")
+        print(" Statistiche Ticket Tracking")
         print("══════════════════════════════")
         print(f"Totale ticket tracciati: {total}")
-        print(f"  🔴 Aperti: {len(open_tickets)}")
-        print(f"  ✅ Risolti: {len(resolved_tickets)}")
+        print(f"   Aperti: {len(open_tickets)}")
+        print(f"   Risolti: {len(resolved_tickets)}")
         print("")
         
         if open_tickets:
-            print("🎯 Ticket Aperti:")
+            print(" Ticket Aperti:")
             for t in open_tickets:
                 print(f"  [#{t['ticket_id']}] {t['codice']} - {t['host']}/{t['service']} - Stato: {t['stato']} - Creato: {t['created_at']}")
             print("")
         
         if resolved_tickets:
-            print("✅ Ultimi 5 Ticket Risolti:")
+            print(" Ultimi 5 Ticket Risolti:")
             sorted_resolved = sorted(resolved_tickets, key=lambda x: x.get('resolved_at', ''), reverse=True)[:5]
             for t in sorted_resolved:
                 print(f"  [{t.get('resolved_at', 'N/A')}] #{t['ticket_id']} {t['codice']} - {t['host']}/{t['service']}")
@@ -851,7 +851,7 @@ class TrackingSystem:
                     resolutions.append(hours)
                 
                 avg_hours = int(sum(resolutions) / len(resolutions))
-                print(f"⏱️  Tempo medio risoluzione: ~{avg_hours} ore")
+                print(f"  Tempo medio risoluzione: ~{avg_hours} ore")
             except Exception:
                 pass
     
@@ -875,7 +875,7 @@ def interactive_config():
     script_dir = Path(__file__).resolve().parent
     env_file = script_dir / ".env"
     
-    print("🎛️  Configurazione Interattiva Ydea Toolkit")
+    print("  Configurazione Interattiva Ydea Toolkit")
     print("==========================================")
     print("")
     
@@ -885,7 +885,7 @@ def interactive_config():
     current_ticket_id = config.USER_ID_CREATE_TICKET
     current_note_id = config.USER_ID_CREATE_NOTE
     
-    print("🔑 CREDENZIALI API (obbligatorie)")
+    print(" CREDENZIALI API (obbligatorie)")
     print("   Ottienile da: https://my.ydea.cloud → Impostazioni → La mia azienda → API")
     print("")
     
@@ -897,7 +897,7 @@ def interactive_config():
         while not new_id:
             new_id = input("YDEA_ID: ").strip()
             if not new_id:
-                print("❌ YDEA_ID è obbligatorio!")
+                print(" YDEA_ID è obbligatorio!")
     
     # YDEA_API_KEY
     if current_key:
@@ -908,10 +908,10 @@ def interactive_config():
         while not new_key:
             new_key = input("YDEA_API_KEY: ").strip()
             if not new_key:
-                print("❌ YDEA_API_KEY è obbligatoria!")
+                print(" YDEA_API_KEY è obbligatoria!")
     
     print("")
-    print("👥 ID UTENTE PER OPERAZIONI (opzionali)")
+    print(" ID UTENTE PER OPERAZIONI (opzionali)")
     print("   Usa gli ID degli utenti Ydea per attribuire creazioni")
     print("")
     
@@ -922,7 +922,7 @@ def interactive_config():
     new_note_id = input(f"ID utente creazione note/commenti [{current_note_id}]: ").strip() or str(current_note_id)
     
     print("")
-    print("📝 GESTIONE LOG E TRACKING (opzionali)")
+    print(" GESTIONE LOG E TRACKING (opzionali)")
     print("   Configurazione avanzata per logging e monitoraggio")
     print("")
     
@@ -949,7 +949,7 @@ def interactive_config():
     new_retention = input(f"Giorni mantenimento ticket risolti [{current_retention}]: ").strip() or str(current_retention)
     
     print("")
-    print(f"💾 Salvataggio configurazione in: {env_file}")
+    print(f" Salvataggio configurazione in: {env_file}")
     
     # Backup se esiste
     if env_file.exists():
@@ -990,22 +990,22 @@ export YDEA_TRACKING_RETENTION_DAYS={new_retention}
     os.chmod(env_file, 0o600)
     
     print("")
-    print("✅ Configurazione salvata con successo!")
+    print(" Configurazione salvata con successo!")
     print("")
-    print("📋 Riepilogo:")
+    print(" Riepilogo:")
     print(f"   YDEA_ID: {new_id}")
     print(f"   YDEA_API_KEY: {new_key[:10]}***")
     print(f"   ID creazione ticket: {new_ticket_id}")
     print(f"   ID creazione note: {new_note_id}")
     print("")
-    print("📊 Configurazione Log & Tracking:")
+    print(" Configurazione Log & Tracking:")
     print(f"   File log: {new_log_file}")
     print(f"   Dimensione max: {new_log_size_mb_str}MB")
     print(f"   Livello log: {new_log_level}")
     print(f"   File tracking: {new_tracking_file}")
     print(f"   Retention giorni: {new_retention}")
     print("")
-    print("🎬 Test configurazione:")
+    print(" Test configurazione:")
     print(f"   source {env_file}")
     print(f"   {sys.argv[0]} login")
     print("")
@@ -1016,7 +1016,7 @@ export YDEA_TRACKING_RETENTION_DAYS={new_retention}
 def show_usage():
     """Mostra help/usage"""
     usage = """
-🛠️  Ydea Toolkit - Gestione API v2 (Python)
+  Ydea Toolkit - Gestione API v2 (Python)
 
 SETUP:
   export YDEA_ID="tuo_id"              # Da: Impostazioni → La mia azienda → API
@@ -1318,7 +1318,7 @@ def main():
             sys.exit(1)
     
     except KeyboardInterrupt:
-        print("\n⚠️  Operazione interrotta dall'utente", file=sys.stderr)
+        print("\n  Operazione interrotta dall'utente", file=sys.stderr)
         sys.exit(130)
     except Exception as e:
         logger.error(f"Errore: {e}")

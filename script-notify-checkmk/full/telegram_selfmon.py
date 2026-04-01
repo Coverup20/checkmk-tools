@@ -31,15 +31,15 @@ def get_emoji(state):
     """Get emoji for notification state."""
     state_upper = state.upper()
     if state_upper in ["OK", "UP"]:
-        return "🟢"
+        return ""
     elif state_upper in ["WARN", "WARNING"]:
-        return "🟡"
+        return ""
     elif state_upper in ["CRIT", "CRITICAL", "DOWN"]:
-        return "🔴"
+        return ""
     elif state_upper == "UNKNOWN":
-        return "⚠"
+        return ""
     else:
-        return "❌"
+        return ""
 
 
 def main():
@@ -78,8 +78,8 @@ def main():
         button = {
             "inline_keyboard": [
                 [
-                    {"text": "🔗 Servizio", "url": service_link},
-                    {"text": "🖥 Host", "url": host_link}
+                    {"text": " Servizio", "url": service_link},
+                    {"text": " Host", "url": host_link}
                 ]
             ]
         }
@@ -102,13 +102,13 @@ def main():
         button = {
             "inline_keyboard": [
                 [
-                    {"text": "🖥 Host", "url": host_link}
+                    {"text": " Host", "url": host_link}
                 ]
             ]
         }
     
     # Prefisso dedicato self-monitoring
-    msg = f"🔧 [SELF-MONITOR] 🔧 {msg}"
+    msg = f" [SELF-MONITOR]  {msg}"
     
     # Send to Telegram
     try:

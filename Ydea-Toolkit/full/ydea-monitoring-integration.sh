@@ -17,19 +17,19 @@ TICKET_CACHE="/tmp/ydea_tickets_cache.json"
 # ===== UTILITY =====
 
 log_info() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ℹ️  $*"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ℹ  $*"
 }
 
 log_warn() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ⚠️  $*"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')]   $*"
 }
 
 log_error() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ❌ $*" >&2
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')]  $*" >&2
 }
 
 log_success() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ $*"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')]  $*"
 }
 
 # Inizializza cache
@@ -97,7 +97,7 @@ check_cpu_usage() {
             template=$(cat <<EOF
 {
     "title": "[HIGH] CPU usage elevato su $hostname",
-    "description": "🔥 CPU Alert\n\n**Dettagli:**\n- Hostname: $hostname\n- CPU Usage: ${cpu_usage}%\n- Soglia: ${ALERT_THRESHOLD_CPU}%\n- Data/Ora: $(date '+%Y-%m-%d %H:%M:%S')\n\n**Azioni immediate:**\n1. Identificare processi che consumano più CPU\n2. Verificare se è un picco temporaneo o persistente\n3. Controllare se ci sono processi zombie\n4. Valutare scaling verticale\n\n**Diagnostica:**\n\`\`\`bash\ntop -bn1 | head -20\nps auxf --sort=-%cpu | head -10\n\`\`\`",
+    "description": " CPU Alert\n\n**Dettagli:**\n- Hostname: $hostname\n- CPU Usage: ${cpu_usage}%\n- Soglia: ${ALERT_THRESHOLD_CPU}%\n- Data/Ora: $(date '+%Y-%m-%d %H:%M:%S')\n\n**Azioni immediate:**\n1. Identificare processi che consumano più CPU\n2. Verificare se è un picco temporaneo o persistente\n3. Controllare se ci sono processi zombie\n4. Valutare scaling verticale\n\n**Diagnostica:**\n\`\`\`bash\ntop -bn1 | head -20\nps auxf --sort=-%cpu | head -10\n\`\`\`",
     "priority": "high",
     "tags": ["cpu", "performance", "infrastruttura"]
 }
@@ -142,7 +142,7 @@ check_memory_usage() {
             template=$(cat <<EOF
 {
     "title": "[HIGH] Memory usage elevato su $hostname",
-    "description": "💾 Memory Alert\n\n**Dettagli:**\n- Hostname: $hostname\n- Memory Usage: ${mem_usage}%\n- Soglia: ${ALERT_THRESHOLD_MEM}%\n- Data/Ora: $(date '+%Y-%m-%d %H:%M:%S')\n\n**Azioni immediate:**\n1. Identificare processi che consumano più memoria\n2. Verificare memory leaks\n3. Controllare cache e buffer\n4. Valutare se aumentare RAM\n\n**Diagnostica:**\n\`\`\`bash\nfree -h\nps auxf --sort=-%mem | head -10\nsudo slabtop\n\`\`\`",
+    "description": " Memory Alert\n\n**Dettagli:**\n- Hostname: $hostname\n- Memory Usage: ${mem_usage}%\n- Soglia: ${ALERT_THRESHOLD_MEM}%\n- Data/Ora: $(date '+%Y-%m-%d %H:%M:%S')\n\n**Azioni immediate:**\n1. Identificare processi che consumano più memoria\n2. Verificare memory leaks\n3. Controllare cache e buffer\n4. Valutare se aumentare RAM\n\n**Diagnostica:**\n\`\`\`bash\nfree -h\nps auxf --sort=-%mem | head -10\nsudo slabtop\n\`\`\`",
     "priority": "high",
     "tags": ["memoria", "performance", "infrastruttura"]
 }
@@ -221,7 +221,7 @@ check_service_status() {
             template=$(cat <<EOF
 {
     "title": "[CRITICAL] Servizio $service_name non attivo su $hostname",
-    "description": "🔴 Service Down Alert\n\n**Dettagli:**\n- Hostname: $hostname\n- Servizio: $service_name\n- Stato: $(systemctl is-active "$service_name" 2>&1)\n- Data/Ora: $(date '+%Y-%m-%d %H:%M:%S')\n\n**Azioni immediate:**\n1. Tentare restart servizio\n2. Controllare log servizio\n3. Verificare dipendenze\n4. Controllare configurazione\n\n**Diagnostica:**\n\`\`\`bash\nsystemctl status $service_name\njournalctl -xeu $service_name --since '10 minutes ago'\nsudo systemctl restart $service_name\n\`\`\`",
+    "description": " Service Down Alert\n\n**Dettagli:**\n- Hostname: $hostname\n- Servizio: $service_name\n- Stato: $(systemctl is-active "$service_name" 2>&1)\n- Data/Ora: $(date '+%Y-%m-%d %H:%M:%S')\n\n**Azioni immediate:**\n1. Tentare restart servizio\n2. Controllare log servizio\n3. Verificare dipendenze\n4. Controllare configurazione\n\n**Diagnostica:**\n\`\`\`bash\nsystemctl status $service_name\njournalctl -xeu $service_name --since '10 minutes ago'\nsudo systemctl restart $service_name\n\`\`\`",
     "priority": "critical",
     "tags": ["servizio", "downtime", "infrastruttura"]
 }

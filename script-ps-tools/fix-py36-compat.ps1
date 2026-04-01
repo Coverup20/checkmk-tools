@@ -16,5 +16,5 @@ foreach ($file in $files) {
     }
 }
 
-Write-Host "`n✓ Completato: Fix compatibilità Python 3.6" -ForegroundColor Green
+Write-Host "`n Completato: Fix compatibilità Python 3.6" -ForegroundColor Green
 Write-Host "  os.environ['PYTHONIOENCODING'] sufficiente per Python 3.6" -ForegroundColor Cyan

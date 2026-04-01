@@ -18,15 +18,15 @@ NOTIFY_BIN_DIR="/usr/local/bin/notify-checkmk"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║     🎫 Installazione Integrazione CheckMK → Ydea           ║${NC}"
+echo -e "${BLUE}║      Installazione Integrazione CheckMK → Ydea           ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
 # Funzioni utility
-info() { echo -e "${BLUE}ℹ️  $*${NC}"; }
-success() { echo -e "${GREEN}✅ $*${NC}"; }
-warn() { echo -e "${YELLOW}⚠️  $*${NC}"; }
-error() { echo -e "${RED}❌ $*${NC}" >&2; }
+info() { echo -e "${BLUE}ℹ  $*${NC}"; }
+success() { echo -e "${GREEN} $*${NC}"; }
+warn() { echo -e "${YELLOW}  $*${NC}"; }
+error() { echo -e "${RED} $*${NC}" >&2; }
 
 check_root() {
   if [[ $EUID -ne 0 ]]; then
@@ -190,7 +190,7 @@ setup_env() {
   done
   
   echo ""
-  warn "⚠️  IMPORTANTE: Configura le credenziali Ydea in:"
+  warn "  IMPORTANTE: Configura le credenziali Ydea in:"
   echo "  $env_file"
   echo ""
   echo "Modifica le righe:"
@@ -291,32 +291,32 @@ create_cache_files() {
 show_next_steps() {
   echo ""
   echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
-  echo -e "${GREEN}║              ✅ Installazione Completata!                   ║${NC}"
+  echo -e "${GREEN}║               Installazione Completata!                   ║${NC}"
   echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}"
   echo ""
-  echo -e "${BLUE}📋 PROSSIMI PASSI:${NC}"
+  echo -e "${BLUE} PROSSIMI PASSI:${NC}"
   echo ""
-  echo "1️⃣  Configura notification rule in CheckMK:"
+  echo "1⃣  Configura notification rule in CheckMK:"
   echo "   → Setup → Notifications → Add rule"
   echo "   → Script: ydea_la / ydea_ag"
   echo ""
-  echo "2️⃣  Verifica credenziali Ydea:"
+  echo "2⃣  Verifica credenziali Ydea:"
   echo "   → ${YDEA_TOOLKIT_DIR}/.env"
   echo ""
-  echo "3️⃣  Test manuale:"
+  echo "3⃣  Test manuale:"
   echo "   → cd ${YDEA_TOOLKIT_DIR}"
   echo "   → source .env"
   echo "   → ./ydea-toolkit.sh login"
   echo ""
-  echo "4️⃣  Monitora log:"
+  echo "4⃣  Monitora log:"
   echo "   → tail -f /var/log/ydea_health.log"
   echo "   → tail -f /var/log/ydea_cache_validator.log"
   echo "   → tail -f /omd/sites/${CHECKMK_SITE}/var/log/notify.log"
   echo ""
-  echo "5️⃣  Documentazione completa:"
+  echo "5⃣  Documentazione completa:"
   echo "   → ${YDEA_TOOLKIT_DIR}/README-CHECKMK-INTEGRATION.md"
   echo ""
-  echo -e "${YELLOW}⚠️  RICORDA: Configura le credenziali in .env prima dell'uso!${NC}"
+  echo -e "${YELLOW}  RICORDA: Configura le credenziali in .env prima dell'uso!${NC}"
   echo ""
 }
 

@@ -31,7 +31,7 @@ def main():
     try:
         api = YdeaAPI()
         
-        print("📋 Lista valori 'tipo' ticket")
+        print(" Lista valori 'tipo' ticket")
         print("=" * 60)
         
         # Get tickets e estrai valori tipo unici
@@ -46,14 +46,14 @@ def main():
                 if tipo:
                     tipo_values.add(tipo)
             
-            print(f"\n✅ Trovati {len(tipo_values)} valori unici:\n")
+            print(f"\n Trovati {len(tipo_values)} valori unici:\n")
             for tipo in sorted(tipo_values):
                 print(f"  - {tipo}")
         else:
-            print(f"\n❌ Errore: Status {status}")
+            print(f"\n Errore: Status {status}")
             sys.exit(1)
     except Exception as e:
-        print(f"❌ Errore: {e}", file=sys.stderr)
+        print(f" Errore: {e}", file=sys.stderr)
         sys.exit(1)
 
 

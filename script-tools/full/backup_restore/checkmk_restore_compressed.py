@@ -22,7 +22,7 @@ def log(message: str) -> None:
 
 
 def fail(message: str, code: int = 1) -> None:
-    print(f"[{dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ❌ ERROR: {message}", file=sys.stderr)
+    print(f"[{dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]  ERROR: {message}", file=sys.stderr)
     raise SystemExit(code)
 
 
@@ -104,24 +104,24 @@ def main() -> int:
 
     sites = run(["omd", "sites"], check=False).stdout
     if any(line.startswith(f"{site_name} ") for line in sites.splitlines()):
-        log(f"⚠️  Site '{site_name}' exists, removing...")
+        log(f"  Site '{site_name}' exists, removing...")
         run(["omd", "stop", site_name], check=False)
         rm = run(["omd", "rm", "--kill", site_name], check=False)
         if rm.returncode != 0:
             fail("Failed to remove existing site")
-        log("✅ Site removed")
+        log(" Site removed")
 
-    log("📦 Restoring backup...")
+    log(" Restoring backup...")
     restore = run(["omd", "restore", str(backup_file)], check=False)
     if restore.returncode != 0:
         fail("omd restore failed")
-    log("✅ Backup restored successfully")
+    log(" Backup restored successfully")
 
-    log("📁 Creating missing directories...")
+    log(" Creating missing directories...")
     ensure_required_dirs(site_dir)
-    log("✅ Directories created")
+    log(" Directories created")
 
-    log("🔧 Fixing ownership and permissions...")
+    log(" Fixing ownership and permissions...")
     chown_recursive(site_name, site_dir / "var/log")
     chown_recursive(site_name, site_dir / "var/nagios")
     chown_recursive(site_name, site_dir / "var/check_mk")
@@ -131,13 +131,13 @@ def main() -> int:
     chmod_path("750", site_dir / "var/log/apache")
     chmod_path("755", site_dir / "var/log/nagios")
     chmod_path("755", site_dir / "var/nagios")
-    log("✅ Ownership and permissions fixed")
+    log(" Ownership and permissions fixed")
 
-    log(f"🚀 Starting site '{site_name}'...")
+    log(f" Starting site '{site_name}'...")
     start = run(["omd", "start", site_name], check=False)
     if start.returncode != 0:
         fail(f"Failed to start site. Check logs in {site_dir}/var/log/")
-    log("✅ Site started successfully")
+    log(" Site started successfully")
 
     log("")
     log("============================================")
@@ -150,7 +150,7 @@ def main() -> int:
     host = socket.gethostname()
     log("")
     log("============================================")
-    log("✅ RESTORE COMPLETED SUCCESSFULLY")
+    log(" RESTORE COMPLETED SUCCESSFULLY")
     log("============================================")
     log(f"Site '{site_name}' is ready at: http://{host}/{site_name}/")
     log("")

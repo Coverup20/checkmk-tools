@@ -14,7 +14,7 @@ case "${PRIORITY_ITA,,}" in
   *)        PRIORITY="normal" ;;
 esac
 
-echo "🎫 Creazione ticket con priorità: $PRIORITY_ITA → $PRIORITY"
+echo " Creazione ticket con priorità: $PRIORITY_ITA → $PRIORITY"
 echo ""
 
 ./ydea-toolkit.sh create "$TITLE" "$DESCRIPTION" "$PRIORITY"

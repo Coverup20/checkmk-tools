@@ -1438,13 +1438,13 @@ def main() -> int:
     print()
 
     if agent_installed:
-        print(f"  ✓ CheckMK Agent         (porta 6556, plain TCP)")
+        print(f"   CheckMK Agent         (porta 6556, plain TCP)")
     if frpc_installed:
-        print(f"  ✓ FRPC                  (tunnel verso server FRP)")
+        print(f"   FRPC                  (tunnel verso server FRP)")
 
     if use_systemd:
-        print(f"  ✓ auto-git-sync.timer          (git pull ogni {interval}s)")
-        print(f"  ✓ checkmk-python-full-sync.timer (deploy ogni 5min)")
+        print(f"   auto-git-sync.timer          (git pull ogni {interval}s)")
+        print(f"   checkmk-python-full-sync.timer (deploy ogni 5min)")
         print()
         print("  Comandi utili:")
         if agent_installed:
@@ -1456,8 +1456,8 @@ def main() -> int:
         print(f"  journalctl -u auto-git-sync -f")
         print(f"  journalctl -u checkmk-python-full-sync -f")
     else:
-        print(f"  ✓ git-auto-sync      (ogni minuto)")
-        print(f"  ✓ python-full-sync   (ogni 5 minuti)")
+        print(f"   git-auto-sync      (ogni minuto)")
+        print(f"   python-full-sync   (ogni 5 minuti)")
         print()
         print("  Verifica: crontab -l")
 

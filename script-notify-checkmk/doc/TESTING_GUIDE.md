@@ -1,6 +1,6 @@
-# 🚀 QUICK START TESTING GUIDE
+#  QUICK START TESTING GUIDE
 
-## 📋 **Pre-Test Setup (5 minuti)**
+##  **Pre-Test Setup (5 minuti)**
 
 ### 1. Carica file su server CheckMK
 ```bash
@@ -24,7 +24,7 @@ chmod +x *.sh
 
 ---
 
-## 🧪 **Fase Testing (10 minuti)**
+##  **Fase Testing (10 minuti)**
 
 ### Test 1: Dry Run (sicuro)
 ```bash
@@ -60,7 +60,7 @@ print('Detection OK!')
 
 ---
 
-## 📧 **Test Notifica Reale (15 minuti)**
+##  **Test Notifica Reale (15 minuti)**
 
 ### 1. Configura host test con label real_ip
 
@@ -97,13 +97,13 @@ cmk --notify-test test-host
 tail -f /omd/sites/$(cat /etc/omd/site)/var/log/notify.log
 
 # Check email content per:
-# ✅ Grafici funzionanti (localhost:PORT usato internamente)
-# ✅ URL clickabili con real IP (192.168.1.100)
+#  Grafici funzionanti (localhost:PORT usato internamente)
+#  URL clickabili con real IP (192.168.1.100)
 ```
 
 ---
 
-## 🔄 **Rollback se necessario**
+##  **Rollback se necessario**
 
 ```bash
 # Il deploy automatico crea script rollback
@@ -115,7 +115,7 @@ ls /omd/sites/$(cat /etc/omd/site)/local/share/check_mk/notifications/backup_*/r
 
 ---
 
-## 📊 **Validation Checklist**
+##  **Validation Checklist**
 
 **Dopo il test, verifica:**
 
@@ -128,9 +128,9 @@ ls /omd/sites/$(cat /etc/omd/site)/local/share/check_mk/notifications/backup_*/r
 
 ---
 
-## 🎯 **Expected Results**
+##  **Expected Results**
 
-**✅ SUCCESS SCENARIO:**
+** SUCCESS SCENARIO:**
 ```
 EMAIL CONTENT:
 - Subject: CheckMK notification
@@ -144,7 +144,7 @@ LOGS:
 - "Email sent successfully"
 ```
 
-**❌ SE FALLISCE:**
+** SE FALLISCE:**
 1. Check pre_test_checker.sh warnings
 2. Verifica label real_ip configurata
 3. Controlla logs notify.log
@@ -153,7 +153,7 @@ LOGS:
 
 ---
 
-## 🔧 **Troubleshooting Rapido**
+##  **Troubleshooting Rapido**
 
 ```bash
 # Check script permissions
@@ -172,4 +172,4 @@ export DEBUG=1
 
 ---
 
-🚀 **Ready to rock? Inizia con `pre_test_checker.sh`!**
+ **Ready to rock? Inizia con `pre_test_checker.sh`!**

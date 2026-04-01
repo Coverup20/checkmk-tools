@@ -41,17 +41,17 @@ def log(message: str) -> None:
 
 def success(message: str) -> None:
     """Print success message."""
-    print(f"{GREEN}✅ {message}{NC}")
+    print(f"{GREEN} {message}{NC}")
 
 
 def warn(message: str) -> None:
     """Print warning message."""
-    print(f"{YELLOW}⚠️  {message}{NC}")
+    print(f"{YELLOW}  {message}{NC}")
 
 
 def error(message: str) -> None:
     """Print error message and exit."""
-    print(f"{RED}❌ {message}{NC}", file=sys.stderr)
+    print(f"{RED} {message}{NC}", file=sys.stderr)
     sys.exit(1)
 
 
@@ -110,7 +110,7 @@ def run_command(cmd: List[str], check: bool = True, capture_output: bool = False
 
 def install_rclone() -> None:
     """Install rclone if not present."""
-    title("📦 Verifica rclone")
+    title(" Verifica rclone")
     
     if shutil.which("rclone"):
         success("rclone già installato")
@@ -130,7 +130,7 @@ def install_rclone() -> None:
 
 def find_or_create_rclone_config() -> str:
     """Find existing rclone config or create new one."""
-    title("⚙️  Configurazione rclone")
+    title("  Configurazione rclone")
     
     possible_configs = [
         "/root/.config/rclone/rclone.conf",
@@ -208,13 +208,13 @@ def create_rclone_config(config_path: str) -> str:
 
 def select_job_paths() -> List[str]:
     """Let user select which job paths to scan."""
-    title("🗂️  Selezione Job")
+    title("  Selezione Job")
     
     print("Quale/i job vuoi visualizzare?")
     print("")
-    print("  1) 📦 job00-daily  - Backup compressi giornalieri (1.2M, retention 90)")
-    print("  2) 📦 job01-weekly - Backup completi settimanali (362M, retention 5)")
-    print("  3) 📦 Entrambi     - Mostra tutti i backup disponibili")
+    print("  1)  job00-daily  - Backup compressi giornalieri (1.2M, retention 90)")
+    print("  2)  job01-weekly - Backup completi settimanali (362M, retention 5)")
+    print("  3)  Entrambi     - Mostra tutti i backup disponibili")
     print("")
     
     choice = input("Selezione [1-3, default: 3]: ").strip() or "3"
@@ -239,7 +239,7 @@ def list_backups(rclone_config: str, paths: List[str]) -> Dict[int, Dict[str, st
     Returns:
         Dictionary mapping index to backup info
     """
-    title("📦 Backup Disponibili")
+    title(" Backup Disponibili")
     
     item_map = {}
     index = 1
@@ -282,7 +282,7 @@ def list_backups(rclone_config: str, paths: List[str]) -> Dict[int, Dict[str, st
                 "path": rclone_path,
                 "label": job_label
             }
-            print(f"{index:2d}) 📁 {dirname:<50} {job_label}")
+            print(f"{index:2d})  {dirname:<50} {job_label}")
             index += 1
         
         # List files (custom backups)
@@ -305,7 +305,7 @@ def list_backups(rclone_config: str, paths: List[str]) -> Dict[int, Dict[str, st
                     "path": rclone_path,
                     "label": job_label
                 }
-                print(f"{index:2d}) 📄 {filename:<40} {job_label}")
+                print(f"{index:2d})  {filename:<40} {job_label}")
                 index += 1
     
     if not item_map:
@@ -362,7 +362,7 @@ def download_backups(rclone_config: str, selected_indices: List[int],
     Returns:
         Tuple of (downloaded_items, failed_items)
     """
-    title("⬇️  Download")
+    title("  Download")
     
     # Create download directory
     Path(download_dir).mkdir(parents=True, exist_ok=True)
@@ -399,10 +399,10 @@ def download_backups(rclone_config: str, selected_indices: List[int],
                     size = result.stdout.split()[0]
                 except:
                     size = "N/A"
-                success(f"  ✅ Directory: {name}/ ({size})")
+                success(f"   Directory: {name}/ ({size})")
                 downloaded.append(f"{name}/ ({size})")
             else:
-                warn(f"  ⚠️  Download fallito: {name}/")
+                warn(f"    Download fallito: {name}/")
                 failed.append(f"{name}/ (download failed)")
         
         else:
@@ -427,10 +427,10 @@ def download_backups(rclone_config: str, selected_indices: List[int],
                     size = result.stdout.split()[0]
                 except:
                     size = "N/A"
-                success(f"  ✅ File: {name} ({size})")
+                success(f"   File: {name} ({size})")
                 downloaded.append(f"{name} ({size})")
             else:
-                warn(f"  ⚠️  Download fallito: {name}")
+                warn(f"    Download fallito: {name}")
                 failed.append(f"{name} (download failed)")
     
     return downloaded, failed
@@ -440,29 +440,29 @@ def print_summary(downloaded: List[str], failed: List[str],
                   total: int, download_dir: str) -> int:
     """Print download summary."""
     print("")
-    title("📊 Riepilogo Download")
+    title(" Riepilogo Download")
     
     if downloaded:
         success(f"Download completati: {len(downloaded)}/{total}")
         print("")
         for item in downloaded:
-            print(f"  ✅ {item}")
+            print(f"   {item}")
     
     if failed:
         print("")
         error(f"Download falliti: {len(failed)}/{total}")
         print("")
         for item in failed:
-            print(f"  ❌ {item}")
+            print(f"   {item}")
     
     print("")
     if not failed:
-        success("✅ Operazione completata con successo!")
+        success(" Operazione completata con successo!")
         print("")
         print(f"Tutti i backup scaricati in: {download_dir}/")
         return 0
     else:
-        warn("⚠️  Operazione completata con errori")
+        warn("  Operazione completata con errori")
         print("")
         print(f"Percorso download: {download_dir}/")
         return 1
@@ -474,13 +474,13 @@ def main() -> int:
     
     # Banner
     os.system('clear')
-    title("📥 DOWNLOAD BACKUP DA DIGITALOCEAN SPACES")
+    title(" DOWNLOAD BACKUP DA DIGITALOCEAN SPACES")
     
     # Install/verify rclone
     install_rclone()
     
     # Get download directory
-    title("📂 Destinazione Download")
+    title(" Destinazione Download")
     download_dir = input(f"Directory download [{DOWNLOAD_DIR_DEFAULT}]: ").strip() or DOWNLOAD_DIR_DEFAULT
     Path(download_dir).mkdir(parents=True, exist_ok=True)
     log(f"Directory download: {download_dir}")
@@ -516,17 +516,17 @@ def main() -> int:
     success(f"Selezionati {len(selected_indices)} backup:")
     for num in selected_indices:
         item = item_map[num]
-        icon = "📁" if item["type"] == "dir" else "📄"
+        icon = "" if item["type"] == "dir" else ""
         name = item["name"] + ("/" if item["type"] == "dir" else "")
         print(f"  [{num}] {icon} {name}")
     
     # Confirm download
-    title("⚠️  Conferma Download")
+    title("  Conferma Download")
     print(f"Stai per scaricare {len(selected_indices)} backup:")
     print("")
     for num in selected_indices:
         item = item_map[num]
-        icon = "📁" if item["type"] == "dir" else "📄"
+        icon = "" if item["type"] == "dir" else ""
         name = item["name"] + ("/" if item["type"] == "dir" else "")
         job_name = "job00-daily" if "job00" in item["path"] else "job01-weekly"
         print(f"  {icon} [{job_name}] {name} → {download_dir}/{item['name']}")

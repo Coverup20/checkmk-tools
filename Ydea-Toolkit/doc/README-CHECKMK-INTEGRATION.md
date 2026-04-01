@@ -1,8 +1,8 @@
-# 🎫 Integrazione CheckMK → Ydea Ticketing
+#  Integrazione CheckMK → Ydea Ticketing
 
 Sistema completo per la gestione automatica di ticket Ydea da alert CheckMK con monitoraggio bidirezionale della disponibilità del servizio.
 
-## 📋 Indice
+##  Indice
 
 - [Panoramica](#-panoramica)
 - [Componenti](#-componenti)
@@ -15,27 +15,27 @@ Sistema completo per la gestione automatica di ticket Ydea da alert CheckMK con 
 
 ---
 
-## 🎯 Panoramica
+##  Panoramica
 
 Questo sistema automatizza la gestione dei ticket Ydea per alert CheckMK con le seguenti funzionalità:
 
 ### Alert CheckMK → Ydea Ticket
 
-- ✅ **Nuovo alert CRITICAL/DOWN** → Crea ticket automatico
-- ✅ **Cambio stato** → Aggiunge nota privata (non visibile al cliente)
-- ✅ **Rilevamento flapping** → Alert se servizio cambia stato frequentemente
-- ✅ **Prevenzione duplicati** → Cache intelligente per evitare ticket multipli
-- ✅ **Note sintetiche** → Tracking completo dei cambi stato
+-  **Nuovo alert CRITICAL/DOWN** → Crea ticket automatico
+-  **Cambio stato** → Aggiunge nota privata (non visibile al cliente)
+-  **Rilevamento flapping** → Alert se servizio cambia stato frequentemente
+-  **Prevenzione duplicati** → Cache intelligente per evitare ticket multipli
+-  **Note sintetiche** → Tracking completo dei cambi stato
 
 ### Monitoraggio Ydea
 
-- ✅ **Check periodico** (ogni 15 min) della disponibilità API Ydea
-- ✅ **Notifica email** se Ydea non è raggiungibile
-- ✅ **Recovery notification** quando servizio torna online
+-  **Check periodico** (ogni 15 min) della disponibilità API Ydea
+-  **Notifica email** se Ydea non è raggiungibile
+-  **Recovery notification** quando servizio torna online
 
 ---
 
-## 📦 Componenti
+##  Componenti
 
 ### 1. `ydea_realip` (in `script-notify-checkmk/`)
 
@@ -74,7 +74,7 @@ Script notifica email per Ydea offline.
 
 ---
 
-## 🚀 Installazione
+##  Installazione
 
 ### Prerequisiti
 
@@ -126,16 +126,16 @@ export YDEA_ALERT_EMAIL="massimo.palazzetti@nethesis.it"
 cd /opt/ydea-toolkit
 source .env
 ./ydea-toolkit.sh login
-# Output atteso: ✅ Login effettuato (token valido ~1h)
+# Output atteso:  Login effettuato (token valido ~1h)
 
 # Test health monitor
 ./ydea-health-monitor.sh
-# Output atteso: [timestamp] ✅ Ydea API raggiungibile
+# Output atteso: [timestamp]  Ydea API raggiungibile
 ```
 
 ---
 
-## ⚙️ Configurazione CheckMK
+##  Configurazione CheckMK
 
 ### Setup Notifica Rule
 
@@ -186,7 +186,7 @@ source .env
 
 ---
 
-## ⏰ Configurazione Cron
+##  Configurazione Cron
 
 ### Setup Cron Job per Health Monitor
 
@@ -225,7 +225,7 @@ tail -f /tmp/ydea_health.log
 
 ---
 
-## 🧪 Test e Verifica
+##  Test e Verifica
 
 ### Test 1: Notifica Manuale CheckMK
 
@@ -249,7 +249,7 @@ export NOTIFY_SERVICESTATETYPE="HARD"
 
 ```text
 [2025-11-13 14:30:00] SERVICE Alert: test-server (192.168.1.100) - CPU Load | OK -> CRIT
-[2025-11-13 14:30:01] ✅ Ticket creato: #12345 per 192.168.1.100:CPU Load
+[2025-11-13 14:30:01]  Ticket creato: #12345 per 192.168.1.100:CPU Load
 ```
 
 ### Test 2: Cambio Stato (Nota Privata)
@@ -302,7 +302,7 @@ cat /tmp/ydea_checkmk_tickets.json | jq .
 
 ---
 
-## 🔧 Troubleshooting
+##  Troubleshooting
 
 ### Problema: Ticket non viene creato
 
@@ -390,7 +390,7 @@ cat /tmp/ydea_checkmk_flapping.json | jq .
 
 ---
 
-## ❓ FAQ
+##  FAQ
 
 ### Q: Posso cambiare il formato delle note private?
 
@@ -432,7 +432,7 @@ cat /tmp/ydea_checkmk_tickets.json | jq 'to_entries | .[] | {service: .key, tick
 
 ---
 
-## 📊 Manutenzione
+##  Manutenzione
 
 ### Pulizia Periodica Cache
 
@@ -467,7 +467,7 @@ tar czf ydea-integration-backup-$(date +%Y%m%d).tar.gz \
 
 ---
 
-## 📞 Supporto
+##  Supporto
 
 Per problemi o domande:
 
@@ -477,15 +477,15 @@ Per problemi o domande:
 
 ---
 
-## 🔄 Changelog
+##  Changelog
 
 ### v1.0.0 (2025-11-13)
 
-- ✅ Prima release integrazione CheckMK → Ydea
-- ✅ Gestione automatica ticket con note private
-- ✅ Flapping detection
-- ✅ Health monitoring Ydea con notifica email
-- ✅ Prevenzione duplicati con cache intelligente
+-  Prima release integrazione CheckMK → Ydea
+-  Gestione automatica ticket con note private
+-  Flapping detection
+-  Health monitoring Ydea con notifica email
+-  Prevenzione duplicati con cache intelligente
 
 ---
 

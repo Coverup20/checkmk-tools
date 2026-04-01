@@ -5,12 +5,12 @@ Cartella: script-check-ns8/
 Data: 27 Ottobre 2025
 ================================================================================
 
-📁 STRUTTURA CARTELLE
+ STRUTTURA CARTELLE
 ├── nopolling/          (5 script: 2 principali + 2 wrapper remoti + 1 readme)
 └── polling/            (11 script: 5 principali + 5 wrapper remoti + 1 readme)
 
 ================================================================================
-📂 SCRIPT-CHECK-NS8/NOPOLLING/
+ SCRIPT-CHECK-NS8/NOPOLLING/
 ================================================================================
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -28,10 +28,10 @@ Monitora lo stato della sessione SOS (NethSecurity Support) leggendo
 /var/log/messages per rilevare eventi start/stop della sessione.
 
 FUNZIONALITÀ:
-✓ Legge eventi start-support-session e stop-support-session dai log
-✓ Estrae Session ID dal messaggio "Transmit the following session ID"
-✓ Determina se sessione è ACTIVE o INACTIVE confrontando timestamp
-✓ Mostra Session ID quando disponibile
+ Legge eventi start-support-session e stop-support-session dai log
+ Estrae Session ID dal messaggio "Transmit the following session ID"
+ Determina se sessione è ACTIVE o INACTIVE confrontando timestamp
+ Mostra Session ID quando disponibile
 
 STATI:
 0 (OK)   - SOS Session INACTIVE
@@ -71,11 +71,11 @@ Demone che ascolta continuamente gli eventi Podman e registra solo gli eventi
 significativi (create, start, stop, remove) escludendo i container Redis.
 
 FUNZIONALITÀ:
-✓ Ascolta eventi Podman in real-time (podman events)
-✓ Filtra solo eventi tipo container
-✓ Registra solo eventi: create, start, stop, remove
-✓ Esclude automaticamente container "redis"
-✓ Formatta eventi con timestamp, status, nome, ID
+ Ascolta eventi Podman in real-time (podman events)
+ Filtra solo eventi tipo container
+ Registra solo eventi: create, start, stop, remove
+ Esclude automaticamente container "redis"
+ Formatta eventi con timestamp, status, nome, ID
 
 FILE UTILIZZATI:
 - Log output: /var/log/podman_events.log
@@ -95,9 +95,9 @@ ESEMPIO LOG:
 2025-10-27 14:32:20 - 2025-10-27T14:32:20.789012+00:00 stop mail1 (def789ghi012)
 
 NOTE:
-⚠️ Script demone - non genera output CheckMK
-⚠️ Richiede esecuzione continua in background
-⚠️ Il file contiene codice duplicato (3 copie identiche)
+ Script demone - non genera output CheckMK
+ Richiede esecuzione continua in background
+ Il file contiene codice duplicato (3 copie identiche)
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -134,7 +134,7 @@ ma in /usr/local/bin/ perché sono utility e demoni di sistema.
 
 
 ================================================================================
-📂 SCRIPT-CHECK-NS8/POLLING/
+ SCRIPT-CHECK-NS8/POLLING/
 ================================================================================
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -152,11 +152,11 @@ Monitoraggio completo delle istanze NethServer 8 tramite comando runagent.
 Controlla stato, risorse CPU/RAM di ogni istanza con nomi friendly.
 
 FUNZIONALITÀ:
-✓ Elenca tutte le istanze NS8 (esclusi cluster e node)
-✓ Mappa nomi tecnici a nomi friendly (es: ldapproxy1 → LdapProxy)
-✓ Verifica se istanza è attiva (runagent -m test)
-✓ Estrae statistiche container (CPU%, RAM usage, RAM%)
-✓ Per istanza Mail: conta sessioni IMAP attive con doveadm
+ Elenca tutte le istanze NS8 (esclusi cluster e node)
+ Mappa nomi tecnici a nomi friendly (es: ldapproxy1 → LdapProxy)
+ Verifica se istanza è attiva (runagent -m test)
+ Estrae statistiche container (CPU%, RAM usage, RAM%)
+ Per istanza Mail: conta sessioni IMAP attive con doveadm
 
 MAPPING NOMI FRIENDLY:
 ldapproxy → LdapProxy
@@ -215,12 +215,12 @@ Monitora container interni (ClamAV, Rspamd, Dovecot, Postfix) e problemi
 specifici come vsz_limit di Dovecot.
 
 FUNZIONALITÀ:
-✓ Rileva tutte le istanze mail (mail1, mail2, ...)
-✓ Verifica stato container: clamav, rspamd, dovecot, postfix
-✓ Conta sessioni IMAP attive (doveadm who)
-✓ Legge configurazione VszLimit da config show dovecot
-✓ Scansiona log Dovecot per errori "Cannot allocate memory due to vsz_limit"
-✓ Conta occorrenze vsz_limit nelle ultime 500 righe di log
+ Rileva tutte le istanze mail (mail1, mail2, ...)
+ Verifica stato container: clamav, rspamd, dovecot, postfix
+ Conta sessioni IMAP attive (doveadm who)
+ Legge configurazione VszLimit da config show dovecot
+ Scansiona log Dovecot per errori "Cannot allocate memory due to vsz_limit"
+ Conta occorrenze vsz_limit nelle ultime 500 righe di log
 
 CONFIGURAZIONE:
 LOG_LINES=500  (righe di log da analizzare)
@@ -277,10 +277,10 @@ Monitora processo Tomcat8 all'interno dei container NS8.
 Controlla utilizzo memoria RAM e uptime con soglie configurabili.
 
 FUNZIONALITÀ:
-✓ Cerca processo Tomcat (org.apache.catalina.startup.Bootstrap) in tutti i container
-✓ Misura memoria RSS del processo in MB
-✓ Calcola uptime del processo
-✓ Applica soglie WARN/CRIT su utilizzo memoria
+ Cerca processo Tomcat (org.apache.catalina.startup.Bootstrap) in tutti i container
+ Misura memoria RSS del processo in MB
+ Calcola uptime del processo
+ Applica soglie WARN/CRIT su utilizzo memoria
 
 CONFIGURAZIONE SOGLIE:
 WARN=1024   (warning se memoria ≥ 1024MB)
@@ -320,10 +320,10 @@ Monitora WebTop in NethServer 8 verificando presenza istanza e raggiungibilità
 interfaccia web tramite HTTP/HTTPS.
 
 FUNZIONALITÀ:
-✓ Estrae dominio da FQDN (hostname -f)
-✓ Cerca istanze WebTop con runagent
-✓ Testa raggiungibilità URL https://webtop.DOMINIO/webtop/
-✓ Verifica codice HTTP di risposta
+ Estrae dominio da FQDN (hostname -f)
+ Cerca istanze WebTop con runagent
+ Testa raggiungibilità URL https://webtop.DOMINIO/webtop/
+ Verifica codice HTTP di risposta
 
 STATI:
 0 (OK)   - WebTop risponde con HTTP 200
@@ -359,11 +359,11 @@ Legge il log degli eventi Podman (generato da monitor_podman_events.sh)
 e mostra l'ultimo evento significativo degli ultimi 5 minuti.
 
 FUNZIONALITÀ:
-✓ Legge /var/log/podman_events.log
-✓ Filtra eventi degli ultimi 5 minuti
-✓ Esclude eventi container "redis"
-✓ Filtra solo eventi: create, start, stop, remove
-✓ Mostra ultimo evento (Nome container + Azione)
+ Legge /var/log/podman_events.log
+ Filtra eventi degli ultimi 5 minuti
+ Esclude eventi container "redis"
+ Filtra solo eventi: create, start, stop, remove
+ Mostra ultimo evento (Nome container + Azione)
 
 CONFIGURAZIONE:
 RECENT="5 minutes ago"  (finestra temporale)
@@ -390,8 +390,8 @@ ESEMPIO OUTPUT:
 "1 Podman_Status - Traefik Create"
 
 DIPENDENZE:
-⚠️ Richiede monitor_podman_events.sh attivo in background
-⚠️ Richiede /var/log/podman_events.log popolato
+ Richiede monitor_podman_events.sh attivo in background
+ Richiede /var/log/podman_events.log popolato
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -458,12 +458,12 @@ DIPENDENZE
 ================================================================================
 
 RICHIESTE:
-✓ NethServer 8 (basato su Podman)
-✓ CheckMK Raw 2.4.x
-✓ bash
-✓ curl (per script remoti)
-✓ runagent (comando NS8 per gestione istanze)
-✓ podman (container runtime)
+ NethServer 8 (basato su Podman)
+ CheckMK Raw 2.4.x
+ bash
+ curl (per script remoti)
+ runagent (comando NS8 per gestione istanze)
+ podman (container runtime)
 
 COMANDI NETHSERVER 8 SPECIFICI:
 - runagent -l                    (lista istanze)
@@ -580,9 +580,9 @@ cp rcheck_ns8_containers.sh /usr/lib/check_mk_agent/local/
 chmod +x /usr/lib/check_mk_agent/local/rcheck_ns8_containers.sh
 
 VANTAGGI:
-✓ Aggiornamenti automatici dal repository
-✓ No manutenzione manuale degli script
-✓ Centralized management
+ Aggiornamenti automatici dal repository
+ No manutenzione manuale degli script
+ Centralized management
 
 
 ================================================================================
@@ -707,10 +707,10 @@ SICUREZZA
 ================================================================================
 
 CONSIDERAZIONI:
-✓ Gli script vengono eseguiti come root (richiesto per runagent)
-✓ Accesso completo a tutti i container e istanze
-✓ Log di sistema accessibili
-✓ Script remoti scaricano codice da GitHub - verificare HTTPS
+ Gli script vengono eseguiti come root (richiesto per runagent)
+ Accesso completo a tutti i container e istanze
+ Log di sistema accessibili
+ Script remoti scaricano codice da GitHub - verificare HTTPS
 
 PERMESSI CONSIGLIATI:
 - Script in /usr/local/bin/: 755 (rwxr-xr-x)

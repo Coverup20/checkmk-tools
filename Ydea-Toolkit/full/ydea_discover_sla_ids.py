@@ -90,7 +90,7 @@ def discover_categories() -> Dict[str, Any]:
     Returns:
         Dizionario con macro_category e subcategories
     """
-    print_header("🔍 DISCOVERY CATEGORIE E SOTTOCATEGORIE")
+    print_header(" DISCOVERY CATEGORIE E SOTTOCATEGORIE")
     
     Logger.info("Recupero lista categorie da Ydea API...")
     
@@ -139,10 +139,10 @@ def discover_categories() -> Dict[str, Any]:
             
             if subcat_id:
                 subcategory_list.append({"name": subcat_name, "id": subcat_id})
-                print(f"  ✓ '{subcat_name}' → ID: {subcat_id}")
+                print(f"   '{subcat_name}' → ID: {subcat_id}")
                 found_count += 1
             else:
-                print(f"  ❌ '{subcat_name}' → NON TROVATA")
+                print(f"   '{subcat_name}' → NON TROVATA")
         
         print()
         Logger.info(f"Sottocategorie trovate: {found_count}/{len(SUBCATEGORIES)}")
@@ -169,7 +169,7 @@ def discover_sla() -> Dict[str, Any]:
     Returns:
         Dizionario con sla info
     """
-    print_header("🔍 DISCOVERY SLA PERSONALIZZATA")
+    print_header(" DISCOVERY SLA PERSONALIZZATA")
     
     Logger.info("Recupero lista SLA da Ydea API...")
     
@@ -240,7 +240,7 @@ def discover_priorities() -> Dict[str, Any]:
     Returns:
         Dizionario con low_priority info
     """
-    print_header("🔍 DISCOVERY PRIORITÀ")
+    print_header(" DISCOVERY PRIORITÀ")
     
     Logger.info("Recupero lista priorità da Ydea API...")
     
@@ -290,7 +290,7 @@ def discover_priorities() -> Dict[str, Any]:
 
 def main():
     """Main function"""
-    print_header("🔍 YDEA SLA DISCOVERY TOOL")
+    print_header(" YDEA SLA DISCOVERY TOOL")
     
     Logger.info("Inizio discovery per SLA Premium_Mon...")
     Logger.info(f"Output verrà salvato in: {OUTPUT_FILE}")
@@ -319,7 +319,7 @@ def main():
     priorities_json = discover_priorities()
     
     # Combina tutti i risultati
-    print_header("📝 GENERAZIONE FILE CONFIGURAZIONE")
+    print_header(" GENERAZIONE FILE CONFIGURAZIONE")
     
     final_json = {
         "discovery_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -334,7 +334,7 @@ def main():
     with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
         json.dump(final_json, f, indent=2, ensure_ascii=False)
     
-    print_header("✓ DISCOVERY COMPLETATO")
+    print_header(" DISCOVERY COMPLETATO")
     
     Logger.success(f"File di configurazione creato: {OUTPUT_FILE}")
     print()
@@ -357,7 +357,7 @@ def main():
     
     if missing_items:
         print()
-        Logger.warn("⚠️  ATTENZIONE: Alcuni elementi non sono stati trovati:")
+        Logger.warn("  ATTENZIONE: Alcuni elementi non sono stati trovati:")
         for item in missing_items:
             print(f"  • {item}")
         print()
@@ -365,7 +365,7 @@ def main():
         sys.exit(1)
     else:
         print()
-        Logger.success("🎉 Tutti gli elementi richiesti sono stati trovati!")
+        Logger.success(" Tutti gli elementi richiesti sono stati trovati!")
         print()
         Logger.info("Prossimi passi:")
         print("  1. Verifica il contenuto di:", OUTPUT_FILE)

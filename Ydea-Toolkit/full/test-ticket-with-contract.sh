@@ -33,7 +33,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Verifica parametri
 if [ -z "$1" ]; then
-    echo -e "${RED}❌ Errore: Devi specificare l'ID del contratto${NC}"
+    echo -e "${RED} Errore: Devi specificare l'ID del contratto${NC}"
     echo ""
     echo "Uso: $0 <CONTRATTO_ID>"
     echo ""
@@ -58,13 +58,13 @@ echo ""
 # Ottieni il token JWT prima di tutto
 TOKEN=$(jq -r '.token' ~/.ydea_token.json 2>/dev/null)
 if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-    echo -e "${RED}❌ Errore: Token non trovato. Esegui prima il login.${NC}"
+    echo -e "${RED} Errore: Token non trovato. Esegui prima il login.${NC}"
     echo "Esegui: cd /opt/ydea-toolkit && ./ydea-toolkit.sh login"
     exit 1
 fi
 
 # Step 1: Verifica che il contratto esista
-echo -e "${YELLOW}📋 Step 1: Verifica esistenza contratto ID ${CONTRATTO_ID}...${NC}"
+echo -e "${YELLOW} Step 1: Verifica esistenza contratto ID ${CONTRATTO_ID}...${NC}"
 
 # Usa curl diretto invece del toolkit
 CONTRATTO_JSON=$(curl -s -X GET "https://my.ydea.cloud/app_api_v2/contratto/${CONTRATTO_ID}" \
@@ -72,7 +72,7 @@ CONTRATTO_JSON=$(curl -s -X GET "https://my.ydea.cloud/app_api_v2/contratto/${CO
   -H "Content-Type: application/json" 2>/dev/null)
 
 if [ -z "$CONTRATTO_JSON" ] || echo "$CONTRATTO_JSON" | grep -q '"message"'; then
-    echo -e "${RED}❌ Errore: Contratto ${CONTRATTO_ID} non trovato!${NC}"
+    echo -e "${RED} Errore: Contratto ${CONTRATTO_ID} non trovato!${NC}"
     echo ""
     echo "Verifica l'ID del contratto con:"
     echo "  curl -s -X GET 'https://my.ydea.cloud/app_api_v2/contratti?page=1' -H \"Authorization: Bearer \$TOKEN\" | jq '.objs[] | {id, nome, azienda_id}'"
@@ -82,7 +82,7 @@ fi
 CONTRATTO_NOME=$(echo "$CONTRATTO_JSON" | jq -r '.nome // "N/A"')
 CONTRATTO_AZIENDA_ID=$(echo "$CONTRATTO_JSON" | jq -r '.azienda_id // 0')
 
-echo -e "${GREEN}✅ Contratto trovato:${NC}"
+echo -e "${GREEN} Contratto trovato:${NC}"
 echo "   - ID: ${CONTRATTO_ID}"
 echo "   - Nome: ${CONTRATTO_NOME}"
 echo "   - Azienda ID: ${CONTRATTO_AZIENDA_ID}"
@@ -90,18 +90,18 @@ echo ""
 
 # Step 2: Verifica che il contratto appartenga all'anagrafica corretta
 if [ "$CONTRATTO_AZIENDA_ID" != "$ANAGRAFICA_ID" ]; then
-    echo -e "${RED}❌ Errore: Il contratto ${CONTRATTO_ID} non appartiene all'anagrafica ${ANAGRAFICA_ID}!${NC}"
+    echo -e "${RED} Errore: Il contratto ${CONTRATTO_ID} non appartiene all'anagrafica ${ANAGRAFICA_ID}!${NC}"
     echo "   Appartiene invece all'anagrafica ${CONTRATTO_AZIENDA_ID}"
     exit 1
 fi
 
-echo -e "${GREEN}✅ Contratto associato all'anagrafica corretta${NC}"
+echo -e "${GREEN} Contratto associato all'anagrafica corretta${NC}"
 echo ""
 
 # Step 3: Crea il ticket di test con il contratto
-echo -e "${YELLOW}🎫 Step 2: Creazione ticket di test con contratto...${NC}"
+echo -e "${YELLOW} Step 2: Creazione ticket di test con contratto...${NC}"
 if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-    echo -e "${RED}❌ Errore: Token non trovato. Esegui prima il login.${NC}"
+    echo -e "${RED} Errore: Token non trovato. Esegui prima il login.${NC}"
     exit 1
 fi
 
@@ -131,7 +131,7 @@ RESPONSE=$(curl -s -X POST "https://my.ydea.cloud/app_api_v2/ticket" \
 
 # Verifica se la risposta contiene un errore
 if echo "$RESPONSE" | jq -e '.message' >/dev/null 2>&1; then
-    echo -e "${RED}❌ Errore durante la creazione del ticket${NC}"
+    echo -e "${RED} Errore durante la creazione del ticket${NC}"
     echo "$RESPONSE" | jq '.'
     exit 1
 fi
@@ -139,19 +139,19 @@ fi
 # Estrai l'ID del ticket creato
 TICKET_ID=$(echo "$RESPONSE" | jq -r '.id // empty')
 if [ -z "$TICKET_ID" ]; then
-    echo -e "${RED}❌ Errore: Impossibile estrarre l'ID del ticket dalla risposta${NC}"
+    echo -e "${RED} Errore: Impossibile estrarre l'ID del ticket dalla risposta${NC}"
     echo "Risposta API:"
     echo "$RESPONSE" | jq '.'
     exit 1
 fi
 
-echo -e "${GREEN}✅ Ticket creato con successo!${NC}"
+echo -e "${GREEN} Ticket creato con successo!${NC}"
 echo "   - Ticket ID: ${TICKET_ID}"
 TICKET_CODICE=$(echo "$RESPONSE" | jq -r '.codice // "N/A"')
 echo "   - Ticket Codice: ${TICKET_CODICE}"
 echo ""
 # Step 4: Verifica il ticket creato
-echo -e "${YELLOW}🔍 Step 3: Verifica dettagli ticket creato...${NC}"
+echo -e "${YELLOW} Step 3: Verifica dettagli ticket creato...${NC}"
 sleep 2  # Pausa per permettere a Ydea di processare
 
 # Usa curl diretto anche per il GET
@@ -164,7 +164,7 @@ TICKET_CONTRATTO_ID=$(echo "$TICKET_DETAILS" | jq -r '.ticket.contrattoId // "0"
 TICKET_CONTRATTO_CODICE=$(echo "$TICKET_DETAILS" | jq -r '.ticket.contrattoCodice // "N/A"')
 TICKET_ANAGRAFICA=$(echo "$TICKET_DETAILS" | jq -r '.ticket.anagrafica // "N/A"')
 
-echo -e "${BLUE}📋 Dettagli Ticket:${NC}"
+echo -e "${BLUE} Dettagli Ticket:${NC}"
 echo "   - ID: ${TICKET_ID}"
 echo "   - Codice: ${TICKET_CODICE}"
 echo "   - Titolo: ${TICKET_TITOLO}"
@@ -180,18 +180,18 @@ echo -e "${BLUE}═════════════════════�
 echo ""
 
 if [ "$TICKET_CONTRATTO_ID" = "$CONTRATTO_ID" ] && [ "$TICKET_CONTRATTO_ID" != "0" ] && [ "$TICKET_CONTRATTO_ID" != "null" ]; then
-    echo -e "${GREEN}✅ SUCCESSO: Il contratto è stato associato correttamente al ticket!${NC}"
+    echo -e "${GREEN} SUCCESSO: Il contratto è stato associato correttamente al ticket!${NC}"
     echo ""
-    echo -e "${YELLOW}⚠️  VERIFICA MANUALE NECESSARIA:${NC}"
+    echo -e "${YELLOW}  VERIFICA MANUALE NECESSARIA:${NC}"
     echo ""
     echo "1. Accedi a: https://my.ydea.cloud"
     echo "2. Apri il ticket: #${TICKET_ID}"
     echo "3. Verifica che il campo SLA mostri: 'Premium_Mon'"
     echo "4. Verifica che il contratto sia: '${TICKET_CONTRATTO_CODICE}'"
     echo ""
-    echo "Se il campo SLA è correttamente impostato, l'automazione funziona! 🎉"
+    echo "Se il campo SLA è correttamente impostato, l'automazione funziona! "
 else
-    echo -e "${RED}❌ ATTENZIONE: Il contratto non sembra essere stato associato correttamente${NC}"
+    echo -e "${RED} ATTENZIONE: Il contratto non sembra essere stato associato correttamente${NC}"
     echo ""
     echo "Dettagli:"
     echo "   - Contratto richiesto: ${CONTRATTO_ID}"

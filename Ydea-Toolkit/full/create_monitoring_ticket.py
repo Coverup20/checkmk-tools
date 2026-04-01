@@ -97,11 +97,11 @@ def get_state_icon(state: str) -> str:
     state_upper = state.upper()
     
     if state_upper in ('DOWN', 'CRITICAL'):
-        return '🔴'
+        return ''
     elif state_upper == 'WARNING':
-        return '⚠️'
+        return ''
     else:
-        return 'ℹ️'
+        return 'ℹ'
 
 
 def build_ticket_title(host: str, service: str, state: str, host_ip: Optional[str] = None) -> str:
@@ -173,7 +173,7 @@ def main():
     
     # Parse argomenti
     if len(sys.argv) < 5:
-        print("📋 Uso: create_monitoring_ticket.py <HOST> <SERVICE> <STATE> <OUTPUT> [HOST_IP]")
+        print(" Uso: create_monitoring_ticket.py <HOST> <SERVICE> <STATE> <OUTPUT> [HOST_IP]")
         print("")
         print("Esempio:")
         print("  create_monitoring_ticket.py 'mail.example.com' 'HTTP' 'CRITICAL' 'Connection timeout' '1.2.3.4'")
@@ -260,7 +260,7 @@ def main():
         ticket_code = response.get('codice') or response.get('code') or response.get('data', {}).get('codice')
         
         if ticket_id:
-            Logger.success("✓ Ticket creato con successo!")
+            Logger.success(" Ticket creato con successo!")
             Logger.success(f"   ID: {ticket_id}")
             Logger.success(f"   Codice: {ticket_code or 'N/A'}")
             Logger.success(f"   Link: https://my.ydea.cloud/ticket/{ticket_id}")
@@ -282,9 +282,9 @@ def main():
             
             try:
                 api.api_call("POST", "/ticket/atk", note_body)
-                Logger.success("✓ Nota privata aggiunta")
+                Logger.success(" Nota privata aggiunta")
             except Exception as e:
-                Logger.warn(f"⚠️  Nota privata non aggiunta (ticket comunque creato): {e}")
+                Logger.warn(f"  Nota privata non aggiunta (ticket comunque creato): {e}")
             
             # Traccia il ticket
             tracking.track_ticket(
@@ -301,12 +301,12 @@ def main():
             
             sys.exit(0)
         else:
-            Logger.error("❌ Errore nella creazione del ticket")
+            Logger.error(" Errore nella creazione del ticket")
             print(response)
             sys.exit(1)
     
     except Exception as e:
-        Logger.error(f"❌ Errore nella creazione del ticket: {e}")
+        Logger.error(f" Errore nella creazione del ticket: {e}")
         sys.exit(1)
 
 

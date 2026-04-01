@@ -11,14 +11,14 @@ source "$SCRIPT_DIR/ydea-toolkit.sh"
 TICKET_ID="${1:-}"
 
 if [[ -z "$TICKET_ID" ]]; then
-    echo "📋 Uso: $0 <ticket_id>"
+    echo " Uso: $0 <ticket_id>"
     echo ""
     echo "Esempio:"
     echo "  $0 1486125"
     exit 1
 fi
 
-echo "🔍 Recuperando ticket ID: $TICKET_ID..."
+echo " Recuperando ticket ID: $TICKET_ID..."
 echo ""
 
 # Assicurati di avere il token
@@ -26,7 +26,7 @@ ensure_token
 TOKEN="$(load_token)"
 
 # Prova prima con l'endpoint diretto /tickets/{id}
-echo "🔍 Tentativo 1: GET /tickets/$TICKET_ID"
+echo " Tentativo 1: GET /tickets/$TICKET_ID"
 RESPONSE=$(curl -s -w '\n%{http_code}' \
   -H "Accept: application/json" \
   -H "Authorization: Bearer ${TOKEN}" \
@@ -47,7 +47,7 @@ else
     MAX_PAGES=100
     
     # Cerca fino a 100 pagine (10000 ticket totali)
-    echo "🔍 Ricerca con paginazione (limit=$LIMIT per pagina)..."
+    echo " Ricerca con paginazione (limit=$LIMIT per pagina)..."
     echo ""
     
     for PAGE in $(seq 1 $MAX_PAGES); do
@@ -62,7 +62,7 @@ else
         HTTP_CODE="$(echo "$RESPONSE" | tail -n1)"
         
         if [[ "$HTTP_CODE" != "200" ]]; then
-            echo "❌ Errore HTTP $HTTP_CODE"
+            echo " Errore HTTP $HTTP_CODE"
             break
         fi
         
@@ -83,7 +83,7 @@ else
         
         if [[ -n "$TICKET_DATA" && "$TICKET_DATA" != "null" ]]; then
             echo ""
-            echo "   ✓ Ticket trovato alla pagina $PAGE!"
+            echo "    Ticket trovato alla pagina $PAGE!"
             break
         fi
         
@@ -96,16 +96,16 @@ else
         # Se l'ID cercato è superiore al massimo, il ticket è nella pagina precedente o non esiste
         if [[ "$TICKET_ID" -gt "$MAX_ID" ]]; then
             echo ""
-            echo "   ⚠️  Ticket ID $TICKET_ID > $MAX_ID, cercato oltre il range"
+            echo "     Ticket ID $TICKET_ID > $MAX_ID, cercato oltre il range"
             break
         fi
     done
     
     if [[ -z "$TICKET_DATA" || "$TICKET_DATA" == "null" ]]; then
         echo ""
-        echo "❌ Ticket ID $TICKET_ID non trovato"
+        echo " Ticket ID $TICKET_ID non trovato"
         echo ""
-        echo "💡 Il ticket potrebbe essere:"
+        echo " Il ticket potrebbe essere:"
         echo "   - Oltre la pagina $MAX_PAGES (più di 10000 ticket fa)"
         echo "   - Stato archiviato o eliminato"
         echo "   - Con ID errato"
@@ -113,7 +113,7 @@ else
     fi
 fi
 
-echo "✓ Ticket trovato!"
+echo " Ticket trovato!"
 echo ""
 
 TICKET_CODE=$(echo "$TICKET_DATA" | jq -r '.codice // "N/A"')
@@ -132,19 +132,19 @@ echo "CAMPI CHIAVE ESTRATTI"
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
 
-echo "🔵 Info Base:"
+echo " Info Base:"
 echo "   ID: $(echo "$TICKET_DATA" | jq -r '.id')"
 echo "   Codice: $(echo "$TICKET_DATA" | jq -r '.codice // "N/A"')"
 echo "   Titolo: $(echo "$TICKET_DATA" | jq -r '.titolo // "N/A"')"
 echo "   Descrizione: $(echo "$TICKET_DATA" | jq -r '.descrizione // .testo // "N/A"')"
 echo ""
 
-echo "🔴 Priorità:"
+echo " Priorità:"
 echo "   Priorità: $(echo "$TICKET_DATA" | jq -r '.priorita // "N/A"')"
 echo "   Priorità ID: $(echo "$TICKET_DATA" | jq -r '.priorita_id // .prioritaId // "N/A"')"
 echo ""
 
-echo "🔹 Categorie:"
+echo " Categorie:"
 echo "   Categoria: $(echo "$TICKET_DATA" | jq -r '.categoria // "N/A"')"
 echo "   Categoria ID: $(echo "$TICKET_DATA" | jq -r '.categoria_id // .categoriaId // "N/A"')"
 echo "   Sotto-categoria: $(echo "$TICKET_DATA" | jq -r '.sottocategoria // .sotto_categoria // "N/A"')"
@@ -153,29 +153,29 @@ echo "   Macro Categoria: $(echo "$TICKET_DATA" | jq -r '.macrocategoria // .mac
 echo "   Macro Categoria ID: $(echo "$TICKET_DATA" | jq -r '.macrocategoria_id // .macrocategoriaId // "N/A"')"
 echo ""
 
-echo "⏱️  SLA:"
+echo "  SLA:"
 echo "   SLA: $(echo "$TICKET_DATA" | jq -r '.sla // "N/A"')"
 echo "   SLA ID: $(echo "$TICKET_DATA" | jq -r '.sla_id // .slaId // "N/A"')"
 echo "   SLA Nome: $(echo "$TICKET_DATA" | jq -r '.sla_nome // .slaNome // "N/A"')"
 echo "   SLA Descrizione: $(echo "$TICKET_DATA" | jq -r '.sla_descrizione // .slaDescrizione // "N/A"')"
 echo ""
 
-echo "🔶 Stato:"
+echo " Stato:"
 echo "   Stato: $(echo "$TICKET_DATA" | jq -r '.stato // "N/A"')"
 echo "   Stato ID: $(echo "$TICKET_DATA" | jq -r '.stato_id // .statoId // "N/A"')"
 echo ""
 
-echo "👤 Assegnazione:"
+echo " Assegnazione:"
 echo "   Assegnato A: $(echo "$TICKET_DATA" | jq -r '.assegnatoA // .assegnato_a // "N/A"')"
 echo ""
 
-echo "🏢 Azienda/Cliente:"
+echo " Azienda/Cliente:"
 echo "   Azienda: $(echo "$TICKET_DATA" | jq -r '.azienda // "N/A"')"
 echo "   Azienda ID: $(echo "$TICKET_DATA" | jq -r '.azienda_id // .aziendaId // "N/A"')"
 echo "   Cliente: $(echo "$TICKET_DATA" | jq -r '.cliente // "N/A"')"
 echo ""
 
-echo "🔧 Custom Attributes:"
+echo " Custom Attributes:"
 if echo "$TICKET_DATA" | jq -e '.customAttributes' >/dev/null 2>&1; then
     echo "$TICKET_DATA" | jq '.customAttributes'
 elif echo "$TICKET_DATA" | jq -e '.custom_attributes' >/dev/null 2>&1; then
@@ -203,8 +203,8 @@ echo ""
 echo "$TICKET_DATA" | jq 'to_entries | map(select(.key | test("categoria|sla|premium|mon|categor|custom"; "i"))) | from_entries'
 
 echo ""
-echo "✓ Ispezione completata!"
+echo " Ispezione completata!"
 echo ""
-echo "💾 Salvo il JSON completo in /tmp/ticket-${TICKET_ID}.json per riferimento futuro..."
+echo " Salvo il JSON completo in /tmp/ticket-${TICKET_ID}.json per riferimento futuro..."
 echo "$TICKET_DATA" | jq '.' > "/tmp/ticket-${TICKET_ID}.json"
 echo "   File salvato: /tmp/ticket-${TICKET_ID}.json"

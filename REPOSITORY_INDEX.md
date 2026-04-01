@@ -1,10 +1,10 @@
-# 📚 Indice Repository CheckMK Tools
+#  Indice Repository CheckMK Tools
 
 Repository organizzato per gestione CheckMK, integrazione Ydea, e script di monitoraggio.
 
-## 🗂️ Struttura Directory
+##  Struttura Directory
 
-### 📂 **script-tools/** - Strumenti principali
+###  **script-tools/** - Strumenti principali
 Script per gestione, deployment e manutenzione CheckMK.
 
 - **`full/`** - Script completi standalone
@@ -15,7 +15,7 @@ Script per gestione, deployment e manutenzione CheckMK.
   - CheckMK tuning (v3, v4, v5)
   - Network tools (nmap scan)
 
-### 📂 **Ydea-Toolkit/** - Integrazione Ydea
+###  **Ydea-Toolkit/** - Integrazione Ydea
 Integrazione completa con sistema ticketing Ydea.
 
 - **`full/`** - Script completi Ydea
@@ -24,7 +24,7 @@ Integrazione completa con sistema ticketing Ydea.
   - Health & ticket monitor
   - Template e utilità
 
-### 📂 **script-notify-checkmk/** - Notifiche CheckMK
+###  **script-notify-checkmk/** - Notifiche CheckMK
 Script di notifica avanzati per CheckMK.
 
 - **`full/`** - Script notifiche completi
@@ -33,7 +33,7 @@ Script di notifica avanzati per CheckMK.
   - `telegram_realip` - Notifiche Telegram
   - Documentazione (TESTING_GUIDE, CHANGELOG, FIX guides)
 
-### 🎨 **nethesis-brand/** - Branding Nethesis per CheckMK
+###  **nethesis-brand/** - Branding Nethesis per CheckMK
 
 Asset e script per il rebranding dell'interfaccia CheckMK con identità visiva Nethesis.
 
@@ -48,7 +48,7 @@ Asset e script per il rebranding dell'interfaccia CheckMK con identità visiva N
 - Uso: `bash deploy-nethesis-brand.sh` (tutti i server) oppure `bash deploy-nethesis-brand.sh <host>`
 - Server target configurati: `ubntmarzio-root`, `checkmk-vps-01`, `checkmk-vps-02`, `srv-monitoring-sp`, `srv-monitoring-us`
 
-### 📂 **Fix/** - Script di fix e troubleshooting
+###  **Fix/** - Script di fix e troubleshooting
 Risoluzione problemi CheckMK e componenti.
 
 - **`full/`** - Script fix completi
@@ -57,19 +57,19 @@ Risoluzione problemi CheckMK e componenti.
   - Ransomware protection fixes
   - Git credentials fixes
 
-### 📂 **script-check-{ns7,ns8,ubuntu,windows}/** - Script di check
+###  **script-check-{ns7,ns8,ubuntu,windows}/** - Script di check
 Script di monitoring per diverse piattaforme.
 
 - **`polling/`** - Check con polling attivo
 - **`nopolling/`** - Check passivi/on-demand
 
-### 📂 **Proxmox/** - Script Proxmox
+###  **Proxmox/** - Script Proxmox
 Monitoring e gestione Proxmox VE.
 
 - **`polling/`** - Check con polling
 - **`nopolling/`** - Check passivi
 
-### 📂 **Install/** - Installer e bootstrap
+###  **Install/** - Installer e bootstrap
 Script di installazione e bootstrap.
 
 - **`checkmk-installer/`** - Installer CheckMK
@@ -77,15 +77,15 @@ Script di installazione e bootstrap.
 - **`install-cmk8/`** - Installer CheckMK v8
 - `bootstrap-installer.sh`, `make-bootstrap-iso.sh`
 
-### 📂 **test script/** - Script di test
+###  **test script/** - Script di test
 Script per testing e validazione.
 
-### 📂 **deploy script/** - Script di deployment
+###  **deploy script/** - Script di deployment
 Script per deploy automatico.
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Uso Script Completi (Consigliato)
 
@@ -108,7 +108,7 @@ sudo ./script-tools/full/installation/install-auto-git-sync.sh
 
 ---
 
-## 📖 Convenzioni
+##  Convenzioni
 
 ### Nomenclatura File
 - **`{nome}.sh`** - Script completo (nella cartella `full/`)
@@ -118,7 +118,7 @@ Le directory `remote/` sono state rimosse: il repository usa solo script complet
 
 ---
 
-## 🔗 Link Utili
+##  Link Utili
 
 - **GitHub**: https://github.com/Coverup20/checkmk-tools
 - **GitLab**: https://gitlab.com/coverup20-group/checkmk-tools
@@ -126,7 +126,7 @@ Le directory `remote/` sono state rimosse: il repository usa solo script complet
 
 ---
 
-## 📝 File Documentazione
+##  File Documentazione
 
 - `README.md` - Readme principale
 - `DOCUMENTATION_INDEX.md` - Indice documentazione
@@ -137,7 +137,7 @@ Le directory `remote/` sono state rimosse: il repository usa solo script complet
 
 ---
 
-## ⚙️ Automazioni Windows (PowerShell)
+##  Automazioni Windows (PowerShell)
 
 Script PowerShell per automazione Windows:
 - `backup-sync-complete.ps1` - Backup e sync completo

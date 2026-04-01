@@ -226,7 +226,7 @@ Write-Host ""
 
 if ($corruptionPercentage -gt $CORRUPTION_THRESHOLD) {
     Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Red
-    Write-Host "║      ⚠️  CORRUZIONE MASSIVA RILEVATA ⚠️              ║" -ForegroundColor White
+    Write-Host "║        CORRUZIONE MASSIVA RILEVATA               ║" -ForegroundColor White
     Write-Host "╚═══════════════════════════════════════════════════════╝" -ForegroundColor Red
     Write-Host ""
     Write-Host "[ERRORE CRITICO] Rilevata corruzione massiva del repository!" -ForegroundColor Red

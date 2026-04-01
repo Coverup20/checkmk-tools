@@ -24,14 +24,14 @@ echo "­ƒôï Autenticazione..."set +eensure_token_output=$(ensure_token 2>&1)e
 echo "DEBUG: ensure_token exit code: $ensure_exit" >&2
 echo "DEBUG: ensure_token output: $ensure_token_output" >&2
 if [[ $ensure_exit -ne 0 ]]; then
-    echo "❌ Errore autenticazione"
+    echo " Errore autenticazione"
     echo "$ensure_token_output"
     exit 1
 fi
 
-echo "✅ Autenticato"
+echo " Autenticato"
 echo ""
-echo "📋 Recupero ticket (limit 100)..."
+echo " Recupero ticket (limit 100)..."
 
 set +e
 tickets_data=$(ydea_api GET "/tickets?limit=100" 2>&1)
@@ -40,7 +40,7 @@ set -e
 
 echo "DEBUG: ydea_api exit code: $api_exit" >&2
 if [[ $api_exit -ne 0 ]]; then
-    echo "❌ Errore nel recupero ticket (exit: $api_exit)"
+    echo " Errore nel recupero ticket (exit: $api_exit)"
     echo "$tickets_data"
     exit 1
 fi
@@ -49,7 +49,7 @@ echo "DEBUG: Dati ricevuti, lunghezza: ${#tickets_data}" >&2
 
 # Salva dump completo
 echo "$tickets_data" > "${SCRIPT_DIR}/tickets-dump.json"
-echo "💾 Dump salvato in: ${SCRIPT_DIR}/tickets-dump.json"
+echo " Dump salvato in: ${SCRIPT_DIR}/tickets-dump.json"
 echo ""
 # Estrai priorit├á uniche
 echo "ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü"

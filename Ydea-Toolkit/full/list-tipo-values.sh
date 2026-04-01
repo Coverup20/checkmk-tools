@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/ydea-toolkit.sh"
 
 PAGES="${1:-30}"
 
-echo "🔍 Raccolta valori del campo 'tipo' da $PAGES pagine..."
+echo " Raccolta valori del campo 'tipo' da $PAGES pagine..."
 echo ""
 
 ensure_token
@@ -25,7 +25,7 @@ for PAGE in $(seq 1 $PAGES); do
     "${YDEA_BASE_URL}/tickets?limit=100&page=${PAGE}")
   
   if ! echo "$RESPONSE" | jq -e '.objs' >/dev/null 2>&1; then
-    echo "❌ Errore"
+    echo " Errore"
     break
   fi
   
@@ -89,10 +89,10 @@ for required in "${REQUIRED[@]}"; do
   done < <(printf '%s\n' "${!TIPO_MAP[@]}")
   
   if [[ -n "$found" ]]; then
-    echo "  ✓ $required"
+    echo "   $required"
     echo "     → '$found'"
   else
-    echo "  ❌ $required"
+    echo "   $required"
     echo "     → NON TROVATO"
   fi
   echo ""
@@ -124,4 +124,4 @@ for pid in $(printf '%s\n' "${!PRIO_MAP[@]}" | sort -n); do
 done
 
 echo ""
-echo "✓ Analisi completata!"
+echo " Analisi completata!"

@@ -50,24 +50,24 @@ class Colors:
 
 
 def info(msg: str):
-    print(f"{Colors.BLUE}ℹ️  {msg}{Colors.NC}")
+    print(f"{Colors.BLUE}ℹ  {msg}{Colors.NC}")
 
 
 def success(msg: str):
-    print(f"{Colors.GREEN}✅ {msg}{Colors.NC}")
+    print(f"{Colors.GREEN} {msg}{Colors.NC}")
 
 
 def warn(msg: str):
-    print(f"{Colors.YELLOW}⚠️  {msg}{Colors.NC}")
+    print(f"{Colors.YELLOW}  {msg}{Colors.NC}")
 
 
 def error(msg: str):
-    print(f"{Colors.RED}❌ {msg}{Colors.NC}", file=sys.stderr)
+    print(f"{Colors.RED} {msg}{Colors.NC}", file=sys.stderr)
 
 
 def print_header():
     print(f"{Colors.BLUE}╔══════════════════════════════════════════════════════════════╗{Colors.NC}")
-    print(f"{Colors.BLUE}║     🎫 Installazione Integrazione CheckMK → Ydea           ║{Colors.NC}")
+    print(f"{Colors.BLUE}║      Installazione Integrazione CheckMK → Ydea           ║{Colors.NC}")
     print(f"{Colors.BLUE}╚══════════════════════════════════════════════════════════════╝{Colors.NC}")
     print()
 
@@ -529,7 +529,7 @@ def setup_env():
     env_ag = prepare_env_profile_file(".env.ag", ag_candidates)
 
     print()
-    warn("⚠️  Configurazione interattiva profili Ydea")
+    warn("  Configurazione interattiva profili Ydea")
     print(f"  Base: {env_base}")
     print(f"  LA:   {env_la}")
     print(f"  AG:   {env_ag}")
@@ -786,32 +786,32 @@ def show_next_steps():
     """Mostra prossimi passi"""
     print()
     print(f"{Colors.GREEN}╔══════════════════════════════════════════════════════════════╗{Colors.NC}")
-    print(f"{Colors.GREEN}║              ✅ Installazione Completata!                   ║{Colors.NC}")
+    print(f"{Colors.GREEN}║               Installazione Completata!                   ║{Colors.NC}")
     print(f"{Colors.GREEN}╚══════════════════════════════════════════════════════════════╝{Colors.NC}")
     print()
-    print(f"{Colors.BLUE}📋 PROSSIMI PASSI:{Colors.NC}")
+    print(f"{Colors.BLUE} PROSSIMI PASSI:{Colors.NC}")
     print()
-    print("1️⃣  Configura notification rule in CheckMK:")
+    print("1⃣  Configura notification rule in CheckMK:")
     print("   → Setup → Notifications → Add rule")
     print("   → Script: ydea_la / ydea_ag")
     print()
-    print("2️⃣  Verifica credenziali Ydea:")
+    print("2⃣  Verifica credenziali Ydea:")
     print(f"   → {YDEA_TOOLKIT_DIR}/.env")
     print()
-    print("3️⃣  Test manuale:")
+    print("3⃣  Test manuale:")
     print(f"   → cd {YDEA_TOOLKIT_DIR}")
     print("   → source .env")
     print("   → ./ydea-toolkit.py login")
     print()
-    print("4️⃣  Monitora log:")
+    print("4⃣  Monitora log:")
     print("   → tail -f /var/log/ydea_health.log")
     print("   → tail -f /var/log/ydea_cache_validator.log")
     print(f"   → tail -f /omd/sites/{CHECKMK_SITE}/var/log/notify.log")
     print()
-    print("5️⃣  Documentazione completa:")
+    print("5⃣  Documentazione completa:")
     print(f"   → {YDEA_TOOLKIT_DIR}/README-CHECKMK-INTEGRATION.md")
     print()
-    print(f"{Colors.YELLOW}⚠️  RICORDA: Configura le credenziali in .env prima dell'uso!{Colors.NC}")
+    print(f"{Colors.YELLOW}  RICORDA: Configura le credenziali in .env prima dell'uso!{Colors.NC}")
     print()
 
 

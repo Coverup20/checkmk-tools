@@ -1,19 +1,19 @@
 # IMPLEMENTATION SUMMARY - Enhanced Notifications for CheckMK
 > **Categoria:** Specialistico
 
-## 🎯 Cosa è Stato Implementato
+##  Cosa è Stato Implementato
 
 Ho creato un **nuovo sistema di notifiche avanzate** completamente indipendente che migliora la comunicazione di due scenari critici di CheckMK:
 
-### 1️⃣ **HOST DOWN Alerts** 🔴
+### 1⃣ **HOST DOWN Alerts** 
 Quando un host perde connettività (Connection Refused, Network Down, Timeout)
 
-### 2️⃣ **HOST UP - NO DATA Alerts** 🟡  
+### 2⃣ **HOST UP - NO DATA Alerts**   
 Quando un host è online ma non invia dati di monitoraggio
 
 ---
 
-## 📦 File Creati
+##  File Creati
 
 | File | Tipo | Descrizione |
 |------|------|-------------|
@@ -28,7 +28,7 @@ Quando un host è online ma non invia dati di monitoraggio
 
 ---
 
-## 🔧 Come Funziona
+##  Come Funziona
 
 ### Architettura
 
@@ -59,7 +59,7 @@ Ticket Ydea con descrizione migliorata
 
 ---
 
-## ✨ Miglioramenti Rispetto a Prima
+##  Miglioramenti Rispetto a Prima
 
 ### PRIMA (Alert Generico)
 ```
@@ -67,11 +67,11 @@ Ticket Ydea con descrizione migliorata
 [piggyback] Success (but no data found for this host) WARN
 Missing monitoring data for all plugins WARN
 ```
-❌ Confuso | ❌ Tecnico | ❌ Non actionable
+ Confuso |  Tecnico |  Non actionable
 
 ### DOPO (Alert Migliorato)
 ```
-🔴 HOST DOWN - hostname (192.168.10.110)
+ HOST DOWN - hostname (192.168.10.110)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PROBLEMA:
 L'host ha rifiutato la connessione. Potrebbe essere:
@@ -84,13 +84,13 @@ AZIONI SUGGERITE:
   2. Verificare stato agent: ssh hostname 'systemctl status check-mk-agent'
   3. Verificare firewall verso port 6556
 ```
-✅ Chiaro | ✅ Operativo | ✅ Actionable
+ Chiaro |  Operativo |  Actionable
 
 ---
 
-## 🚀 Installazione Quick Start
+##  Installazione Quick Start
 
-### Opzione 1: Manual (Consigliata) ✅
+### Opzione 1: Manual (Consigliata) 
 
 ```bash
 # Su CheckMK server - come monitoring user
@@ -135,18 +135,18 @@ ls -la rydea_ag_host_down
 
 ---
 
-## 🔗 Relazione con ydea_ag (IMPORTANTE)
+##  Relazione con ydea_ag (IMPORTANTE)
 
 **`ydea_ag_host_down` è una versione migliorata di `ydea_ag`**
 
-- ✅ Mantiene TUTTI i meccanismi originali (cache, ticket aggregation, flapping detection)
-- ✅ Aggiunge smart alert type detection (REFUSED, NETWORK, TIMEOUT, NODATA, etc.)
-- ✅ Genera ticket descriptions migliorati e context-aware
-- ✅ Completamente compatibile - puoi sostituire ydea_ag con ydea_ag_host_down
+-  Mantiene TUTTI i meccanismi originali (cache, ticket aggregation, flapping detection)
+-  Aggiunge smart alert type detection (REFUSED, NETWORK, TIMEOUT, NODATA, etc.)
+-  Genera ticket descriptions migliorati e context-aware
+-  Completamente compatibile - puoi sostituire ydea_ag con ydea_ag_host_down
 
 ---
 
-## 📊 Features
+##  Features
 
 ### Smart Alert Type Detection
 ```
@@ -174,7 +174,7 @@ STALE_CACHE → HOST_STALE_DATA
 
 ---
 
-## 📝 Testing
+##  Testing
 
 ### Test Standalone
 ```bash
@@ -194,7 +194,7 @@ Vedi **ENHANCED-TESTING-GUIDE.md** per procedure complete.
 
 ---
 
-## 🔍 Monitoring
+##  Monitoring
 
 ### Visualizza Log
 ```bash
@@ -230,7 +230,7 @@ grep "ALERT_TYPE" /tmp/ydea-host-down.log
 
 ---
 
-## 🛠️ Troubleshooting
+##  Troubleshooting
 
 | Problema | Soluzione |
 |----------|-----------|
@@ -243,7 +243,7 @@ grep "ALERT_TYPE" /tmp/ydea-host-down.log
 
 ---
 
-## 📚 Documentazione Completa
+##  Documentazione Completa
 
 Tutti i file sono nel repository:
 
@@ -253,7 +253,7 @@ Tutti i file sono nel repository:
 
 ---
 
-## ✅ Checklist Deployment
+##  Checklist Deployment
 
 - [ ] Script scaricato nella directory corretta: `~/local/share/check_mk/notifications/`
 - [ ] Permessi corretti: `ls -la` mostra `rwxr-xr-x` per ydea_ag_host_down
@@ -266,7 +266,7 @@ Tutti i file sono nel repository:
 
 ---
 
-## 🎓 Prossimi Step (Opzionali)
+##  Prossimi Step (Opzionali)
 
 1. **Sostituire ydea_ag**: Se vuoi usare SOLO ydea_ag_host_down (raccomandato)
 2. **Integrazione ITSM**: Aggiungere link KB nel ticket Ydea
@@ -276,7 +276,7 @@ Tutti i file sono nel repository:
 
 ---
 
-## 📞 Support
+##  Support
 
 - **GitHub**: https://github.com/Coverup20/checkmk-tools
 - **Repository**: checkmk-tools - branch main
@@ -294,16 +294,16 @@ Tutti i file sono nel repository:
 
 ---
 
-## 🔐 Sicurezza
+##  Sicurezza
 
-- ✅ Nessuna credenziale hardcoded
-- ✅ Cache permessi world-writable (777) per multi-user
-- ✅ Log sanitizzato (no IP/host sensitivi in output)
-- ✅ Indipendente da ydea_ag (no lock file contention)
+-  Nessuna credenziale hardcoded
+-  Cache permessi world-writable (777) per multi-user
+-  Log sanitizzato (no IP/host sensitivi in output)
+-  Indipendente da ydea_ag (no lock file contention)
 
 ---
 
-## 📌 Nota Importante
+##  Nota Importante
 
 **Questo script è completamente indipendente da `ydea_ag` e NON lo modifica.**
 
@@ -314,6 +314,6 @@ Tutti i file sono nel repository:
 
 ---
 
-**Status**: ✅ **READY FOR PRODUCTION**
+**Status**:  **READY FOR PRODUCTION**
 
 Tutti i file sono committati in repository e pronti per il deploy.

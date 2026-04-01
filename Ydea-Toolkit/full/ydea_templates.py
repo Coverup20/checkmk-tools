@@ -31,7 +31,7 @@ def template_server_down(hostname: str, service: str = "N/A") -> Dict[str, Any]:
     """Template per server non raggiungibile"""
     return {
         "title": f"[CRITICAL] Server {hostname} non raggiungibile",
-        "description": f"""🔴 Server Down Alert
+        "description": f""" Server Down Alert
 
 **Dettagli:**
 - Hostname: {hostname}
@@ -68,7 +68,7 @@ def template_backup_failed(backup_job: str, error_msg: str = "Unknown error") ->
     """Template per backup fallito"""
     return {
         "title": f"[HIGH] Backup fallito: {backup_job}",
-        "description": f"""⚠️ Backup Failure Alert
+        "description": f""" Backup Failure Alert
 
 **Dettagli Job:**
 - Nome job: {backup_job}
@@ -103,7 +103,7 @@ def template_disk_full(hostname: str, mount_point: str, usage: str) -> Dict[str,
     """Template per disco quasi pieno"""
     return {
         "title": f"[HIGH] Disco quasi pieno su {hostname}:{mount_point}",
-        "description": f"""💾 Disk Space Alert
+        "description": f""" Disk Space Alert
 
 **Dettagli:**
 - Hostname: {hostname}
@@ -154,7 +154,7 @@ def template_ssl_expiring(domain: str, days_left: str) -> Dict[str, Any]:
     
     return {
         "title": f"[MEDIUM] Certificato SSL in scadenza per {domain}",
-        "description": f"""🔒 SSL Certificate Expiration Warning
+        "description": f""" SSL Certificate Expiration Warning
 
 **Dettagli:**
 - Dominio: {domain}
@@ -199,7 +199,7 @@ def template_app_error_rate(app_name: str, error_rate: str, threshold: str = "5"
     """Template per error rate elevato"""
     return {
         "title": f"[HIGH] Error rate elevato per {app_name}",
-        "description": f"""⚠️ Application Error Rate Alert
+        "description": f""" Application Error Rate Alert
 
 **Dettagli:**
 - Applicazione: {app_name}
@@ -236,7 +236,7 @@ def template_db_slow_queries(db_name: str, slow_count: str) -> Dict[str, Any]:
     """Template per query lente database"""
     return {
         "title": f"[MEDIUM] Query lente rilevate su database {db_name}",
-        "description": f"""🐌 Database Performance Alert
+        "description": f""" Database Performance Alert
 
 **Dettagli:**
 - Database: {db_name}
@@ -290,7 +290,7 @@ def template_security_breach(incident_type: str, affected_system: str) -> Dict[s
     """Template per incidente di sicurezza"""
     return {
         "title": f"[CRITICAL] Potenziale incidente di sicurezza: {incident_type}",
-        "description": f"""🚨 SECURITY INCIDENT ALERT
+        "description": f""" SECURITY INCIDENT ALERT
 
 **ATTENZIONE: INCIDENT RESPONSE IMMEDIATA RICHIESTA**
 
@@ -301,17 +301,17 @@ def template_security_breach(incident_type: str, affected_system: str) -> Dict[s
 - Severità: CRITICAL
 
 **Azioni immediate (NON MODIFICARE IL SISTEMA):**
-1. ✓ Isolare sistema compromesso dalla rete
-2. ✓ Preservare log e evidenze
-3. ✓ Notificare team security
-4. ✓ Attivare piano incident response
-5. ✓ Documentare ogni azione
+1.  Isolare sistema compromesso dalla rete
+2.  Preservare log e evidenze
+3.  Notificare team security
+4.  Attivare piano incident response
+5.  Documentare ogni azione
 
 **NON FARE:**
-- ✗ Non riavviare il sistema
-- ✗ Non modificare file
-- ✗ Non cancellare log
-- ✗ Non informare pubblicamente
+-  Non riavviare il sistema
+-  Non modificare file
+-  Non cancellare log
+-  Non informare pubblicamente
 
 **Contatti emergenza:**
 - Security Team: [INSERIRE CONTATTO]
@@ -340,7 +340,7 @@ def template_failed_login(username: str, ip_address: str, attempts: str) -> Dict
     """Template per tentativi di login falliti"""
     return {
         "title": f"[HIGH] Tentativi di login falliti per {username}",
-        "description": f"""🔐 Failed Login Attempts Alert
+        "description": f""" Failed Login Attempts Alert
 
 **Dettagli:**
 - Username: {username}
@@ -388,7 +388,7 @@ def template_planned_maintenance(system: str, date_time: str, duration: str) -> 
     """Template per manutenzione programmata"""
     return {
         "title": f"[PLANNED] Manutenzione programmata: {system}",
-        "description": f"""🔧 Scheduled Maintenance
+        "description": f""" Scheduled Maintenance
 
 **Dettagli:**
 - Sistema: {system}
@@ -439,7 +439,7 @@ def template_planned_maintenance(system: str, date_time: str, duration: str) -> 
 
 def print_usage():
     """Stampa usage"""
-    print("""📋 Ydea Ticket Templates
+    print(""" Ydea Ticket Templates
 
 USO:
   # Template infrastruttura

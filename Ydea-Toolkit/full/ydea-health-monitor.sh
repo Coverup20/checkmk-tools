@@ -129,13 +129,13 @@ main() {
     
     if test_ydea_login; then
         # ===== YDEA UP =====
-        log "✅ Ydea API raggiungibile"
+        log " Ydea API raggiungibile"
         
         # Se era down e abbiamo notificato, invia recovery email
         if [[ "$current_status" == "down" && "$was_notified" == "true" ]]; then
             log "Ydea tornato online, invio notifica di recovery"
             
-            local subject="✅ [RECOVERY] Ydea API - Servizio Ripristinato"
+            local subject=" [RECOVERY] Ydea API - Servizio Ripristinato"
             local body="Il servizio Ydea API è tornato online.
 
 Dettagli:
@@ -156,13 +156,13 @@ Monitor automatico Ydea Health"
     else
         # ===== YDEA DOWN =====
         consecutive_failures=$((consecutive_failures + 1))
-        log_error "❌ Ydea API non raggiungibile (tentativi falliti: $consecutive_failures/$FAILURE_THRESHOLD)"
+        log_error " Ydea API non raggiungibile (tentativi falliti: $consecutive_failures/$FAILURE_THRESHOLD)"
         
         # Notifica solo se raggiungiamo la soglia e non abbiamo già notificato
         if [[ $consecutive_failures -ge $FAILURE_THRESHOLD && "$was_notified" != "true" ]]; then
             log "Soglia di errori raggiunta, invio notifica"
             
-            local subject="🚨 [ALERT] Ydea API - Servizio Non Raggiungibile"
+            local subject=" [ALERT] Ydea API - Servizio Non Raggiungibile"
             local body="ATTENZIONE: Il servizio Ydea API non è raggiungibile.
 
 Dettagli:
@@ -189,7 +189,7 @@ Monitor automatico Ydea Health
 Check ogni 15 minuti"
             
             if send_email_alert "$subject" "$body"; then
-                log "✅ Notifica inviata con successo"
+                log " Notifica inviata con successo"
                 update_state "down" "$consecutive_failures" "true"
             else
                 log_error "Errore invio notifica"

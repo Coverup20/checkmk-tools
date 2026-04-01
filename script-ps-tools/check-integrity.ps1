@@ -22,7 +22,7 @@ $EMAIL_CREDENTIAL_FILE = "C:\CheckMK-Backups\smtp_credential.xml"
 
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Cyan
-Write-Host "     🔍 CONTROLLO INTEGRITÀ REPOSITORY CHECKMK-TOOLS" -ForegroundColor White
+Write-Host "      CONTROLLO INTEGRITÀ REPOSITORY CHECKMK-TOOLS" -ForegroundColor White
 Write-Host "================================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -315,7 +315,7 @@ Write-Host ""
 
 if ($corruptionPercentage -gt $Threshold) {
     Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Red
-    Write-Host "║      ⚠️  CORRUZIONE MASSIVA RILEVATA ⚠️              ║" -ForegroundColor White
+    Write-Host "║        CORRUZIONE MASSIVA RILEVATA               ║" -ForegroundColor White
     Write-Host "╚═══════════════════════════════════════════════════════╝" -ForegroundColor Red
     Write-Host ""
     Write-Host "[STATO] CRITICO - Corruzione sopra soglia!" -ForegroundColor Red
@@ -338,7 +338,7 @@ if ($corruptionPercentage -gt $Threshold) {
     $exitCode = 1
 } else {
     Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Green
-    Write-Host "║         ✅ REPOSITORY INTEGRO ✅                      ║" -ForegroundColor White
+    Write-Host "║          REPOSITORY INTEGRO                       ║" -ForegroundColor White
     Write-Host "╚═══════════════════════════════════════════════════════╝" -ForegroundColor Green
     Write-Host ""
     Write-Host "[STATO] OK - Nessun errore rilevato" -ForegroundColor Green
@@ -447,7 +447,7 @@ Script corrotti:       $corruptedScripts
 Percentuale errori:    $([math]::Round($corruptionPercentage, 2))%
 Soglia corruzione:     $Threshold%
 
-STATO: $(if ($corruptionPercentage -gt $Threshold) { 'CRITICO ❌' } else { 'WARNING ⚠️' })
+STATO: $(if ($corruptionPercentage -gt $Threshold) { 'CRITICO ' } else { 'WARNING ' })
 
 ---------------------------------------------------------------
   DETTAGLIO PER TIPO

@@ -245,7 +245,7 @@ def main():
     """Main function"""
     
     Logger.info("=" * 60)
-    Logger.info("🎯 Avvio monitoraggio ticket tracciati")
+    Logger.info(" Avvio monitoraggio ticket tracciati")
     
     # Inizializza tracking e API
     tracking = TrackingSystem()
@@ -253,13 +253,13 @@ def main():
     
     # Mostra statistiche iniziali
     stats = get_tracking_stats(tracking)
-    Logger.info(f"📊 Stato: {stats['total_tickets']} totali "
+    Logger.info(f" Stato: {stats['total_tickets']} totali "
                f"({stats['open_tickets']} aperti, {stats['resolved_tickets']} risolti)")
     
     # Salva stati precedenti
     previous_states = get_previous_states(tracking)
     
-    Logger.info("🔄 Aggiornamento stati ticket...")
+    Logger.info(" Aggiornamento stati ticket...")
     
     # Aggiorna stati ticket
     try:
@@ -288,11 +288,11 @@ def main():
         if current_ticket:
             detect_changes(ticket_id, prev_data, current_ticket)
     
-    Logger.success("✅ Aggiornamento stati completato")
+    Logger.success(" Aggiornamento stati completato")
     
     # Cleanup ticket risolti vecchi (ogni 6 ore)
     if should_cleanup():
-        Logger.info("🧹 Eseguo pulizia ticket risolti vecchi...")
+        Logger.info(" Eseguo pulizia ticket risolti vecchi...")
         try:
             tracking.cleanup_tracking()
             mark_cleanup_done()
@@ -300,9 +300,9 @@ def main():
             Logger.error(f"Errore durante cleanup: {e}")
     else:
         hours_remaining = get_hours_until_next_cleanup()
-        Logger.info(f"⏱️  Cleanup non necessario (prossimo tra {hours_remaining}h)")
+        Logger.info(f"  Cleanup non necessario (prossimo tra {hours_remaining}h)")
     
-    Logger.success("✅ Monitoraggio completato")
+    Logger.success(" Monitoraggio completato")
     Logger.info("=" * 60)
 
 

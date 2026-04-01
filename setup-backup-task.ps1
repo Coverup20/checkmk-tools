@@ -4,7 +4,7 @@
 $ErrorActionPreference = "Stop"
 
 Write-Host "`n╔═══════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║      ⏰ SETUP BACKUP AUTOMATICO REPOSITORY            ║" -ForegroundColor White
+Write-Host "║       SETUP BACKUP AUTOMATICO REPOSITORY            ║" -ForegroundColor White
 Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
 
 $TASK_NAME = "CheckMK-Backup-Auto"
@@ -13,7 +13,7 @@ $LOG_PATH = "C:\CheckMK-Backups\logs"
 
 # Verifica che lo script esista
 if (-not (Test-Path $SCRIPT_PATH)) {
-    Write-Host "✗ Script non trovato: $SCRIPT_PATH" -ForegroundColor Red
+    Write-Host " Script non trovato: $SCRIPT_PATH" -ForegroundColor Red
     exit 1
 }
 
@@ -21,21 +21,21 @@ if (-not (Test-Path $SCRIPT_PATH)) {
 # SCELTA FREQUENZA BACKUP
 # ═══════════════════════════════════════════════════════════════════
 
-Write-Host "⏱️  Scegli la frequenza di backup automatico:" -ForegroundColor Yellow
+Write-Host "  Scegli la frequenza di backup automatico:" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "  1) Ogni 15 minuti  ⚡ (molto frequente)" -ForegroundColor White
-Write-Host "  2) Ogni 30 minuti  🔄 (frequente)" -ForegroundColor White
-Write-Host "  3) Ogni ora        ⏰ (consigliato)" -ForegroundColor Green
-Write-Host "  4) Ogni 2 ore      📅 (moderato)" -ForegroundColor White
-Write-Host "  5) Ogni 4 ore      🕐 (leggero)" -ForegroundColor White
-Write-Host "  6) Ogni 6 ore      🌙 (minimo)" -ForegroundColor White
+Write-Host "  1) Ogni 15 minuti   (molto frequente)" -ForegroundColor White
+Write-Host "  2) Ogni 30 minuti   (frequente)" -ForegroundColor White
+Write-Host "  3) Ogni ora         (consigliato)" -ForegroundColor Green
+Write-Host "  4) Ogni 2 ore       (moderato)" -ForegroundColor White
+Write-Host "  5) Ogni 4 ore       (leggero)" -ForegroundColor White
+Write-Host "  6) Ogni 6 ore       (minimo)" -ForegroundColor White
 Write-Host ""
 
 do {
     $scelta = Read-Host "Inserisci il numero della tua scelta (1-6)"
     $sceltaValida = $scelta -match '^[1-6]$'
     if (-not $sceltaValida) {
-        Write-Host "✗ Scelta non valida. Inserisci un numero da 1 a 6." -ForegroundColor Red
+        Write-Host " Scelta non valida. Inserisci un numero da 1 a 6." -ForegroundColor Red
     }
 } while (-not $sceltaValida)
 
@@ -60,16 +60,16 @@ if ($frequenzaOre -ge 1) {
     $frequenzaTesto = "ogni $frequenzaMinuti minuti"
 }
 
-Write-Host "`n✓ Frequenza selezionata: $frequenzaTesto" -ForegroundColor Green
+Write-Host "`n Frequenza selezionata: $frequenzaTesto" -ForegroundColor Green
 Write-Host ""
 
 # Crea cartella log se non esiste
 if (-not (Test-Path $LOG_PATH)) {
     New-Item -ItemType Directory -Path $LOG_PATH -Force | Out-Null
-    Write-Host "✓ Creata cartella log: $LOG_PATH" -ForegroundColor Green
+    Write-Host " Creata cartella log: $LOG_PATH" -ForegroundColor Green
 }
 
-Write-Host "📝 Configurazione Scheduled Task..." -ForegroundColor Yellow
+Write-Host " Configurazione Scheduled Task..." -ForegroundColor Yellow
 
 # Rimuovi task esistente se presente
 $existingTask = Get-ScheduledTask -TaskName $TASK_NAME -ErrorAction SilentlyContinue
@@ -114,24 +114,24 @@ try {
         -Description "Backup automatico $frequenzaTesto del repository checkmk-tools (funziona anche con utente disconnesso)" `
         -Force | Out-Null
     
-    Write-Host "✓ Scheduled Task creato con successo!" -ForegroundColor Green
+    Write-Host " Scheduled Task creato con successo!" -ForegroundColor Green
 } catch {
-    Write-Host "✗ Errore nella creazione del task: $_" -ForegroundColor Red
+    Write-Host " Errore nella creazione del task: $_" -ForegroundColor Red
     exit 1
 }
 
 Write-Host "`n╔═══════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║              ✓ CONFIGURAZIONE COMPLETATA              ║" -ForegroundColor White
+Write-Host "║               CONFIGURAZIONE COMPLETATA              ║" -ForegroundColor White
 Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Green
 
-Write-Host "📋 Dettagli configurazione:" -ForegroundColor Cyan
+Write-Host " Dettagli configurazione:" -ForegroundColor Cyan
 Write-Host "   Task Name: $TASK_NAME" -ForegroundColor Gray
 Write-Host "   Script: $SCRIPT_PATH" -ForegroundColor Gray
 Write-Host "   Frequenza: $frequenzaTesto" -ForegroundColor Yellow
 Write-Host "   Log: $LOG_PATH" -ForegroundColor Gray
 Write-Host "   User: $env:USERDOMAIN\$env:USERNAME" -ForegroundColor Gray
 
-Write-Host "`n💡 Comandi utili:" -ForegroundColor Yellow
+Write-Host "`n Comandi utili:" -ForegroundColor Yellow
 Write-Host "   Verifica task:" -ForegroundColor Gray
 Write-Host "     Get-ScheduledTask -TaskName '$TASK_NAME'" -ForegroundColor White
 Write-Host "`n   Avvia manualmente:" -ForegroundColor Gray
@@ -145,5 +145,5 @@ Write-Host "     Unregister-ScheduledTask -TaskName '$TASK_NAME' -Confirm:`$fals
 Write-Host "`n   Visualizza log ultima esecuzione:" -ForegroundColor Gray
 Write-Host "     Get-Content '$LOG_PATH\backup_$(Get-Date -Format 'yyyy-MM-dd').log'" -ForegroundColor White
 
-Write-Host "`n🚀 Il backup automatico partirà tra 2 minuti e poi $frequenzaTesto!" -ForegroundColor Green
+Write-Host "`n Il backup automatico partirà tra 2 minuti e poi $frequenzaTesto!" -ForegroundColor Green
 Write-Host ""

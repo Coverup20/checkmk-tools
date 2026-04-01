@@ -44,14 +44,14 @@ def load_env_file(path: str) -> None:
 def get_emoji(state: str) -> str:
     state = state.upper()
     if state in ("OK", "UP"):
-        return "🟢"
+        return ""
     elif state in ("WARN", "WARNING"):
-        return "🟡"
+        return ""
     elif state in ("CRIT", "CRITICAL", "DOWN"):
-        return "🔴"
+        return ""
     elif state == "UNKNOWN":
-        return "⚠"
-    return "❌"
+        return ""
+    return ""
 
 
 def urlencode(value: str) -> str:
@@ -116,8 +116,8 @@ def main() -> int:
             f"Output: {output}"
         )
         button = (
-            '{"inline_keyboard":[[{"text":"🔗 Servizio","url":"' + service_link + '"},'
-            '{"text":"🖥 Host","url":"' + host_link + '"}]]}'
+            '{"inline_keyboard":[[{"text":" Servizio","url":"' + service_link + '"},'
+            '{"text":" Host","url":"' + host_link + '"}]]}'
         )
     else:
         state = os.environ.get("NOTIFY_HOSTSTATE", "UNKNOWN")
@@ -135,10 +135,10 @@ def main() -> int:
             f"Output: {output}"
         )
         button = (
-            '{"inline_keyboard":[[{"text":"🖥 Host","url":"' + host_link + '"}]]}'
+            '{"inline_keyboard":[[{"text":" Host","url":"' + host_link + '"}]]}'
         )
 
-    msg = f"🤝 [TMATE] {msg}"
+    msg = f" [TMATE] {msg}"
     send_telegram(token, chat_id, msg, button)
     return 0
 

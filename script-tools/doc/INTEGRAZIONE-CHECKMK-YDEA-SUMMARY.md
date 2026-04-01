@@ -1,42 +1,42 @@
-# 🎉 Integrazione CheckMK → Ydea Completata
+#  Integrazione CheckMK → Ydea Completata
 
-# 🎉 Integrazione CheckMK → Ydea Completata
+#  Integrazione CheckMK → Ydea Completata
 > **Categoria:** Specialistico
 
-## ✅ File Creati
+##  File Creati
 
 ### **Script di Notifica CheckMK**
-📁 `script-notify-checkmk/`
-- ✅ **`ydea_la`** - Script notifica principale (415 righe)
+ `script-notify-checkmk/`
+-  **`ydea_la`** - Script notifica principale (415 righe)
   - Gestione automatica ticket Ydea da alert CheckMK
   - Cache intelligente per prevenire duplicati
   - Note private su cambio stato
   - Rilevamento flapping (5+ cambi in 10 min)
   - Supporto HOST e SERVICE alert
 
-- ✅ **`mail_ydea_down`** - Notifica email Ydea offline (300+ righe)
+-  **`mail_ydea_down`** - Notifica email Ydea offline (300+ righe)
   - Email HTML professionale
   - Informazioni dettagliate su impatto
   - Basato su mail_realip_hybrid_safe
 
 ### **Monitoring Ydea**
-📁 `Ydea-Toolkit/`
-- ✅ **`ydea-health-monitor.sh`** - Monitor periodico (200 righe)
+ `Ydea-Toolkit/`
+-  **`ydea-health-monitor.sh`** - Monitor periodico (200 righe)
   - Controllo ogni 15 minuti (configurabile)
   - Soglia 3 fallimenti prima di notificare
   - Email alert + recovery notification
   - State tracking in `/tmp/ydea_health_state.json`
 
 ### **Configurazione**
-📁 `Ydea-Toolkit/`
-- ✅ **`.env`** - Aggiornato con nuove variabili
+ `Ydea-Toolkit/`
+-  **`.env`** - Aggiornato con nuove variabili
   - `YDEA_ALERT_EMAIL` per notifiche down
   - `YDEA_FAILURE_THRESHOLD` per soglia errori
   - `DEBUG_YDEA` per troubleshooting
 
 ### **Documentazione**
-📁 `Ydea-Toolkit/`
-- ✅ **`README-CHECKMK-INTEGRATION.md`** - Guida completa (600+ righe)
+ `Ydea-Toolkit/`
+-  **`README-CHECKMK-INTEGRATION.md`** - Guida completa (600+ righe)
   - Panoramica sistema
   - Installazione passo-passo
   - Configurazione CheckMK notification rule
@@ -45,62 +45,62 @@
   - Troubleshooting dettagliato
   - FAQ completa
 
-- ✅ **`QUICK-REFERENCE.md`** - Riferimento rapido (400+ righe)
+-  **`QUICK-REFERENCE.md`** - Riferimento rapido (400+ righe)
   - Comandi utili one-liner
   - Test manuali
   - Debug e log
   - Esempi configurazione
   - Manutenzione cache
 
-- ✅ **`install-ydea-checkmk-integration.sh`** - Installer automatico
+-  **`install-ydea-checkmk-integration.sh`** - Installer automatico
   - Verifica prerequisiti
   - Copia script nelle directory corrette
   - Setup .env
   - Configurazione cron
   - Test connessione
 
-- ✅ **`INDEX.txt`** - Aggiornato con nuova sezione CheckMK
+-  **`INDEX.txt`** - Aggiornato con nuova sezione CheckMK
 
 ---
 
-## 🎯 Funzionalità Implementate
+##  Funzionalità Implementate
 
 ### **Alert CheckMK → Ticket Ydea**
-✅ **Creazione automatica ticket** quando servizio/host passa a CRITICAL/DOWN
-✅ **Identificazione univoca** per IP/Hostname + Servizio
-✅ **Prevenzione duplicati** tramite cache JSON
-✅ **Note private** (non visibili al cliente) per ogni cambio stato:
+ **Creazione automatica ticket** quando servizio/host passa a CRITICAL/DOWN
+ **Identificazione univoca** per IP/Hostname + Servizio
+ **Prevenzione duplicati** tramite cache JSON
+ **Note private** (non visibili al cliente) per ogni cambio stato:
    - CRIT → OK (allarme rientrato)
    - CRIT → WARN
    - Rilevamento flapping
-✅ **Formato note sintetico**: `[data ora] 🔴CRIT→🟢OK | Output: descrizione`
-✅ **Ticket rimane aperto** (non viene chiuso automaticamente)
+ **Formato note sintetico**: `[data ora] CRIT→OK | Output: descrizione`
+ **Ticket rimane aperto** (non viene chiuso automaticamente)
 
 ### **Flapping Detection**
-✅ **Soglia configurabile**: 5 cambi stato in 10 minuti (default)
-✅ **Alert speciale** quando rilevato flapping
-✅ **Priorità elevata** a critical per ticket con flapping
-✅ **Cache separata** per tracking cambi stato
+ **Soglia configurabile**: 5 cambi stato in 10 minuti (default)
+ **Alert speciale** quando rilevato flapping
+ **Priorità elevata** a critical per ticket con flapping
+ **Cache separata** per tracking cambi stato
 
 ### **Monitoraggio Ydea API**
-✅ **Check periodico** ogni 15 minuti (via cron)
-✅ **Soglia intelligente**: 3 fallimenti consecutivi prima di notificare
-✅ **Email alert** quando Ydea non raggiungibile
-✅ **Recovery notification** quando torna online
-✅ **State tracking** per evitare notifiche duplicate
+ **Check periodico** ogni 15 minuti (via cron)
+ **Soglia intelligente**: 3 fallimenti consecutivi prima di notificare
+ **Email alert** quando Ydea non raggiungibile
+ **Recovery notification** quando torna online
+ **State tracking** per evitare notifiche duplicate
 
 ### **Cache e Persistenza**
-✅ **Ticket cache**: `/tmp/ydea_checkmk_tickets.json`
+ **Ticket cache**: `/tmp/ydea_checkmk_tickets.json`
    - Ticket ID, stato corrente, timestamp creazione/aggiornamento
-✅ **Flapping cache**: `/tmp/ydea_checkmk_flapping.json`
+ **Flapping cache**: `/tmp/ydea_checkmk_flapping.json`
    - Storia cambi stato con timestamp
    - Auto-pulizia eventi > 10 minuti
-✅ **Health state**: `/tmp/ydea_health_state.json`
+ **Health state**: `/tmp/ydea_health_state.json`
    - Stato Ydea, ultimo check, fallimenti consecutivi
 
 ---
 
-## 📋 Come Funziona
+##  Come Funziona
 
 ### **Scenario 1: Nuovo Alert CRITICAL**
 ```
@@ -108,7 +108,7 @@
 2. Esegue script ydea_la
 3. Script controlla cache: ticket esiste per questo servizio?
 4. NO → Crea nuovo ticket Ydea:
-   - Titolo: "[🔴 CRIT] 192.168.1.50 - CPU Load"
+   - Titolo: "[ CRIT] 192.168.1.50 - CPU Load"
    - Corpo: Dettagli alert con output plugin
    - Priorità: high (o critical se flapping)
 5. Salva ticket ID in cache
@@ -120,7 +120,7 @@
 2. Esegue script ydea_la
 3. Script controlla cache: ticket esiste? SÌ
 4. Aggiunge nota privata a ticket esistente:
-   "🔄 [13/11/25 14:32] 🔴CRIT→🟢OK | ✅ Allarme rientrato | Output: CPU normal"
+   " [13/11/25 14:32] CRIT→OK |  Allarme rientrato | Output: CPU normal"
 5. Ticket rimane APERTO
 ```
 
@@ -128,7 +128,7 @@
 ```
 1. Servizio cambia stato 5 volte in 10 minuti
 2. Script rileva pattern flapping
-3. Nota privata: "⚠️ FLAPPING (5 cambi in 10min) | Current: CRIT"
+3. Nota privata: " FLAPPING (5 cambi in 10min) | Current: CRIT"
 4. Se nuovo ticket, priorità → CRITICAL
 ```
 
@@ -137,7 +137,7 @@
 1. Cron esegue ydea-health-monitor.sh ogni 15 min
 2. Login Ydea fallisce 3 volte consecutive
 3. Invia email a massimo.palazzetti@nethesis.it:
-   - Subject: "🚨 [ALERT] Ydea API - Servizio Non Raggiungibile"
+   - Subject: " [ALERT] Ydea API - Servizio Non Raggiungibile"
    - Corpo HTML con dettagli e azioni richieste
 4. Continua a monitorare
 5. Quando Ydea torna up → Email recovery
@@ -145,7 +145,7 @@
 
 ---
 
-## 🚀 Prossimi Passi per l'Installazione
+##  Prossimi Passi per l'Installazione
 
 ### **1. Deploy su Server CheckMK**
 ```bash
@@ -178,7 +178,7 @@ Modifica:
 cd /opt/ydea-toolkit
 source .env
 ./ydea-toolkit.sh login
-# Output atteso: ✅ Login effettuato
+# Output atteso:  Login effettuato
 ```
 
 ### **4. Configura CheckMK Notification Rule**
@@ -198,7 +198,7 @@ Vedi: `QUICK-REFERENCE.md` → sezione "Test Notifica Manuale"
 
 ---
 
-## 📊 Struttura File Finali
+##  Struttura File Finali
 
 ```
 checkmk-tools/
@@ -223,22 +223,22 @@ checkmk-tools/
 
 ---
 
-## 🎓 Documentazione
+##  Documentazione
 
 ### **Leggere Subito**
-1. 📖 `README-CHECKMK-INTEGRATION.md` - Guida completa
-2. 🚀 `QUICK-REFERENCE.md` - Comandi rapidi
+1.  `README-CHECKMK-INTEGRATION.md` - Guida completa
+2.  `QUICK-REFERENCE.md` - Comandi rapidi
 
 ### **Per Setup**
-3. 🔧 `install-ydea-checkmk-integration.sh` - Installer automatico
+3.  `install-ydea-checkmk-integration.sh` - Installer automatico
 
 ### **Per Troubleshooting**
-4. 📋 `README-CHECKMK-INTEGRATION.md` → sezione Troubleshooting
-5. 🔍 `QUICK-REFERENCE.md` → sezione Debug
+4.  `README-CHECKMK-INTEGRATION.md` → sezione Troubleshooting
+5.  `QUICK-REFERENCE.md` → sezione Debug
 
 ---
 
-## 💡 Note Importanti
+##  Note Importanti
 
 ### **Permessi File**
 Tutti gli script devono essere eseguibili:
@@ -266,7 +266,7 @@ Oppure l'installer lo fa automaticamente.
 
 ---
 
-## ✅ Checklist Pre-Produzione
+##  Checklist Pre-Produzione
 
 - [ ] Repository committato e pushato su GitHub
 - [ ] Script deployati su server CheckMK
@@ -281,19 +281,19 @@ Oppure l'installer lo fa automaticamente.
 
 ---
 
-## 🎯 Risultato Finale
+##  Risultato Finale
 
 Hai ora un sistema completo che:
 
-✅ **Automatizza** la creazione ticket Ydea da alert CheckMK  
-✅ **Traccia** ogni cambio stato con note private  
-✅ **Previene** duplicati con cache intelligente  
-✅ **Rileva** servizi in flapping  
-✅ **Monitora** la disponibilità di Ydea stesso  
-✅ **Notifica** il responsabile se Ydea è down  
-✅ **Mantiene** tutto sincronizzato e logging completo  
+ **Automatizza** la creazione ticket Ydea da alert CheckMK  
+ **Traccia** ogni cambio stato con note private  
+ **Previene** duplicati con cache intelligente  
+ **Rileva** servizi in flapping  
+ **Monitora** la disponibilità di Ydea stesso  
+ **Notifica** il responsabile se Ydea è down  
+ **Mantiene** tutto sincronizzato e logging completo  
 
-🎉 **Congratulazioni! Sistema pronto per la produzione!** 🎉
+ **Congratulazioni! Sistema pronto per la produzione!** 
 
 ---
 

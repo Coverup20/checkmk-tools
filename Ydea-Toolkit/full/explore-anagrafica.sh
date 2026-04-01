@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/ydea-toolkit.sh"
 
 ANAGRAFICA_ID="${1:-2339268}"  # Default: AZIENDA MONITORATA test
 
-echo "🔍 Esplorazione anagrafica ID: $ANAGRAFICA_ID..."
+echo " Esplorazione anagrafica ID: $ANAGRAFICA_ID..."
 echo ""
 
 ensure_token
@@ -28,7 +28,7 @@ declare -a ENDPOINTS=(
   "/contratti?anagrafica_id=$ANAGRAFICA_ID"
 )
 
-echo "📊 Tentativo di recupero dati anagrafica..."
+echo " Tentativo di recupero dati anagrafica..."
 echo ""
 
 for ENDPOINT in "${ENDPOINTS[@]}"; do
@@ -42,7 +42,7 @@ for ENDPOINT in "${ENDPOINTS[@]}"; do
   HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
   
   if [[ "$HTTP_CODE" == "200" ]]; then
-    echo "✅ HTTP $HTTP_CODE - TROVATO!"
+    echo " HTTP $HTTP_CODE - TROVATO!"
     
     HTTP_BODY=$(echo "$RESPONSE" | sed '$d')
     
@@ -57,23 +57,23 @@ for ENDPOINT in "${ENDPOINTS[@]}"; do
     echo ""
     
     # Cerca campi contenenti "sla", "premium", "mon"
-    echo "🔍 Campi contenenti 'SLA', 'Premium' o 'Mon':"
+    echo " Campi contenenti 'SLA', 'Premium' o 'Mon':"
     echo "$HTTP_BODY" | jq 'walk(if type == "object" then with_entries(select(.key | test("sla|premium|mon|contract|contratt"; "i"))) else . end)' 2>/dev/null || echo "   Nessuno trovato"
     
     echo ""
     
     # Salva il risultato
     echo "$HTTP_BODY" | jq '.' > "/tmp/anagrafica-${ANAGRAFICA_ID}.json"
-    echo "💾 Salvato in: /tmp/anagrafica-${ANAGRAFICA_ID}.json"
+    echo " Salvato in: /tmp/anagrafica-${ANAGRAFICA_ID}.json"
     echo ""
   elif [[ "$HTTP_CODE" == "404" ]]; then
-    echo "❌ HTTP $HTTP_CODE - Non trovato"
+    echo " HTTP $HTTP_CODE - Non trovato"
   elif [[ "$HTTP_CODE" == "401" ]]; then
-    echo "❌ HTTP $HTTP_CODE - Non autorizzato"
+    echo " HTTP $HTTP_CODE - Non autorizzato"
   elif [[ "$HTTP_CODE" == "403" ]]; then
-    echo "❌ HTTP $HTTP_CODE - Accesso negato"
+    echo " HTTP $HTTP_CODE - Accesso negato"
   else
-    echo "❌ HTTP $HTTP_CODE"
+    echo " HTTP $HTTP_CODE"
   fi
 done
 
@@ -112,4 +112,4 @@ if [[ "$COUNT" -gt 0 ]]; then
 fi
 
 echo ""
-echo "✓ Esplorazione completata!"
+echo " Esplorazione completata!"

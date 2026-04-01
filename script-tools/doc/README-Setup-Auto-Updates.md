@@ -19,13 +19,13 @@ Launcher che scarica ed esegue lo script completo direttamente da GitHub.
 
 ## Caratteristiche
 
-- ✅ **Menu interattivo** con opzioni predefinite
-- ✅ **Backup automatico** del crontab esistente
-- ✅ **Logging completo** degli aggiornamenti
-- ✅ **Validazione input** per sicurezza
-- ✅ **Gestione duplicati** - rimuove entry esistenti
-- ✅ **Output colorato** per migliore leggibilità
-- ✅ **Personalizzazione orari** flessibile
+-  **Menu interattivo** con opzioni predefinite
+-  **Backup automatico** del crontab esistente
+-  **Logging completo** degli aggiornamenti
+-  **Validazione input** per sicurezza
+-  **Gestione duplicati** - rimuove entry esistenti
+-  **Output colorato** per migliore leggibilità
+-  **Personalizzazione orari** flessibile
 
 ## Utilizzo
 
@@ -357,13 +357,13 @@ Questo script fa parte del progetto checkmk-tools.
 
 ## Note Importanti
 
-⚠️ **ATTENZIONE:**
+ **ATTENZIONE:**
 - Gli aggiornamenti automatici possono richiedere riavvii
 - Monitora sempre i log dopo le prime esecuzioni
 - Testa prima su sistemi non critici
 - Mantieni backup del sistema aggiornati
 
-💡 **SUGGERIMENTO:**
+ **SUGGERIMENTO:**
 - Configura notifiche email per i risultati degli aggiornamenti
 - Considera l'uso di `unattended-upgrades` per configurazioni più avanzate
 - Integra con sistemi di monitoring esistenti (CheckMK, Nagios, etc.)

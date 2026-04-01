@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/ydea-toolkit.sh"
 
 PAGES="${1:-20}"  # Numero di pagine da analizzare (default: 20 = 2000 ticket)
 
-echo "🔍 Analisi customAttributes su $PAGES pagine di ticket..."
+echo " Analisi customAttributes su $PAGES pagine di ticket..."
 echo ""
 
 ensure_token
@@ -18,7 +18,7 @@ TOKEN="$(load_token)"
 TEMP_FILE="/tmp/all-custom-attributes.json"
 echo "[]" > "$TEMP_FILE"
 
-echo "📊 Raccolta dati in corso..."
+echo " Raccolta dati in corso..."
 
 for PAGE in $(seq 1 $PAGES); do
   echo -n "   Pagina $PAGE/$PAGES... "
@@ -32,7 +32,7 @@ for PAGE in $(seq 1 $PAGES); do
   HTTP_CODE="$(echo "$RESPONSE" | tail -n1)"
   
   if [[ "$HTTP_CODE" != "200" ]]; then
-    echo "❌ Errore HTTP $HTTP_CODE"
+    echo " Errore HTTP $HTTP_CODE"
     break
   fi
   
@@ -50,7 +50,7 @@ for PAGE in $(seq 1 $PAGES); do
 done
 
 echo ""
-echo "🔎 Elaborazione dati..."
+echo " Elaborazione dati..."
 
 # Combina tutti i risultati
 jq -s 'add' "$TEMP_FILE.part" 2>/dev/null > "$TEMP_FILE" || echo "[]" > "$TEMP_FILE"
@@ -100,7 +100,7 @@ if [[ -n "$MATCHING_ATTRS" && "$MATCHING_ATTRS" != "null" ]]; then
       echo ""
     done <<< "$MATCHING_ATTRS"
 else
-    echo "⚠️  Nessun custom attribute trovato con queste parole chiave"
+    echo "  Nessun custom attribute trovato con queste parole chiave"
     echo ""
 fi
 
@@ -146,12 +146,12 @@ if [[ "$PREMIUM_TICKETS" -gt 0 ]]; then
 fi
 
 echo ""
-echo "✓ Analisi completata!"
+echo " Analisi completata!"
 echo ""
-echo "💾 File salvati:"
+echo " File salvati:"
 echo "   - $TEMP_FILE (tutti i customAttributes)"
 echo "   - $TIPO_FILE (tutti i valori 'tipo')"
 echo ""
-echo "💡 Usa questi comandi per ulteriori analisi:"
+echo " Usa questi comandi per ulteriori analisi:"
 echo "   cat $TEMP_FILE | jq '.[] | select(.customAttributes | has(\"NOME_CAMPO\"))'"
 echo "   cat $TEMP_FILE | jq '[.[].customAttributes | keys[]] | unique'"

@@ -5,12 +5,12 @@ Cartella: Proxmox/
 Data: 27 Ottobre 2025
 ================================================================================
 
-📁 STRUTTURA CARTELLE
+ STRUTTURA CARTELLE
 ├── nopolling/          (10 script)
 └── polling/            (vuota)
 
 ================================================================================
-📂 PROXMOX/NOPOLLING/
+ PROXMOX/NOPOLLING/
 ================================================================================
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -25,10 +25,10 @@ DESCRIZIONE:
 Monitora lo stato degli snapshot per VM (QEMU) e container LXC in Proxmox.
 
 FUNZIONALITÀ:
-✓ Conta numero snapshot per ogni VM/LXC
-✓ Rileva snapshot in corso (state: prepare/running)
-✓ Segnala assenza di snapshot
-✓ Trasforma nomi in Title Case per leggibilità
+ Conta numero snapshot per ogni VM/LXC
+ Rileva snapshot in corso (state: prepare/running)
+ Segnala assenza di snapshot
+ Trasforma nomi in Title Case per leggibilità
 
 OUTPUT CHECKMK:
 - SNAPSHOT_VM_{vmid}_{NAME}   (per macchine virtuali)
@@ -56,11 +56,11 @@ Monitora lo stato completo di tutte le VM e container LXC sul nodo Proxmox.
 Ogni VM/LXC viene creato come servizio distinto in CheckMK.
 
 FUNZIONALITÀ:
-✓ Status VM/LXC (running/stopped)
-✓ Uptime leggibile completo (giorni, ore, minuti, secondi)
-✓ Nomi servizi in MAIUSCOLO
-✓ Contatori globali (totale VM/LXC, running, stopped)
-✓ Conversione uptime da secondi a formato umano
+ Status VM/LXC (running/stopped)
+ Uptime leggibile completo (giorni, ore, minuti, secondi)
+ Nomi servizi in MAIUSCOLO
+ Contatori globali (totale VM/LXC, running, stopped)
+ Conversione uptime da secondi a formato umano
 
 OUTPUT CHECKMK:
 - Proxmox_VM_Global          (servizio riepilogo)
@@ -91,10 +91,10 @@ Script CheckMK local check per monitorare stato e RAM delle VM tramite API
 Proxmox (pvesh).
 
 FUNZIONALITÀ:
-✓ Stato VM (accesa/spenta)
-✓ Utilizzo RAM in percentuale
-✓ Memoria allocata vs memoria usata
-✓ Supporto per VM spente (legge config da /etc/pve/qemu-server/)
+ Stato VM (accesa/spenta)
+ Utilizzo RAM in percentuale
+ Memoria allocata vs memoria usata
+ Supporto per VM spente (legge config da /etc/pve/qemu-server/)
 
 OUTPUT CHECKMK:
 - vm_{vmid}_{name} Stato
@@ -122,9 +122,9 @@ DESCRIZIONE:
 Script CheckMK local check per monitorare i dischi delle VM Proxmox.
 
 FUNZIONALITÀ:
-✓ Rileva tutti i dischi configurati (ide, scsi, sata, virtio)
-✓ Mostra dimensione allocata per ogni disco
-✓ Un servizio per ogni disco della VM
+ Rileva tutti i dischi configurati (ide, scsi, sata, virtio)
+ Mostra dimensione allocata per ogni disco
+ Un servizio per ogni disco della VM
 
 OUTPUT CHECKMK:
 - vm_{vmid}_{name} Disk
@@ -158,12 +158,12 @@ WARN_DISK=80   (warning disco al 80%)
 CRIT_DISK=90   (critical disco al 90%)
 
 FUNZIONALITÀ:
-✓ Status VM (accesa/spenta)
-✓ Monitoraggio RAM con soglie
-✓ Monitoraggio disco con soglie
-✓ Supporto LVM-thin storage
-✓ Calcolo percentuali uso RAM/Disk
-✓ Stati dinamici (0=OK, 1=WARN, 2=CRIT)
+ Status VM (accesa/spenta)
+ Monitoraggio RAM con soglie
+ Monitoraggio disco con soglie
+ Supporto LVM-thin storage
+ Calcolo percentuali uso RAM/Disk
+ Stati dinamici (0=OK, 1=WARN, 2=CRIT)
 
 OUTPUT CHECKMK:
 - vm_{vmid}_{name} Status
@@ -188,7 +188,7 @@ ESEMPIO OUTPUT:
 
 
 ================================================================================
-📂 SCRIPT REMOTI (WRAPPER)
+ SCRIPT REMOTI (WRAPPER)
 ================================================================================
 
 Tutti gli script con prefisso "r" sono wrapper che scaricano ed eseguono
@@ -198,10 +198,10 @@ FUNZIONAMENTO:
 bash <(curl -fsSL "$SCRIPT_URL") "$@"
 
 VANTAGGI:
-✓ Sempre aggiornati all'ultima versione su GitHub
-✓ Non serve copiare manualmente gli script sui server
-✓ Centralized management
-✓ Facile deployment su nuovi host
+ Sempre aggiornati all'ultima versione su GitHub
+ Non serve copiare manualmente gli script sui server
+ Centralized management
+ Facile deployment su nuovi host
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -255,7 +255,7 @@ Wrapper remoto per proxmox_vm_monitor.sh
 
 
 ================================================================================
-📂 PROXMOX/POLLING/
+ PROXMOX/POLLING/
 ================================================================================
 
 STATO: Cartella vuota
@@ -291,11 +291,11 @@ DIPENDENZE
 ================================================================================
 
 RICHIESTE:
-✓ Proxmox VE 8.x
-✓ CheckMK Raw 2.4.x
-✓ jq (JSON parser) - per script API-based
-✓ bash
-✓ curl (per script remoti)
+ Proxmox VE 8.x
+ CheckMK Raw 2.4.x
+ jq (JSON parser) - per script API-based
+ bash
+ curl (per script remoti)
 
 COMANDI PROXMOX USATI:
 - qm (gestione VM QEMU)
@@ -331,9 +331,9 @@ cp rcheck-proxmox-vm-status.sh /usr/lib/check_mk_agent/local/
 chmod +x /usr/lib/check_mk_agent/local/rcheck-proxmox-vm-status.sh
 
 VANTAGGI:
-✓ Aggiornamenti automatici dal repository
-✓ No manutenzione manuale degli script
-✓ Centralized management
+ Aggiornamenti automatici dal repository
+ No manutenzione manuale degli script
+ Centralized management
 
 
 ================================================================================

@@ -1,7 +1,7 @@
 # Setup Auto-Upgrade CheckMK - Configurazione Upgrade Automatici
 > **Categoria:** Operativo
 
-## ⚠️ ATTENZIONE - Script Avanzato
+##  ATTENZIONE - Script Avanzato
 
 Questo script configura upgrade **AUTOMATICI** di CheckMK tramite crontab. Si tratta di un'operazione potenzialmente rischiosa che deve essere configurata con attenzione.
 
@@ -28,14 +28,14 @@ Script che esegue effettivamente l'upgrade di CheckMK (deve essere presente).
 
 ## Caratteristiche di Sicurezza
 
-- ✅ **Backup automatico** prima di ogni upgrade
-- ✅ **Upgrade non interattivo** completamente automatizzato
-- ✅ **Logging dettagliato** di tutte le operazioni
-- ✅ **Notifiche email** opzionali per successo/fallimento
-- ✅ **Verifica versione** - upgrade solo se disponibile nuova versione
-- ✅ **Riavvio automatico** del sito CheckMK dopo upgrade
-- ✅ **Backup crontab** prima di modifiche
-- ✅ **Gestione duplicati** nel crontab
+-  **Backup automatico** prima di ogni upgrade
+-  **Upgrade non interattivo** completamente automatizzato
+-  **Logging dettagliato** di tutte le operazioni
+-  **Notifiche email** opzionali per successo/fallimento
+-  **Verifica versione** - upgrade solo se disponibile nuova versione
+-  **Riavvio automatico** del sito CheckMK dopo upgrade
+-  **Backup crontab** prima di modifiche
+-  **Gestione duplicati** nel crontab
 
 ## Prerequisiti
 
@@ -238,37 +238,37 @@ crontab -l | grep -v "upgrade-checkmk.sh" | crontab -
 
 ## Best Practices
 
-### 1. ⏰ Orario di Esecuzione
+### 1.  Orario di Esecuzione
 - **Consigliato:** 02:00-04:00 (basso traffico)
 - **Evita:** Ore di punta e orari lavorativi
 - **Weekend:** Preferibile per sistemi di produzione
 - **Considera:** Fuso orario del server
 
-### 2. 📅 Frequenza Upgrade
+### 2.  Frequenza Upgrade
 - **Produzione critica:** Mensile + test preventivi su ambiente staging
 - **Produzione standard:** Settimanale
 - **Sviluppo/Test:** Anche settimanale va bene
 - **Mai:** Giornaliero (troppo rischioso)
 
-### 3. 🔍 Monitoraggio
+### 3.  Monitoraggio
 - Controlla i log **dopo ogni upgrade automatico**
 - Imposta alert per fallimenti
 - Verifica funzionamento CheckMK post-upgrade
 - Controlla spazio disco per backup
 
-### 4. 💾 Gestione Backup
+### 4.  Gestione Backup
 - I backup si accumulano in `/opt/omd/backups/`
 - Implementa rotazione backup (mantieni ultimi 5-10)
 - Verifica regolarmente l'integrità dei backup
 - Considera backup esterni aggiuntivi
 
-### 5. 🧪 Testing
+### 5.  Testing
 - **Prima volta:** Testa l'upgrade manuale
 - **Staging:** Prova su ambiente di test prima
 - **Verifica:** Controlla il primo upgrade automatico
 - **Rollback:** Preparati a ripristinare se necessario
 
-### 6. 🔔 Notifiche
+### 6.  Notifiche
 - Configura email per amministratori
 - Integra con sistemi di monitoring esistenti
 - Verifica che le email arrivino correttamente
@@ -453,14 +453,14 @@ fi
 
 ## Sicurezza e Responsabilità
 
-### ⚠️ Disclaimer
+###  Disclaimer
 - Gli upgrade automatici comportano rischi intrinseci
 - Testa sempre in ambiente di staging prima
 - Mantieni backup esterni e indipendenti
 - Monitora attivamente il sistema post-upgrade
 - Preparati a interventi manuali in caso di problemi
 
-### 🛡️ Raccomandazioni di Sicurezza
+###  Raccomandazioni di Sicurezza
 1. **Backup esterni** oltre a quelli automatici
 2. **Ambiente di test** per validare upgrade
 3. **Documentazione** delle configurazioni custom
@@ -492,28 +492,28 @@ Questo script fa parte del progetto checkmk-tools.
 
 ## Note Finali
 
-🚨 **IMPORTANTE:**
+ **IMPORTANTE:**
 - Questo è uno strumento potente ma potenzialmente pericoloso
 - Usalo SOLO se comprendi completamente i rischi
 - Per sistemi critici, considera upgrade manuali con test preventivi
 - Gli upgrade possono richiedere riavvii del server
 - Non tutti gli upgrade sono backward-compatible
 
-💡 **QUANDO USARLO:**
+ **QUANDO USARLO:**
 - Ambienti di sviluppo/test
 - Sistemi non critici
 - Con monitoring attivo e alerting
 - Con backup esterni robusti
 - Quando hai competenza per gestire problemi
 
-❌ **QUANDO NON USARLO:**
+ **QUANDO NON USARLO:**
 - Sistemi critici di produzione senza test
 - Se non hai familiarità con CheckMK
 - Senza piano di disaster recovery
 - Senza possibilità di intervento rapido
 - In ambienti con SLA stringenti
 
-📚 **RISORSE UTILI:**
+ **RISORSE UTILI:**
 - [CheckMK Official Documentation](https://docs.checkmk.com/)
 - [OMD Update Guide](https://docs.checkmk.com/latest/en/update.html)
 - [CheckMK Backup/Restore](https://docs.checkmk.com/latest/en/backup.html)

@@ -9,7 +9,7 @@ YDEA_TOOLKIT="${SCRIPT_DIR}/ydea-toolkit.sh"
 
 # Verifica che ydea-toolkit esista
 if [[ ! -f "$YDEA_TOOLKIT" ]]; then
-    echo "❌ Errore: ydea-toolkit.sh non trovato in $SCRIPT_DIR"
+    echo " Errore: ydea-toolkit.sh non trovato in $SCRIPT_DIR"
     exit 1
 fi
 
@@ -46,7 +46,7 @@ print_header() {
 
 # ===== Discovery Categorie =====
 discover_categories() {
-  print_header "🔍 DISCOVERY CATEGORIE E SOTTOCATEGORIE"
+  print_header " DISCOVERY CATEGORIE E SOTTOCATEGORIE"
   
   log_info "Recupero lista categorie da Ydea API..."
   
@@ -94,10 +94,10 @@ discover_categories() {
     
     if [[ -n "$subcat_id" && "$subcat_id" != "null" ]]; then
       subcategory_ids["$subcat"]="$subcat_id"
-      echo "  ✓ '$subcat' → ID: $subcat_id"
+      echo "   '$subcat' → ID: $subcat_id"
       ((found_count++))
     else
-      echo "  ❌ '$subcat' → NON TROVATA"
+      echo "   '$subcat' → NON TROVATA"
     fi
   done
   
@@ -131,7 +131,7 @@ discover_categories() {
 
 # ===== Discovery SLA =====
 discover_sla() {
-  print_header "🔍 DISCOVERY SLA PERSONALIZZATA"
+  print_header " DISCOVERY SLA PERSONALIZZATA"
   
   log_info "Recupero lista SLA da Ydea API..."
   
@@ -189,7 +189,7 @@ discover_sla() {
 
 # ===== Discovery Priorità =====
 discover_priorities() {
-  print_header "🔍 DISCOVERY PRIORITÀ"
+  print_header " DISCOVERY PRIORITÀ"
   
   log_info "Recupero lista priorità da Ydea API..."
   
@@ -235,7 +235,7 @@ discover_priorities() {
 
 # ===== Main =====
 main() {
-  print_header "🔍 YDEA SLA DISCOVERY TOOL"
+  print_header " YDEA SLA DISCOVERY TOOL"
   
   log_info "Inizio discovery per SLA Premium_Mon..."
   log_info "Output verrà salvato in: $OUTPUT_FILE"
@@ -262,7 +262,7 @@ main() {
   priorities_json=$(discover_priorities)
   
   # Combina tutti i risultati
-  print_header "📝 GENERAZIONE FILE CONFIGURAZIONE"
+  print_header " GENERAZIONE FILE CONFIGURAZIONE"
   
   local final_json
   final_json=$(jq -n \
@@ -281,7 +281,7 @@ main() {
   # Salva il file
   echo "$final_json" > "$OUTPUT_FILE"
   
-  print_header "✓ DISCOVERY COMPLETATO"
+  print_header " DISCOVERY COMPLETATO"
   
   log_success "File di configurazione creato: $OUTPUT_FILE"
   echo ""
@@ -308,7 +308,7 @@ main() {
   
   if [[ "${#missing_items[@]}" -gt 0 ]]; then
     echo ""
-    log_warn "⚠️  ATTENZIONE: Alcuni elementi non sono stati trovati:"
+    log_warn "  ATTENZIONE: Alcuni elementi non sono stati trovati:"
     for item in "${missing_items[@]}"; do
       echo "  • $item"
     done
@@ -317,7 +317,7 @@ main() {
     exit 1
   else
     echo ""
-    log_success "🎉 Tutti gli elementi richiesti sono stati trovati!"
+    log_success " Tutti gli elementi richiesti sono stati trovati!"
     echo ""
     log_info "Prossimi passi:"
     echo "  1. Verifica il contenuto di: $OUTPUT_FILE"

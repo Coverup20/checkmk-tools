@@ -57,24 +57,24 @@ class Console:
 
     @staticmethod
     def success(msg: str):
-        print(f"{Console.GREEN}✅ {msg}{Console.NC}")
+        print(f"{Console.GREEN} {msg}{Console.NC}")
         log(f"SUCCESS: {msg}")
 
     @staticmethod
     def error(msg: str, fatal: bool = False):
-        print(f"{Console.RED}❌ {msg}{Console.NC}")
+        print(f"{Console.RED} {msg}{Console.NC}")
         log(f"ERROR: {msg}")
         if fatal:
             sys.exit(1)
 
     @staticmethod
     def warn(msg: str):
-        print(f"{Console.YELLOW}⚠️  {msg}{Console.NC}")
+        print(f"{Console.YELLOW}  {msg}{Console.NC}")
         log(f"WARN: {msg}")
 
     @staticmethod
     def info(msg: str):
-        print(f"{Console.BLUE}ℹ️  {msg}{Console.NC}")
+        print(f"{Console.BLUE}ℹ  {msg}{Console.NC}")
         log(f"INFO: {msg}")
 
     @staticmethod
@@ -301,7 +301,7 @@ class RestoreManager:
         return site
 
     def run(self):
-        Console.title("🔄 CHECKMK DR RESTORE")
+        Console.title(" CHECKMK DR RESTORE")
         
         parser = argparse.ArgumentParser()
         parser.add_argument("--site", help="Site name")
@@ -365,7 +365,7 @@ class RestoreManager:
             backup_file = local_backup_path
 
         # 3. Confirmation
-        Console.title("⚠️  CONFERMA RIPRISTINO")
+        Console.title("  CONFERMA RIPRISTINO")
         print(f"Site:   {site}")
         print(f"Backup: {backup_file}")
         print("Azioni: STOP site, Backup config attuale, Restore, START site")
@@ -430,7 +430,7 @@ class RestoreManager:
         if Console.confirm("Ricompilare configurazione monitoring?", True):
             run_cmd(["su", "-", site, "-c", "cmk -R"], check=False)
 
-        Console.title("🎉 RESTORE COMPLETATO")
+        Console.title(" RESTORE COMPLETATO")
         print(f"Verifica: https://$(hostname)/{site}/")
 
 if __name__ == "__main__":

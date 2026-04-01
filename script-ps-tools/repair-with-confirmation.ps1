@@ -181,28 +181,28 @@ foreach ($file in $targetFiles) {
         $bashCheck = wsl bash -n "$wslPath" 2>&1
         
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "  ✅ RIPARATO CON SUCCESSO" -ForegroundColor Green
+            Write-Host "   RIPARATO CON SUCCESSO" -ForegroundColor Green
             $repairedCount++
             $repairLog += [PSCustomObject]@{
                 File = $file.RelativePath
-                Status = "✅ Riparato"
+                Status = " Riparato"
                 Changes = ($changes -join "; ")
             }
         } else {
-            Write-Host "  ⚠️  Riparazione parziale (ancora errori)" -ForegroundColor Yellow
+            Write-Host "    Riparazione parziale (ancora errori)" -ForegroundColor Yellow
             $failedCount++
             $repairLog += [PSCustomObject]@{
                 File = $file.RelativePath
-                Status = "⚠️ Parziale"
+                Status = " Parziale"
                 Changes = ($changes -join "; ")
             }
         }
     } else {
-        Write-Host "  ❌ Nessuna riparazione automatica disponibile" -ForegroundColor Red
+        Write-Host "   Nessuna riparazione automatica disponibile" -ForegroundColor Red
         $failedCount++
         $repairLog += [PSCustomObject]@{
             File = $file.RelativePath
-            Status = "❌ Fallito"
+            Status = " Fallito"
             Changes = "Nessuna riparazione trovata"
         }
     }
@@ -263,15 +263,15 @@ foreach ($file in $targetFiles) {
     $workingFile = Join-Path $workingDir $file.RelativePath
     
     # Verifica se è stato riparato
-    $logEntry = $repairLog | Where-Object { $_.File -eq $file.RelativePath -and $_.Status -eq "✅ Riparato" }
+    $logEntry = $repairLog | Where-Object { $_.File -eq $file.RelativePath -and $_.Status -eq " Riparato" }
     
     if ($logEntry) {
         try {
             Copy-Item $workingFile -Destination $file.FullPath -Force
-            Write-Host "  ✅ $($file.Name)" -ForegroundColor Green
+            Write-Host "   $($file.Name)" -ForegroundColor Green
             $successCount++
         } catch {
-            Write-Host "  ❌ $($file.Name): $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "   $($file.Name): $($_.Exception.Message)" -ForegroundColor Red
             $errorCount++
         }
     }

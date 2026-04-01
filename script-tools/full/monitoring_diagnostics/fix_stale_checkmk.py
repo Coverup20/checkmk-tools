@@ -170,7 +170,7 @@ for r in sorted(after, key=lambda x: (x[0], x[1])):
     age = (now2 - last_chk) // 60
     state_str = {0:"OK",1:"WARN",2:"CRIT",3:"UNK"}.get(state,"?")
     if age < 5:
-        status_str = "✓ AGGIORNATO"
+        status_str = " AGGIORNATO"
         ok_count += 1
     else:
         status_str = f"ancora stale ({age}min)"
@@ -180,5 +180,5 @@ for r in sorted(after, key=lambda x: (x[0], x[1])):
 print(f"\nRisultato:")
 print(f"  Aggiornati: {ok_count}")
 print(f"  Ancora stale: {still_stale}")
-print(f"  active_checks_enabled toccato: NO ✓")
+print(f"  active_checks_enabled toccato: NO ")
 print("\n" + "=" * 62)

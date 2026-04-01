@@ -2,7 +2,7 @@
 > **Categoria:** Storico
 
 **Date:** 2025-11-07 (FRPC Diagnostics & Fix)  
-**Status:** ✅ FIXED - Installation Script Updated  
+**Status:**  FIXED - Installation Script Updated  
 **Commit:** 90229ce
 
 ---
@@ -14,10 +14,10 @@ After running the installer, CheckMK Agent installed successfully, but **FRPC se
 ### Diagnostic Results
 
 **Positive Findings:**
-- ✅ FRPC executable: Present at `C:\Program Files\frp\frpc.exe`
-- ✅ Configuration file: Correct at `C:\ProgramData\frp\frpc.toml`
-- ✅ Service registered: `sc.exe qc frpc` showed proper configuration
-- ✅ **MANUAL EXECUTION: WORKS PERFECTLY!**
+-  FRPC executable: Present at `C:\Program Files\frp\frpc.exe`
+-  Configuration file: Correct at `C:\ProgramData\frp\frpc.toml`
+-  Service registered: `sc.exe qc frpc` showed proper configuration
+-  **MANUAL EXECUTION: WORKS PERFECTLY!**
 
 **Test Output (manual run):**
 ```
@@ -29,9 +29,9 @@ After running the installer, CheckMK Agent installed successfully, but **FRPC se
 ```
 
 **Problem:**
-- ❌ Service wouldn't auto-start when registered with `sc.exe create`
-- ❌ Calling `Start-Service` immediately after registration failed
-- ❌ Service status remained "Stopped"
+-  Service wouldn't auto-start when registered with `sc.exe create`
+-  Calling `Start-Service` immediately after registration failed
+-  Service status remained "Stopped"
 
 ---
 
@@ -183,11 +183,11 @@ The service is registered with:
 
 ### Service Startup Flow
 
-1. ✅ Service registered with Windows (via `sc.exe create`)
-2. ✅ Service verified to exist
-3. ✅ Service start attempted (with retry logic)
-4. ✅ Verification that service is actually running
-5. ✅ User feedback on success/failure
+1.  Service registered with Windows (via `sc.exe create`)
+2.  Service verified to exist
+3.  Service start attempted (with retry logic)
+4.  Verification that service is actually running
+5.  User feedback on success/failure
 
 ### Fallback Behavior
 
@@ -229,12 +229,12 @@ Changes:
 
 ## Status
 
-✅ **Installation Script:** UPDATED  
-✅ **FRPC Connectivity:** VERIFIED (works manually)  
-✅ **Service Startup:** IMPROVED with retry logic  
-✅ **Commit:** PUSHED to GitHub  
+ **Installation Script:** UPDATED  
+ **FRPC Connectivity:** VERIFIED (works manually)  
+ **Service Startup:** IMPROVED with retry logic  
+ **Commit:** PUSHED to GitHub  
 
-🟢 **Ready for production testing!**
+ **Ready for production testing!**
 
 The installer now handles FRPC service startup more robustly and provides better feedback to the user about what's happening.
 
@@ -284,6 +284,6 @@ Error scenarios:
 
 ---
 
-**Status:** ✅ FIXED AND TESTED  
+**Status:**  FIXED AND TESTED  
 **Last Update:** 2025-11-07  
 **Next Step:** Production deployment

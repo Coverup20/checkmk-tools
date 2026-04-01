@@ -3,16 +3,16 @@
 
 # Template per configurare i label 'real_ip' negli host CheckMK
 
-## 🎯 OBIETTIVO
+##  OBIETTIVO
 Configurare il label 'real_ip' negli host CheckMK per abilitare 
 l'uso dell'IP reale nelle email invece di 127.0.0.1
 
-## 📋 PREREQUISITI
+##  PREREQUISITI
 - Accesso amministrativo a CheckMK Web UI
 - Conoscere l'IP pubblico/reale del server CheckMK
 - Permessi per modificare configurazione host
 
-## 🔧 CONFIGURAZIONE VIA WEB UI
+##  CONFIGURAZIONE VIA WEB UI
 
 ### Metodo 1: Configurazione Singolo Host
 
@@ -94,7 +94,7 @@ l'uso dell'IP reale nelle email invece di 127.0.0.1
    # Oppure via Web UI: Activate changes
    ```
 
-## 🧪 VERIFICA CONFIGURAZIONE
+##  VERIFICA CONFIGURAZIONE
 
 ### Test via Web UI
 1. **Verificare label applicato**
@@ -130,7 +130,7 @@ export NOTIFY_NOTIFICATIONTYPE="PROBLEM"
 ./local/share/check_mk/notifications/mail_realip_graphs
 ```
 
-## 📊 ESEMPI CONFIGURAZIONE
+##  ESEMPI CONFIGURAZIONE
 
 ### Esempio 1: Server con IP Statico LAN
 ```
@@ -165,7 +165,7 @@ Risultato email:
 - Grafici: Risoluzione DNS automatica
 ```
 
-## ⚠️ ATTENZIONE
+##  ATTENZIONE
 
 ### Considerazioni di Sicurezza
 - **IP Pubblici**: Assicurarsi che CheckMK sia accessibile pubblicamente solo se necessario
@@ -177,7 +177,7 @@ Risultato email:
 - **Raggiungibilità**: L'IP/FQDN deve essere raggiungibile dai client email
 - **Certificati**: Per HTTPS, certificati devono essere validi per l'IP/FQDN usato
 
-## 🔧 TROUBLESHOOTING
+##  TROUBLESHOOTING
 
 ### Problema: Label non applicato
 ```bash
@@ -207,7 +207,7 @@ print(f'Real IP trovato: {real_ip}')
 - Controllare regole notifica attive
 - Verificare label host configurato correttamente
 
-## ✅ CHECKLIST CONFIGURAZIONE
+##  CHECKLIST CONFIGURAZIONE
 
 - [ ] Label 'real_ip' aggiunto all'host
 - [ ] Valore label corretto (IP/FQDN raggiungibile)
@@ -220,5 +220,5 @@ print(f'Real IP trovato: {real_ip}')
 
 ---
 
-**📝 Note**: Questa configurazione è fondamentale per il corretto 
+** Note**: Questa configurazione è fondamentale per il corretto 
 funzionamento del sistema email con real IP e grafici abilitati.

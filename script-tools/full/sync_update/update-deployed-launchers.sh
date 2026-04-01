@@ -11,7 +11,7 @@ echo "=== UPDATE DEPLOYED LAUNCHERS ==="
 echo ""
 
 if [[ ! -d "$REPO_PATH" ]]; then
-  echo "❌ Repository non trovato: $REPO_PATH"
+  echo " Repository non trovato: $REPO_PATH"
   exit 1
 fi
 
@@ -36,17 +36,17 @@ while IFS= read -r repo_launcher; do
   # Crea directory se non esiste
   dest_dir=$(dirname "$dest")
   if [[ ! -d "$dest_dir" ]]; then
-    echo "📁 Creating directory: $dest_dir"
+    echo " Creating directory: $dest_dir"
     sudo mkdir -p "$dest_dir"
   fi
   
   # Copia launcher
-  echo "📦 Updating: $launcher_name -> $dest"
+  echo " Updating: $launcher_name -> $dest"
   if sudo cp "$repo_launcher" "$dest" && sudo chmod +x "$dest"; then
-    echo "  ✓ Updated"
+    echo "   Updated"
     ((updated++))
   else
-    echo "  ✗ Failed"
+    echo "   Failed"
     ((failed++))
   fi
   

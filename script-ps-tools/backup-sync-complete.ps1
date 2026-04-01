@@ -15,7 +15,7 @@ $LOCAL_BACKUP_PATH = Join-Path $LOCAL_BACKUP_BASE $TIMESTAMP
 $NETWORK_BACKUP_PATH = Join-Path $NETWORK_BACKUP_BASE $TIMESTAMP
 
 Write-Host "`n╔═══════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║     📦 BACKUP COMPLETO REPOSITORY CHECKMK-TOOLS      ║" -ForegroundColor White
+Write-Host "║      BACKUP COMPLETO REPOSITORY CHECKMK-TOOLS      ║" -ForegroundColor White
 Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
 
 # ═══════════════════════════════════════════════════════════════════
@@ -23,7 +23,7 @@ Write-Host "╚═════════════════════�
 # ═══════════════════════════════════════════════════════════════════
 
 Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Yellow
-Write-Host "║          🔍 VERIFICA INTEGRITÀ SCRIPT                ║" -ForegroundColor White
+Write-Host "║           VERIFICA INTEGRITÀ SCRIPT                ║" -ForegroundColor White
 Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Yellow
 
 function Test-ScriptIntegrity {
@@ -35,7 +35,7 @@ function Test-ScriptIntegrity {
     
     # Verifica esistenza file
     if (-not (Test-Path $ScriptPath)) {
-        Write-Host "✗ File non trovato: $relativePath" -ForegroundColor Red
+        Write-Host " File non trovato: $relativePath" -ForegroundColor Red
         return $false
     }
     
@@ -52,7 +52,7 @@ function Test-ScriptIntegrity {
     # Verifica che il file non sia vuoto (a meno che non sia nella whitelist)
     $fileInfo = Get-Item $ScriptPath
     if ($fileInfo.Length -eq 0 -and -not $canBeEmpty) {
-        Write-Host "✗ File vuoto: $relativePath" -ForegroundColor Red
+        Write-Host " File vuoto: $relativePath" -ForegroundColor Red
         return $false
     }
     
@@ -64,14 +64,14 @@ function Test-ScriptIntegrity {
             $null = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$tokens, [ref]$errors)
             
             if ($errors.Count -gt 0) {
-                Write-Host "✗ Errori di sintassi in: $relativePath" -ForegroundColor Red
+                Write-Host " Errori di sintassi in: $relativePath" -ForegroundColor Red
                 foreach ($parseError in $errors) {
                     Write-Host "  └─ Linea $($parseError.Extent.StartLineNumber): $($parseError.Message)" -ForegroundColor Red
                 }
                 return $false
             }
         } catch {
-            Write-Host "✗ Impossibile analizzare: $relativePath" -ForegroundColor Red
+            Write-Host " Impossibile analizzare: $relativePath" -ForegroundColor Red
             Write-Host "  └─ $($_.Exception.Message)" -ForegroundColor Red
             return $false
         }
@@ -82,11 +82,11 @@ function Test-ScriptIntegrity {
         try {
             $content = Get-Content $ScriptPath -Raw -ErrorAction Stop
             if ([string]::IsNullOrWhiteSpace($content)) {
-                Write-Host "✗ File corrotto o vuoto: $relativePath" -ForegroundColor Red
+                Write-Host " File corrotto o vuoto: $relativePath" -ForegroundColor Red
                 return $false
             }
         } catch {
-            Write-Host "✗ Impossibile leggere: $relativePath" -ForegroundColor Red
+            Write-Host " Impossibile leggere: $relativePath" -ForegroundColor Red
             Write-Host "  └─ $($_.Exception.Message)" -ForegroundColor Red
             return $false
         }
@@ -97,11 +97,11 @@ function Test-ScriptIntegrity {
         try {
             $content = Get-Content $ScriptPath -Raw -ErrorAction Stop
             if ([string]::IsNullOrWhiteSpace($content)) {
-                Write-Host "✗ File corrotto o vuoto: $relativePath" -ForegroundColor Red
+                Write-Host " File corrotto o vuoto: $relativePath" -ForegroundColor Red
                 return $false
             }
         } catch {
-            Write-Host "✗ Impossibile leggere: $relativePath" -ForegroundColor Red
+            Write-Host " Impossibile leggere: $relativePath" -ForegroundColor Red
             Write-Host "  └─ $($_.Exception.Message)" -ForegroundColor Red
             return $false
         }
@@ -113,25 +113,25 @@ function Test-ScriptIntegrity {
             $content = Get-Content $ScriptPath -Raw -ErrorAction Stop
             # Skip verifica contenuto vuoto per file nella whitelist
             if ([string]::IsNullOrWhiteSpace($content) -and -not $canBeEmpty) {
-                Write-Host "✗ File corrotto o non leggibile: $relativePath" -ForegroundColor Red
+                Write-Host " File corrotto o non leggibile: $relativePath" -ForegroundColor Red
                 return $false
             }
             # Per script senza estensione, avvisa se manca lo shebang ma non bloccare
             if ($ScriptPath -notlike "*.*") {
                 $firstLine = ($content -split "`n")[0].Trim()
                 if ($firstLine -notmatch '^#!') {
-                    Write-Host "⚠ Shebang mancante (potrebbe non essere uno script): $relativePath" -ForegroundColor Yellow
+                    Write-Host " Shebang mancante (potrebbe non essere uno script): $relativePath" -ForegroundColor Yellow
                     # Non bloccare, continua la verifica
                 }
             }
         } catch {
-            Write-Host "✗ Impossibile leggere: $relativePath" -ForegroundColor Red
+            Write-Host " Impossibile leggere: $relativePath" -ForegroundColor Red
             Write-Host "  └─ $($_.Exception.Message)" -ForegroundColor Red
             return $false
         }
     }
     
-    Write-Host "✓ $relativePath" -ForegroundColor Green
+    Write-Host " $relativePath" -ForegroundColor Green
     return $true
 }
 
@@ -140,17 +140,17 @@ Write-Host "Controllo script critici in corso...`n" -ForegroundColor Cyan
 # Verifica che il percorso repository esista
 if (-not (Test-Path $REPO_PATH)) {
     Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Red
-    Write-Host "║             ⚠️  ERRORE CONFIGURAZIONE ⚠️             ║" -ForegroundColor White
+    Write-Host "║               ERRORE CONFIGURAZIONE              ║" -ForegroundColor White
     Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Red
     
-    Write-Host "❌ BACKUP INTERROTTO: Percorso repository non trovato!" -ForegroundColor Red
+    Write-Host " BACKUP INTERROTTO: Percorso repository non trovato!" -ForegroundColor Red
     Write-Host "   Percorso configurato: $REPO_PATH" -ForegroundColor Yellow
     Write-Host "   Verifica la variabile `$REPO_PATH nello script.`n" -ForegroundColor Yellow
     
     exit 1
 }
 
-Write-Host "📂 Repository: $REPO_PATH`n" -ForegroundColor Gray
+Write-Host " Repository: $REPO_PATH`n" -ForegroundColor Gray
 
 $allValid = $true
 $checkedScripts = 0
@@ -205,10 +205,10 @@ $totalScripts = $allScripts.Count
 
 if ($totalScripts -eq 0) {
     Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Red
-    Write-Host "║             ⚠️  NESSUN FILE TROVATO ⚠️               ║" -ForegroundColor White
+    Write-Host "║               NESSUN FILE TROVATO                ║" -ForegroundColor White
     Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Red
     
-    Write-Host "❌ BACKUP INTERROTTO: Nessun file trovato!" -ForegroundColor Red
+    Write-Host " BACKUP INTERROTTO: Nessun file trovato!" -ForegroundColor Red
     Write-Host "   Verifica che il percorso repository sia corretto.`n" -ForegroundColor Yellow
     
     exit 1
@@ -219,7 +219,7 @@ Write-Host "Trovati $totalScripts file da verificare`n" -ForegroundColor White
 # Mostra statistiche per cartella
 Write-Host "Distribuzione file per cartella:" -ForegroundColor Cyan
 foreach ($stat in $folderStats) {
-    Write-Host "  📁 $($stat.Folder): $($stat.Count) file" -ForegroundColor Gray
+    Write-Host "   $($stat.Folder): $($stat.Count) file" -ForegroundColor Gray
 }
 Write-Host ""
 
@@ -250,17 +250,17 @@ Write-Host "══════════════════════�
 
 if (-not $allValid) {
     Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Red
-    Write-Host "║             ⚠️  FILE CORROTTI RILEVATI ⚠️            ║" -ForegroundColor White
+    Write-Host "║               FILE CORROTTI RILEVATI             ║" -ForegroundColor White
     Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Red
     
-    Write-Host "❌ BACKUP INTERROTTO: $corruptedScripts file corrotti o con errori." -ForegroundColor Red
+    Write-Host " BACKUP INTERROTTO: $corruptedScripts file corrotti o con errori." -ForegroundColor Red
     Write-Host "   Correggi gli errori sopra indicati prima di procedere con il backup.`n" -ForegroundColor Yellow
     
     exit 1
 }
 
 Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║         ✓ INTEGRITÀ VERIFICATA ($checkedScripts file)            ║" -ForegroundColor White
+Write-Host "║          INTEGRITÀ VERIFICATA ($checkedScripts file)            ║" -ForegroundColor White
 Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Green
 
 # Pausa per permettere di vedere i risultati
@@ -281,17 +281,17 @@ if (-not $Unattended) {
 # INIZIO BACKUP
 # ═══════════════════════════════════════════════════════════════════
 
-Write-Host "📁 Repository locale: $REPO_PATH" -ForegroundColor Gray
-Write-Host "💾 Backup locale: $LOCAL_BACKUP_PATH" -ForegroundColor Gray
-Write-Host "🌐 Backup rete (opzionale): $NETWORK_BACKUP_PATH`n" -ForegroundColor Gray
+Write-Host " Repository locale: $REPO_PATH" -ForegroundColor Gray
+Write-Host " Backup locale: $LOCAL_BACKUP_PATH" -ForegroundColor Gray
+Write-Host " Backup rete (opzionale): $NETWORK_BACKUP_PATH`n" -ForegroundColor Gray
 
 # Crea cartella backup locale
-Write-Host "📂 Creazione cartella backup locale..." -ForegroundColor Yellow
+Write-Host " Creazione cartella backup locale..." -ForegroundColor Yellow
 if (-not (Test-Path $LOCAL_BACKUP_BASE)) {
     New-Item -ItemType Directory -Path $LOCAL_BACKUP_BASE -Force | Out-Null
 }
 New-Item -ItemType Directory -Path $LOCAL_BACKUP_PATH -Force | Out-Null
-Write-Host "✓ Cartella creata: $LOCAL_BACKUP_PATH`n" -ForegroundColor Green
+Write-Host " Cartella creata: $LOCAL_BACKUP_PATH`n" -ForegroundColor Green
 
 # Funzione per copiare file
 function Copy-BackupFiles {
@@ -299,7 +299,7 @@ function Copy-BackupFiles {
         [string]$DestinationPath
     )
     
-    Write-Host "📋 Copia file verso $DestinationPath..." -ForegroundColor Yellow
+    Write-Host " Copia file verso $DestinationPath..." -ForegroundColor Yellow
     
     $excludeDirs = @('.git', 'node_modules', '.vagrant', 'obj', 'bin')
     $excludeFiles = @('*.log', '*.tmp', '*.cache', 'Thumbs.db', '.DS_Store')
@@ -352,7 +352,7 @@ function Copy-BackupFiles {
         }
     }
 
-    Write-Host "✓ Completato: $copied file copiati`n" -ForegroundColor Green
+    Write-Host " Completato: $copied file copiati`n" -ForegroundColor Green
     return $copied
 }
 
@@ -361,7 +361,7 @@ $localCopied = Copy-BackupFiles -DestinationPath $LOCAL_BACKUP_PATH
 
 # Backup su rete (opzionale con timeout)
 Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Yellow
-Write-Host "║          🌐 BACKUP SU RETE (OPZIONALE)               ║" -ForegroundColor White
+Write-Host "║           BACKUP SU RETE (OPZIONALE)               ║" -ForegroundColor White
 Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Yellow
 
 if ($Unattended) {
@@ -375,15 +375,15 @@ if ($Unattended) {
 
 $networkCopied = 0
 if ($response -eq 's' -or $response -eq 'S') {
-    Write-Host "✓ Backup su rete confermato`n" -ForegroundColor Green
+    Write-Host " Backup su rete confermato`n" -ForegroundColor Green
     
     # Verifica connessione rete
-    Write-Host "🔍 Verifica connessione rete..." -ForegroundColor Yellow
+    Write-Host " Verifica connessione rete..." -ForegroundColor Yellow
     if (-not (Test-Path $NETWORK_BACKUP_BASE)) {
-        Write-Host "✗ Impossibile accedere a $NETWORK_BACKUP_BASE" -ForegroundColor Red
+        Write-Host " Impossibile accedere a $NETWORK_BACKUP_BASE" -ForegroundColor Red
         Write-Host "  Backup locale completato, rete saltata`n" -ForegroundColor Yellow
     } else {
-        Write-Host "✓ Connessione OK`n" -ForegroundColor Green
+        Write-Host " Connessione OK`n" -ForegroundColor Green
         
         # Crea cartella backup rete
         New-Item -ItemType Directory -Path $NETWORK_BACKUP_PATH -Force | Out-Null
@@ -397,13 +397,13 @@ if ($response -eq 's' -or $response -eq 'S') {
 
 # Statistiche
 Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║              📊 STATISTICHE BACKUP                    ║" -ForegroundColor White
+Write-Host "║               STATISTICHE BACKUP                    ║" -ForegroundColor White
 Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Green
 
 $localSize = (Get-ChildItem -Path $LOCAL_BACKUP_PATH -Recurse -File | Measure-Object -Property Length -Sum).Sum
 $localSizeMB = [math]::Round($localSize / 1MB, 2)
 
-Write-Host "📦 BACKUP LOCALE:" -ForegroundColor Cyan
+Write-Host " BACKUP LOCALE:" -ForegroundColor Cyan
 Write-Host "   File copiati:     $localCopied" -ForegroundColor White
 Write-Host "   Dimensione:       $localSizeMB MB" -ForegroundColor White
 Write-Host "   Percorso:         $LOCAL_BACKUP_PATH`n" -ForegroundColor White
@@ -412,20 +412,20 @@ if ($networkCopied -gt 0) {
     $networkSize = (Get-ChildItem -Path $NETWORK_BACKUP_PATH -Recurse -File | Measure-Object -Property Length -Sum).Sum
     $networkSizeMB = [math]::Round($networkSize / 1MB, 2)
     
-    Write-Host "🌐 BACKUP RETE:" -ForegroundColor Cyan
+    Write-Host " BACKUP RETE:" -ForegroundColor Cyan
     Write-Host "   File copiati:     $networkCopied" -ForegroundColor White
     Write-Host "   Dimensione:       $networkSizeMB MB" -ForegroundColor White
     Write-Host "   Percorso:         $NETWORK_BACKUP_PATH`n" -ForegroundColor White
 }
 
-Write-Host "⏰ Timestamp:        $TIMESTAMP`n" -ForegroundColor Cyan
+Write-Host " Timestamp:        $TIMESTAMP`n" -ForegroundColor Cyan
 
 # Conta backup precedenti locali
 $previousBackups = Get-ChildItem -Path $LOCAL_BACKUP_BASE -Directory | 
     Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$' } |
     Sort-Object Name -Descending
 
-Write-Host "📚 Backup locali disponibili: $($previousBackups.Count)" -ForegroundColor Gray
+Write-Host " Backup locali disponibili: $($previousBackups.Count)" -ForegroundColor Gray
 
 # Retention automatica - mantieni solo gli ultimi 10 backup
 $RETENTION_COUNT = 10
@@ -435,25 +435,25 @@ if ($previousBackups.Count -gt $RETENTION_COUNT) {
     $deleteCount = $backupsToDelete.Count
     
     Write-Host "`n╔═══════════════════════════════════════════════════════╗" -ForegroundColor Yellow
-    Write-Host "║          🗑️  PULIZIA BACKUP VECCHI (Retention)        ║" -ForegroundColor White
+    Write-Host "║            PULIZIA BACKUP VECCHI (Retention)        ║" -ForegroundColor White
     Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Yellow
     
-    Write-Host "⚠️  Trovati $($previousBackups.Count) backup, retention impostata a $RETENTION_COUNT" -ForegroundColor Yellow
+    Write-Host "  Trovati $($previousBackups.Count) backup, retention impostata a $RETENTION_COUNT" -ForegroundColor Yellow
     Write-Host "   Verranno eliminati $deleteCount backup più vecchi...`n" -ForegroundColor Gray
     
     foreach ($backup in $backupsToDelete) {
         try {
-            Write-Host "  🗑️  Eliminazione: $($backup.Name)" -ForegroundColor Gray
+            Write-Host "    Eliminazione: $($backup.Name)" -ForegroundColor Gray
             Remove-Item -Path $backup.FullName -Recurse -Force -ErrorAction Stop
-            Write-Host "     ✓ Eliminato" -ForegroundColor Green
+            Write-Host "      Eliminato" -ForegroundColor Green
         } catch {
-            Write-Host "     ✗ Errore: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "      Errore: $($_.Exception.Message)" -ForegroundColor Red
         }
     }
     
-    Write-Host "`n✓ Pulizia completata: mantenuti gli ultimi $RETENTION_COUNT backup`n" -ForegroundColor Green
+    Write-Host "`n Pulizia completata: mantenuti gli ultimi $RETENTION_COUNT backup`n" -ForegroundColor Green
 }
 
 Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║          ✓ BACKUP COMPLETATO CON SUCCESSO ✓          ║" -ForegroundColor White
+Write-Host "║           BACKUP COMPLETATO CON SUCCESSO           ║" -ForegroundColor White
 Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Green

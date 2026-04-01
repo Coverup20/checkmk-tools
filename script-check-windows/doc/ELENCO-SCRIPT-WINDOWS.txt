@@ -5,7 +5,7 @@ Cartella: script-check-windows/
 Data: 27 Ottobre 2025
 ================================================================================
 
-📁 STRUTTURA CARTELLE
+ STRUTTURA CARTELLE
 ├── nopolling/
 │   └── ransomware_detection/
 │       ├── check_ransomware_activity.ps1
@@ -14,7 +14,7 @@ Data: 27 Ottobre 2025
 └── polling/                (vuota)
 
 ================================================================================
-📂 SCRIPT-CHECK-WINDOWS/NOPOLLING/RANSOMWARE_DETECTION/
+ SCRIPT-CHECK-WINDOWS/NOPOLLING/RANSOMWARE_DETECTION/
 ================================================================================
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -36,16 +36,16 @@ di rete (UNC o locali) alla ricerca di attività sospette indicative di attacco
 ransomware in corso o recente.
 
 FUNZIONALITÀ PRINCIPALI:
-✓ Rilevamento file con estensioni ransomware (50+ varianti note)
-✓ Analisi entropia file (file crittografati hanno entropia >7.5)
-✓ Rilevamento ransom notes (README, DECRYPT, HOW_TO, ecc.)
-✓ Monitoraggio cambio estensioni anomale
-✓ Canary files (file esca per early detection)
-✓ Analisi attività massiva di crittografia
-✓ Pattern di accesso sospetti
-✓ Timeout e performance optimization per grandi share
-✓ Configurazione JSON esterna
-✓ Statefile per tracking continuo
+ Rilevamento file con estensioni ransomware (50+ varianti note)
+ Analisi entropia file (file crittografati hanno entropia >7.5)
+ Rilevamento ransom notes (README, DECRYPT, HOW_TO, ecc.)
+ Monitoraggio cambio estensioni anomale
+ Canary files (file esca per early detection)
+ Analisi attività massiva di crittografia
+ Pattern di accesso sospetti
+ Timeout e performance optimization per grandi share
+ Configurazione JSON esterna
+ Statefile per tracking continuo
 
 CONFIGURAZIONE (ransomware_config.json):
 {
@@ -135,11 +135,11 @@ Calcola entropia di Shannon su sample 1024 byte del file:
 Formula: H = -Σ(p(i) * log₂(p(i)))
 
 PERFORMANCE OPTIMIZATION:
-✓ Timeout 30 secondi per scan share
-✓ MaxFilesToScan limita file processati
-✓ PowerShell background jobs con timeout
-✓ Sample-based entropy analysis (primi 1KB)
-✓ Early exit su share inaccessibili
+ Timeout 30 secondi per scan share
+ MaxFilesToScan limita file processati
+ PowerShell background jobs con timeout
+ Sample-based entropy analysis (primi 1KB)
+ Early exit su share inaccessibili
 
 ESEMPIO OUTPUT:
 
@@ -174,11 +174,11 @@ FILE UTILIZZATI:
 - Canary: {SharePath}\.canary_donotdelete.txt (file esca)
 
 REQUISITI SISTEMA:
-✓ Windows Server 2016+
-✓ PowerShell 5.1 o superiore
-✓ Permessi lettura su share monitorate
-✓ Accesso scrittura per canary files (se abilitati)
-✓ CheckMK Agent 2.4.x
+ Windows Server 2016+
+ PowerShell 5.1 o superiore
+ Permessi lettura su share monitorate
+ Accesso scrittura per canary files (se abilitati)
+ CheckMK Agent 2.4.x
 
 INSTALLAZIONE:
 1. Copiare script in C:\ProgramData\checkmk\agent\local\
@@ -217,11 +217,11 @@ ESEMPIO CONFIGURAZIONE COMPLETA:
 }
 
 NOTA ENCODING FIX:
-⚠️ Versione corrente usa "attivita'" invece di "attività" per evitare 
+ Versione corrente usa "attivita'" invece di "attività" per evitare 
    corruzione caratteri in output CheckMK (commit f0ac3f1)
 
 NOTA SERVICE NAMING:
-⚠️ Service names per share usano solo nome share (es: "test00")
+ Service names per share usano solo nome share (es: "test00")
    invece di path completo per evitare nomi troppo lunghi (commit ed28dfa)
 
 
@@ -358,12 +358,12 @@ Wrapper remoto per check_ransomware_activity.ps1. Scarica ed esegue
 automaticamente l'ultima versione da GitHub, simile agli script wrapper Linux.
 
 FUNZIONALITÀ:
-✓ Download automatico da GitHub raw URL
-✓ Cache bypass con timestamp query string
-✓ Nessun caching locale - sempre ultima versione
-✓ Passa parametri allo script principale
-✓ Cleanup automatico file temporanei
-✓ Gestione errori con fallback
+ Download automatico da GitHub raw URL
+ Cache bypass con timestamp query string
+ Nessun caching locale - sempre ultima versione
+ Passa parametri allo script principale
+ Cleanup automatico file temporanei
+ Gestione errori con fallback
 
 PARAMETRI:
 -ConfigFile          Path config JSON (default: C:\ProgramData\checkmk\agent\local\ransomware_config.json)
@@ -384,11 +384,11 @@ LOGICA:
 5. In caso di errore, output CheckMK con stato UNKNOWN
 
 VANTAGGI:
-✓ Zero manutenzione manuale script
-✓ Aggiornamenti automatici dal repository
-✓ Centralized management
-✓ Rollback facile cambiando branch
-✓ Testing branch feature senza modificare produzione
+ Zero manutenzione manuale script
+ Aggiornamenti automatici dal repository
+ Centralized management
+ Rollback facile cambiando branch
+ Testing branch feature senza modificare produzione
 
 ESEMPIO ESECUZIONE:
 powershell -File rcheck_ransomware_activity.ps1 -ConfigFile "C:\custom\config.json"
@@ -403,10 +403,10 @@ Se esecuzione fallisce:
 "3 Ransomware_Detection - UNKNOWN: Errore esecuzione script: [messaggio]"
 
 REQUISITI:
-✓ PowerShell 5.1+
-✓ Accesso Internet (HTTPS GitHub)
-✓ System.Net.WebClient disponibile
-✓ Permessi scrittura in %TEMP%
+ PowerShell 5.1+
+ Accesso Internet (HTTPS GitHub)
+ System.Net.WebClient disponibile
+ Permessi scrittura in %TEMP%
 
 INSTALLAZIONE:
 1. Copiare in C:\ProgramData\checkmk\agent\local\
@@ -414,10 +414,10 @@ INSTALLAZIONE:
 3. Testare: powershell -File rcheck_ransomware_activity.ps1
 
 SICUREZZA:
-⚠️ Script scarica e esegue codice da GitHub
-⚠️ Verificare HTTPS e validità repository
-⚠️ Possibile MITM se rete compromessa
-⚠️ Consigliato: usare script locale in ambienti critici
+ Script scarica e esegue codice da GitHub
+ Verificare HTTPS e validità repository
+ Possibile MITM se rete compromessa
+ Consigliato: usare script locale in ambienti critici
 
 CLEANUP:
 File temporanei creati: %TEMP%\check_ransomware_activity_{timestamp}.ps1
@@ -429,7 +429,7 @@ Forza download fresh evitando cache browser/proxy
 
 
 ================================================================================
-📂 SCRIPT-CHECK-WINDOWS/POLLING/
+ SCRIPT-CHECK-WINDOWS/POLLING/
 ================================================================================
 
 STATO: Cartella vuota
@@ -461,10 +461,10 @@ DIPENDENZE
 ================================================================================
 
 RICHIESTE:
-✓ Windows Server 2016+ (testato su 2022)
-✓ PowerShell 5.1 o superiore
-✓ CheckMK Raw 2.4.x
-✓ .NET Framework 4.5+ (per System.Net.WebClient)
+ Windows Server 2016+ (testato su 2022)
+ PowerShell 5.1 o superiore
+ CheckMK Raw 2.4.x
+ .NET Framework 4.5+ (per System.Net.WebClient)
 
 MODULI POWERSHELL:
 - Nessun modulo esterno richiesto
@@ -545,16 +545,16 @@ INSTALLAZIONE WRAPPER:
    Test-NetConnection raw.githubusercontent.com -Port 443
 
 VANTAGGI WRAPPER:
-✓ Aggiornamenti automatici (nessuna ridistribuzione)
-✓ Centralized version management
-✓ Rollback immediato (cambio branch)
-✓ Testing feature branch senza rischi
+ Aggiornamenti automatici (nessuna ridistribuzione)
+ Centralized version management
+ Rollback immediato (cambio branch)
+ Testing feature branch senza rischi
 
 SVANTAGGI WRAPPER:
-⚠️ Richiede Internet access
-⚠️ Latenza download (cache bypass)
-⚠️ Potenziale MITM risk
-⚠️ Dependency su GitHub availability
+ Richiede Internet access
+ Latenza download (cache bypass)
+ Potenziale MITM risk
+ Dependency su GitHub availability
 
 CONFIGURAZIONE PROXY:
 Se ambiente usa proxy HTTP:
@@ -614,13 +614,13 @@ PERFORMANCE:
 - Early exit su share inaccessibili
 
 BEST PRACTICES:
-✓ Monitorare solo share critiche (non backup/temp)
-✓ Configurare ExcludePaths per cartelle grandi
-✓ AlertThreshold basato su dimensione share
-✓ EnableCanaryFiles per early detection
-✓ Test periodici con file .encrypted fake
-✓ Review alert history in statefile
-✓ Tune MaxFilesPerSecond per ambiente
+ Monitorare solo share critiche (non backup/temp)
+ Configurare ExcludePaths per cartelle grandi
+ AlertThreshold basato su dimensione share
+ EnableCanaryFiles per early detection
+ Test periodici con file .encrypted fake
+ Review alert history in statefile
+ Tune MaxFilesPerSecond per ambiente
 
 
 ================================================================================
@@ -658,16 +658,16 @@ MONITORAGGIO:
 4. Memorizza hash in statefile per integrity check
 
 VANTAGGI:
-✓ Early detection (prima che danni siano estesi)
-✓ Zero-day ransomware detection
-✓ Non dipende da signature
-✓ Basso overhead performance
-✓ Difficile da eludere per ransomware
+ Early detection (prima che danni siano estesi)
+ Zero-day ransomware detection
+ Non dipende da signature
+ Basso overhead performance
+ Difficile da eludere per ransomware
 
 LIMITAZIONI:
-⚠️ Ransomware evoluto può riconoscere canary
-⚠️ Richiede permessi scrittura share
-⚠️ Può generare falsi positivi se utenti toccano file
+ Ransomware evoluto può riconoscere canary
+ Richiede permessi scrittura share
+ Può generare falsi positivi se utenti toccano file
 
 
 ================================================================================
@@ -913,22 +913,22 @@ SICUREZZA
 CONSIDERAZIONI:
 
 RANSOMWARE DETECTION:
-✓ Script legge file ma non scrive (eccetto canary e statefile)
-✓ Nessuna modifica ai file monitorati
-✓ Read-only access sufficiente (eccetto canary)
-✓ Non esegue file o comandi dalle share
+ Script legge file ma non scrive (eccetto canary e statefile)
+ Nessuna modifica ai file monitorati
+ Read-only access sufficiente (eccetto canary)
+ Non esegue file o comandi dalle share
 
 WRAPPER REMOTO:
-⚠️ Scarica ed esegue codice da GitHub
-⚠️ Rischio MITM se rete compromessa
-⚠️ Verificare HTTPS e certificato
-⚠️ Uso in produzione: script locale preferibile
+ Scarica ed esegue codice da GitHub
+ Rischio MITM se rete compromessa
+ Verificare HTTPS e certificato
+ Uso in produzione: script locale preferibile
 
 CREDENZIALI:
-✓ Script non memorizza credenziali
-✓ Usa context account CheckMK service
-✓ Nessun hardcoded password
-✓ Config file non contiene secrets
+ Script non memorizza credenziali
+ Usa context account CheckMK service
+ Nessun hardcoded password
+ Config file non contiene secrets
 
 PERMESSI MINIMI:
 - Read su share monitorate
@@ -936,16 +936,16 @@ PERMESSI MINIMI:
 - Write in %TEMP% per statefile
 
 LOG E STATEFILE:
-✓ Statefile contiene solo metadata (no file content)
-✓ Non logga contenuto file
-✓ IP e path share visibili in output CheckMK
-✓ Non espone informazioni sensibili business
+ Statefile contiene solo metadata (no file content)
+ Non logga contenuto file
+ IP e path share visibili in output CheckMK
+ Non espone informazioni sensibili business
 
 CANARY FILES:
-✓ Contenuto innocuo (solo warning message)
-✓ Attributi Hidden per ridurre visibility
-✓ ReadOnly per prevenire modifica accidentale
-✓ Non contiene dati sensibili
+ Contenuto innocuo (solo warning message)
+ Attributi Hidden per ridurre visibility
+ ReadOnly per prevenire modifica accidentale
+ Non contiene dati sensibili
 
 
 BEST PRACTICES SICUREZZA:

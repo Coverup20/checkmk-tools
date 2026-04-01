@@ -1,18 +1,18 @@
-# 🛡️ CheckMK Tools Collection
+#  CheckMK Tools Collection
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![CheckMK](https://img.shields.io/badge/CheckMK-Compatible-green.svg)](https://checkmk.com/)
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1+-blue.svg)](https://github.com/PowerShell/PowerShell)
 [![Bash](https://img.shields.io/badge/Bash-4.0+-green.svg)](https://www.gnu.org/software/bash/)
-[![Language](https://img.shields.io/badge/Lingua-Italiano%20🇮🇹-green.svg)](https://github.com/Coverup20/checkmk-tools)
+[![Language](https://img.shields.io/badge/Lingua-Italiano%20-green.svg)](https://github.com/Coverup20/checkmk-tools)
 
 Collezione completa di script per il monitoraggio e la gestione di infrastrutture con CheckMK. Include script di check per diverse piattaforme, sistemi di notifica personalizzati, tool di deployment automatizzato, backup cloud, e automazione completa.
 
-> 🇮🇹 **Nota**: Questo repository è principalmente in italiano. Documentazione e commenti sono in lingua italiana.
+>  **Nota**: Questo repository è principalmente in italiano. Documentazione e commenti sono in lingua italiana.
 
 ---
 
-## 📋 Indice
+##  Indice
 
 - **Caratteristiche Principali**
 - **Struttura Repository**
@@ -31,21 +31,21 @@ Collezione completa di script per il monitoraggio e la gestione di infrastruttur
 
 ---
 
-## 🎯 Caratteristiche Principali
+##  Caratteristiche Principali
 
-### ✨ Multi-Piattaforma
+###  Multi-Piattaforma
 
 - **Windows**: PowerShell scripts per Windows Server (AD, IIS, Ransomware Detection)
 - **Linux**: Bash scripts per NethServer, Ubuntu, Proxmox
 - **Container**: Monitoraggio Podman/Docker su NethServer 8
 
-### 🔄 Auto-Update Pattern
+###  Auto-Update Pattern
 
 - **Remote Wrappers**: Script che si auto-aggiornano da GitHub
 - **Cache Intelligente**: Sistema di caching con timeout configurabile (60s default)
 - **Fallback Resiliente**: Usa cache obsoleta se GitHub non raggiungibile
 
-### �️ ROCKSOLID Mode - Agent Resistente agli Upgrade
+### � ROCKSOLID Mode - Agent Resistente agli Upgrade
 
 - **NethSecurity 8**: Installazione agent CheckMK + FRP resistente ai major upgrade
 - **Auto-Recovery**: Script di avvio che ripristina servizi automaticamente
@@ -54,21 +54,21 @@ Collezione completa di script per il monitoraggio e la gestione di infrastruttur
 - **Protezioni Totali**: 13 file critici protetti in `/etc/sysupgrade.conf`
 - **Validazione Completa**: Testato su NethSecurity 8.7.1 + CheckMK 2.4.0p20
 
-### �🚀 Deploy Automatizzato
+### � Deploy Automatizzato
 
 - **Smart Deploy**: Sistema ibrido per deployment multi-host
 - **Backup Automatico**: Snapshot pre-deployment con rollback
 - **Validazione**: Test sintassi e funzionalità pre-deployment
 - **Interactive Menu**: Deploy interattivo con selezione script per OS
 
-### 🎨 Nethesis Branding per CheckMK
+###  Nethesis Branding per CheckMK
 
 - **Rebranding completo**: Logo, colori e CSS per tema facelift di CheckMK
 - **Multi-server**: Deploy su tutti i server con un solo script
 - **Asset statici**: SVG con logo embedded in `nethesis-brand/`
 - **Idempotente**: Sicuro da rieseguire, non rompe la configurazione esistente
 
-### ☁️ Backup Cloud Automatizzato
+###  Backup Cloud Automatizzato
 
 - **rclone Integration**: Backup CheckMK su cloud storage (S3, DigitalOcean Spaces, ecc.)
 - **Retention Intelligente**: Gestione automatica retention locale e remota
@@ -76,14 +76,14 @@ Collezione completa di script per il monitoraggio e la gestione di infrastruttur
 - **Monitoring Timer**: Check ogni minuto per nuovi backup
 - **Auto-Install Dipendenze**: Installazione automatica rclone e dipendenze
 
-### 🔄 Auto-Upgrade CheckMK
+###  Auto-Upgrade CheckMK
 
 - **Upgrade Automatico**: Setup wizard per upgrade CheckMK via crontab
 - **Always Latest**: Scarica sempre ultima versione script da GitHub
 - **Compatibilità Universale**: Supporto bash 3.2+ con metodo download-to-temp
 - **Configurazione Interattiva**: Wizard step-by-step per configurazione completa
 
-### 📧 Notifiche Avanzate
+###  Notifiche Avanzate
 
 - **Email Real IP**: Notifiche con IP reale anche dietro proxy FRP
 - **Telegram Integration**: Notifiche Telegram con detection automatica scenario
@@ -91,14 +91,14 @@ Collezione completa di script per il monitoraggio e la gestione di infrastruttur
 
 ---
 
-## 📁 Struttura Repository
+##  Struttura Repository
 
 ```text
 
 checkmk-tools/
 ├── script-check-windows/          # Script check per Windows
 │   ├── nopolling/
-│   │   └── ransomware_detection/  # ⭐ Rilevamento ransomware real-time
+│   │   └── ransomware_detection/  #  Rilevamento ransomware real-time
 │   └── polling/
 │
 ├── script-check-ns7/              # Script check per NethServer 7
@@ -140,16 +140,16 @@ checkmk-tools/
 │   ├── doc/                       # Documentazione
 │   ├── full/                      # Tool completi
 │   │   ├── smart-deploy-hybrid.sh     # Deploy intelligente multi-host
-│   │   ├── deploy-monitoring-scripts.sh  # ⭐ Deploy interattivo OS-aware
+│   │   ├── deploy-monitoring-scripts.sh  #  Deploy interattivo OS-aware
 │   │   ├── deploy-plain-agent*.sh     # Deploy agent CheckMK
 │   │   ├── install-frpc*.sh           # Installazione FRP client
 │   │   ├── install-agent-interactive.sh  # Installazione agent interattiva
 │   │   ├── checkmk-tuning-interactive*.sh  # Tuning CheckMK
 │   │   ├── checkmk-optimize.sh        # Ottimizzazione CheckMK
 │   │   ├── scan-nmap*.sh              # Scanner rete interattivo
-│   │   ├── auto-git-sync.sh           # ⭐ Sync automatico repository
-│   │   ├── checkmk_rclone_space_dyn.sh # ⭐ Backup cloud con rclone
-│   │   ├── setup-auto-upgrade-checkmk.sh # ⭐ Setup auto-upgrade CheckMK
+│   │   ├── auto-git-sync.sh           #  Sync automatico repository
+│   │   ├── checkmk_rclone_space_dyn.sh #  Backup cloud con rclone
+│   │   ├── setup-auto-upgrade-checkmk.sh #  Setup auto-upgrade CheckMK
 │   │   ├── upgrade-checkmk.sh         # Upgrade CheckMK
 │   │   └── increase-swap.sh           # Gestione swap
 │   ├── (remote rimosso)           # Launcher remoti dismessi
@@ -167,10 +167,10 @@ checkmk-tools/
 │   ├── full/                      # Script fix completi
 │   └── (remote rimosso)           # Solo script full
 │
-├── Ydea-Toolkit/                  # 🎫 Integrazione Ydea Ticketing
+├── Ydea-Toolkit/                  #  Integrazione Ydea Ticketing
 │   ├── doc/                       # Documentazione completa
 │   ├── full/                      # Script completi integrazione
-│   │   ├── ydea-toolkit.sh        # ⭐ Toolkit principale
+│   │   ├── ydea-toolkit.sh        #  Toolkit principale
 │   │   ├── ydea-monitoring-integration.sh  # Integrazione CheckMK
 │   │   ├── create-monitoring-ticket.sh     # Creazione ticket
 │   │   ├── ydea-discover-sla-ids.sh        # Discovery SLA
@@ -181,7 +181,7 @@ checkmk-tools/
 │   ├── README.md                  # Guida principale
 │   └── README-*.md                # Guide specifiche
 │
-├── nethesis-brand/                # 🎨 Asset branding Nethesis per CheckMK
+├── nethesis-brand/                #  Asset branding Nethesis per CheckMK
 │   ├── checkmk_logo.svg           # Logo login (290px, bordo verde)
 │   ├── icon_checkmk_logo.svg      # Icona N sidebar 40px
 │   ├── icon_checkmk_logo_min.svg  # Icona N sidebar 28px
@@ -189,7 +189,7 @@ checkmk-tools/
 │   ├── nethesis_n_icon.png        # Favicon N originale (sorgente)
 │   └── theme.css                  # CSS override colori Nethesis
 │
-├── deploy-nethesis-brand.sh       # 🎨 Deploy branding su tutti i server CheckMK
+├── deploy-nethesis-brand.sh       #  Deploy branding su tutti i server CheckMK
 │
 ├── tools/                         # Utility Python
 │   ├── fix_bash_syntax_corruption.py  # Fix corruzione sintassi
@@ -209,30 +209,30 @@ checkmk-tools/
     ├── debug-monitor.sh           # Debug monitoring
     ├── update-deployed-launchers.sh  # Aggiorna launcher deployati
     ├── distributed-monitoring-setup.sh  # Setup monitoring distribuito
-    └── .copilot-context.md        # ⭐ Context file per AI (auto-sync, preferenze)
+    └── .copilot-context.md        #  Context file per AI (auto-sync, preferenze)
 
 ```text
 
-> 📝 **Nota importante**: Il file `.copilot-context.md` contiene informazioni critiche sull'architettura del sistema auto-sync e preferenze per assistenti AI. Leggerlo prima di modificare file o eseguire comandi.
+>  **Nota importante**: Il file `.copilot-context.md` contiene informazioni critiche sull'architettura del sistema auto-sync e preferenze per assistenti AI. Leggerlo prima di modificare file o eseguire comandi.
 
 ---
 
-## 🛡️ Script di Check
+##  Script di Check
 
 ### Windows
 
 **Directory**: `script-check-windows/`
 
-#### ⭐ Ransomware Detection
+####  Ransomware Detection
 
 Script avanzato per rilevamento tempestivo attività ransomware su share di rete.
 
 **Features**:
-- 🔍 Detection multi-pattern (estensioni sospette, ransom note, velocità I/O)
-- 🐤 Canary files monitoring
-- ⏱️ Timeout protection per share lente/bloccate
-- 🔄 Auto-update da GitHub
-- 📊 Metriche dettagliate per share
+-  Detection multi-pattern (estensioni sospette, ransom note, velocità I/O)
+-  Canary files monitoring
+-  Timeout protection per share lente/bloccate
+-  Auto-update da GitHub
+-  Metriche dettagliate per share
 
 **Files**:
 - `check_ransomware_activity.ps1` - Script principale (737 righe)
@@ -395,7 +395,7 @@ Monitoraggio Proxmox Virtual Environment tramite API.
 
 ---
 
-## 📧 Script di Notifica
+##  Script di Notifica
 
 **Directory**: `script-notify-checkmk/`
 
@@ -407,7 +407,7 @@ Sistema avanzato di notifiche CheckMK con supporto FRP (Fast Reverse Proxy) e in
 
 ### Features Principali
 
-#### 🌐 Real IP Detection
+####  Real IP Detection
 
 Estrae IP reale anche dietro proxy FRP per notifiche accurate:
 
@@ -419,7 +419,7 @@ if 'NOTIFY_HOSTLABEL_real_ip' in os.environ:
 
 ```text
 
-#### 📊 Grafici Integrati
+####  Grafici Integrati
 
 Email HTML con grafici performance inclusi automaticamente:
 - CPU usage
@@ -427,7 +427,7 @@ Email HTML con grafici performance inclusi automaticamente:
 - Disk I/O
 - Network traffic
 
-#### 🔔 Multi-Channel
+####  Multi-Channel
 
 - **Email**: `mail_realip*` - Varie versioni (HTML, hybrid, safe)
 - **Telegram**: `telegram_realip` - Bot Telegram con formattazione
@@ -436,7 +436,7 @@ Email HTML con grafici performance inclusi automaticamente:
 
 | Script | Descrizione | Features |
 |--------|-------------|----------|
-| `mail_realip_hybrid` | Email HTML + Real IP + Grafici | ⭐ Consigliato |
+| `mail_realip_hybrid` | Email HTML + Real IP + Grafici |  Consigliato |
 | `mail_realip_hybrid_v24` | Versione CheckMK 2.4+ | Latest version |
 | `mail_realip_hybrid_safe` | Versione con fallback | Extra safety |
 | `mail_realip` | Email base Real IP | Minimal |
@@ -446,7 +446,7 @@ Email HTML con grafici performance inclusi automaticamente:
 | `ydea_ag` | Integrazione Ydea AG | Ticketing AG |
 | `ydea_la` | Integrazione Ydea LA | Ticketing LA |
 | `mail_ydea_down` | Email notifica host down Ydea | Host down |
-| `dump_env` | Dump environment variables | 🔧 Debug |
+| `dump_env` | Dump environment variables |  Debug |
 
 ### Deployment
 
@@ -470,7 +470,7 @@ ls -la local/share/check_mk/notifications/
 
 ---
 
-## 🚀 Tool di Deploy
+##  Tool di Deploy
 
 **Directory**: `script-tools/`
 
@@ -483,16 +483,16 @@ Utility per deployment automatizzato CheckMK Agent, script e gestione infrastrut
 - `auto-git-sync.service` - Systemd service per sync automatico
 - `install-auto-git-sync.sh` - Installazione sync automatico repository
 
-### 🎯 Deploy Monitoring Scripts
+###  Deploy Monitoring Scripts
 
 Script interattivo per deployment selettivo di monitoring scripts su host remoti.
 
 **Features**:
-- 🔍 Auto-detect sistema operativo (NS7/NS8/Proxmox/Ubuntu)
-- 📋 Menu interattivo con lista script disponibili
-- ✅ Deploy selettivo (singoli script o tutti)
-- 🎯 Copia automatica in `/usr/lib/check_mk_agent/local/`
-- 🔄 Usa repository locale `/opt/checkmk-tools`
+-  Auto-detect sistema operativo (NS7/NS8/Proxmox/Ubuntu)
+-  Menu interattivo con lista script disponibili
+-  Deploy selettivo (singoli script o tutti)
+-  Copia automatica in `/usr/lib/check_mk_agent/local/`
+-  Usa repository locale `/opt/checkmk-tools`
 
 **Installazione one-liner**:
 
@@ -519,7 +519,7 @@ cd /opt/checkmk-tools
   Deploy Monitoring Scripts
 ========================================
 
-✅ Repository trovato: /opt/checkmk-tools
+ Repository trovato: /opt/checkmk-tools
 Sistema rilevato: NethServer 7
 
 Script disponibili:
@@ -539,11 +539,11 @@ Selezione (numeri separati da spazi, 'a' per tutti, 'q' per uscire): 1 3 5
 Sistema intelligente per deployment multi-host con auto-update.
 
 **Features**:
-- 🔄 Auto-download da GitHub con cache
-- 🛡️ Fallback su cache in caso di network issue
-- ⏱️ Timeout protection (30s default)
-- 📝 Logging dettagliato
-- ✅ Validazione sintassi pre-deploy
+-  Auto-download da GitHub con cache
+-  Fallback su cache in caso di network issue
+-  Timeout protection (30s default)
+-  Logging dettagliato
+-  Validazione sintassi pre-deploy
 
 **Files**:
 - `smart-deploy-hybrid.sh` - Deploy intelligente
@@ -594,22 +594,22 @@ Installazione e configurazione CheckMK Agent.
 | Script | Descrizione |
 |--------|-------------|
 | `install-agent-interactive.sh` | Installazione agent interattiva |
-| `install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh` | ⭐ **Installer ROCKSOLID** per NethSecurity 8 |
+| `install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh` |  **Installer ROCKSOLID** per NethSecurity 8 |
 | `rocksolid-startup-check.sh` | Autocheck boot per protezione post-upgrade |
 | `update-all-scripts.sh` | Aggiornamento script da repository |
 | `update-scripts-from-repo.sh` | Update specifici script |
 
-#### 🛡️ ROCKSOLID Mode - Installazione Resistente agli Upgrade
+####  ROCKSOLID Mode - Installazione Resistente agli Upgrade
 
 **Sistema avanzato di protezione per NethSecurity 8** che garantisce la sopravvivenza di CheckMK Agent e FRP Client durante i major upgrade di sistema.
 
 **Caratteristiche**:
-- ✅ **Protezione Totale**: Aggiunge file critici a `/etc/sysupgrade.conf` (sopravvivono agli upgrade)
-- ✅ **Backup Binari**: Backup automatico di `tar`, `ar`, `gzip` (protegge da corruzione durante upgrade)
-- ✅ **Auto-Recovery**: Script di avvio che verifica e ripristina servizi automaticamente
-- ✅ **FRP Integration**: Supporto FRP v0.x e v1.x con rilevamento configurazione esistente
-- ✅ **Marker System**: File marker per rilevamento installazione FRP persistente
-- ✅ **Post-Upgrade Script**: Script automatico di verifica e ripristino post-upgrade
+-  **Protezione Totale**: Aggiunge file critici a `/etc/sysupgrade.conf` (sopravvivono agli upgrade)
+-  **Backup Binari**: Backup automatico di `tar`, `ar`, `gzip` (protegge da corruzione durante upgrade)
+-  **Auto-Recovery**: Script di avvio che verifica e ripristina servizi automaticamente
+-  **FRP Integration**: Supporto FRP v0.x e v1.x con rilevamento configurazione esistente
+-  **Marker System**: File marker per rilevamento installazione FRP persistente
+-  **Post-Upgrade Script**: Script automatico di verifica e ripristino post-upgrade
 
 **Validato su**:
 - NethSecurity 8.7.1 (OpenWrt 23.05.0)
@@ -662,7 +662,7 @@ bash install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh
 
 ---
 
-## 🎫 Ydea Toolkit - Integrazione Ticketing
+##  Ydea Toolkit - Integrazione Ticketing
 
 **Directory**: `Ydea-Toolkit/`
 
@@ -676,13 +676,13 @@ Integrazione completa tra CheckMK e sistema di ticketing Ydea per creazione auto
 
 ### Features Principali
 
-#### 🎯 Funzionalità Core
+####  Funzionalità Core
 
-- 🎫 **Creazione ticket automatica** da eventi CheckMK
-- 🔍 **Discovery SLA** automatico da contratti
-- 📊 **Monitoring ticket** aperti e in corso
-- 🏥 **Health monitor** stato integrazione
-- 🔧 **Toolkit completo** per gestione API Ydea
+-  **Creazione ticket automatica** da eventi CheckMK
+-  **Discovery SLA** automatico da contratti
+-  **Monitoring ticket** aperti e in corso
+-  **Health monitor** stato integrazione
+-  **Toolkit completo** per gestione API Ydea
 
 ### Script Disponibili
 
@@ -690,7 +690,7 @@ Integrazione completa tra CheckMK e sistema di ticketing Ydea per creazione auto
 
 | Script | Descrizione |
 |--------|-------------|
-| `ydea-monitoring-integration.sh` | ⭐ Integrazione completa CheckMK-Ydea |
+| `ydea-monitoring-integration.sh` |  Integrazione completa CheckMK-Ydea |
 | `install-ydea-checkmk-integration.sh` | Installazione automatica integrazione |
 | `ydea-health-monitor.sh` | Monitor stato integrazione |
 | `ydea-ticket-monitor.sh` | Monitor ticket aperti |
@@ -718,7 +718,7 @@ Integrazione completa tra CheckMK e sistema di ticketing Ydea per creazione auto
 
 | Script | Descrizione |
 |--------|-------------|
-| `ydea-toolkit.sh` | ⭐ Toolkit principale API Ydea |
+| `ydea-toolkit.sh` |  Toolkit principale API Ydea |
 | `explore-ydea-api.sh` | Esplora API Ydea |
 | `explore-anagrafica.sh` | Esplora anagrafica clienti |
 | `quick-test-ydea-api.sh` | Test rapido API |
@@ -753,10 +753,10 @@ vim .env
 
 ### Documentazione
 
-- 📖 **[README.md](Ydea-Toolkit/README.md)** - Guida principale
-- 📖 **[README-CHECKMK-INTEGRATION.md](Ydea-Toolkit/doc/README-CHECKMK-INTEGRATION.md)** - Guida integrazione completa CheckMK-Ydea
+-  **[README.md](Ydea-Toolkit/README.md)** - Guida principale
+-  **[README-CHECKMK-INTEGRATION.md](Ydea-Toolkit/doc/README-CHECKMK-INTEGRATION.md)** - Guida integrazione completa CheckMK-Ydea
 
-> 📋 **Nota**: Documentazione consolidata da 17 a 2 file essenziali per facilità navigazione (Febbraio 2026)
+>  **Nota**: Documentazione consolidata da 17 a 2 file essenziali per facilità navigazione (Febbraio 2026)
 
 ### Configurazione
 
@@ -777,7 +777,7 @@ YDEA_CONTRATTO_ID="171734"  # Contratto che applica SLA automaticamente
 
 ---
 
-## 🔧 Directory Utility
+##  Directory Utility
 
 ### Install - Installazione e Bootstrap
 
@@ -838,7 +838,7 @@ Script bash utility nella root del repository.
 
 ---
 
-## ⚙️ Automazione e Backup
+##  Automazione e Backup
 
 ### Script PowerShell Root Directory
 
@@ -892,7 +892,7 @@ Sistema automatizzato per backup e sync del repository.
 
 ---
 
-## 🔧 Installazione
+##  Installazione
 
 ### Requisiti Base
 
@@ -980,34 +980,34 @@ omd start
 
 ---
 
-## 📖 Documentazione
+##  Documentazione
 
 ### README Specifici
 
 Ogni categoria ha la sua documentazione dettagliata:
 
-- 📂 **Windows**: [script-check-windows/README.md](script-check-windows/README.md)
-  - 🛡️ **Ransomware**: [README-Ransomware-Detection.md](script-check-windows/README-Ransomware-Detection.md)
+-  **Windows**: [script-check-windows/README.md](script-check-windows/README.md)
+  -  **Ransomware**: [README-Ransomware-Detection.md](script-check-windows/README-Ransomware-Detection.md)
 
-- 📂 **Notifiche**: [script-notify-checkmk/TESTING_GUIDE.md](script-notify-checkmk/TESTING_GUIDE.md)
+-  **Notifiche**: [script-notify-checkmk/TESTING_GUIDE.md](script-notify-checkmk/TESTING_GUIDE.md)
 
-- 📂 **Deploy Tools**: 
+-  **Deploy Tools**: 
   - [script-tools/README-Smart-Deploy.md](script-tools/README-Smart-Deploy.md)
   - [script-tools/README-Smart-Deploy-Enhanced.md](script-tools/README-Smart-Deploy-Enhanced.md)
 
-- 📂 **Soluzioni Complete**: [SOLUZIONE-COMPLETA.md](SOLUZIONE-COMPLETA.md)
+-  **Soluzioni Complete**: [SOLUZIONE-COMPLETA.md](SOLUZIONE-COMPLETA.md)
 
 ### Guide Installazione
 
-- 📦 **CheckMK 8**: [script-tools/full/installation/install-cmk8/](script-tools/full/installation/install-cmk8/)
+-  **CheckMK 8**: [script-tools/full/installation/install-cmk8/](script-tools/full/installation/install-cmk8/)
 
 ### Configurazioni
 
-- 🏷️ **Host Labels**: [checkmk-host-labels-config.md](checkmk-host-labels-config.md)
+-  **Host Labels**: [checkmk-host-labels-config.md](checkmk-host-labels-config.md)
 
 ---
 
-## 🧪 Testing
+##  Testing
 
 ### Test Windows
 
@@ -1054,7 +1054,7 @@ exec(open('mail_realip_hybrid').read())
 
 ---
 
-## 🤝 Contributi
+##  Contributi
 
 ### Come Contribuire
 
@@ -1100,7 +1100,7 @@ exec(open('mail_realip_hybrid').read())
 
 ---
 
-## 📊 Statistiche Repository
+##  Statistiche Repository
 
 ### Script Count
 
@@ -1126,24 +1126,24 @@ exec(open('mail_realip_hybrid').read())
 
 ### Lingue
 
-- 🔷 **PowerShell**: ~25% (Windows scripts, automazione)
-- 🟢 **Bash**: ~65% (Linux scripts, deploy, tools)
-- 🐍 **Python**: ~10% (Notifiche CheckMK, utility)
+-  **PowerShell**: ~25% (Windows scripts, automazione)
+-  **Bash**: ~65% (Linux scripts, deploy, tools)
+-  **Python**: ~10% (Notifiche CheckMK, utility)
 
 ### Copertura Piattaforme
 
-- ✅ **Windows Server** (PowerShell scripts)
-- ✅ **NethServer 7** (CentOS 7 based)
-- ✅ **NethServer 8** (Container/Podman based)
-- ✅ **NethSecurity 8** (Firewall)
-- ✅ **Ubuntu/Debian** (Script generici Linux)
-- ✅ **Proxmox VE** (Virtualizzazione)
-- ✅ **CheckMK** (Notifiche, tuning, deploy)
-- ✅ **Ydea** (Sistema ticketing)
+-  **Windows Server** (PowerShell scripts)
+-  **NethServer 7** (CentOS 7 based)
+-  **NethServer 8** (Container/Podman based)
+-  **NethSecurity 8** (Firewall)
+-  **Ubuntu/Debian** (Script generici Linux)
+-  **Proxmox VE** (Virtualizzazione)
+-  **CheckMK** (Notifiche, tuning, deploy)
+-  **Ydea** (Sistema ticketing)
 
 ---
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### Windows
 
@@ -1205,17 +1205,17 @@ python3 -c "exec(open('./mail_realip_hybrid').read())"
 
 ---
 
-## 🔒 Sicurezza
+##  Sicurezza
 
 ### Best Practices
 
-- ✅ Non committare credenziali in config files
-- ✅ Usa variabili ambiente per token/password
-- ✅ Limita permessi file (600 per config sensibili)
-- ✅ Valida input utente
-- ✅ Usa HTTPS per comunicazioni API
-- ✅ Timeout per operazioni di rete
-- ✅ Log eventi di sicurezza rilevanti
+-  Non committare credenziali in config files
+-  Usa variabili ambiente per token/password
+-  Limita permessi file (600 per config sensibili)
+-  Valida input utente
+-  Usa HTTPS per comunicazioni API
+-  Timeout per operazioni di rete
+-  Log eventi di sicurezza rilevanti
 
 ### Credenziali
 
@@ -1268,7 +1268,7 @@ Produzione
 4. **Script aggiornati** in `/opt/checkmk-tools/`
 5. **Test in produzione**
 
-⚠️ **Importante**: Non modificare mai direttamente file in `/opt/checkmk-tools/` - verranno sovrascritti dal sync!
+ **Importante**: Non modificare mai direttamente file in `/opt/checkmk-tools/` - verranno sovrascritti dal sync!
 
 ### Verifica Sync
 
@@ -1288,18 +1288,18 @@ sudo bash /opt/checkmk-tools/script-tools/full/sync_update/auto-git-sync.sh
 
 ---
 
-## ☁️ Backup Cloud CheckMK
+##  Backup Cloud CheckMK
 
 Script completo per backup automatizzato CheckMK su cloud storage con rclone.
 
 ### Features
 
-- ✅ **Multi-Cloud**: Supporto S3, DigitalOcean Spaces, Google Drive, Dropbox, ecc.
-- ✅ **Auto-Install**: Installazione automatica rclone e dipendenze
-- ✅ **Retention Automatica**: Gestione locale e remota con giorni configurabili
-- ✅ **Rename Intelligente**: Timestamp automatico per backup `-complete`
-- ✅ **Monitoring Timer**: Systemd timer (ogni 1 minuto) per check automatici
-- ✅ **S3-Compatible**: Ottimizzato per S3/Spaces (no mkdir, path auto-create)
+-  **Multi-Cloud**: Supporto S3, DigitalOcean Spaces, Google Drive, Dropbox, ecc.
+-  **Auto-Install**: Installazione automatica rclone e dipendenze
+-  **Retention Automatica**: Gestione locale e remota con giorni configurabili
+-  **Rename Intelligente**: Timestamp automatico per backup `-complete`
+-  **Monitoring Timer**: Systemd timer (ogni 1 minuto) per check automatici
+-  **S3-Compatible**: Ottimizzato per S3/Spaces (no mkdir, path auto-create)
 
 ### Quick Start
 
@@ -1340,17 +1340,17 @@ rclone config
 
 ---
 
-## 🔄 Auto-Upgrade CheckMK
+##  Auto-Upgrade CheckMK
 
 Wizard interattivo per configurare upgrade automatico CheckMK via crontab.
 
 ### Features
 
-- ✅ **Always Latest**: Scarica sempre ultima versione upgrade script da GitHub
-- ✅ **Compatibilità Universale**: Supporto bash 3.2+ (download-to-temp)
-- ✅ **Wizard Interattivo**: Configurazione step-by-step guidata
-- ✅ **Crontab Safe**: Validazione e backup crontab automatico
-- ✅ **Multi-Site**: Supporto upgrade singolo site o tutti
+-  **Always Latest**: Scarica sempre ultima versione upgrade script da GitHub
+-  **Compatibilità Universale**: Supporto bash 3.2+ (download-to-temp)
+-  **Wizard Interattivo**: Configurazione step-by-step guidata
+-  **Crontab Safe**: Validazione e backup crontab automatico
+-  **Multi-Site**: Supporto upgrade singolo site o tutti
 
 ### Quick Start
 
@@ -1375,33 +1375,33 @@ crontab -l
 
 ---
 
-## �📞 Supporto
+## � Supporto
 
 ### Issue Reporting
 
 Apri issue su GitHub con:
-- 🖥️ Sistema operativo e versione
-- 📦 Versione CheckMK
-- 📄 Script coinvolto
-- ❌ Messaggio errore completo
-- 🔍 Log di debug (se disponibili)
+-  Sistema operativo e versione
+-  Versione CheckMK
+-  Script coinvolto
+-  Messaggio errore completo
+-  Log di debug (se disponibili)
 
 ### Community
 
-- 💬 Discussions GitHub
-- 📧 Email: coverup20@github.com
+-  Discussions GitHub
+-  Email: coverup20@github.com
 
 ---
 
-## 📄 License
+##  License
 
 MIT License - Vedi [LICENSE](LICENSE) per dettagli.
 
 ---
 
-## ✨ Credits
+##  Credits
 
-Sviluppato con ❤️ per la community CheckMK.
+Sviluppato con  per la community CheckMK.
 
 ### Autori Principali
 
@@ -1419,9 +1419,9 @@ Grazie a tutti i contributori che hanno aiutato a migliorare questa collezione!
 
 ---
 
-## 🗺️ Roadmap
+##  Roadmap
 
-### ✅ Completato (v2.0)
+###  Completato (v2.0)
 
 - [x] **Ydea Toolkit**: Integrazione completa ticketing
 - [x] **NethSecurity 8**: Monitoraggio firewall
@@ -1464,21 +1464,21 @@ Grazie a tutti i contributori che hanno aiutato a migliorare questa collezione!
 
 ---
 
-## 📅 Changelog
+##  Changelog
 
 ### v2.2.0 (Current - Febbraio 2026)
 
-- ✅ **Ydea Toolkit Enhanced**: Sistema SLA contract-based con campo `contrattoId`
+-  **Ydea Toolkit Enhanced**: Sistema SLA contract-based con campo `contrattoId`
   - Applicazione automatica SLA "Premium_Mon" da contratto 171734
   - Eliminato bisogno di specificare esplicitamente `serviceLevelAgreement`
   - Testing completo con 6 ticket validati (tutti con SLA Premium_Mon)
   - Configurazione multi-utente (Alessandro Gaggiano, Lorenzo Angelini)
-- ✅ **Documentazione Consolidata**: Ydea-Toolkit da 17 a 2 file essenziali
+-  **Documentazione Consolidata**: Ydea-Toolkit da 17 a 2 file essenziali
   - README.md principale (overview e quick start)
   - README-CHECKMK-INTEGRATION.md (guida completa integrazione)
   - Rimossi file ridondanti e frammentati
   - Fix 61 warning markdownlint per qualità codice
-- ✅ **ROCKSOLID Mode Production**: Sistema completato e validato
+-  **ROCKSOLID Mode Production**: Sistema completato e validato
   - Testato su 2 host production (nsec8-stable, laboratorio)
   - Dynamic package download da repository OpenWrt
   - Auto-recovery post major-upgrade funzionante
@@ -1487,7 +1487,7 @@ Grazie a tutti i contributori che hanno aiutato a migliorare questa collezione!
 
 ### v2.1.0 (Gennaio 2026)
 
-- ✅ **ROCKSOLID Mode**: Sistema protezione completo per NethSecurity 8 agent CheckMK
+-  **ROCKSOLID Mode**: Sistema protezione completo per NethSecurity 8 agent CheckMK
   - Installazione resistente ai major upgrade con 13 file critici protetti
   - Auto-recovery automatico all'avvio (CheckMK Agent + FRP Client)
   - Supporto FRP v0.x e v1.x con rilevamento config esistente
@@ -1499,65 +1499,65 @@ Grazie a tutti i contributori che hanno aiutato a migliorare questa collezione!
 
 ### v2.0.0 (Gennaio 2026)
 
-- ✅ **Backup Cloud**: Sistema completo backup CheckMK su cloud con rclone (S3/Spaces)
-- ✅ **Auto-Upgrade CheckMK**: Wizard setup upgrade automatico via crontab
-- ✅ **Auto-Sync Enhanced**: Sistema sincronizzazione automatica con .copilot-context.md
-- ✅ **S3/Spaces Compatibility**: Fix compatibilità per cloud storage senza mkdir
-- ✅ **Unified Search**: Backup selection unificata file/directory per timestamp
-- ✅ **Preferenze Lingua**: Repository configurato per italiano 🇮🇹
-- ✅ **Ydea Toolkit completo**: Integrazione ticketing con 30+ script
-- ✅ **NethSecurity 8**: Supporto completo firewall NS8
-- ✅ **Ubuntu/Linux enhanced**: 6 script monitoraggio (SSH, Fail2ban, Disk)
-- ✅ **NS8 monitoring esteso**: Container, Webtop, Tomcat, servizi
-- ✅ **Deploy tools avanzati**: 28+ tool deployment e ottimizzazione
-- ✅ **CheckMK tuning**: Script interattivi ottimizzazione v2-v5
-- ✅ **Git sync automatico**: Automazione repository con systemd
-- ✅ **Directory riorganizzate**: Struttura full/doc standardizzata (remote dismesso)
-- ✅ **Documentazione completa**: 15+ README specifici
+-  **Backup Cloud**: Sistema completo backup CheckMK su cloud con rclone (S3/Spaces)
+-  **Auto-Upgrade CheckMK**: Wizard setup upgrade automatico via crontab
+-  **Auto-Sync Enhanced**: Sistema sincronizzazione automatica con .copilot-context.md
+-  **S3/Spaces Compatibility**: Fix compatibilità per cloud storage senza mkdir
+-  **Unified Search**: Backup selection unificata file/directory per timestamp
+-  **Preferenze Lingua**: Repository configurato per italiano 
+-  **Ydea Toolkit completo**: Integrazione ticketing con 30+ script
+-  **NethSecurity 8**: Supporto completo firewall NS8
+-  **Ubuntu/Linux enhanced**: 6 script monitoraggio (SSH, Fail2ban, Disk)
+-  **NS8 monitoring esteso**: Container, Webtop, Tomcat, servizi
+-  **Deploy tools avanzati**: 28+ tool deployment e ottimizzazione
+-  **CheckMK tuning**: Script interattivi ottimizzazione v2-v5
+-  **Git sync automatico**: Automazione repository con systemd
+-  **Directory riorganizzate**: Struttura full/doc standardizzata (remote dismesso)
+-  **Documentazione completa**: 15+ README specifici
 
 ### v1.5.0
 
-- ✅ Aggiunto ransomware detection per Windows
-- ✅ Ridotto cache timeout wrapper (60s)
-- ✅ Migliorato error handling script notifica
-- ✅ Aggiornata documentazione completa
+-  Aggiunto ransomware detection per Windows
+-  Ridotto cache timeout wrapper (60s)
+-  Migliorato error handling script notifica
+-  Aggiornata documentazione completa
 
 ### v1.4.0
 
-- ✅ Sistema smart deploy enhanced
-- ✅ Pattern CheckMK ufficiali integrati
-- ✅ Avvio diretto da script completi in `full/`
+-  Sistema smart deploy enhanced
+-  Pattern CheckMK ufficiali integrati
+-  Avvio diretto da script completi in `full/`
 
 ### v1.3.0
 
-- ✅ Script notifica con Real IP + Grafici
-- ✅ Backup automatico pre-deployment
-- ✅ Testing guide completa
+-  Script notifica con Real IP + Grafici
+-  Backup automatico pre-deployment
+-  Testing guide completa
 
 ### v1.2.0
 
-- ✅ Monitoraggio NethServer 8 (Podman)
-- ✅ Script Proxmox VE
-- ✅ Deploy tools automatizzati
+-  Monitoraggio NethServer 8 (Podman)
+-  Script Proxmox VE
+-  Deploy tools automatizzati
 
 ### v1.1.0
 
-- ✅ Collezione completa script NethServer 7
-- ✅ Sistema backup automatico
-- ✅ Setup automazione Windows
+-  Collezione completa script NethServer 7
+-  Sistema backup automatico
+-  Setup automazione Windows
 
 ### v1.0.0
 
-- ✅ Release iniziale
-- ✅ Script base per CheckMK
+-  Release iniziale
+-  Script base per CheckMK
 
 ---
 
-**⭐ Se trovi utile questo repository, lascia una stella su GitHub!**
+** Se trovi utile questo repository, lascia una stella su GitHub!**
 
-**🐛 Problemi? Apri una issue!**
+** Problemi? Apri una issue!**
 
-**🤝 Vuoi contribuire? Le PR sono benvenute!**
+** Vuoi contribuire? Le PR sono benvenute!**
 
 ---
 

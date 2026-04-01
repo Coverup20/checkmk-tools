@@ -41,20 +41,20 @@ def main():
         data, status = api.api_call("GET", f"/tickets/{ticket_id}")
         
         if status != 200:
-            print(f"❌ Errore: Status {status}", file=sys.stderr)
+            print(f" Errore: Status {status}", file=sys.stderr)
             sys.exit(1)
         
         print("=" * 70)
-        print(f"🔍 INSPECT TICKET ID: {ticket_id}")
+        print(f" INSPECT TICKET ID: {ticket_id}")
         print("=" * 70)
         print()
         
-        print("📋 JSON COMPLETO:")
+        print(" JSON COMPLETO:")
         print(json.dumps(data, indent=2, ensure_ascii=False))
         print()
         
         print("=" * 70)
-        print("🔑 CHIAVI DISPONIBILI:")
+        print(" CHIAVI DISPONIBILI:")
         print("=" * 70)
         if isinstance(data, dict):
             for key in sorted(data.keys()):
@@ -66,10 +66,10 @@ def main():
         # Salva su file
         output_file = f"/tmp/ticket-{ticket_id}-inspect.json"
         Path(output_file).write_text(json.dumps(data, indent=2, ensure_ascii=False))
-        print(f"💾 Salvato in: {output_file}")
+        print(f" Salvato in: {output_file}")
         
     except Exception as e:
-        print(f"❌ Errore: {e}", file=sys.stderr)
+        print(f" Errore: {e}", file=sys.stderr)
         sys.exit(1)
 
 

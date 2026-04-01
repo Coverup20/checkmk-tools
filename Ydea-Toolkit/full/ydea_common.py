@@ -45,28 +45,28 @@ class Logger:
     @staticmethod
     def info(message: str):
         """Log informativo"""
-        Logger._log("ℹ️ ", "INFO", message)
+        Logger._log("ℹ ", "INFO", message)
     
     @staticmethod
     def warn(message: str):
         """Log warning"""
-        Logger._log("⚠️ ", "WARN", message, to_stderr=True)
+        Logger._log(" ", "WARN", message, to_stderr=True)
     
     @staticmethod
     def error(message: str):
         """Log errore"""
-        Logger._log("❌", "ERROR", message, to_stderr=True)
+        Logger._log("", "ERROR", message, to_stderr=True)
     
     @staticmethod
     def success(message: str):
         """Log successo"""
-        Logger._log("✅", "SUCCESS", message)
+        Logger._log("", "SUCCESS", message)
     
     @staticmethod
     def debug(message: str):
         """Log debug (solo se DEBUG=1)"""
         if os.getenv("DEBUG", "0") == "1":
-            Logger._log("🔧", "DEBUG", message, to_stderr=True)
+            Logger._log("", "DEBUG", message, to_stderr=True)
 
 
 # ===== CACHE MANAGEMENT =====

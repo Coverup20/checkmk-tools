@@ -117,10 +117,10 @@ rm -rf "$FRP_EXTRACTED" "frp_${FRP_VERSION}_linux_amd64.tar.gz"
 ## Compatibility
 
 **Platforms Tested**:
-- ✅ OpenWrt / NethSecurity 8.7.1 (init.d + procd)
-- ✅ Debian/Ubuntu (systemd, apt)
-- ✅ RHEL/Rocky/CentOS (systemd, yum)
-- ✅ NethServer Enterprise
+-  OpenWrt / NethSecurity 8.7.1 (init.d + procd)
+-  Debian/Ubuntu (systemd, apt)
+-  RHEL/Rocky/CentOS (systemd, yum)
+-  NethServer Enterprise
 
 **Temporary Directory Handling**:
 - **OpenWrt**: `/tmp` (always, `/usr/local/src` doesn't exist)
@@ -191,7 +191,7 @@ rm -rf "$FRP_EXTRACTED" "frp_${FRP_VERSION}_linux_amd64.tar.gz"
 
 ## Backward Compatibility
 
-✅ **Fully backward compatible**:
+ **Fully backward compatible**:
 - Same command-line interface
 - Same installation workflow
 - Same configuration options

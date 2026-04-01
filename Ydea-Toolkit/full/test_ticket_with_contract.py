@@ -41,7 +41,7 @@ ANAGRAFICA_ID = 2339268
 
 def main():
     if len(sys.argv) < 2:
-        print("❌ Errore: Devi specificare l'ID del contratto")
+        print(" Errore: Devi specificare l'ID del contratto")
         print("\nUsage: test_ticket_with_contract.py <contract_id>")
         sys.exit(1)
     
@@ -49,7 +49,7 @@ def main():
     logger = Logger()
     
     print("=" * 60)
-    print("🧪 Test Creazione Ticket con Contratto Associato")
+    print(" Test Creazione Ticket con Contratto Associato")
     print("=" * 60)
     print()
     
@@ -57,27 +57,27 @@ def main():
         api = YdeaAPI()
         
         # Step 1: Verifica esistenza contratto
-        print(f"📋 Step 1: Verifica esistenza contratto ID {contract_id}...")
+        print(f" Step 1: Verifica esistenza contratto ID {contract_id}...")
         contract_data, status = api.api_call("GET", f"/contratto/{contract_id}")
         
         if status != 200 or not contract_data:
-            print(f"❌ Errore: Contratto {contract_id} non trovato!")
+            print(f" Errore: Contratto {contract_id} non trovato!")
             sys.exit(1)
         
         contract_name = contract_data.get("nome", "N/A")
         contract_azienda = contract_data.get("azienda_id", 0)
         
-        print(f"   ✅ Contratto trovato: {contract_name}")
-        print(f"   ✅ Azienda ID: {contract_azienda}")
+        print(f"    Contratto trovato: {contract_name}")
+        print(f"    Azienda ID: {contract_azienda}")
         
         if int(contract_azienda) != ANAGRAFICA_ID:
-            print(f"❌ Errore: Il contratto non appartiene all'anagrafica {ANAGRAFICA_ID}!")
+            print(f" Errore: Il contratto non appartiene all'anagrafica {ANAGRAFICA_ID}!")
             sys.exit(1)
             
         print()
         
         # Step 2: Crea ticket di test
-        print("🎫 Step 2: Creazione ticket di test con contratto...")
+        print(" Step 2: Creazione ticket di test con contratto...")
         
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ticket_payload = {
@@ -93,22 +93,22 @@ def main():
         ticket_data, status = api.api_call("POST", "/ticket", ticket_payload)
         
         if status not in [200, 201]:
-            print(f"❌ Errore creazione ticket: {status}")
+            print(f" Errore creazione ticket: {status}")
             print(json.dumps(ticket_data, indent=2))
             sys.exit(1)
             
         ticket_id = ticket_data.get("id")
         ticket_codice = ticket_data.get("codice", "N/A")
-        print(f"   ✅ Ticket creato: ID {ticket_id} - Codice {ticket_codice}")
+        print(f"    Ticket creato: ID {ticket_id} - Codice {ticket_codice}")
         print()
         
         # Step 3: Verifica associazione
-        print("🔍 Step 3: Verifica dettagli ticket creato...")
+        print(" Step 3: Verifica dettagli ticket creato...")
         time.sleep(2)  # Attendi propagazione
         
         details, status = api.api_call("GET", f"/ticket/{ticket_id}")
         if status != 200:
-            print("❌ Errore recupero dettagli ticket")
+            print(" Errore recupero dettagli ticket")
             sys.exit(1)
             
         ticket_info = details.get("ticket", {})
@@ -118,15 +118,15 @@ def main():
         print(f"   Contratto nel ticket: {actual_contract_id} ({actual_contract_codice})")
         
         if actual_contract_id == str(contract_id):
-            print("\n✅ SUCCESSO: Il contratto è stato associato correttamente!")
+            print("\n SUCCESSO: Il contratto è stato associato correttamente!")
             print(f"   Verifica manuale: https://my.ydea.cloud/ticket/{ticket_id}")
         else:
-            print("\n❌ FALLIMENTO: Il contratto non corrisponde")
+            print("\n FALLIMENTO: Il contratto non corrisponde")
             print(f"   Atteso: {contract_id}")
             print(f"   Trovato: {actual_contract_id}")
             
     except Exception as e:
-        print(f"❌ Errore imprevisto: {e}")
+        print(f" Errore imprevisto: {e}")
         sys.exit(1)
 
 

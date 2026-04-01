@@ -528,7 +528,7 @@ def setup() -> None:
         write_defaults_file(site, f"{configured_remote_name}:{configured_bucket}", retention_local, retention_remote, remote_prefix)
         run(["chown", "-R", f"{site}:{site}", str(backup_dir)], check=False)
         run(["systemctl", "enable", "--now", f"checkmk-cloud-backup-push@{site}.timer"], check=False)
-        log(f"  ✓ {site} - monitoring /var/backups/checkmk")
+        log(f"   {site} - monitoring /var/backups/checkmk")
 
     log("Setup complete.")
 

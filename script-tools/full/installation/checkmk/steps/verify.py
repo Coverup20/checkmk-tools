@@ -9,15 +9,15 @@ from lib.config import InstallerConfig
 
 
 def _ok(msg: str) -> None:
-    print(f"{Colors.GREEN}✓{Colors.NC} {msg}")
+    print(f"{Colors.GREEN}{Colors.NC} {msg}")
 
 
 def _fail(msg: str) -> None:
-    print(f"{Colors.RED}✗{Colors.NC} {msg}")
+    print(f"{Colors.RED}{Colors.NC} {msg}")
 
 
 def _warn(msg: str) -> None:
-    print(f"{Colors.YELLOW}⚠{Colors.NC} {msg}")
+    print(f"{Colors.YELLOW}{Colors.NC} {msg}")
 
 
 def _verify_site(site: str) -> tuple[bool, str]:
@@ -170,9 +170,9 @@ def run(cfg: InstallerConfig) -> int:
     print("\n===================================")
     ip = run_capture(["bash", "-lc", "hostname -I | awk '{print $1}'"], check=False)
     if errors == 0:
-        print(f"{Colors.GREEN}✓ All checks passed{Colors.NC}\n")
+        print(f"{Colors.GREEN} All checks passed{Colors.NC}\n")
         print(f"Access CheckMK at: http://{ip}/{cfg.site_name}")
         return 0
-    print(f"{Colors.RED}✗ {errors} check(s) failed{Colors.NC}\n")
+    print(f"{Colors.RED} {errors} check(s) failed{Colors.NC}\n")
     print("Review the errors above and fix any issues")
     return 1

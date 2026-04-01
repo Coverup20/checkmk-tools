@@ -13,30 +13,30 @@ source "$YDEA_TOOLKIT"
 
 echo ""
 echo "════════════════════════════════════════════════════════════════"
-echo "  🔍 ESPLORAZIONE API YDEA"
+echo "   ESPLORAZIONE API YDEA"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
 
 # Verifica autenticazione
-echo "🔵 Step 1: Autenticazione..."
+echo " Step 1: Autenticazione..."
 
 set +e
 ensure_token 2>&1
 if [[ $? -ne 0 ]]; then
-    echo "❌ Errore autenticazione"
+    echo " Errore autenticazione"
     exit 1
 fi
 set -e
 
-echo "✓ Autenticato"
+echo " Autenticato"
 echo ""
 
 # Carica token
 TOKEN=$(load_token)
 BASE_URL="${YDEA_BASE_URL%/}"
 
-echo "🌐 Base URL: $BASE_URL"
-echo "🔑 Token: ${TOKEN:0:20}..."
+echo " Base URL: $BASE_URL"
+echo " Token: ${TOKEN:0:20}..."
 echo ""
 
 # Funzione helper per testare un endpoint
@@ -46,7 +46,7 @@ test_endpoint() {
   local description="$3"
   
   echo "==========================================================="
-  echo "📊 Test: $description"
+  echo " Test: $description"
   echo "   $method $endpoint"
   echo ""
   
@@ -67,7 +67,7 @@ test_endpoint() {
   set -e
   
   if [[ $curl_exit -ne 0 ]]; then
-    echo "❌ Errore curl (exit: $curl_exit)"
+    echo " Errore curl (exit: $curl_exit)"
     echo "$response"
     return 1
   fi
@@ -75,10 +75,10 @@ test_endpoint() {
   http_code=$(echo "$response" | tail -1)
   response=$(echo "$response" | head -n -1)
   
-  echo "📊 HTTP Status: $http_code"
+  echo " HTTP Status: $http_code"
   
   if [[ "$http_code" == "200" || "$http_code" == "201" ]]; then
-    echo "✓ Successo!"
+    echo " Successo!"
     echo ""
     echo "Risposta (primi 50 caratteri):"
     echo "$response" | head -c 500
@@ -91,7 +91,7 @@ test_endpoint() {
     local count
     count=$(echo "$response" | jq -r '.objs | length' 2>/dev/null || echo "")
     if [[ -n "$count" && "$count" != "null" ]]; then
-      echo "🔢 Numero di oggetti (.objs): $count"
+      echo " Numero di oggetti (.objs): $count"
       if [[ "$count" -gt 0 ]]; then
         echo ""
         echo "Esempio primo oggetto:"
@@ -99,7 +99,7 @@ test_endpoint() {
       fi
     fi
   else
-    echo "⚠️  HTTP $http_code"
+    echo "  HTTP $http_code"
     echo "$response" | jq '.' 2>/dev/null || echo "$response"
   fi
   echo ""
@@ -139,9 +139,9 @@ test_endpoint "GET" "/info" "Info API"
 test_endpoint "GET" "/api" "API info"
 
 echo "════════════════════════════════════════════════════════════════"
-echo "  ✓ ESPLORAZIONE COMPLETATA"
+echo "   ESPLORAZIONE COMPLETATA"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
-echo "💡 Suggerimento: Cerca negli output sopra gli HTTP 200 per vedere"
+echo " Suggerimento: Cerca negli output sopra gli HTTP 200 per vedere"
 echo "   quali endpoint funzionano e quale struttura hanno i dati."
 echo ""

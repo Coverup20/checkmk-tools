@@ -45,22 +45,22 @@ def main():
     try:
         api = YdeaAPI()
         
-        print(f"🎫 Recupero ticket ID: {ticket_id}")
+        print(f" Recupero ticket ID: {ticket_id}")
         print("=" * 60)
         
         # Get ticket
         data, status_code = api.api_call("GET", f"/tickets/{ticket_id}")
         
         if status_code == 200:
-            print("\n✅ Ticket trovato:\n")
+            print("\n Ticket trovato:\n")
             print(json.dumps(data, indent=2, ensure_ascii=False))
         else:
-            print(f"\n❌ Errore: Status {status_code}")
+            print(f"\n Errore: Status {status_code}")
             print(json.dumps(data, indent=2, ensure_ascii=False))
             sys.exit(1)
         
     except Exception as e:
-        print(f"❌ Errore: {e}", file=sys.stderr)
+        print(f" Errore: {e}", file=sys.stderr)
         sys.exit(1)
 
 

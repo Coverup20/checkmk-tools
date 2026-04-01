@@ -12,7 +12,7 @@ $REPO_PATH = "C:\Users\Marzio\Desktop\CheckMK\checkmk-tools"
 
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Cyan
-Write-Host "     🔧 RIPARAZIONE SCRIPT CORROTTI" -ForegroundColor White
+Write-Host "      RIPARAZIONE SCRIPT CORROTTI" -ForegroundColor White
 Write-Host "================================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -77,7 +77,7 @@ Write-Host "Script corrotti trovati: $($corruptedScripts.Count)" -ForegroundColo
 Write-Host ""
 
 if ($corruptedScripts.Count -eq 0) {
-    Write-Host "✅ Nessuno script corrotto trovato!" -ForegroundColor Green
+    Write-Host " Nessuno script corrotto trovato!" -ForegroundColor Green
     Write-Host ""
     exit 0
 }
@@ -138,7 +138,7 @@ Write-Host ""
 # ═══════════════════════════════════════════════════════════════
 
 Write-Host "================================================================" -ForegroundColor Yellow
-Write-Host "     📋 RIEPILOGO AZIONI" -ForegroundColor White
+Write-Host "      RIEPILOGO AZIONI" -ForegroundColor White
 Write-Host "================================================================" -ForegroundColor Yellow
 Write-Host ""
 
@@ -162,7 +162,7 @@ if ($notFound.Count -gt 0) {
     Write-Host ""
     
     foreach ($item in $notFound) {
-        Write-Host "  ⚠️  $($item.FileName)" -ForegroundColor Yellow
+        Write-Host "    $($item.FileName)" -ForegroundColor Yellow
         Write-Host "     Path: $($item.CorruptedPath)" -ForegroundColor Gray
         Write-Host ""
     }
@@ -176,7 +176,7 @@ Write-Host ""
 # ═══════════════════════════════════════════════════════════════
 
 if ($repairable.Count -eq 0) {
-    Write-Host "❌ Nessuno script riparabile trovato!" -ForegroundColor Red
+    Write-Host " Nessuno script riparabile trovato!" -ForegroundColor Red
     Write-Host ""
     exit 1
 }
@@ -189,7 +189,7 @@ Write-Host ""
 
 if ($DryRun) {
     Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Magenta
-    Write-Host "║              🔍 MODALITÀ DRY-RUN 🔍                  ║" -ForegroundColor White
+    Write-Host "║               MODALITÀ DRY-RUN                   ║" -ForegroundColor White
     Write-Host "╚═══════════════════════════════════════════════════════╝" -ForegroundColor Magenta
     Write-Host ""
     Write-Host "[INFO] Nessuna modifica verrà effettuata" -ForegroundColor Yellow
@@ -203,7 +203,7 @@ if (-not $AutoConfirm) {
     Write-Host ""
     
     if ($confirmation -ne "si" -and $confirmation -ne "s" -and $confirmation -ne "yes" -and $confirmation -ne "y") {
-        Write-Host "❌ Operazione annullata dall'utente" -ForegroundColor Red
+        Write-Host " Operazione annullata dall'utente" -ForegroundColor Red
         Write-Host ""
         exit 0
     }
@@ -233,7 +233,7 @@ foreach ($item in $repairable) {
     Copy-Item $item.FullPath -Destination $backupPath -Force
 }
 
-Write-Host "✅ Backup completato: $($repairable.Count) file salvati" -ForegroundColor Green
+Write-Host " Backup completato: $($repairable.Count) file salvati" -ForegroundColor Green
 Write-Host ""
 
 # ═══════════════════════════════════════════════════════════════
@@ -251,10 +251,10 @@ foreach ($item in $repairable) {
     
     try {
         Copy-Item $sourcePath -Destination $item.FullPath -Force
-        Write-Host "  ✅ $($item.FileName)" -ForegroundColor Green
+        Write-Host "   $($item.FileName)" -ForegroundColor Green
         $repaired++
     } catch {
-        Write-Host "  ❌ $($item.FileName) - Errore: $_" -ForegroundColor Red
+        Write-Host "   $($item.FileName) - Errore: $_" -ForegroundColor Red
         $failed++
     }
 }
@@ -276,7 +276,7 @@ if ($wslAvailable) {
         $bashCheck = wsl bash -n "$wslPath" 2>&1
         
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "  ⚠️  $($item.FileName) - Ancora corrotto!" -ForegroundColor Yellow
+            Write-Host "    $($item.FileName) - Ancora corrotto!" -ForegroundColor Yellow
             $stillCorrupted++
         }
     }
@@ -288,7 +288,7 @@ if ($wslAvailable) {
 
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Green
-Write-Host "     ✅ RIPARAZIONE COMPLETATA" -ForegroundColor White
+Write-Host "      RIPARAZIONE COMPLETATA" -ForegroundColor White
 Write-Host "================================================================" -ForegroundColor Green
 Write-Host ""
 
@@ -305,13 +305,13 @@ Write-Host "  Percorso: $backupDir" -ForegroundColor Gray
 Write-Host ""
 
 if ($stillCorrupted -gt 0) {
-    Write-Host "⚠️  ATTENZIONE: $stillCorrupted script risultano ancora corrotti" -ForegroundColor Yellow
+    Write-Host "  ATTENZIONE: $stillCorrupted script risultano ancora corrotti" -ForegroundColor Yellow
     Write-Host "   Potrebbero richiedere riparazione manuale" -ForegroundColor Gray
     Write-Host ""
 }
 
 if ($notFound.Count -gt 0) {
-    Write-Host "ℹ️  INFO: $($notFound.Count) script non hanno una versione corretta disponibile" -ForegroundColor Cyan
+    Write-Host "ℹ  INFO: $($notFound.Count) script non hanno una versione corretta disponibile" -ForegroundColor Cyan
     Write-Host "   Potrebbero richiedere ripristino da backup o riscrittura" -ForegroundColor Gray
     Write-Host ""
 }

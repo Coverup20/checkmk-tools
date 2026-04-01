@@ -163,7 +163,7 @@ class HostDetector:
 def print_header() -> None:
     """Stampa header dello script."""
     print(f"{Colors.BLUE}╔═══════════════════════════════════════════════════════════╗{Colors.NC}")
-    print(f"{Colors.BLUE}║{Colors.NC}  🚀 {Colors.GREEN}Auto Deploy CheckMK Checks v{VERSION}{Colors.NC}               {Colors.BLUE}║{Colors.NC}")
+    print(f"{Colors.BLUE}║{Colors.NC}   {Colors.GREEN}Auto Deploy CheckMK Checks v{VERSION}{Colors.NC}               {Colors.BLUE}║{Colors.NC}")
     print(f"{Colors.BLUE}╠═══════════════════════════════════════════════════════════╣{Colors.NC}")
     print(f"{Colors.BLUE}║{Colors.NC}  Installazione automatica script CheckMK             {Colors.BLUE}║{Colors.NC}")
     print(f"{Colors.BLUE}╚═══════════════════════════════════════════════════════════╝{Colors.NC}")
@@ -306,7 +306,7 @@ def download_script(url: str, dest_path: Path) -> bool:
         return True
     
     except (urllib.error.URLError, IOError) as e:
-        print(f"{Colors.RED}✗ Errore download: {e}{Colors.NC}")
+        print(f"{Colors.RED} Errore download: {e}{Colors.NC}")
         return False
 
 
@@ -397,7 +397,7 @@ def install_scripts(scripts: List[Tuple[str, str]], selected_indices: List[int])
         Numero script installati con successo
     """
     if not CHECKMK_LOCAL_PATH.exists():
-        print(f"{Colors.RED}✗ Path CheckMK non trovato: {CHECKMK_LOCAL_PATH}{Colors.NC}")
+        print(f"{Colors.RED} Path CheckMK non trovato: {CHECKMK_LOCAL_PATH}{Colors.NC}")
         print(f"{Colors.YELLOW}  Installare prima CheckMK Agent{Colors.NC}")
         return 0
     
@@ -426,10 +426,10 @@ def install_scripts(scripts: List[Tuple[str, str]], selected_indices: List[int])
             except OSError:
                 pass  # Ignora errori chmod, già gestito in download_script
             
-            print(f"{Colors.GREEN}✓{Colors.NC}")
+            print(f"{Colors.GREEN}{Colors.NC}")
             installed += 1
         else:
-            print(f"{Colors.RED}✗{Colors.NC}")
+            print(f"{Colors.RED}{Colors.NC}")
     
     return installed
 
@@ -445,7 +445,7 @@ def uninstall_scripts(script_names: List[str]) -> int:
         Numero script rimossi con successo
     """
     if not CHECKMK_LOCAL_PATH.exists():
-        print(f"{Colors.RED}✗ Path CheckMK non trovato: {CHECKMK_LOCAL_PATH}{Colors.NC}")
+        print(f"{Colors.RED} Path CheckMK non trovato: {CHECKMK_LOCAL_PATH}{Colors.NC}")
         return 0
     
     removed = 0
@@ -454,17 +454,17 @@ def uninstall_scripts(script_names: List[str]) -> int:
         script_path = CHECKMK_LOCAL_PATH / script_name
         
         if not script_path.exists():
-            print(f"{Colors.YELLOW}⚠ Non trovato:{Colors.NC} {script_name}")
+            print(f"{Colors.YELLOW} Non trovato:{Colors.NC} {script_name}")
             continue
         
         print(f"{Colors.CYAN}Rimozione:{Colors.NC} {script_name}... ", end='', flush=True)
         
         try:
             script_path.unlink()
-            print(f"{Colors.GREEN}✓{Colors.NC}")
+            print(f"{Colors.GREEN}{Colors.NC}")
             removed += 1
         except OSError as e:
-            print(f"{Colors.RED}✗ {e}{Colors.NC}")
+            print(f"{Colors.RED} {e}{Colors.NC}")
     
     return removed
 
@@ -492,22 +492,22 @@ def show_main_menu() -> str:
         return 'exit'
     
     if choice == '1':
-        print(f"\n{Colors.GREEN}✓ Hai scelto:{Colors.NC} Installa CheckMK Agent\n")
+        print(f"\n{Colors.GREEN} Hai scelto:{Colors.NC} Installa CheckMK Agent\n")
         return 'install_agent'
     elif choice == '2':
-        print(f"\n{Colors.GREEN}✓ Hai scelto:{Colors.NC} Installa script CheckMK\n")
+        print(f"\n{Colors.GREEN} Hai scelto:{Colors.NC} Installa script CheckMK\n")
         return 'install'
     elif choice == '3':
-        print(f"\n{Colors.GREEN}✓ Hai scelto:{Colors.NC} Rimuovi script installati\n")
+        print(f"\n{Colors.GREEN} Hai scelto:{Colors.NC} Rimuovi script installati\n")
         return 'uninstall'
     elif choice == '4':
-        print(f"\n{Colors.GREEN}✓ Hai scelto:{Colors.NC} Rimuovi tutto (Agent + FRPC + Script)\n")
+        print(f"\n{Colors.GREEN} Hai scelto:{Colors.NC} Rimuovi tutto (Agent + FRPC + Script)\n")
         return 'uninstall_all'
     elif choice == '0':
-        print(f"\n{Colors.YELLOW}✓ Uscita in corso...{Colors.NC}\n")
+        print(f"\n{Colors.YELLOW} Uscita in corso...{Colors.NC}\n")
         return 'exit'
     else:
-        print(f"\n{Colors.RED}✗ Scelta non valida: '{choice}'{Colors.NC}\n")
+        print(f"\n{Colors.RED} Scelta non valida: '{choice}'{Colors.NC}\n")
         return 'exit'
 
 
@@ -555,14 +555,14 @@ def uninstall_agent() -> int:
             )
         
         if result.returncode == 0:
-            print(f"  {Colors.GREEN}✓ CheckMK Agent rimosso{Colors.NC}")
+            print(f"  {Colors.GREEN} CheckMK Agent rimosso{Colors.NC}")
             return 0
         else:
-            print(f"  {Colors.RED}✗ Errore rimozione CheckMK Agent{Colors.NC}")
+            print(f"  {Colors.RED} Errore rimozione CheckMK Agent{Colors.NC}")
             return 1
             
     except Exception as e:
-        print(f"  {Colors.RED}✗ Errore: {e}{Colors.NC}")
+        print(f"  {Colors.RED} Errore: {e}{Colors.NC}")
         return 1
 
 
@@ -618,11 +618,11 @@ def uninstall_frpc() -> int:
             stderr=subprocess.DEVNULL
         )
         
-        print(f"  {Colors.GREEN}✓ FRPC Client rimosso{Colors.NC}")
+        print(f"  {Colors.GREEN} FRPC Client rimosso{Colors.NC}")
         return 0
         
     except Exception as e:
-        print(f"  {Colors.RED}✗ Errore: {e}{Colors.NC}")
+        print(f"  {Colors.RED} Errore: {e}{Colors.NC}")
         return 1
 
 
@@ -714,22 +714,22 @@ def show_current_status() -> Tuple[bool, bool]:
         (agent_installed, frpc_installed)
     """
     print(f"\n{Colors.CYAN}╔═══════════════════════════════════════════════════════════╗{Colors.NC}")
-    print(f"{Colors.CYAN}║  📊 Stato Attuale Sistema                                ║{Colors.NC}")
+    print(f"{Colors.CYAN}║   Stato Attuale Sistema                                ║{Colors.NC}")
     print(f"{Colors.CYAN}╚═══════════════════════════════════════════════════════════╝{Colors.NC}\n")
     
     # CheckMK Agent
     agent_installed, agent_info = check_agent_installed()
     if agent_installed:
-        print(f"  {Colors.GREEN}✓ CheckMK Agent:{Colors.NC} Installato - {agent_info}")
+        print(f"  {Colors.GREEN} CheckMK Agent:{Colors.NC} Installato - {agent_info}")
     else:
-        print(f"  {Colors.RED}✗ CheckMK Agent:{Colors.NC} Non installato")
+        print(f"  {Colors.RED} CheckMK Agent:{Colors.NC} Non installato")
     
     # FRPC
     frpc_installed, frpc_info = check_frpc_installed()
     if frpc_installed:
-        print(f"  {Colors.GREEN}✓ FRPC Client:{Colors.NC} {frpc_info}")
+        print(f"  {Colors.GREEN} FRPC Client:{Colors.NC} {frpc_info}")
     else:
-        print(f"  {Colors.RED}✗ FRPC Client:{Colors.NC} {frpc_info}")
+        print(f"  {Colors.RED} FRPC Client:{Colors.NC} {frpc_info}")
     
     print()
     return agent_installed, frpc_installed
@@ -744,7 +744,7 @@ def install_checkmk_agent() -> int:
         0 se successo, 1 se errore
     """
     print(f"\n{Colors.MAGENTA}╔═══════════════════════════════════════════════════════════╗{Colors.NC}")
-    print(f"{Colors.MAGENTA}║  🚀 Setup Completo Sistema CheckMK                       ║{Colors.NC}")
+    print(f"{Colors.MAGENTA}║   Setup Completo Sistema CheckMK                       ║{Colors.NC}")
     print(f"{Colors.MAGENTA}╚═══════════════════════════════════════════════════════════╝{Colors.NC}")
     
     # ===== STEP 1: Controlla e installa CheckMK Agent =====
@@ -753,7 +753,7 @@ def install_checkmk_agent() -> int:
     agent_installed, agent_info = check_agent_installed()
     
     if agent_installed:
-        print(f"  {Colors.GREEN}✓ CheckMK Agent:{Colors.NC} Già installato - {agent_info}")
+        print(f"  {Colors.GREEN} CheckMK Agent:{Colors.NC} Già installato - {agent_info}")
         print(f"\n{Colors.YELLOW}Vuoi aggiornare/reinstallare CheckMK Agent?{Colors.NC}")
         print(f"  {Colors.GREEN}s{Colors.NC} = Sì, aggiorna agent")
         print(f"  {Colors.YELLOW}n{Colors.NC} = No, mantieni versione attuale\n")
@@ -765,35 +765,35 @@ def install_checkmk_agent() -> int:
             choice = 'n'
         
         if choice == 's':
-            print(f"\n{Colors.GREEN}✓ Hai scelto:{Colors.NC} Aggiorna agent\n")
+            print(f"\n{Colors.GREEN} Hai scelto:{Colors.NC} Aggiorna agent\n")
             print(f"  {Colors.GREEN}⤷ Procedo con aggiornamento...{Colors.NC}\n")
             result = install_agent_only()
             if result != 0:
-                print(f"{Colors.RED}✗ Aggiornamento agent fallito{Colors.NC}")
+                print(f"{Colors.RED} Aggiornamento agent fallito{Colors.NC}")
                 return 1
             
             # Ricontrolla versione
             agent_installed, agent_info = check_agent_installed()
             if agent_installed:
-                print(f"\n  {Colors.GREEN}✓ CheckMK Agent aggiornato - {agent_info}{Colors.NC}\n")
+                print(f"\n  {Colors.GREEN} CheckMK Agent aggiornato - {agent_info}{Colors.NC}\n")
         else:
-            print(f"\n{Colors.YELLOW}✓ Hai scelto:{Colors.NC} Mantieni versione attuale\n")
+            print(f"\n{Colors.YELLOW} Hai scelto:{Colors.NC} Mantieni versione attuale\n")
             print(f"  {Colors.YELLOW}⤷ Mantengo versione attuale{Colors.NC}\n")
     else:
-        print(f"  {Colors.RED}✗ CheckMK Agent:{Colors.NC} Non installato")
+        print(f"  {Colors.RED} CheckMK Agent:{Colors.NC} Non installato")
         print(f"  {Colors.GREEN}⤷ Procedo con installazione...{Colors.NC}\n")
         
         result = install_agent_only()
         if result != 0:
-            print(f"{Colors.RED}✗ Installazione agent fallita{Colors.NC}")
+            print(f"{Colors.RED} Installazione agent fallita{Colors.NC}")
             return 1
         
         # Ricontrolla
         agent_installed, agent_info = check_agent_installed()
         if agent_installed:
-            print(f"\n  {Colors.GREEN}✓ CheckMK Agent installato con successo - {agent_info}{Colors.NC}\n")
+            print(f"\n  {Colors.GREEN} CheckMK Agent installato con successo - {agent_info}{Colors.NC}\n")
         else:
-            print(f"\n  {Colors.YELLOW}⚠ Agent potrebbe non essere stato installato{Colors.NC}\n")
+            print(f"\n  {Colors.YELLOW} Agent potrebbe non essere stato installato{Colors.NC}\n")
     
     # ===== STEP 2: Controlla e installa FRPC =====
     print(f"{Colors.CYAN}━━━ STEP 2: FRPC Client (tunnel remoto) ━━━{Colors.NC}\n")
@@ -801,10 +801,10 @@ def install_checkmk_agent() -> int:
     frpc_installed, frpc_info = check_frpc_installed()
     
     if frpc_installed:
-        print(f"  {Colors.GREEN}✓ FRPC Client:{Colors.NC} {frpc_info}")
+        print(f"  {Colors.GREEN} FRPC Client:{Colors.NC} {frpc_info}")
         print(f"  {Colors.YELLOW}⤷ Salto installazione FRPC{Colors.NC}\n")
     else:
-        print(f"  {Colors.RED}✗ FRPC Client:{Colors.NC} Non installato")
+        print(f"  {Colors.RED} FRPC Client:{Colors.NC} Non installato")
         print(f"\n{Colors.YELLOW}Vuoi installare FRPC per monitoraggio remoto tramite tunnel?{Colors.NC}")
         print(f"  {Colors.GREEN}s{Colors.NC} = Sì, installa FRPC")
         print(f"  {Colors.YELLOW}n{Colors.NC} = No, salta\n")
@@ -816,17 +816,17 @@ def install_checkmk_agent() -> int:
             choice = 'n'
         
         if choice == 's':
-            print(f"\n{Colors.GREEN}✓ Hai scelto:{Colors.NC} Installa FRPC\n")
+            print(f"\n{Colors.GREEN} Hai scelto:{Colors.NC} Installa FRPC\n")
             print(f"  {Colors.GREEN}⤷ Procedo con installazione FRPC...{Colors.NC}\n")
             result = install_frpc_only()
             if result == 0:
                 frpc_installed, frpc_info = check_frpc_installed()
                 if frpc_installed:
-                    print(f"\n  {Colors.GREEN}✓ FRPC installato con successo - {frpc_info}{Colors.NC}\n")
+                    print(f"\n  {Colors.GREEN} FRPC installato con successo - {frpc_info}{Colors.NC}\n")
             else:
-                print(f"\n  {Colors.YELLOW}⚠ FRPC non installato{Colors.NC}\n")
+                print(f"\n  {Colors.YELLOW} FRPC non installato{Colors.NC}\n")
         else:
-            print(f"\n{Colors.YELLOW}✓ Hai scelto:{Colors.NC} Salta FRPC\n")
+            print(f"\n{Colors.YELLOW} Hai scelto:{Colors.NC} Salta FRPC\n")
             print(f"  {Colors.YELLOW}⤷ Installazione FRPC saltata{Colors.NC}\n")
     
     # ===== STEP 3: Deploy Script CheckMK =====
@@ -843,13 +843,13 @@ def install_checkmk_agent() -> int:
         choice = 'n'
     
     if choice == 's':
-        print(f"\n{Colors.GREEN}✓ Hai scelto:{Colors.NC} Procedi con deploy script\n")
-        print(f"{Colors.GREEN}✓ Setup base completato. Passo al deploy script...{Colors.NC}\n")
+        print(f"\n{Colors.GREEN} Hai scelto:{Colors.NC} Procedi con deploy script\n")
+        print(f"{Colors.GREEN} Setup base completato. Passo al deploy script...{Colors.NC}\n")
         # Ritorna 2 come segnale per continuare con deploy script
         return 2
     else:
-        print(f"\n{Colors.YELLOW}✓ Hai scelto:{Colors.NC} Esci senza deploy script\n")
-        print(f"{Colors.GREEN}✓ Setup completato{Colors.NC}\n")
+        print(f"\n{Colors.YELLOW} Hai scelto:{Colors.NC} Esci senza deploy script\n")
+        print(f"{Colors.GREEN} Setup completato{Colors.NC}\n")
         return 0
 
 
@@ -876,13 +876,13 @@ def install_agent_only() -> int:
                 pkg_type = "rpm"
                 pkg_manager = "yum"
             else:
-                print(f"{Colors.RED}✗ OS non supportato{Colors.NC}")
+                print(f"{Colors.RED} OS non supportato{Colors.NC}")
                 return 1
         elif Path("/etc/nethserver-release").exists():
             pkg_type = "rpm"
             pkg_manager = "yum"
         else:
-            print(f"{Colors.RED}✗ Impossibile rilevare sistema operativo{Colors.NC}")
+            print(f"{Colors.RED} Impossibile rilevare sistema operativo{Colors.NC}")
             return 1
         
         print(f"  Tipo pacchetto: {pkg_type}")
@@ -905,7 +905,7 @@ def install_agent_only() -> int:
         
         matches = re.findall(pattern, listing)
         if not matches:
-            print(f"{Colors.RED}✗ Nessun pacchetto agent trovato{Colors.NC}")
+            print(f"{Colors.RED} Nessun pacchetto agent trovato{Colors.NC}")
             return 1
         
         # Prendi ultima versione (sort)
@@ -924,7 +924,7 @@ def install_agent_only() -> int:
             with open(tmp_pkg, 'wb') as f:
                 f.write(response.read())
         
-        print(f"{Colors.GREEN}✓ Download completato{Colors.NC}\n")
+        print(f"{Colors.GREEN} Download completato{Colors.NC}\n")
         
         # Installa pacchetto
         print(f"{Colors.YELLOW}Installazione pacchetto...{Colors.NC}")
@@ -956,10 +956,10 @@ def install_agent_only() -> int:
             pass
         
         if result.returncode != 0 and "already installed" not in result.stderr.lower():
-            print(f"{Colors.RED}✗ Errore installazione: {result.stderr}{Colors.NC}")
+            print(f"{Colors.RED} Errore installazione: {result.stderr}{Colors.NC}")
             return 1
         
-        print(f"{Colors.GREEN}✓ Pacchetto installato{Colors.NC}\n")
+        print(f"{Colors.GREEN} Pacchetto installato{Colors.NC}\n")
         
         # Configura socket systemd
         print(f"{Colors.YELLOW}Configurazione socket systemd...{Colors.NC}")
@@ -1005,12 +1005,12 @@ User=root
                       check=True, stdout=subprocess.DEVNULL)
         subprocess.run(['systemctl', 'start', 'check-mk-agent-plain.socket'], check=True)
         
-        print(f"{Colors.GREEN}✓ Socket systemd configurato e attivo (porta 6556){Colors.NC}\n")
+        print(f"{Colors.GREEN} Socket systemd configurato e attivo (porta 6556){Colors.NC}\n")
         
         return 0
     
     except Exception as e:
-        print(f"{Colors.RED}✗ Errore: {e}{Colors.NC}\n")
+        print(f"{Colors.RED} Errore: {e}{Colors.NC}\n")
         import traceback
         traceback.print_exc()
         return 1
@@ -1126,13 +1126,13 @@ WantedBy=multi-user.target
         subprocess.run(['systemctl', 'enable', 'frpc'], check=True, stdout=subprocess.DEVNULL)
         subprocess.run(['systemctl', 'start', 'frpc'], check=True)
         
-        print(f"{Colors.GREEN}✓ FRPC configurato e avviato{Colors.NC}")
+        print(f"{Colors.GREEN} FRPC configurato e avviato{Colors.NC}")
         print(f"  Tunnel: {frp_server}:{remote_port} → localhost:6556")
         
         return 0
     
     except Exception as e:
-        print(f"{Colors.RED}✗ Errore installazione FRPC: {e}{Colors.NC}\n")
+        print(f"{Colors.RED} Errore installazione FRPC: {e}{Colors.NC}\n")
         return 1
 
 
@@ -1158,19 +1158,19 @@ def ask_script_type() -> str:
         return 'remote'  # Default per pipe execution
     
     if choice == '1':
-        print(f"\n{Colors.GREEN}✓ Hai scelto:{Colors.NC} Remote launchers\n")
+        print(f"\n{Colors.GREEN} Hai scelto:{Colors.NC} Remote launchers\n")
         return 'remote'
     elif choice == '2':
-        print(f"\n{Colors.GREEN}✓ Hai scelto:{Colors.NC} Full scripts\n")
+        print(f"\n{Colors.GREEN} Hai scelto:{Colors.NC} Full scripts\n")
         return 'full'
     elif choice == '3':
-        print(f"\n{Colors.GREEN}✓ Hai scelto:{Colors.NC} Entrambi (remote + full)\n")
+        print(f"\n{Colors.GREEN} Hai scelto:{Colors.NC} Entrambi (remote + full)\n")
         return 'both'
     elif choice == '0':
-        print(f"\n{Colors.YELLOW}✓ Annullato{Colors.NC}\n")
+        print(f"\n{Colors.YELLOW} Annullato{Colors.NC}\n")
         return 'cancel'
     else:
-        print(f"\n{Colors.YELLOW}⚠ Scelta non valida '{choice}', uso default: Remote launchers{Colors.NC}\n")
+        print(f"\n{Colors.YELLOW} Scelta non valida '{choice}', uso default: Remote launchers{Colors.NC}\n")
         return 'remote'
 
 
@@ -1223,7 +1223,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
     
     # Verifica root
     if os.geteuid() != 0:
-        print(f"{Colors.RED}✗ Questo script richiede privilegi root{Colors.NC}")
+        print(f"{Colors.RED} Questo script richiede privilegi root{Colors.NC}")
         print(f"{Colors.YELLOW}  Esegui con: sudo {sys.argv[0]}{Colors.NC}\n")
         return 1
     
@@ -1263,7 +1263,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
         elif action == 'uninstall_all':
             # Rimozione completa: Script → FRPC → Agent
             print(f"\n{Colors.YELLOW}╔═══════════════════════════════════════════════════════════╗{Colors.NC}")
-            print(f"{Colors.YELLOW}║  ⚠️  RIMOZIONE COMPLETA SISTEMA CHECKMK                  ║{Colors.NC}")
+            print(f"{Colors.YELLOW}║    RIMOZIONE COMPLETA SISTEMA CHECKMK                  ║{Colors.NC}")
             print(f"{Colors.YELLOW}╚═══════════════════════════════════════════════════════════╝{Colors.NC}\n")
             print(f"{Colors.RED}Verranno rimossi:{Colors.NC}")
             print(f"  • Tutti gli script CheckMK installati")
@@ -1278,18 +1278,18 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
                     confirm = 'n'
                 
                 if confirm != 's':
-                    print(f"\n{Colors.YELLOW}✓ Hai scelto:{Colors.NC} Annulla rimozione completa\n")
+                    print(f"\n{Colors.YELLOW} Hai scelto:{Colors.NC} Annulla rimozione completa\n")
                     print(f"{Colors.YELLOW}Rimozione annullata{Colors.NC}")
                     return 0
                 else:
-                    print(f"\n{Colors.GREEN}✓ Hai scelto:{Colors.NC} Conferma rimozione completa\n")
+                    print(f"\n{Colors.GREEN} Hai scelto:{Colors.NC} Conferma rimozione completa\n")
             
             print(f"{Colors.CYAN}━━━ STEP 1: Rimozione Script CheckMK ━━━{Colors.NC}")
             installed = list_installed_scripts()
             if installed:
                 result = uninstall_scripts(installed)
                 if result == 0:
-                    print(f"  {Colors.GREEN}✓ Script rimossi: {len(installed)}{Colors.NC}")
+                    print(f"  {Colors.GREEN} Script rimossi: {len(installed)}{Colors.NC}")
             else:
                 print(f"  {Colors.YELLOW}Nessuno script installato{Colors.NC}")
             
@@ -1299,7 +1299,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
             print(f"\n{Colors.CYAN}━━━ STEP 3: Rimozione CheckMK Agent ━━━{Colors.NC}")
             uninstall_agent()
             
-            print(f"\n{Colors.GREEN}✓ Rimozione completa terminata{Colors.NC}\n")
+            print(f"\n{Colors.GREEN} Rimozione completa terminata{Colors.NC}\n")
             return 0
         
         elif action == 'install':
@@ -1329,7 +1329,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
             print(f"{Colors.YELLOW}Selezione:{Colors.NC} ", end='', flush=True)
             selection = input().strip().lower()
         except EOFError:
-            print(f"\n{Colors.RED}✗ Input non disponibile{Colors.NC}")
+            print(f"\n{Colors.RED} Input non disponibile{Colors.NC}")
             return 1
         
         if selection == '0':
@@ -1344,11 +1344,11 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
             to_remove = [installed[i - 1] for i in indices]
         
         if not to_remove:
-            print(f"{Colors.RED}✗ Nessuno script selezionato{Colors.NC}")
+            print(f"{Colors.RED} Nessuno script selezionato{Colors.NC}")
             return 1
         
         # Conferma rimozione
-        print(f"\n{Colors.RED}⚠ Verranno rimossi {len(to_remove)} script{Colors.NC}")
+        print(f"\n{Colors.RED} Verranno rimossi {len(to_remove)} script{Colors.NC}")
         for name in to_remove:
             print(f"  - {name}")
         
@@ -1360,18 +1360,18 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
                 confirm = 'n'
             
             if confirm not in ['s', 'si', 'y', 'yes']:
-                print(f"\n{Colors.YELLOW}✓ Hai scelto:{Colors.NC} Annulla rimozione\n")
+                print(f"\n{Colors.YELLOW} Hai scelto:{Colors.NC} Annulla rimozione\n")
                 print(f"{Colors.YELLOW}Rimozione annullata{Colors.NC}")
                 return 0
             else:
-                print(f"\n{Colors.GREEN}✓ Hai scelto:{Colors.NC} Conferma rimozione\n")
+                print(f"\n{Colors.GREEN} Hai scelto:{Colors.NC} Conferma rimozione\n")
         
         # Esegui rimozione
         print(f"{Colors.RED}▶ Rimozione in corso...{Colors.NC}\n")
         removed = uninstall_scripts(to_remove)
         
         print(f"\n{Colors.BLUE}{'='*60}{Colors.NC}")
-        print(f"{Colors.GREEN}✓ Rimozione completata{Colors.NC}")
+        print(f"{Colors.GREEN} Rimozione completata{Colors.NC}")
         print(f"  Script rimossi: {removed}/{len(to_remove)}")
         print(f"{Colors.BLUE}{'='*60}{Colors.NC}\n")
         
@@ -1383,12 +1383,12 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
     print(f"{Colors.YELLOW}Rilevamento sistema in corso...{Colors.NC}\n")
     detector = HostDetector()
     
-    print(f"{Colors.GREEN}✓ Sistema rilevato:{Colors.NC}")
+    print(f"{Colors.GREEN} Sistema rilevato:{Colors.NC}")
     print(f"  {Colors.CYAN}Tipo Host:{Colors.NC} {detector.host_type}")
     print(f"  {Colors.CYAN}Categoria Script:{Colors.NC} {detector.script_category}")
     
     if detector.script_category is None:
-        print(f"\n{Colors.RED}✗ Impossibile determinare categoria script appropriata{Colors.NC}")
+        print(f"\n{Colors.RED} Impossibile determinare categoria script appropriata{Colors.NC}")
         return 1
     
     # USA SEMPRE SCRIPT FULL (non più launcher remote)
@@ -1403,10 +1403,10 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
     scripts = list_available_scripts(detector.script_category, script_type)
     
     if not scripts:
-        print(f"{Colors.RED}✗ Nessuno script trovato per categoria: {detector.script_category} (tipo: {script_type}){Colors.NC}")
+        print(f"{Colors.RED} Nessuno script trovato per categoria: {detector.script_category} (tipo: {script_type}){Colors.NC}")
         return 1
     
-    print(f"{Colors.GREEN}✓ Trovati {len(scripts)} script completi{Colors.NC}")
+    print(f"{Colors.GREEN} Trovati {len(scripts)} script completi{Colors.NC}")
 
     # Filtra script per moduli NS8 installati
     if detector.script_category == 'script-check-ns8':
@@ -1415,8 +1415,8 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
             scripts, excluded = filter_scripts_by_ns8_modules(scripts, ns8_modules)
             print(f"{Colors.CYAN}ℹ Moduli NS8 attivi: {', '.join(ns8_modules)}{Colors.NC}")
             if excluded:
-                print(f"{Colors.YELLOW}⚠ Script esclusi (modulo non installato): {', '.join(excluded)}{Colors.NC}")
-            print(f"{Colors.GREEN}✓ Script applicabili a questo host: {len(scripts)}{Colors.NC}")
+                print(f"{Colors.YELLOW} Script esclusi (modulo non installato): {', '.join(excluded)}{Colors.NC}")
+            print(f"{Colors.GREEN} Script applicabili a questo host: {len(scripts)}{Colors.NC}")
 
     # Determina selezione (da args o input interattivo)
     selected_indices: List[int] = []
@@ -1439,7 +1439,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
             print(f"\n{Colors.YELLOW}Selezione:{Colors.NC} ", end='', flush=True)
             selection = input().strip()
         except EOFError:
-            print(f"\n{Colors.RED}✗ Input non disponibile (esegui interattivamente o usa --install-*)${Colors.NC}")
+            print(f"\n{Colors.RED} Input non disponibile (esegui interattivamente o usa --install-*)${Colors.NC}")
             print(f"{Colors.YELLOW}Suggerimento:{Colors.NC} Usa --install-all --yes per installazione automatica")
             return 1
         
@@ -1451,7 +1451,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
         selected_indices = parse_selection(selection, len(scripts))
     
     if not selected_indices:
-        print(f"{Colors.RED}✗ Nessuno script selezionato{Colors.NC}")
+        print(f"{Colors.RED} Nessuno script selezionato{Colors.NC}")
         return 1
     
     # Conferma installazione
@@ -1485,7 +1485,7 @@ Nota: Ora vengono installati SOLO script completi (full/), non più launcher rem
     
     # Riepilogo
     print(f"\n{Colors.BLUE}{'='*60}{Colors.NC}")
-    print(f"{Colors.GREEN}✓ Installazione completata{Colors.NC}")
+    print(f"{Colors.GREEN} Installazione completata{Colors.NC}")
     print(f"  Script installati: {installed}/{len(selected_indices)}")
     print(f"  Script eseguibili: {executable_count}")
     print(f"  Path: {CHECKMK_LOCAL_PATH}")
@@ -1507,7 +1507,7 @@ if __name__ == "__main__":
         print(f"\n{Colors.YELLOW}Interrotto dall'utente{Colors.NC}")
         sys.exit(130)
     except Exception as e:
-        print(f"{Colors.RED}✗ Errore inatteso: {e}{Colors.NC}")
+        print(f"{Colors.RED} Errore inatteso: {e}{Colors.NC}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

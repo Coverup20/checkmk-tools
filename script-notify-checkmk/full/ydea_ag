@@ -178,9 +178,9 @@ cleanup_closed_tickets_from_cache() {
   done
   
   if [[ $removed_count -gt 0 ]]; then
-    log "✅ Rimossi $removed_count ticket chiusi/non trovati dalla cache"
+    log " Rimossi $removed_count ticket chiusi/non trovati dalla cache"
   else
-    log "✅ Tutti i ticket in cache sono ancora aperti su Ydea"
+    log " Tutti i ticket in cache sono ancora aperti su Ydea"
   fi
 }
 
@@ -529,11 +529,11 @@ get_state_changes_count() {
 # ===== EMOJI PER STATI =====
 get_emoji() {
   case "${1^^}" in
-    OK|UP) echo "🟢" ;;
-    WARN|WARNING) echo "🟡" ;;
-    CRIT|CRITICAL|DOWN) echo "🔴" ;;
-    UNKNOWN) echo "⚪" ;;
-    *) echo "⚠️" ;;
+    OK|UP) echo "" ;;
+    WARN|WARNING) echo "" ;;
+    CRIT|CRITICAL|DOWN) echo "" ;;
+    UNKNOWN) echo "" ;;
+    *) echo "" ;;
   esac
 }
 
@@ -884,7 +884,7 @@ main() {
     FLAPPING_STATUS=""
     if is_flapping "$TICKET_KEY"; then
       FLAPPING_COUNT=$(get_state_changes_count "$TICKET_KEY")
-      FLAPPING_STATUS="⚠️ FLAPPING (${FLAPPING_COUNT} cambi in $((FLAPPING_WINDOW/60))min)"
+      FLAPPING_STATUS=" FLAPPING (${FLAPPING_COUNT} cambi in $((FLAPPING_WINDOW/60))min)"
       log "FLAPPING rilevato per $TICKET_KEY"
     fi
     
@@ -899,7 +899,7 @@ main() {
       
       # Aggiungi dettagli stato
       if [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
-        NOTE="${NOTE} | ✅ Allarme rientrato"
+        NOTE="${NOTE} |  Allarme rientrato"
       elif [[ -n "$FLAPPING_STATUS" ]]; then
         NOTE="${NOTE} | ${FLAPPING_STATUS}"
       fi
@@ -922,7 +922,7 @@ main() {
           local was_resolved
           was_resolved=$(jq -r --arg key "$TICKET_KEY" '.[$key].resolved_at // "null"' "$TICKET_CACHE" 2>/dev/null)
           if [[ "$was_resolved" != "null" ]]; then
-            log "⚠️ Ticket #$TICKET_ID riaperto: problema tornato CRITICAL (resolved_at resettato)"
+            log " Ticket #$TICKET_ID riaperto: problema tornato CRITICAL (resolved_at resettato)"
             log_ticket_event "RIAPERTO" "$TICKET_ID" "Service: $HOSTNAME/$SERVICE, Stato: $STATE (era risolto)"
           fi
         fi
@@ -944,14 +944,14 @@ main() {
         
         # Se stato è ancora CRITICAL/DOWN/WARNING, crea un nuovo ticket
         if [[ "$STATE" == "CRITICAL" || "$STATE" == "CRIT" || "$STATE" == "DOWN" || "$STATE" == "WARNING" || "$STATE" == "WARN" ]]; then
-          log "⚠️ Stato ancora CRITICAL/WARNING dopo 404: creazione nuovo ticket"
+          log " Stato ancora CRITICAL/WARNING dopo 404: creazione nuovo ticket"
           
           # Priorità sempre Bassa per monitoraggio Premium_Mon
           PRIORITY="low"
           
           # SMART DETECTION: Rileva tipo alert e genera descrizione intelligente
           ALERT_TYPE=$(detect_alert_type "$OUTPUT" "UP" "$STATE")
-          log "🔍 Alert Type Detected: $ALERT_TYPE"
+          log " Alert Type Detected: $ALERT_TYPE"
           
           # Titolo con diagnosi leggibile
           ALERT_LABEL=$(get_alert_label "$ALERT_TYPE" "SERVICE" "$SERVICE")
@@ -971,11 +971,11 @@ Marcatore: $(build_cmk_marker \"$HOSTNAME\" \"$REAL_IP\")"
           NEW_TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY" "$YDEA_CATEGORY_ID" "$HOSTNAME" "$SERVICE" "$OUTPUT")
           
           if [[ -n "$NEW_TICKET_ID" && "$NEW_TICKET_ID" != "null" ]]; then
-            log "✅ Nuovo ticket creato: #$NEW_TICKET_ID (dopo 404 su #$TICKET_ID)"
+            log " Nuovo ticket creato: #$NEW_TICKET_ID (dopo 404 su #$TICKET_ID)"
             save_ticket_cache "$TICKET_KEY" "$NEW_TICKET_ID" "$STATE"
             log_ticket_event "CREATO" "$NEW_TICKET_ID" "Service: $HOSTNAME/$SERVICE, Stato: $STATE, Sostituisce #$TICKET_ID (eliminato)"
           else
-            log "❌ Errore creazione nuovo ticket dopo 404"
+            log " Errore creazione nuovo ticket dopo 404"
           fi
         elif [[ "$STATE" == "OK" || "$STATE" == "UP" ]]; then
           # Stato OK dopo 404: ticket era già chiuso, nulla da fare
@@ -1013,7 +1013,7 @@ Marcatore: $(build_cmk_marker \"$HOSTNAME\" \"$REAL_IP\")"
       
       # SMART DETECTION: Rileva tipo alert e genera descrizione intelligente
       ALERT_TYPE=$(detect_alert_type "$OUTPUT" "UP" "$STATE")
-      log "🔍 Alert Type Detected: $ALERT_TYPE"
+      log " Alert Type Detected: $ALERT_TYPE"
       
       # Titolo con diagnosi leggibile
       ALERT_LABEL=$(get_alert_label "$ALERT_TYPE" "SERVICE" "$SERVICE")
@@ -1036,11 +1036,11 @@ Marcatore: ${MARKER}"
       fi
       
       if [[ -n "$TICKET_ID" ]]; then
-        log "✅ Ticket creato: #$TICKET_ID per $TICKET_KEY"
+        log " Ticket creato: #$TICKET_ID per $TICKET_KEY"
         save_ticket_cache "$TICKET_KEY" "$TICKET_ID" "$STATE"
         log_ticket_event "CREATO" "$TICKET_ID" "Service: $HOSTNAME/$SERVICE, Stato: $STATE, Priorità: $PRIORITY"
       else
-        log "❌ Errore creazione ticket per $TICKET_KEY"
+        log " Errore creazione ticket per $TICKET_KEY"
       fi
     else
       # Stato UNKNOWN o altri stati non problematici -> solo log
@@ -1068,7 +1068,7 @@ Marcatore: ${MARKER}"
     FLAPPING_STATUS=""
     if is_flapping "$TICKET_KEY"; then
       FLAPPING_COUNT=$(get_state_changes_count "$TICKET_KEY")
-      FLAPPING_STATUS="⚠️ FLAPPING (${FLAPPING_COUNT} cambi in $((FLAPPING_WINDOW/60))min)"
+      FLAPPING_STATUS=" FLAPPING (${FLAPPING_COUNT} cambi in $((FLAPPING_WINDOW/60))min)"
     fi
     
     # Gestione ticket host
@@ -1147,7 +1147,7 @@ Sito: ${NOTIFY_OMD_SITE:-monitoring}\n\nMarcatore: $(build_cmk_marker \"$HOSTNAM
           NEW_TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY" "$YDEA_CATEGORY_ID" "$HOSTNAME" "HOST" "$OUTPUT")
           
           if [[ -n "$NEW_TICKET_ID" ]]; then
-            log "✅ Nuovo ticket creato: #$NEW_TICKET_ID (sostituisce #$TICKET_ID)"
+            log " Nuovo ticket creato: #$NEW_TICKET_ID (sostituisce #$TICKET_ID)"
             save_ticket_cache "$TICKET_KEY" "$NEW_TICKET_ID" "$STATE"
             log_ticket_event "CREATO" "$NEW_TICKET_ID" "Host: $HOSTNAME, Stato: $STATE, Sostituisce #$TICKET_ID (eliminato)"
           fi
@@ -1184,7 +1184,7 @@ Sito: ${NOTIFY_OMD_SITE:-monitoring}\n\nMarcatore: $(build_cmk_marker \"$HOSTNAM
       
       # SMART DETECTION: Rileva tipo alert HOST e genera descrizione intelligente
       ALERT_TYPE=$(detect_alert_type "$OUTPUT" "$STATE" "CRIT")
-      log "🔍 Alert Type Detected: $ALERT_TYPE"
+      log " Alert Type Detected: $ALERT_TYPE"
       
       # Titolo con diagnosi leggibile
       ALERT_LABEL=$(get_alert_label "$ALERT_TYPE" "HOST" "")
@@ -1199,7 +1199,7 @@ Sito: ${NOTIFY_OMD_SITE:-monitoring}\n\nMarcatore: $(build_cmk_marker \"$HOSTNAM
       fi
       
       if [[ -n "$TICKET_ID" ]]; then
-        log "✅ Ticket creato: #$TICKET_ID per $TICKET_KEY"
+        log " Ticket creato: #$TICKET_ID per $TICKET_KEY"
         save_ticket_cache "$TICKET_KEY" "$TICKET_ID" "$STATE"
         log_ticket_event "CREATO" "$TICKET_ID" "Host: $HOSTNAME, Stato: $STATE, Priorità: $PRIORITY"
       fi

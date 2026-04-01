@@ -59,7 +59,7 @@ def error(message: str) -> None:
         message: Error message
     """
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    formatted = f"[{timestamp}] ❌ ERROR: {message}"
+    formatted = f"[{timestamp}]  ERROR: {message}"
     print(formatted, file=sys.stderr)
     
     try:
@@ -115,7 +115,7 @@ def find_unprocessed_backup() -> Optional[Path]:
     Returns:
         Path to backup or None if not found
     """
-    log("📂 Searching for unprocessed job00-complete backup...")
+    log(" Searching for unprocessed job00-complete backup...")
     
     backup_path = Path(BACKUP_DIR)
     if not backup_path.exists():
@@ -142,7 +142,7 @@ def compress_backup(backup_path: Path, site: str) -> Tuple[str, str]:
     Returns:
         Tuple of (original_size, compressed_size)
     """
-    log("📦 Starting compression...")
+    log(" Starting compression...")
     
     tmp_path = Path(TMP_DIR)
     tmp_path.mkdir(parents=True, exist_ok=True)
@@ -161,7 +161,7 @@ def compress_backup(backup_path: Path, site: str) -> Tuple[str, str]:
     original_size = site_tar.stat().st_size
     
     # Decompress
-    log("  🔓 Decompressing...")
+    log("   Decompressing...")
     run_command(["gunzip", "-f", str(work_targz)])
     
     # Directories to remove (441M -> 1.2M)
@@ -182,7 +182,7 @@ def compress_backup(backup_path: Path, site: str) -> Tuple[str, str]:
     ]
     
     # Remove directories from tar
-    log("  ❌ Removing heavy components...")
+    log("   Removing heavy components...")
     for path in remove_paths:
         run_command(
             ["tar", "--delete", "-f", str(work_tar), path],
@@ -191,7 +191,7 @@ def compress_backup(backup_path: Path, site: str) -> Tuple[str, str]:
         )
     
     # Recompress
-    log("  🔐 Recompressing...")
+    log("   Recompressing...")
     run_command(["gzip", "-f", str(work_tar)])
     
     # Calculate sizes
@@ -201,7 +201,7 @@ def compress_backup(backup_path: Path, site: str) -> Tuple[str, str]:
     original_size_hr = format_size(original_size)
     compressed_size_hr = format_size(compressed_size)
     
-    log(f"  ✅ Compressed: {original_size_hr} -> {compressed_size_hr} ({reduction}% reduction)")
+    log(f"   Compressed: {original_size_hr} -> {compressed_size_hr} ({reduction}% reduction)")
     
     # Replace original file
     shutil.move(str(work_targz), str(site_tar))
@@ -237,7 +237,7 @@ def rename_with_timestamp(backup_path: Path) -> Path:
     new_path = backup_path.parent / new_name
     
     backup_path.rename(new_path)
-    log(f"  ✅ Renamed to: {new_name}")
+    log(f"   Renamed to: {new_name}")
     
     return new_path
 
@@ -250,7 +250,7 @@ def upload_to_cloud(backup_path: Path, site: str) -> None:
         backup_path: Backup directory path
         site: Site name
     """
-    log("☁️  Uploading to cloud...")
+    log("  Uploading to cloud...")
     
     rclone_config = f"/opt/omd/sites/{site}/.config/rclone/rclone.conf"
     
@@ -263,7 +263,7 @@ def upload_to_cloud(backup_path: Path, site: str) -> None:
         
         # Append rclone output to log file
         if result.returncode == 0:
-            log("✅ Upload completed")
+            log(" Upload completed")
         else:
             error("Upload failed")
     except Exception as e:
@@ -277,7 +277,7 @@ def apply_local_retention(retention: int) -> None:
     Args:
         retention: Number of backups to keep
     """
-    log(f"🗂️  Applying local retention (keep last {retention})...")
+    log(f"  Applying local retention (keep last {retention})...")
     
     backup_path = Path(BACKUP_DIR)
     
@@ -290,13 +290,13 @@ def apply_local_retention(retention: int) -> None:
     
     if len(backups) > retention:
         for old_backup in backups[retention:]:
-            log(f"  🗑️  Removing old backup: {old_backup.name}")
+            log(f"    Removing old backup: {old_backup.name}")
             shutil.rmtree(old_backup)
         
         removed = len(backups) - retention
-        log(f"✅ Local retention applied: removed {removed} old backups")
+        log(f" Local retention applied: removed {removed} old backups")
     else:
-        log(f"✅ Local retention OK: {len(backups)} backups (max {retention})")
+        log(f" Local retention OK: {len(backups)} backups (max {retention})")
 
 
 def apply_cloud_retention(retention: int, site: str) -> None:
@@ -307,7 +307,7 @@ def apply_cloud_retention(retention: int, site: str) -> None:
         retention: Number of backups to keep
         site: Site name
     """
-    log(f"☁️  Applying cloud retention (keep last {retention})...")
+    log(f"  Applying cloud retention (keep last {retention})...")
     
     try:
         # List cloud backups
@@ -321,7 +321,7 @@ def apply_cloud_retention(retention: int, site: str) -> None:
         
         if len(backups) > retention:
             for old_backup in backups[retention:]:
-                log(f"  🗑️  Removing old cloud backup: {old_backup}")
+                log(f"    Removing old cloud backup: {old_backup}")
                 run_command([
                     "su", "-", site, "-c",
                     f"rclone purge '{RCLONE_REMOTE}/{RCLONE_PATH}/{old_backup}' "
@@ -329,9 +329,9 @@ def apply_cloud_retention(retention: int, site: str) -> None:
                 ], capture_output=True)
             
             removed = len(backups) - retention
-            log(f"✅ Cloud retention applied: removed {removed} old backups")
+            log(f" Cloud retention applied: removed {removed} old backups")
         else:
-            log(f"✅ Cloud retention OK: {len(backups)} backups (max {retention})")
+            log(f" Cloud retention OK: {len(backups)} backups (max {retention})")
     
     except Exception as e:
         error(f"Cloud retention failed: {e}")
@@ -364,14 +364,14 @@ def main() -> int:
     backup = find_unprocessed_backup()
     
     if not backup:
-        log("⚠️  No job00-complete backup found, exiting")
+        log("  No job00-complete backup found, exiting")
         return 0
     
-    log(f"✅ Found: {backup.name}")
+    log(f" Found: {backup.name}")
     
     # Check if already processed (has timestamp)
     if re.search(r'-\d{4}-\d{2}-\d{2}-\d{2}h\d{2}$', backup.name):
-        log("✅ Backup already processed (has timestamp), skipping compression")
+        log(" Backup already processed (has timestamp), skipping compression")
         already_processed = True
     else:
         # Compress backup
@@ -406,7 +406,7 @@ def main() -> int:
         cloud_count = 0
     
     log("============================================")
-    log("✅ Job00 Daily Backup Management Completed")
+    log(" Job00 Daily Backup Management Completed")
     log("============================================")
     log(f"Backup: {backup.name}")
     log(f"Local backups: {local_count}/{RETENTION_LOCAL}")

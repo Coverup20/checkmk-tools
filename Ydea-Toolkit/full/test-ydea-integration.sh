@@ -12,7 +12,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║     🧪 Test Integrazione CheckMK → Ydea Ticketing          ║${NC}"
+echo -e "${BLUE}║      Test Integrazione CheckMK → Ydea Ticketing          ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -35,18 +35,18 @@ test_start() {
 
 test_pass() {
   TESTS_PASSED=$((TESTS_PASSED + 1))
-  echo -e "${GREEN}  ✅ PASS${NC}: $1"
+  echo -e "${GREEN}   PASS${NC}: $1"
   echo ""
 }
 
 test_fail() {
   TESTS_FAILED=$((TESTS_FAILED + 1))
-  echo -e "${RED}  ❌ FAIL${NC}: $1"
+  echo -e "${RED}   FAIL${NC}: $1"
   echo ""
 }
 
 test_warn() {
-  echo -e "${YELLOW}  ⚠️  WARN${NC}: $1"
+  echo -e "${YELLOW}    WARN${NC}: $1"
 }
 
 # ===== TEST 1: Verifica File =====
@@ -250,7 +250,7 @@ echo ""
 # ===== RIEPILOGO =====
 echo ""
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║                    📊 RIEPILOGO TEST                        ║${NC}"
+echo -e "${BLUE}║                     RIEPILOGO TEST                        ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "Test totali:  ${BLUE}$TESTS_TOTAL${NC}"
@@ -259,16 +259,16 @@ echo -e "Test falliti: ${RED}$TESTS_FAILED${NC}"
 echo ""
 
 if [[ $TESTS_FAILED -eq 0 ]]; then
-  echo -e "${GREEN}✅ TUTTI I TEST PASSATI!${NC}"
+  echo -e "${GREEN} TUTTI I TEST PASSATI!${NC}"
   echo ""
-  echo -e "${GREEN}🎉 Sistema pronto per la produzione!${NC}"
+  echo -e "${GREEN} Sistema pronto per la produzione!${NC}"
   echo ""
   echo "Prossimi passi:"
   echo "1. Configura notification rule in CheckMK"
   echo "2. Monitora i log durante i primi alert"
   echo "3. Verifica creazione ticket su Ydea"
 else
-  echo -e "${RED}❌ ALCUNI TEST FALLITI${NC}"
+  echo -e "${RED} ALCUNI TEST FALLITI${NC}"
   echo ""
   echo "Correggi gli errori prima di usare in produzione:"
   echo "1. Verifica messaggi di errore sopra"
@@ -301,7 +301,7 @@ REPORT_FILE="/tmp/ydea_integration_test_report_$(date +%Y%m%d_%H%M%S).txt"
   crontab -l 2>/dev/null | grep ydea || echo "Nessun cron job trovato"
 } > "$REPORT_FILE"
 
-echo "📄 Report completo salvato in: $REPORT_FILE"
+echo " Report completo salvato in: $REPORT_FILE"
 echo ""
 
 exit $TESTS_FAILED

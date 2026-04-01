@@ -33,7 +33,7 @@ if r4:
             age = (now - int(p[2])) // 60 if p[2].isdigit() else "?"
             print(f"  {p[0]} | {p[1]} | {age}min | active={p[3]}")
 else:
-    print("  nessuno ✓")
+    print("  nessuno ")
 
 # Top 10 stale
 r5 = live(f"GET services\nFilter: last_check < {th}\nColumns: host_name description last_check\n").strip()
@@ -47,4 +47,4 @@ if r5:
             age = (now - int(p[2])) // 60 if p[2].isdigit() else "?"
             print(f"  {p[0]} | {p[1]} | {age}min")
 else:
-    print("  nessuno ✓")
+    print("  nessuno ")

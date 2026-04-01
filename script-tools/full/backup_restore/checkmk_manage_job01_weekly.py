@@ -58,7 +58,7 @@ def error(message: str) -> None:
         message: Error message
     """
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    formatted = f"[{timestamp}] ❌ ERROR: {message}"
+    formatted = f"[{timestamp}]  ERROR: {message}"
     print(formatted, file=sys.stderr)
     
     try:
@@ -112,7 +112,7 @@ def find_unprocessed_backup() -> Optional[Path]:
     Returns:
         Path to backup or None if not found
     """
-    log("📂 Searching for unprocessed job01-complete backup...")
+    log(" Searching for unprocessed job01-complete backup...")
     
     backup_path = Path(BACKUP_DIR)
     if not backup_path.exists():
@@ -169,7 +169,7 @@ def rename_with_timestamp(backup_path: Path) -> Path:
     new_path = backup_path.parent / new_name
     
     backup_path.rename(new_path)
-    log(f"✅ Renamed to: {new_name}")
+    log(f" Renamed to: {new_name}")
     
     return new_path
 
@@ -182,7 +182,7 @@ def upload_to_cloud(backup_path: Path, site: str) -> None:
         backup_path: Backup directory path
         site: Site name
     """
-    log("☁️  Uploading to cloud (full backup, no compression)...")
+    log("  Uploading to cloud (full backup, no compression)...")
     
     rclone_config = f"/opt/omd/sites/{site}/.config/rclone/rclone.conf"
     
@@ -195,7 +195,7 @@ def upload_to_cloud(backup_path: Path, site: str) -> None:
         
         # Append rclone output to log file
         if result.returncode == 0:
-            log("✅ Upload completed")
+            log(" Upload completed")
         else:
             error("Upload failed")
     except Exception as e:
@@ -212,7 +212,7 @@ def apply_local_retention(retention: int) -> int:
     Returns:
         Number of local backups after retention
     """
-    log(f"🗂️  Applying local retention (keep last {retention})...")
+    log(f"  Applying local retention (keep last {retention})...")
     
     backup_path = Path(BACKUP_DIR)
     
@@ -225,13 +225,13 @@ def apply_local_retention(retention: int) -> int:
     
     if len(backups) > retention:
         for old_backup in backups[retention:]:
-            log(f"  🗑️  Removing old backup: {old_backup.name}")
+            log(f"    Removing old backup: {old_backup.name}")
             shutil.rmtree(old_backup)
         
         removed = len(backups) - retention
-        log(f"✅ Local retention applied: removed {removed} old backups")
+        log(f" Local retention applied: removed {removed} old backups")
     else:
-        log(f"✅ Local retention OK: {len(backups)} backups (max {retention})")
+        log(f" Local retention OK: {len(backups)} backups (max {retention})")
     
     return min(len(backups), retention)
 
@@ -247,7 +247,7 @@ def apply_cloud_retention(retention: int, site: str) -> int:
     Returns:
         Number of cloud backups after retention
     """
-    log(f"☁️  Applying cloud retention (keep last {retention})...")
+    log(f"  Applying cloud retention (keep last {retention})...")
     
     try:
         # List cloud backups
@@ -261,7 +261,7 @@ def apply_cloud_retention(retention: int, site: str) -> int:
         
         if len(backups) > retention:
             for old_backup in backups[retention:]:
-                log(f"  🗑️  Removing old cloud backup: {old_backup}")
+                log(f"    Removing old cloud backup: {old_backup}")
                 run_command([
                     "su", "-", site, "-c",
                     f"rclone purge '{RCLONE_REMOTE}/{RCLONE_PATH}/{old_backup}' "
@@ -269,9 +269,9 @@ def apply_cloud_retention(retention: int, site: str) -> int:
                 ], capture_output=True)
             
             removed = len(backups) - retention
-            log(f"✅ Cloud retention applied: removed {removed} old backups")
+            log(f" Cloud retention applied: removed {removed} old backups")
         else:
-            log(f"✅ Cloud retention OK: {len(backups)} backups (max {retention})")
+            log(f" Cloud retention OK: {len(backups)} backups (max {retention})")
         
         return min(len(backups), retention)
     
@@ -297,18 +297,18 @@ def main() -> int:
     backup = find_unprocessed_backup()
     
     if not backup:
-        log("⚠️  No job01-complete backup found, exiting")
+        log("  No job01-complete backup found, exiting")
         return 0
     
-    log(f"✅ Found: {backup.name}")
+    log(f" Found: {backup.name}")
     
     # Get backup size
     backup_size = get_backup_size(backup, SITE)
-    log(f"📦 Backup size: {backup_size}")
+    log(f" Backup size: {backup_size}")
     
     # Check if already processed (has timestamp)
     if re.search(r'-\d{4}-\d{2}-\d{2}-\d{2}h\d{2}$', backup.name):
-        log("✅ Backup already processed (has timestamp)")
+        log(" Backup already processed (has timestamp)")
     else:
         # Rename with timestamp
         backup = rename_with_timestamp(backup)
@@ -323,7 +323,7 @@ def main() -> int:
     cloud_count = apply_cloud_retention(RETENTION_CLOUD, SITE)
     
     log("============================================")
-    log("✅ Job01 Weekly Backup Management Completed")
+    log(" Job01 Weekly Backup Management Completed")
     log("============================================")
     log(f"Backup: {backup.name}")
     log(f"Size: {backup_size} (full, uncompressed)")

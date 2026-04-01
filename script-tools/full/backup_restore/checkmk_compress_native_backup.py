@@ -100,7 +100,7 @@ def compress_site_tar(site_tar: Path, site: str) -> tuple[str, int]:
 
     log("Rimuovo componenti pesanti con tar --delete (preserva metadati)...")
     for path in REMOVE_PATHS:
-        log(f"  ❌ Rimuovo: {path}")
+        log(f"   Rimuovo: {path}")
         run(["tar", "--delete", "-f", str(work_tar), path], check=False)
 
     log("Ricomprimo tar...")
@@ -111,7 +111,7 @@ def compress_site_tar(site_tar: Path, site: str) -> tuple[str, int]:
     reduction = 100 - (compressed_bytes * 100 // original_bytes)
     compressed_size = human_size(work_targz)
 
-    log(f"📊 Riduzione dimensione: {reduction}%")
+    log(f" Riduzione dimensione: {reduction}%")
     log("Sostituisco file originale con versione compressa...")
 
     shutil.move(str(work_targz), str(site_tar))
@@ -121,7 +121,7 @@ def compress_site_tar(site_tar: Path, site: str) -> tuple[str, int]:
         run(["chown", f"{site}:{site}", str(site_tar)], check=False)
 
     run(["chmod", "600", str(site_tar)], check=False)
-    log(f"✅ File sostituito: {site_tar} ({compressed_size})")
+    log(f" File sostituito: {site_tar} ({compressed_size})")
 
     return compressed_size, reduction
 
@@ -136,7 +136,7 @@ def rename_backup_if_needed(backup_path: Path, already_renamed: bool) -> Path:
 
     log(f"Rinomino directory con timestamp: {new_name}")
     backup_path.rename(new_path)
-    log("✅ Directory rinominata")
+    log(" Directory rinominata")
     return new_path
 
 
@@ -155,7 +155,7 @@ def upload_backup(site: str, backup_path: Path, compressed_size: str) -> None:
         error("Upload fallito!")
         raise SystemExit(1)
 
-    log("✅ Upload completato")
+    log(" Upload completato")
     log("   - mkbackup.info")
     log(f"   - site-{site}.tar.gz ({compressed_size})")
 
@@ -183,9 +183,9 @@ def main() -> int:
         error(f"File {site_tar} non trovato!")
         return 1
 
-    log("✅ Backup trovato, procedo con compressione")
+    log(" Backup trovato, procedo con compressione")
     original_size = human_size(site_tar)
-    log(f"✅ Backup trovato: {backup_name}")
+    log(f" Backup trovato: {backup_name}")
     log(f"   Dimensione originale: {original_size}")
 
     compressed_size, reduction = compress_site_tar(site_tar, site)

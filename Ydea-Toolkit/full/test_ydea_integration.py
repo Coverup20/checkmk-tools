@@ -55,15 +55,15 @@ def test_start(name):
 def test_pass(msg):
     global passed_tests
     passed_tests += 1
-    print(f"{Colors.GREEN}  ✅ PASS{Colors.NC}: {msg}\n")
+    print(f"{Colors.GREEN}   PASS{Colors.NC}: {msg}\n")
 
 def test_fail(msg):
     global failed_tests
     failed_tests += 1
-    print(f"{Colors.RED}  ❌ FAIL{Colors.NC}: {msg}\n")
+    print(f"{Colors.RED}   FAIL{Colors.NC}: {msg}\n")
 
 def test_warn(msg):
-    print(f"{Colors.YELLOW}  ⚠️  WARN{Colors.NC}: {msg}\n")
+    print(f"{Colors.YELLOW}    WARN{Colors.NC}: {msg}\n")
 
 def check_file(path, name, executable=False):
     p = Path(path)
@@ -80,7 +80,7 @@ def check_file(path, name, executable=False):
 
 def main():
     print(f"{Colors.BLUE}╔══════════════════════════════════════════════════════════════╗{Colors.NC}")
-    print(f"{Colors.BLUE}║     🧪 Test Integrazione CheckMK -> Ydea Ticketing          ║{Colors.NC}")
+    print(f"{Colors.BLUE}║      Test Integrazione CheckMK -> Ydea Ticketing          ║{Colors.NC}")
     print(f"{Colors.BLUE}╚══════════════════════════════════════════════════════════════╝{Colors.NC}\n")
 
     # 1. Verifica File Necessari
@@ -153,10 +153,10 @@ def main():
     print(f"Falliti:      {Colors.RED}{failed_tests}{Colors.NC}\n")
 
     if failed_tests == 0:
-        print(f"{Colors.GREEN}✅ TUTTI I TEST PASSATI! Sistema pronto.{Colors.NC}")
+        print(f"{Colors.GREEN} TUTTI I TEST PASSATI! Sistema pronto.{Colors.NC}")
         sys.exit(0)
     else:
-        print(f"{Colors.RED}❌ ALCUNI TEST FALLITI. Verificare output sopra.{Colors.NC}")
+        print(f"{Colors.RED} ALCUNI TEST FALLITI. Verificare output sopra.{Colors.NC}")
         sys.exit(1)
 
 if __name__ == "__main__":

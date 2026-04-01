@@ -18,10 +18,10 @@ curl: (22) The requested URL returned error: 404
 
 ### Conseguenze
 
-- ✗ Perdita di tracciamento per alert ricorrenti
-- ✗ Log pieni di errori 404 ripetuti
-- ✗ Nessuna notifica quando un problema si ripresenta
-- ✗ Cache inquinata con ticket ID non validi
+-  Perdita di tracciamento per alert ricorrenti
+-  Log pieni di errori 404 ripetuti
+-  Nessuna notifica quando un problema si ripresenta
+-  Cache inquinata con ticket ID non validi
 
 ## Soluzione Implementata
 
@@ -90,7 +90,7 @@ if [[ $note_result -eq 2 ]]; then
     NEW_TICKET_ID=$(create_ydea_ticket "$TITLE" "$DESCRIPTION" "$PRIORITY")
     
     if [[ -n "$NEW_TICKET_ID" ]]; then
-      log "✅ Nuovo ticket creato: #$NEW_TICKET_ID (sostituisce #$TICKET_ID)"
+      log " Nuovo ticket creato: #$NEW_TICKET_ID (sostituisce #$TICKET_ID)"
       save_ticket_cache "$TICKET_KEY" "$NEW_TICKET_ID" "$STATE"
     fi
   fi
@@ -103,7 +103,7 @@ I nuovi ticket creati dopo un 404 includono una nota speciale:
 
 ```
 -------------------------------------------
-⚠️ NOTA: Ticket precedente #1502113 non più disponibile
+ NOTA: Ticket precedente #1502113 non più disponibile
 Nuovo ticket creato automaticamente
 -------------------------------------------
 ```
@@ -114,14 +114,14 @@ Questo aiuta l'operatore a capire il contesto.
 
 ### Caso 1: Ticket Esiste e Funziona
 ```
-Alert → Trova ticket in cache → Aggiunge nota → Successo ✅
+Alert → Trova ticket in cache → Aggiunge nota → Successo 
 ```
 
 ### Caso 2: Ticket Chiuso/Cancellato + Stato OK/UP
 ```
 Alert OK/UP → Trova ticket in cache → Errore 404 
   → Rimuove dalla cache 
-  → Nessun nuovo ticket (problema rientrato) ✅
+  → Nessun nuovo ticket (problema rientrato) 
 ```
 
 ### Caso 3: Ticket Chiuso/Cancellato + Stato CRITICAL
@@ -129,29 +129,29 @@ Alert OK/UP → Trova ticket in cache → Errore 404
 Alert CRITICAL → Trova ticket in cache → Errore 404 
   → Rimuove dalla cache 
   → Crea NUOVO ticket 
-  → Salva nuovo ID in cache ✅
+  → Salva nuovo ID in cache 
 ```
 
 ### Caso 4: Errore Generico (non 404)
 ```
 Alert → Trova ticket in cache → Errore generico
   → Log errore
-  → Mantiene ticket in cache (retry futuro) ⚠️
+  → Mantiene ticket in cache (retry futuro) 
 ```
 
 ## Benefici
 
 | Aspetto | Prima | Dopo |
 |---------|-------|------|
-| **Errori 404 ripetuti** | ❌ Infiniti log di errore | ✅ Gestiti automaticamente |
-| **Cache inquinata** | ❌ ID non validi permanenti | ✅ Pulizia automatica |
-| **Alert persi** | ❌ Nessuna notifica se ticket chiuso | ✅ Nuovo ticket auto-creato |
-| **Tracciabilità** | ❌ Continuità persa | ✅ Nota su ticket precedente |
-| **Intervento manuale** | ⚠️ Necessario | ✅ Auto-healing |
+| **Errori 404 ripetuti** |  Infiniti log di errore |  Gestiti automaticamente |
+| **Cache inquinata** |  ID non validi permanenti |  Pulizia automatica |
+| **Alert persi** |  Nessuna notifica se ticket chiuso |  Nuovo ticket auto-creato |
+| **Tracciabilità** |  Continuità persa |  Nota su ticket precedente |
+| **Intervento manuale** |  Necessario |  Auto-healing |
 
 ## Casistiche Gestite
 
-### ✅ Operatore Chiude Ticket Manualmente
+###  Operatore Chiude Ticket Manualmente
 
 **Scenario**: L'operatore risolve e chiude il ticket #1502113
 
@@ -161,13 +161,13 @@ Alert → Trova ticket in cache → Errore generico
 3. Se problema rientrato (OK): Nessuna azione
 4. Se problema persiste (CRIT): Nuovo ticket creato
 
-### ✅ Ticket Cancellato dal Sistema
+###  Ticket Cancellato dal Sistema
 
 **Scenario**: Sistema Ydea cancella ticket vecchi dopo X giorni
 
 **Comportamento**: Identico al caso precedente
 
-### ✅ Flapping con Ticket Chiuso
+###  Flapping con Ticket Chiuso
 
 **Scenario**: 
 - Servizio va CRIT → Ticket #1001 creato
@@ -181,7 +181,7 @@ Alert → Trova ticket in cache → Errore generico
 4. Nota indica ticket precedente
 5. Detection flapping funziona normalmente
 
-### ✅ Alert OK su Ticket Chiuso
+###  Alert OK su Ticket Chiuso
 
 **Scenario**:
 - Servizio va OK
@@ -206,34 +206,34 @@ curl: (22) The requested URL returned error: 404
 [2025-11-14 12:18:19] WARN: Ticket #1502113 non trovato (404) - potrebbe essere stato chiuso
 [2025-11-14 12:18:19] Ticket #1502113 non più valido, rimozione dalla cache
 [2025-11-14 12:18:19] Stato ancora CRITICAL, creazione nuovo ticket
-[2025-11-14 12:18:20] ✅ Nuovo ticket creato: #1502200 (sostituisce #1502113)
+[2025-11-14 12:18:20]  Nuovo ticket creato: #1502200 (sostituisce #1502113)
 ```
 
 ## Testing
 
 Script testato con:
 
-✅ **Test 1**: Ticket chiuso manualmente + Alert OK
+ **Test 1**: Ticket chiuso manualmente + Alert OK
 - Risultato: Cache pulita, nessun nuovo ticket
 
-✅ **Test 2**: Ticket chiuso manualmente + Alert CRIT
+ **Test 2**: Ticket chiuso manualmente + Alert CRIT
 - Risultato: Nuovo ticket creato con nota
 
-✅ **Test 3**: Ticket cancellato + Alert WARNING
+ **Test 3**: Ticket cancellato + Alert WARNING
 - Risultato: Cache pulita, nessun nuovo ticket (solo CRIT creano ticket)
 
-✅ **Test 4**: Errore rete (non 404)
+ **Test 4**: Errore rete (non 404)
 - Risultato: Log errore, ticket mantenuto in cache
 
-✅ **Test 5**: Flapping con ticket chiuso
+ **Test 5**: Flapping con ticket chiuso
 - Risultato: Nuovo ticket con detection flapping
 
 ## Compatibilità
 
-- ✅ Backward compatible con funzionamento esistente
-- ✅ Nessuna modifica a `ydea-toolkit.sh` richiesta
-- ✅ Cache esistente continua a funzionare
-- ✅ Formato log compatibile con parsing esistente
+-  Backward compatible con funzionamento esistente
+-  Nessuna modifica a `ydea-toolkit.sh` richiesta
+-  Cache esistente continua a funzionare
+-  Formato log compatibile con parsing esistente
 
 ## Manutenzione
 

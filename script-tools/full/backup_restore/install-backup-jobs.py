@@ -37,22 +37,22 @@ UNITS = {
 
 def check_root() -> None:
     if os.geteuid() != 0:
-        print("❌ This script must be run as root")
+        print(" This script must be run as root")
         sys.exit(1)
 
 
 def ask_mode() -> str:
     print()
     print("Select schedule mode:")
-    print("  1) 🧪 TEST MODE - Every minute (for immediate testing)")
-    print("  2) 🚀 PRODUCTION MODE - job00 daily 03:00, job01 Sunday 04:00")
+    print("  1)  TEST MODE - Every minute (for immediate testing)")
+    print("  2)  PRODUCTION MODE - job00 daily 03:00, job01 Sunday 04:00")
     print()
     choice = input("Enter choice [1-2]: ").strip()
     if choice == "1":
-        print("✅ TEST MODE selected - timers will run every minute")
+        print(" TEST MODE selected - timers will run every minute")
         return "test"
     else:
-        print("✅ PRODUCTION MODE selected - standard schedule")
+        print(" PRODUCTION MODE selected - standard schedule")
         return "production"
 
 
@@ -71,7 +71,7 @@ def install_unit(name: str, src: Path, mode: str) -> None:
         content = patch_timer_test(content)
 
     dest.write_text(content)
-    print(f"  ✅ {name} → {dest}")
+    print(f"   {name} → {dest}")
 
 
 def run(cmd: list) -> None:
@@ -108,32 +108,32 @@ def main() -> int:
     print()
 
     # Installa units systemd
-    print("⚙️  Installing systemd units...")
+    print("  Installing systemd units...")
     for job, units in UNITS.items():
         for unit_name in (units["service"], units["timer"]):
             src = SYSTEMD_SRC / unit_name
             if not src.exists():
-                print(f"  ❌ Source not found: {src}", file=sys.stderr)
+                print(f"   Source not found: {src}", file=sys.stderr)
                 return 1
             install_unit(unit_name, src, mode)
 
     # Reload systemd
-    print("\n🔄 Reloading systemd daemon...")
+    print("\n Reloading systemd daemon...")
     run(["systemctl", "daemon-reload"])
-    print("✅ Systemd reloaded")
+    print(" Systemd reloaded")
 
     # Abilita e avvia timers
-    print("\n🚀 Enabling and starting timers...")
+    print("\n Enabling and starting timers...")
     for job, units in UNITS.items():
         timer = units["timer"]
         run(["systemctl", "enable", timer])
         run(["systemctl", "start", timer])
-        print(f"  ✅ {timer} enabled and started")
+        print(f"   {timer} enabled and started")
 
     show_status()
 
     print("=" * 44)
-    print("✅ Installation Completed Successfully")
+    print(" Installation Completed Successfully")
     print("=" * 44)
     print()
     print("Logs:")

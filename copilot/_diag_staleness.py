@@ -47,7 +47,7 @@ if r:
         if len(svcs) > 10:
             print(f"    ... e altri {len(svcs)-10}")
 else:
-    print("  Nessuno stale! ✓")
+    print("  Nessuno stale! ")
 
 # ===== CHECK_MK SERVICE PER HOST — verifica active + staleness =====
 r = live("GET services\nFilter: description ~ Check_MK\nColumns: host_name description staleness active_checks_enabled last_check\n").strip()
@@ -65,8 +65,8 @@ if r:
     if problems:
         print(f"  PROBLEMI ({len(problems)}):")
         for host, svc, stale, active, age in problems:
-            print(f"  ⚠️  {host} | {svc} | staleness={stale:.1f} | active={active} | {age}min fa")
+            print(f"    {host} | {svc} | staleness={stale:.1f} | active={active} | {age}min fa")
     else:
-        print(f"  Tutti OK (active=0, staleness OK) su {len(lines)} servizi ✓")
+        print(f"  Tutti OK (active=0, staleness OK) su {len(lines)} servizi ")
 
 print("\n" + "=" * 70)

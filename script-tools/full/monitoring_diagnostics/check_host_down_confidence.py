@@ -19,11 +19,11 @@ Se qualsiasi check risponde (porta aperta/rifiutata, ping risponde):
   il punteggio viene ridotto → confidenza scende verso 0%.
 
 Soglie interpretazione:
-  >= 90%  → 🔴 OFFLINE CONFERMATO
-  >= 80%  → 🟠 Molto probabilmente offline
-  >= 60%  → 🟡 Probabilmente offline
-  >= 30%  → 🟡 Incerto (rete vs host)
-  <  30%  → 🟢 Host probabilmente attivo
+  >= 90%  →  OFFLINE CONFERMATO
+  >= 80%  →  Molto probabilmente offline
+  >= 60%  →  Probabilmente offline
+  >= 30%  →  Incerto (rete vs host)
+  <  30%  →  Host probabilmente attivo
 
 Exit codes:
   0 = host probabilmente attivo (confidence < 60%)
@@ -101,10 +101,10 @@ class DiagResult:
     STATUS_INFO    = "info"
 
     ICONS = {
-        STATUS_DOWN:    "❌",
-        STATUS_UP:      "✅",
-        STATUS_UNKNOWN: "⚠️",
-        STATUS_INFO:    "ℹ️",
+        STATUS_DOWN:    "",
+        STATUS_UP:      "",
+        STATUS_UNKNOWN: "",
+        STATUS_INFO:    "ℹ",
     }
 
     def __init__(self, name, desc, status, msg, score):
@@ -116,7 +116,7 @@ class DiagResult:
 
     @property
     def icon(self):
-        return self.ICONS.get(self.status, "⚠️")
+        return self.ICONS.get(self.status, "")
 
     def __repr__(self):
         return "DiagResult({}, {}, score={})".format(self.name, self.status, self.score)
@@ -412,15 +412,15 @@ def run_all_checks(host, ports, skip_arp, skip_trace):
 def get_verdict(confidence):
     """Restituisce (label_verdetto, testo_dettaglio)."""
     if confidence >= 90:
-        return "🔴 OFFLINE CONFERMATO",        "L'host è quasi certamente spento o irraggiungibile"
+        return " OFFLINE CONFERMATO",        "L'host è quasi certamente spento o irraggiungibile"
     elif confidence >= 80:
-        return "🟠 MOLTO PROBABILMENTE OFFLINE", "Alta probabilità che l'host sia spento"
+        return " MOLTO PROBABILMENTE OFFLINE", "Alta probabilità che l'host sia spento"
     elif confidence >= 60:
-        return "🟡 PROBABILMENTE OFFLINE",        "Possibile problema host, ma potrebbe essere transitorio"
+        return " PROBABILMENTE OFFLINE",        "Possibile problema host, ma potrebbe essere transitorio"
     elif confidence >= 30:
-        return "🟡 INCERTO",                      "Difficile distinguere tra problema host e problema di rete"
+        return " INCERTO",                      "Difficile distinguere tra problema host e problema di rete"
     else:
-        return "🟢 HOST PROBABILMENTE ATTIVO",    "Almeno un servizio risponde — host probabilmente attivo"
+        return " HOST PROBABILMENTE ATTIVO",    "Almeno un servizio risponde — host probabilmente attivo"
 
 
 def format_human(host, confidence, results):

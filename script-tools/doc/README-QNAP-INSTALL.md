@@ -1,18 +1,18 @@
 # Installazione CheckMK Agent + FRPC su QNAP NAS
 > **Categoria:** Operativo
 
-## 📋 Descrizione
+##  Descrizione
 
 Script per l'installazione automatica di CheckMK Agent e FRPC su sistemi QNAP NAS.
 
-## ✅ Requisiti
+##  Requisiti
 
 - QNAP NAS con QTS 4.x/5.x o QuTS hero
 - Accesso SSH attivo
 - Utente root o admin
 - Almeno 100MB di spazio disco
 
-## 🚀 Installazione
+##  Installazione
 
 ### 1. Carica lo script sul NAS
 
@@ -33,7 +33,7 @@ chmod +x install-agent-frpc-qnap.sh
 sudo ./install-agent-frpc-qnap.sh
 ```
 
-## ⚙️ Opzioni
+##  Opzioni
 
 ```bash
 # Installazione interattiva (default)
@@ -52,7 +52,7 @@ sudo ./install-agent-frpc-qnap.sh
 ./install-agent-frpc-qnap.sh --help
 ```
 
-## 🔧 Gestione dipendenze
+##  Gestione dipendenze
 
 ### Se `socat` non è disponibile
 
@@ -86,7 +86,7 @@ Lo script chiederà automaticamente se vuoi usare xinetd al posto di socat:
 Vuoi provare a usare xinetd al posto di socat? [s/N]: s
 ```
 
-## 📂 Struttura installazione
+##  Struttura installazione
 
 ```
 /opt/checkmk/
@@ -111,7 +111,7 @@ Vuoi provare a usare xinetd al posto di socat? [s/N]: s
 /etc/config/autorun.sh         # Autostart QNAP
 ```
 
-## 🎮 Comandi utili
+##  Comandi utili
 
 ### CheckMK Agent
 
@@ -151,7 +151,7 @@ tail -f /opt/frpc/log/frpc.log
 vi /opt/frpc/conf/frpc.toml
 ```
 
-## 🔍 Troubleshooting
+##  Troubleshooting
 
 ### Agent non risponde
 
@@ -201,7 +201,7 @@ chmod +x /etc/config/autorun.sh
 /etc/config/autorun.sh
 ```
 
-## 📝 Note
+##  Note
 
 - I servizi si avviano automaticamente al boot tramite `/etc/config/autorun.sh`
 - Il backup di `autorun.sh` viene creato automaticamente prima delle modifiche
@@ -209,7 +209,7 @@ chmod +x /etc/config/autorun.sh
 - FRPC si connette al server FRP specificato durante l'installazione
 - I log vengono mantenuti per 7 giorni (FRPC) o illimitati (Agent)
 
-## 🆘 Supporto
+##  Supporto
 
 In caso di problemi:
 
@@ -218,6 +218,6 @@ In caso di problemi:
 3. Verifica la configurazione in `/opt/frpc/conf/frpc.toml`
 4. Consulta la documentazione CheckMK e FRP ufficiale
 
-## 📄 Licenza
+##  Licenza
 
 Script sviluppato per uso interno - Modificabile liberamente

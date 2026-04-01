@@ -138,9 +138,9 @@ def create_archive(site: str, site_base: Path, archive_path: Path) -> Tuple[str,
             include_args.append(item)
             size = run_cmd(["bash", "-lc", f"du -sh '{full_path}' 2>/dev/null | cut -f1"], check=False)
             size_text = (size.stdout or "N/A").strip() or "N/A"
-            log(f"  ✅ Include: {item} ({size_text})")
+            log(f"   Include: {item} ({size_text})")
         else:
-            log(f"  ⏭️  Skip: {item} (non esiste)")
+            log(f"    Skip: {item} (non esiste)")
 
     if not include_args:
         log("ERRORE: Nessun file da backuppare trovato")
@@ -209,7 +209,7 @@ def apply_retention(site: str) -> None:
         file_date = dt.datetime.strptime(match.group(1), "%Y-%m-%d").date()
         if file_date < cutoff:
             age_days = (dt.date.today() - file_date).days
-            log(f"  🗑️  Cancello backup vecchio ({age_days} giorni): {filename}")
+            log(f"    Cancello backup vecchio ({age_days} giorni): {filename}")
             run_site_cmd(
                 site,
                 f"rclone delete '{RCLONE_REMOTE}/{RCLONE_PATH}/{filename}' --s3-no-check-bucket --config=$HOME/.config/rclone/rclone.conf",

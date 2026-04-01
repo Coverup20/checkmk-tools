@@ -31,52 +31,52 @@ YdeaAPI = ydea_toolkit.YdeaAPI
 
 def main():
     """Quick test API"""
-    print("🚀 Quick Test Ydea API")
+    print(" Quick Test Ydea API")
     print("=" * 60)
     
     try:
         api = YdeaAPI()
         
         # Test 1: Login
-        print("\n1️⃣  Test Login...")
+        print("\n1⃣  Test Login...")
         if api.ensure_token():
-            print("   ✅ Login OK")
+            print("    Login OK")
         else:
-            print("   ❌ Login fallito")
+            print("    Login fallito")
             sys.exit(1)
         
         # Test 2: Get Tickets
-        print("\n2️⃣  Test GET /tickets...")
+        print("\n2⃣  Test GET /tickets...")
         tickets_data, status = api.api_call("GET", "/tickets", {"limit": 5})
         if status == 200:
             ticket_count = len(tickets_data.get("objs", []))
-            print(f"   ✅ Tickets recuperati: {ticket_count}")
+            print(f"    Tickets recuperati: {ticket_count}")
         else:
-            print(f"   ⚠️  Status: {status}")
+            print(f"     Status: {status}")
         
         # Test 3: Get Categories
-        print("\n3️⃣  Test GET /categories...")
+        print("\n3⃣  Test GET /categories...")
         cat_data, status = api.api_call("GET", "/categories")
         if status == 200:
             cat_count = len(cat_data.get("objs", []))
-            print(f"   ✅ Categorie recuperate: {cat_count}")
+            print(f"    Categorie recuperate: {cat_count}")
         else:
-            print(f"   ⚠️  Status: {status}")
+            print(f"     Status: {status}")
         
         # Test 4: Get Priorities
-        print("\n4️⃣  Test GET /priorities...")
+        print("\n4⃣  Test GET /priorities...")
         prio_data, status = api.api_call("GET", "/priorities")
         if status == 200:
             prio_count = len(prio_data.get("objs", []))
-            print(f"   ✅ Priorità recuperate: {prio_count}")
+            print(f"    Priorità recuperate: {prio_count}")
         else:
-            print(f"   ⚠️  Status: {status}")
+            print(f"     Status: {status}")
         
         print("\n" + "=" * 60)
-        print("✅ Quick test completato con successo!")
+        print(" Quick test completato con successo!")
         
     except Exception as e:
-        print(f"\n❌ Errore: {e}")
+        print(f"\n Errore: {e}")
         sys.exit(1)
 
 

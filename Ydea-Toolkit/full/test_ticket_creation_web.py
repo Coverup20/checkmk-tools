@@ -60,7 +60,7 @@ if not username or not password:
             if p_match: password = p_match.group(1)
 
 if not username or not password:
-    print(f"{Colors.RED}❌ Credenziali non trovate (YDEA_USERNAME, YDEA_PASSWORD){Colors.NC}")
+    print(f"{Colors.RED} Credenziali non trovate (YDEA_USERNAME, YDEA_PASSWORD){Colors.NC}")
     sys.exit(1)
 
 
@@ -106,16 +106,16 @@ class YdeaWebClient:
         self.cookie_jar.save(ignore_discard=True, ignore_expires=True)
 
     def login(self):
-        print("🔐 Login a YDEA (web)...")
+        print(" Login a YDEA (web)...")
         # 1. GET login page for CSRF
         html, code = self.get(f"{YDEA_BASE_URL}/login")
         if code != 200:
-            print("❌ Errore caricamento pagina login")
+            print(" Errore caricamento pagina login")
             return False
             
         csrf = re.search(r'name="_csrf_token" value="([^"]+)"', html)
         if not csrf:
-            print("❌ Token CSRF non trovato")
+            print(" Token CSRF non trovato")
             return False
             
         csrf_token = csrf.group(1)
@@ -131,20 +131,20 @@ class YdeaWebClient:
         self.save_cookies()
         
         if "logout" in html.lower() or "esci" in html.lower() or "/ticket/new" in html.lower():
-            print("✅ Login riuscito")
+            print(" Login riuscito")
             return True
         else:
-            print("❌ Login fallito")
+            print(" Login fallito")
             return False
 
     def create_ticket(self, titolo, contrato_id, sla_id=None):
-        print(f"\n📝 Creazione ticket: {titolo}")
+        print(f"\n Creazione ticket: {titolo}")
         
         # 1. GET new ticket page for form token
         html, code = self.get(f"{YDEA_BASE_URL}/ticket/new")
         form_token_match = re.search(r'name="appbundle_ticket\[_token\]" value="([^"]+)"', html)
         if not form_token_match:
-            print("❌ Form token non trovato")
+            print(" Form token non trovato")
             return False
         form_token = form_token_match.group(1)
         
@@ -213,23 +213,23 @@ class YdeaWebClient:
                 # Check redirect to /ticket/ID
                 match = re.search(r'/ticket/(\d+)', url)
                 if match:
-                    print(f"✅ Ticket creato: ID {match.group(1)}")
-                    print(f"🔗 URL: {url}")
+                    print(f" Ticket creato: ID {match.group(1)}")
+                    print(f" URL: {url}")
                     return True
                 elif "ticket creato" in html.lower() or "success" in html.lower():
-                     print("✅ Ticket probabilmente creato (messaggio successo trovato)")
+                     print(" Ticket probabilmente creato (messaggio successo trovato)")
                      return True
                 else:
-                    print(f"❌ Creazione fallita. URL finale: {url}")
+                    print(f" Creazione fallita. URL finale: {url}")
                     return False
         except Exception as e:
-            print(f"❌ Errore POST: {e}")
+            print(f" Errore POST: {e}")
             return False
 
 
 def main():
     print(f"{Colors.BLUE}════════════════════════════════════════════════════════════════════{Colors.NC}")
-    print(f"{Colors.BLUE}🧪 TEST CREAZIONE TICKET YDEA - Via Form HTML (Python){Colors.NC}")
+    print(f"{Colors.BLUE} TEST CREAZIONE TICKET YDEA - Via Form HTML (Python){Colors.NC}")
     print(f"{Colors.BLUE}════════════════════════════════════════════════════════════════════{Colors.NC}")
     
     client = YdeaWebClient()
@@ -239,10 +239,10 @@ def main():
     contract_id = "171734"
     sla_id = "147"
     
-    print("\n🧪 TEST 1: Ticket con contratto SLA Premium_Mon")
+    print("\n TEST 1: Ticket con contratto SLA Premium_Mon")
     client.create_ticket("[TEST Python] Contratto Premium_Mon", contract_id, sla_id)
     
-    print("\n🧪 TEST 2: Ticket SENZA campo SLA")
+    print("\n TEST 2: Ticket SENZA campo SLA")
     client.create_ticket("[TEST Python] Solo contratto", contract_id)
 
 if __name__ == "__main__":

@@ -1,14 +1,14 @@
 # Cleanup Retention CheckMK - Guida Installazione
 > **Categoria:** Operativo
 
-## 📋 Descrizione
+##  Descrizione
 
 Script automatico per gestione retention dati CheckMK:
 - **180 giorni** per file RRD (metriche performance P4P)
 - **180 giorni** per archivi Nagios (con compressione dopo 30 giorni)
 - **30 giorni** per backup notifiche (con compressione dopo 1 giorno)
 
-## 🚀 Installazione
+##  Installazione
 
 ### 1. Copia lo script sul server CheckMK
 
@@ -43,7 +43,7 @@ crontab -e
 0 2 * * * /omd/sites/monitoring/local/bin/cleanup-checkmk-retention.sh >> /omd/sites/monitoring/var/log/cleanup-retention-cron.log 2>&1
 ```
 
-## ⚙️ Configurazione Personalizzata
+##  Configurazione Personalizzata
 
 Puoi modificare i parametri via variabili d'ambiente:
 
@@ -58,7 +58,7 @@ COMPRESS_AFTER=7 RETENTION_NAGIOS=180 ./cleanup-checkmk-retention.sh
 OMD_SITE=cmk ./cleanup-checkmk-retention.sh
 ```
 
-## 📊 Output e Log
+##  Output e Log
 
 Lo script genera log dettagliati in:
 ```
@@ -74,7 +74,7 @@ Esempio output:
 [2026-01-22 16:30:10] [OK] Spazio risparmiato: 1.2GB
 ```
 
-## 🎯 Risultati Attesi
+##  Risultati Attesi
 
 **Prima del cleanup** (stato attuale):
 - Totale: 8.4 GB
@@ -90,7 +90,7 @@ Esempio output:
 
 **Risparmio**: ~43-50% (3.6-4.1 GB liberati)
 
-## ⚠️ Note Importanti
+##  Note Importanti
 
 1. **Backup prima dell'uso**: Il primo cleanup può eliminare molti dati. Fai un backup completo prima.
 
@@ -100,7 +100,7 @@ Esempio output:
 
 4. **Frequenza esecuzione**: Raccomandato giornaliero (di notte) per evitare accumulo.
 
-## 🔧 Troubleshooting
+##  Troubleshooting
 
 ### Script non elimina nulla
 ```bash
@@ -128,7 +128,7 @@ mkdir -p /omd/sites/monitoring/var/log
 chmod 755 /omd/sites/monitoring/var/log
 ```
 
-## 📈 Monitoraggio
+##  Monitoraggio
 
 Monitora lo spazio disco con:
 ```bash
@@ -142,7 +142,7 @@ find /omd/sites/monitoring/var/pnp4nagios -name "*.rrd" | wc -l
 find /omd/sites/monitoring/var/nagios -type f -printf "%T@ %p\n" | sort -n | head -5
 ```
 
-## 🔄 Aggiornamento Script
+##  Aggiornamento Script
 
 ```bash
 cd /omd/sites/monitoring/local/bin

@@ -193,10 +193,10 @@ Aggiungi nota "Allarme rientrato" → mark_ticket_resolved() → Imposta resolve
 
 ## Testing Eseguito
 
-- ✅ Verifica sintassi bash (`bash -n`): OK
-- ✅ Struttura JSON valida per tutte le operazioni cache
-- ✅ Funzione `mark_ticket_resolved()` correttamente integrata
-- ✅ Cleanup usa atomic writes per prevenire race conditions
+-  Verifica sintassi bash (`bash -n`): OK
+-  Struttura JSON valida per tutte le operazioni cache
+-  Funzione `mark_ticket_resolved()` correttamente integrata
+-  Cleanup usa atomic writes per prevenire race conditions
 
 ## Deploy Richiesto
 
@@ -225,7 +225,7 @@ tail -f /opt/omd/sites/monitoring/var/log/notify.log | grep -E "marcato come ris
 
 ## Compatibilità
 
-- ✅ Retrocompatibile: cache senza `resolved_at` trattata come ticket attivo (TTL 30gg)
-- ✅ jq 1.6+: richiesto per `if-then-else` in filtri JSON
-- ✅ flock: già richiesto dalla v1.8 per atomic operations
-- ✅ bash 4.0+: nessuna nuova feature richiesta
+-  Retrocompatibile: cache senza `resolved_at` trattata come ticket attivo (TTL 30gg)
+-  jq 1.6+: richiesto per `if-then-else` in filtri JSON
+-  flock: già richiesto dalla v1.8 per atomic operations
+-  bash 4.0+: nessuna nuova feature richiesta

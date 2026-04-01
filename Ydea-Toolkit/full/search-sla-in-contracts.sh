@@ -6,14 +6,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/ydea-toolkit.sh"
 
-echo "🔍 Ricerca 'Premium_Mon' nei contratti..."
+echo " Ricerca 'Premium_Mon' nei contratti..."
 echo ""
 
 ensure_token
 TOKEN="$(load_token)"
 
 # Recupera tutti i contratti (paginati)
-echo "📊 Recupero contratti..."
+echo " Recupero contratti..."
 ALL_CONTRACTS="/tmp/all-contracts.json"
 echo "[]" > "$ALL_CONTRACTS"
 
@@ -95,6 +95,6 @@ if [[ -n "$FIRST_ID" && "$FIRST_ID" != "null" ]]; then
 fi
 
 echo ""
-echo "💾 File salvato: $ALL_CONTRACTS"
+echo " File salvato: $ALL_CONTRACTS"
 echo ""
-echo "✓ Ricerca completata!"
+echo " Ricerca completata!"

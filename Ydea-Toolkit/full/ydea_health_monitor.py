@@ -146,7 +146,7 @@ def build_down_alert() -> tuple[str, str]:
     Returns:
         Tuple (subject, body)
     """
-    subject = "🚨 [ALERT] Ydea API - Servizio Non Raggiungibile"
+    subject = " [ALERT] Ydea API - Servizio Non Raggiungibile"
     
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
@@ -188,7 +188,7 @@ def build_recovery_alert(last_failure_timestamp: str) -> tuple[str, str]:
     Returns:
         Tuple (subject, body)
     """
-    subject = "✅ [RECOVERY] Ydea API - Servizio Ripristinato"
+    subject = " [RECOVERY] Ydea API - Servizio Ripristinato"
     
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
@@ -232,7 +232,7 @@ def main():
     
     if test_ydea_login():
         # ===== YDEA UP =====
-        Logger.success("✅ Ydea API raggiungibile")
+        Logger.success(" Ydea API raggiungibile")
         
         # Se era down e abbiamo notificato, invia recovery email
         if current_status == "down" and was_notified:
@@ -253,7 +253,7 @@ def main():
     else:
         # ===== YDEA DOWN =====
         consecutive_failures += 1
-        Logger.error(f"❌ Ydea API non raggiungibile (tentativi falliti: {consecutive_failures}/{FAILURE_THRESHOLD})")
+        Logger.error(f" Ydea API non raggiungibile (tentativi falliti: {consecutive_failures}/{FAILURE_THRESHOLD})")
         
         # Notifica solo se raggiungiamo la soglia e non abbiamo già notificato
         if consecutive_failures >= FAILURE_THRESHOLD and not was_notified:
@@ -262,7 +262,7 @@ def main():
             subject, body = build_down_alert()
             
             if send_email_alert(subject, body):
-                Logger.success("✅ Notifica inviata con successo")
+                Logger.success(" Notifica inviata con successo")
                 state.set("notified", True)
             else:
                 Logger.error("Errore invio notifica")

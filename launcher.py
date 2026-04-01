@@ -63,7 +63,7 @@ class LauncherData:
             with open(FAVORITES_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.favorites, f, indent=2)
         except IOError as e:
-            print(f"{Colors.RED}✗ Errore salvataggio preferiti: {e}{Colors.NC}")
+            print(f"{Colors.RED} Errore salvataggio preferiti: {e}{Colors.NC}")
     
     def load_stats(self) -> None:
         """Carica statistiche da file JSON."""
@@ -80,7 +80,7 @@ class LauncherData:
             with open(STATS_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.stats, f, indent=2)
         except IOError as e:
-            print(f"{Colors.RED}✗ Errore salvataggio statistiche: {e}{Colors.NC}")
+            print(f"{Colors.RED} Errore salvataggio statistiche: {e}{Colors.NC}")
     
     def increment_usage(self, idx: str) -> None:
         """Incrementa contatore utilizzo script."""
@@ -113,8 +113,8 @@ class LauncherData:
 def print_header(data: LauncherData) -> None:
     """Stampa header del launcher."""
     print(f"{Colors.BLUE}═══════════════════════════════════════════════════════════{Colors.NC}")
-    print(f"{Colors.GREEN}🚀 Interactive Launcher - CheckMK Tools Repository{Colors.NC}")
-    print(f"{Colors.CYAN}⭐ Preferiti: {len(data.favorites)}{Colors.NC}    {Colors.MAGENTA}📊 Script eseguiti: {data.get_total_runs()}{Colors.NC}")
+    print(f"{Colors.GREEN} Interactive Launcher - CheckMK Tools Repository{Colors.NC}")
+    print(f"{Colors.CYAN} Preferiti: {len(data.favorites)}{Colors.NC}    {Colors.MAGENTA} Script eseguiti: {data.get_total_runs()}{Colors.NC}")
     print()
 
 
@@ -152,7 +152,7 @@ def get_script_description(script_path: Path) -> str:
 
 def scan_remote_scripts(data: LauncherData) -> None:
     """Scansiona repository locale per trovare script COMPLETI (no remote)."""
-    print(f"{Colors.YELLOW}📂 Scansione script completi (full/) in corso...{Colors.NC}\n")
+    print(f"{Colors.YELLOW} Scansione script completi (full/) in corso...{Colors.NC}\n")
 
     # Trova tutti gli script completi nelle directory full/
     full_scripts: List[Path] = []
@@ -177,7 +177,7 @@ def scan_remote_scripts(data: LauncherData) -> None:
     # Costruisce la mappatura categorie -> script
     data.build_categories()
 
-    print(f"{Colors.GREEN}✓ Trovati {len(data.scripts)} script completi{Colors.NC}\n")
+    print(f"{Colors.GREEN} Trovati {len(data.scripts)} script completi{Colors.NC}\n")
 
 
 def search_scripts(data: LauncherData, query: str) -> None:
@@ -196,12 +196,12 @@ def search_scripts(data: LauncherData, query: str) -> None:
             results.append(i)
     
     if not results:
-        print(f"{Colors.RED}✗ Nessun risultato trovato per: '{query}'{Colors.NC}\n")
+        print(f"{Colors.RED} Nessun risultato trovato per: '{query}'{Colors.NC}\n")
         return
     
-    print(f"{Colors.GREEN}🔍 Risultati ricerca '{query}':{Colors.NC}\n")
+    print(f"{Colors.GREEN} Risultati ricerca '{query}':{Colors.NC}\n")
     for idx in results:
-        star = f"{Colors.YELLOW}⭐{Colors.NC} " if str(idx) in data.favorites else ""
+        star = f"{Colors.YELLOW}{Colors.NC} " if str(idx) in data.favorites else ""
         script_name = data.scripts[idx].split('] ', 1)[1] if '] ' in data.scripts[idx] else data.scripts[idx]
         print(f"  {Colors.BLUE}{idx:3d}){Colors.NC} {star}{script_name}")
     print()
@@ -216,11 +216,11 @@ def show_script_details(data: LauncherData, idx: int) -> None:
         idx: Indice dello script
     """
     if idx < 0 or idx >= len(data.scripts):
-        print(f"{Colors.RED}✗ Script non valido!{Colors.NC}\n")
+        print(f"{Colors.RED} Script non valido!{Colors.NC}\n")
         return
     
     print(f"{Colors.CYAN}╔═══════════════════════════════════════════════════════════╗{Colors.NC}")
-    print(f"{Colors.CYAN}║{Colors.NC}  📋 {Colors.GREEN}Dettagli Script{Colors.NC}                                    {Colors.CYAN}║{Colors.NC}")
+    print(f"{Colors.CYAN}║{Colors.NC}   {Colors.GREEN}Dettagli Script{Colors.NC}                                    {Colors.CYAN}║{Colors.NC}")
     print(f"{Colors.CYAN}╠═══════════════════════════════════════════════════════════╣{Colors.NC}")
     print(f"{Colors.CYAN}║{Colors.NC}  {Colors.YELLOW}Nome:{Colors.NC} {data.scripts[idx]}")
     print(f"{Colors.CYAN}║{Colors.NC}  {Colors.YELLOW}Path:{Colors.NC} {data.script_paths[idx]}")
@@ -228,17 +228,17 @@ def show_script_details(data: LauncherData, idx: int) -> None:
     print(f"{Colors.CYAN}║{Colors.NC}    {data.script_descriptions[idx]}")
     print(f"{Colors.CYAN}║{Colors.NC}  {Colors.YELLOW}Utilizzi:{Colors.NC} {data.stats.get(str(idx), 0)}")
     if str(idx) in data.favorites:
-        print(f"{Colors.CYAN}║{Colors.NC}  {Colors.YELLOW}Preferito:{Colors.NC} ⭐ Sì")
+        print(f"{Colors.CYAN}║{Colors.NC}  {Colors.YELLOW}Preferito:{Colors.NC}  Sì")
     print(f"{Colors.CYAN}╚═══════════════════════════════════════════════════════════╝{Colors.NC}\n")
 
 
 def show_favorites(data: LauncherData) -> None:
     """Mostra solo script preferiti."""
     if not data.favorites:
-        print(f"{Colors.YELLOW}⭐ Nessun preferito salvato{Colors.NC}\n")
+        print(f"{Colors.YELLOW} Nessun preferito salvato{Colors.NC}\n")
         return
     
-    print(f"{Colors.YELLOW}⭐ Script preferiti:{Colors.NC}\n")
+    print(f"{Colors.YELLOW} Script preferiti:{Colors.NC}\n")
     for idx_str in data.favorites.keys():
         idx = int(idx_str)
         if idx < len(data.scripts):
@@ -259,10 +259,10 @@ def toggle_favorite(data: LauncherData, idx: int) -> None:
     
     if idx_str in data.favorites:
         del data.favorites[idx_str]
-        print(f"{Colors.GREEN}✓ Rimosso dai preferiti{Colors.NC}")
+        print(f"{Colors.GREEN} Rimosso dai preferiti{Colors.NC}")
     else:
         data.favorites[idx_str] = True
-        print(f"{Colors.GREEN}✓ Aggiunto ai preferiti ⭐{Colors.NC}")
+        print(f"{Colors.GREEN} Aggiunto ai preferiti {Colors.NC}")
     
     data.save_favorites()
 
@@ -270,7 +270,7 @@ def toggle_favorite(data: LauncherData, idx: int) -> None:
 def show_statistics(data: LauncherData) -> None:
     """Mostra statistiche di utilizzo."""
     print(f"{Colors.MAGENTA}╔═══════════════════════════════════════════════════════════╗{Colors.NC}")
-    print(f"{Colors.MAGENTA}║{Colors.NC}  📊 {Colors.GREEN}Statistiche di Utilizzo{Colors.NC}                          {Colors.MAGENTA}║{Colors.NC}")
+    print(f"{Colors.MAGENTA}║{Colors.NC}   {Colors.GREEN}Statistiche di Utilizzo{Colors.NC}                          {Colors.MAGENTA}║{Colors.NC}")
     print(f"{Colors.MAGENTA}╠═══════════════════════════════════════════════════════════╣{Colors.NC}")
     print(f"{Colors.MAGENTA}║{Colors.NC}  {Colors.YELLOW}Totale esecuzioni:{Colors.NC} {data.get_total_runs()}")
     print(f"{Colors.MAGENTA}║{Colors.NC}  {Colors.YELLOW}Script più usati:{Colors.NC}")
@@ -294,10 +294,10 @@ def show_menu(data: LauncherData) -> None:
     """Mostra menu principale con le categorie compresse."""
     print(f"{Colors.BLUE}═══════════════════════════════════════════════════════════{Colors.NC}")
     print(f"{Colors.GREEN}Categorie disponibili:{Colors.NC}")
-    print(f"{Colors.CYAN}Comandi: {Colors.YELLOW}s){Colors.NC}Cerca {Colors.YELLOW}f){Colors.NC}Preferiti {Colors.YELLOW}i){Colors.NC}Info {Colors.YELLOW}t){Colors.NC}Stats {Colors.YELLOW}*+){Colors.NC}Aggiungi/Rimuovi ⭐{Colors.NC}\n")
+    print(f"{Colors.CYAN}Comandi: {Colors.YELLOW}s){Colors.NC}Cerca {Colors.YELLOW}f){Colors.NC}Preferiti {Colors.YELLOW}i){Colors.NC}Info {Colors.YELLOW}t){Colors.NC}Stats {Colors.YELLOW}*+){Colors.NC}Aggiungi/Rimuovi {Colors.NC}\n")
 
     if not data.category_order:
-        print(f"{Colors.RED}✗ Nessuna categoria trovata{Colors.NC}")
+        print(f"{Colors.RED} Nessuna categoria trovata{Colors.NC}")
     else:
         for idx, category in enumerate(data.category_order, start=1):
             scripts_idx = data.categories.get(category, [])
@@ -338,7 +338,7 @@ def show_category_scripts_menu(data: LauncherData, category: str, filter_ext: Op
 
     for local_idx, global_idx in enumerate(filtered_idx, start=1):
         # Stella se preferito
-        star = f"{Colors.YELLOW}⭐{Colors.NC} " if str(global_idx) in data.favorites else ""
+        star = f"{Colors.YELLOW}{Colors.NC} " if str(global_idx) in data.favorites else ""
 
         # Numero di utilizzi
         uses = ""
@@ -372,7 +372,7 @@ def execute_script(data: LauncherData, selection: int) -> bool:
         True se esecuzione riuscita, False altrimenti
     """
     if selection < 0 or selection >= len(data.scripts):
-        print(f"{Colors.RED}✗ Selezione non valida!{Colors.NC}\n")
+        print(f"{Colors.RED} Selezione non valida!{Colors.NC}\n")
         return False
     
     script_path = data.script_paths[selection]
@@ -442,17 +442,17 @@ def execute_script(data: LauncherData, selection: int) -> bool:
         print(f"\n{Colors.BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Colors.NC}")
         
         if exit_code == 0:
-            print(f"{Colors.GREEN}✓ Script completato con successo{Colors.NC}\n")
+            print(f"{Colors.GREEN} Script completato con successo{Colors.NC}\n")
             return True
         else:
-            print(f"{Colors.RED}✗ Script terminato con errore (exit code: {exit_code}){Colors.NC}\n")
+            print(f"{Colors.RED} Script terminato con errore (exit code: {exit_code}){Colors.NC}\n")
             return False
     
     except urllib.error.URLError as e:
-        print(f"{Colors.RED}✗ Errore download script: {e}{Colors.NC}\n")
+        print(f"{Colors.RED} Errore download script: {e}{Colors.NC}\n")
         return False
     except Exception as e:
-        print(f"{Colors.RED}✗ Errore esecuzione: {e}{Colors.NC}\n")
+        print(f"{Colors.RED} Errore esecuzione: {e}{Colors.NC}\n")
         return False
     finally:
         # Pausa prima di tornare al menu
@@ -470,7 +470,7 @@ def main() -> int:
     
     # Verifica prerequisiti
     if os.system('which curl >/dev/null 2>&1') != 0:
-        print(f"{Colors.RED}✗ Errore: curl non trovato. Installalo con: apt install curl{Colors.NC}")
+        print(f"{Colors.RED} Errore: curl non trovato. Installalo con: apt install curl{Colors.NC}")
         return 1
     
     # Inizializza dati
@@ -491,11 +491,11 @@ def main() -> int:
         
         # Comandi speciali
         if selection == '0':
-            print(f"{Colors.GREEN}Arrivederci! 👋{Colors.NC}")
+            print(f"{Colors.GREEN}Arrivederci! {Colors.NC}")
             return 0
         
         elif selection.lower() in ['s', 'S']:
-            print(f"{Colors.CYAN}🔍 Cerca script:{Colors.NC} ", end='')
+            print(f"{Colors.CYAN} Cerca script:{Colors.NC} ", end='')
             query = input().strip()
             search_scripts(data, query)
             print(f"{Colors.YELLOW}Premi INVIO per continuare...{Colors.NC}")
@@ -507,12 +507,12 @@ def main() -> int:
             input()
         
         elif selection.lower() in ['i', 'I']:
-            print(f"{Colors.CYAN}📋 Numero script per info:{Colors.NC} ", end='')
+            print(f"{Colors.CYAN} Numero script per info:{Colors.NC} ", end='')
             idx_input = input().strip()
             if idx_input.isdigit():
                 show_script_details(data, int(idx_input))
             else:
-                print(f"{Colors.RED}✗ Numero non valido{Colors.NC}")
+                print(f"{Colors.RED} Numero non valido{Colors.NC}")
             print(f"{Colors.YELLOW}Premi INVIO per continuare...{Colors.NC}")
             input()
         
@@ -528,7 +528,7 @@ def main() -> int:
                 import time
                 time.sleep(1)
             else:
-                print(f"{Colors.RED}✗ Formato: numero+ (es: 57+){Colors.NC}")
+                print(f"{Colors.RED} Formato: numero+ (es: 57+){Colors.NC}")
                 import time
                 time.sleep(2)
         
@@ -571,20 +571,20 @@ def main() -> int:
                             global_idx = visible_idx[local_idx - 1]
                             execute_script(data, global_idx)
                         else:
-                            print(f"{Colors.RED}✗ Numero script non valido{Colors.NC}")
+                            print(f"{Colors.RED} Numero script non valido{Colors.NC}")
                             import time
                             time.sleep(2)
                     else:
-                        print(f"{Colors.RED}✗ Selezione non valida{Colors.NC}")
+                        print(f"{Colors.RED} Selezione non valida{Colors.NC}")
                         import time
                         time.sleep(2)
             else:
-                print(f"{Colors.RED}✗ Categoria non valida{Colors.NC}")
+                print(f"{Colors.RED} Categoria non valida{Colors.NC}")
                 import time
                 time.sleep(2)
         
         else:
-            print(f"{Colors.RED}✗ Comando non riconosciuto!{Colors.NC}\n")
+            print(f"{Colors.RED} Comando non riconosciuto!{Colors.NC}\n")
             import time
             time.sleep(2)
 
@@ -596,5 +596,5 @@ if __name__ == "__main__":
         print(f"\n{Colors.YELLOW}Interrotto dall'utente{Colors.NC}")
         sys.exit(130)
     except Exception as e:
-        print(f"{Colors.RED}✗ Errore inatteso: {e}{Colors.NC}")
+        print(f"{Colors.RED} Errore inatteso: {e}{Colors.NC}")
         sys.exit(1)

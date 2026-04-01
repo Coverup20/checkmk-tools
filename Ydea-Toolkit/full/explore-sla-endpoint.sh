@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/ydea-toolkit.sh"
 
 echo "════════════════════════════════════════════════════════════════════"
-echo "🔍 ESPLORAZIONE ENDPOINT SLA - YDEA API"
+echo " ESPLORAZIONE ENDPOINT SLA - YDEA API"
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
 
@@ -92,7 +92,7 @@ RESPONSE=$(ydea_api POST "/ticket" "$TICKET_BODY")
 TICKET_ID_NEW=$(echo "$RESPONSE" | jq -r '.id // .ticket_id // .data.id // empty')
 
 if [[ -n "$TICKET_ID_NEW" && "$TICKET_ID_NEW" != "null" ]]; then
-  echo "✅ Ticket creato: ID=$TICKET_ID_NEW"
+  echo " Ticket creato: ID=$TICKET_ID_NEW"
   
   # Recupera e verifica SLA
   sleep 1
@@ -100,7 +100,7 @@ if [[ -n "$TICKET_ID_NEW" && "$TICKET_ID_NEW" != "null" ]]; then
   DETAIL=$(ydea_api GET "/tickets?id=${TICKET_ID_NEW}&limit=1" | jq '.objs[0] // .data[0] // .')
   echo "$DETAIL" | jq '{id, codice, sla_id, sla}' 2>/dev/null
 else
-  echo "❌ Creazione fallita"
+  echo " Creazione fallita"
   echo "$RESPONSE" | jq '.'
 fi
 
@@ -116,9 +116,9 @@ for endpoint in "/api-docs" "/schema" "/openapi" "/swagger"; do
   RESPONSE=$(ydea_api GET "$endpoint" 2>/dev/null || echo '{"error": "not found"}')
   
   if echo "$RESPONSE" | jq -e '.error' >/dev/null 2>&1; then
-    echo "   ❌ Non disponibile"
+    echo "    Non disponibile"
   else
-    echo "   ✅ TROVATO!"
+    echo "    TROVATO!"
     echo "$RESPONSE" | jq '.' | head -50
     break
   fi
@@ -126,14 +126,14 @@ done
 
 echo ""
 echo "════════════════════════════════════════════════════════════════════"
-echo "✅ Esplorazione completata!"
+echo " Esplorazione completata!"
 echo ""
-echo "📋 CONCLUSIONI:"
+echo " CONCLUSIONI:"
 echo "   1. Verifica manualmente i ticket su https://my.ydea.cloud"
 echo "   2. Se SLA appare su UI ma non via API, potrebbe essere:"
 echo "      - Campo custom attribute"
 echo "      - Logica lato server post-creazione"
 echo "      - API v3 con endpoint diverso"
 echo ""
-echo "💡 SUGGERIMENTO: Contatta YDEA per documentazione API SLA"
+echo " SUGGERIMENTO: Contatta YDEA per documentazione API SLA"
 echo "════════════════════════════════════════════════════════════════════"

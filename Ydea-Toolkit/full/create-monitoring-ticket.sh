@@ -22,7 +22,7 @@ CMK_OUTPUT="${4:-}"
 CMK_HOSTIP="${5:-}"
 
 if [[ -z "$CMK_HOST" ]]; then
-    echo "📋 Uso: $0 <HOST> <SERVICE> <STATE> <OUTPUT> [HOST_IP]"
+    echo " Uso: $0 <HOST> <SERVICE> <STATE> <OUTPUT> [HOST_IP]"
     echo ""
     echo "Esempio:"
     echo "  $0 'mail.example.com' 'HTTP' 'CRITICAL' 'Connection timeout' '1.2.3.4'"
@@ -74,11 +74,11 @@ log_info "Tipologia determinata: $TIPO"
 
 # Costruisci titolo e descrizione
 if [[ "$CMK_STATE" == "DOWN" || "$CMK_STATE" == "CRITICAL" ]]; then
-    STATE_ICON="🔴"
+    STATE_ICON=""
 elif [[ "$CMK_STATE" == "WARNING" ]]; then
-    STATE_ICON="⚠️"
+    STATE_ICON=""
 else
-    STATE_ICON="ℹ️"
+    STATE_ICON="ℹ"
 fi
 
 TITOLO="[${CMK_STATE}] ${CMK_HOST}"
@@ -141,7 +141,7 @@ TICKET_ID=$(echo "$RESPONSE" | jq -r '.id // .ticket_id // .data.id // empty')
 TICKET_CODE=$(echo "$RESPONSE" | jq -r '.codice // .code // .data.codice // empty')
 
 if [[ -n "$TICKET_ID" && "$TICKET_ID" != "null" ]]; then
-  log_success "✓ Ticket creato con successo!"
+  log_success " Ticket creato con successo!"
   log_success "   ID: $TICKET_ID"
   log_success "   Codice: ${TICKET_CODE:-N/A}"
   log_success "   Link: https://my.ydea.cloud/ticket/${TICKET_ID}"
@@ -157,9 +157,9 @@ if [[ -n "$TICKET_ID" && "$TICKET_ID" != "null" ]]; then
     '{ticket_id: $tid, atk: {descrizione: $desc, pubblico: false, creatoda: $uid}}')
     
   if ydea_api POST "/ticket/atk" "$NOTE_BODY" >/dev/null 2>&1; then
-    log_success "✓ Nota privata aggiunta"
+    log_success " Nota privata aggiunta"
   else
-    log_warn "⚠️  Nota privata non aggiunta (ticket comunque creato)"
+    log_warn "  Nota privata non aggiunta (ticket comunque creato)"
   fi
     
   # Traccia il ticket
@@ -171,7 +171,7 @@ if [[ -n "$TICKET_ID" && "$TICKET_ID" != "null" ]]; then
   
   exit 0
 else
-  log_error "❌ Errore nella creazione del ticket"
+  log_error " Errore nella creazione del ticket"
   echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
   exit 1
 fi

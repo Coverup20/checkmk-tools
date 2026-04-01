@@ -41,11 +41,11 @@ def main() -> int:
     print(f"=== UPDATE DEPLOYED LAUNCHERS v{VERSION} ===\n")
 
     if not is_root():
-        print("❌ Eseguire come root", file=sys.stderr)
+        print(" Eseguire come root", file=sys.stderr)
         return 1
 
     if not REPO_PATH.exists():
-        print(f"❌ Repository non trovato: {REPO_PATH}")
+        print(f" Repository non trovato: {REPO_PATH}")
         return 1
 
     updated = 0
@@ -61,17 +61,17 @@ def main() -> int:
 
         dest_dir = dest.parent
         if not dest_dir.exists():
-            print(f"📁 Creating directory: {dest_dir}")
+            print(f" Creating directory: {dest_dir}")
             dest_dir.mkdir(parents=True, exist_ok=True)
 
-        print(f"📦 Updating: {repo_launcher.name} -> {dest}")
+        print(f" Updating: {repo_launcher.name} -> {dest}")
         try:
             shutil.copy2(repo_launcher, dest)
             set_executable(dest)
-            print("  ✓ Updated")
+            print("   Updated")
             updated += 1
         except Exception as exc:
-            print(f"  ✗ Failed: {exc}")
+            print(f"   Failed: {exc}")
             failed += 1
 
     print("\n=== RIEPILOGO ===")

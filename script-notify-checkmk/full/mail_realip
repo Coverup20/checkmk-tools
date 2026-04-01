@@ -79,7 +79,7 @@ NEW_LABEL=$(get_label "$NEW_STATE")
 
 # Info FRP
 FRP_ROW=""
-[[ "$FRP" == "yes" ]] && FRP_ROW="<tr><td>FRP Tunnel:</td><td><span style=\"color:#00d4aa;font-weight:600\">✓ Active</span> (Real IP: $REAL_IP)</td></tr>"
+[[ "$FRP" == "yes" ]] && FRP_ROW="<tr><td>FRP Tunnel:</td><td><span style=\"color:#00d4aa;font-weight:600\"> Active</span> (Real IP: $REAL_IP)</td></tr>"
 
 # Link diretti a view.py
 CMK_URL="${CMK_URL%/}"
@@ -141,13 +141,13 @@ body{padding:10px}
 </style></head>
 <body>
 <div class="container">
-<div class="header"><div class="logo-icon">✓</div><span class="logo-text">checkmk</span></div>
+<div class="header"><div class="logo-icon"></div><span class="logo-text">checkmk</span></div>
 <div class="status-bar"></div>
 <div class="content">
 <div class="event-row"><span class="event-label">Event:</span><div><span class="state-badge" style="background:${OLD_COLOR}">${OLD_LABEL}</span> → <span class="state-badge">${NEW_LABEL}</span></div></div>
 <div class="event-row"><span class="event-label">Service:</span><span class="event-value">${SERVICE}</span></div>
 <div class="event-row"><span class="event-label">Host:</span><span class="event-value">${HOSTNAME}</span></div>
-<h2 class="section-title">🔍 Event overview</h2>
+<h2 class="section-title"> Event overview</h2>
 <table class="info-table">
 <tr><td>Event date:</td><td>${DATE}</td></tr>
 <tr><td>Address:</td><td>${REAL_IP}</td></tr>
@@ -155,7 +155,7 @@ ${FRP_ROW}
 <tr><td>Site:</td><td>${SITE}</td></tr>
 <tr><td>Summary:</td><td>${OUTPUT//$'\n'/<br>}</td></tr>
 </table>
-<h2 class="section-title">📋 Service details:</h2>
+<h2 class="section-title"> Service details:</h2>
 <div class="service-details"><pre>${FULL_OUTPUT}</pre></div>
 </div>
 <div class="footer">Sent by Checkmk<div class="buttons"><a href="${SRV_LINK}" class="btn">Service</a><a href="${HOST_LINK}" class="btn">Host</a></div></div>

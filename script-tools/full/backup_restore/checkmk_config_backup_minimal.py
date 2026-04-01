@@ -139,9 +139,9 @@ def create_archive(site_base: Path, archive_path: Path) -> Tuple[str, int]:
     for item in backup_items:
         if (site_base / item).exists():
             tar_items.append(item)
-            log(f"  ✅ Includo: {item}")
+            log(f"   Includo: {item}")
         else:
-            log(f"  ⏭️  Skip (non presente): {item}")
+            log(f"    Skip (non presente): {item}")
 
     if not tar_items:
         log("ERRORE: nessun file da backuppare trovato")
@@ -230,7 +230,7 @@ def apply_retention(site: str) -> None:
         mtime, rel_path = parts[0].strip(), parts[1].strip()
 
         if "MINIMAL" in rel_path:
-            log(f"  ⏭️  Skip retention: {rel_path} (contiene MINIMAL)")
+            log(f"    Skip retention: {rel_path} (contiene MINIMAL)")
             continue
 
         match = re.match(r"(\d{4}-\d{2}-\d{2})", mtime)

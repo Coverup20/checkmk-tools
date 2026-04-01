@@ -34,7 +34,7 @@ log_ticket_event() {
 # ===== MAIN =====
 main() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========================================"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🎯 Avvio monitoraggio ticket tracciati"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')]  Avvio monitoraggio ticket tracciati"
     
     # Mostra statistiche iniziali
     if [[ -f "$TRACKING_FILE" ]]; then
@@ -42,7 +42,7 @@ main() {
         total_tickets=$(jq '.tickets | length' "$TRACKING_FILE" 2>/dev/null || echo "0")
         open_tickets=$(jq '[.tickets[] | select(.resolved_at == null)] | length' "$TRACKING_FILE" 2>/dev/null || echo "0")
         resolved_tickets=$(jq '[.tickets[] | select(.resolved_at != null)] | length' "$TRACKING_FILE" 2>/dev/null || echo "0")
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 📊 Stato: $total_tickets totali ($open_tickets aperti, $resolved_tickets risolti)"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')]  Stato: $total_tickets totali ($open_tickets aperti, $resolved_tickets risolti)"
     fi
     
     # Salva stato precedente per rilevare cambiamenti
@@ -62,7 +62,7 @@ main() {
         done < <(jq -r '.tickets[] | select(.resolved_at == null) | "\(.ticket_id)|\(.stato)|\(.host)|\(.service)|\(.codice)|\(.descrizione_ticket // "")|\(.priorita // "Normale")|\(.assegnatoA // "Non assegnato")"' "$TRACKING_FILE" 2>/dev/null || true)
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🔄 Aggiornamento stati ticket..."
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')]  Aggiornamento stati ticket..."
     
     # Aggiorna stati ticket
     "$YDEA_TOOLKIT" update-tracking
@@ -122,7 +122,7 @@ main() {
         done < <(jq -r '.tickets[] | select(.resolved_at == null) | "\(.ticket_id)|\(.stato)|\(.host)|\(.service)|\(.codice)"' "$TRACKING_FILE" 2>/dev/null || true)
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✅ Aggiornamento stati completato"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')]  Aggiornamento stati completato"
     
     # Pulisci ticket risolti vecchi (ogni 6 ore, controlla se ultima pulizia > 6h fa)
     local cleanup_marker="/tmp/ydea_last_cleanup"
@@ -137,14 +137,14 @@ main() {
     local hours_since_cleanup=$(( (now - last_cleanup) / 3600 ))
     
     if [[ $hours_since_cleanup -ge 6 ]]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🧹 Eseguo pulizia ticket risolti vecchi..."
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')]  Eseguo pulizia ticket risolti vecchi..."
         "$YDEA_TOOLKIT" cleanup-tracking
         echo "$now" > "$cleanup_marker"
     else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ⏱️  Cleanup non necessario (prossimo tra $((6 - hours_since_cleanup))h)"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')]   Cleanup non necessario (prossimo tra $((6 - hours_since_cleanup))h)"
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✅ Monitoraggio completato"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')]  Monitoraggio completato"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========================================"
 }
 

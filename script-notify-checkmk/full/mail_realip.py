@@ -98,7 +98,7 @@ def main():
     # FRP info row
     frp_row = ""
     if frp == "yes":
-        frp_row = f'<tr><td>FRP Tunnel:</td><td><span style="color:#00d4aa;font-weight:600">✓ Active</span> (Real IP: {real_ip})</td></tr>'
+        frp_row = f'<tr><td>FRP Tunnel:</td><td><span style="color:#00d4aa;font-weight:600"> Active</span> (Real IP: {real_ip})</td></tr>'
     
     # CheckMK links
     cmk_url = CMK_URL.rstrip("/")
@@ -161,13 +161,13 @@ body{{padding:10px}}
 </style></head>
 <body>
 <div class="container">
-<div class="header"><div class="logo-icon">✓</div><span class="logo-text">checkmk</span></div>
+<div class="header"><div class="logo-icon"></div><span class="logo-text">checkmk</span></div>
 <div class="status-bar"></div>
 <div class="content">
 <div class="event-row"><span class="event-label">Event:</span><div><span class="state-badge" style="background:{old_color}">{old_label}</span> → <span class="state-badge">{new_label}</span></div></div>
 <div class="event-row"><span class="event-label">Service:</span><span class="event-value">{service}</span></div>
 <div class="event-row"><span class="event-label">Host:</span><span class="event-value">{hostname}</span></div>
-<h2 class="section-title">🔍 Event overview</h2>
+<h2 class="section-title"> Event overview</h2>
 <table class="info-table">
 <tr><td>Event date:</td><td>{date}</td></tr>
 <tr><td>Address:</td><td>{real_ip}</td></tr>
@@ -175,7 +175,7 @@ body{{padding:10px}}
 <tr><td>Site:</td><td>{site}</td></tr>
 <tr><td>Summary:</td><td>{output_summary}</td></tr>
 </table>
-<h2 class="section-title">📋 Service details:</h2>
+<h2 class="section-title"> Service details:</h2>
 <div class="service-details"><pre>{full_output}</pre></div>
 </div>
 <div class="footer">Sent by Checkmk<div class="buttons"><a href="{srv_link}" class="btn">Service</a><a href="{host_link}" class="btn">Host</a></div></div>

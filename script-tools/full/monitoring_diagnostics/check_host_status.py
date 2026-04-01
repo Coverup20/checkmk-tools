@@ -143,7 +143,7 @@ TYPE_PROFILES: Dict[str, dict] = {
         "skip_arp":         True,   # monitoring su VPS: ARP non raggiunge host cross-VLAN
         "early_exit_ports": [],
         "w_ping_up":        -80,    # switch risponde ping = certamente acceso
-        "w_ping_down":       75,    # senza ARP, ping porta peso maggiore → 75+8+5+5=93% CRIT✓
+        "w_ping_down":       75,    # senza ARP, ping porta peso maggiore → 75+8+5+5=93% CRIT
         "w_tcp_up":         -20,
         "w_tcp_timeout":    {22: 8, 443: 5, 80: 5},
         "w_arp_present":    -30,
@@ -154,7 +154,7 @@ TYPE_PROFILES: Dict[str, dict] = {
         "ports":            [22, 6556, 443, 80],
         "skip_arp":         True,   # monitoring su VPS: ARP non raggiunge host cross-VLAN
         "early_exit_ports": [],
-        "w_ping_down":       40,    # senza ARP, ping porta peso maggiore → 40+15+20+10+8=93% CRIT✓
+        "w_ping_down":       40,    # senza ARP, ping porta peso maggiore → 40+15+20+10+8=93% CRIT
         # altri pesi usano W_* globali
     },
 }

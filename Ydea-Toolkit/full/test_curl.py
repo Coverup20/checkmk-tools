@@ -33,7 +33,7 @@ YdeaAPI = ydea_toolkit.YdeaAPI
 def main():
     """Test connessione API"""
     print("=" * 60)
-    print("🧪 Test Connessione Ydea API")
+    print(" Test Connessione Ydea API")
     print("=" * 60)
     print()
     
@@ -41,35 +41,35 @@ def main():
         api = YdeaAPI()
         
         # Test login
-        print("📡 Test autenticazione...")
+        print(" Test autenticazione...")
         if api.ensure_token():
-            print("✅ Autenticazione OK")
+            print(" Autenticazione OK")
             print(f"   Token: {api.token[:20]}..." if api.token else "   Token: N/A")
         else:
-            print("❌ Autenticazione fallita")
+            print(" Autenticazione fallita")
             sys.exit(1)
         
         print()
         
         # Test chiamata API base
-        print("📡 Test chiamata API /tickets...")
+        print(" Test chiamata API /tickets...")
         data, status_code = api.api_call("GET", "/tickets", {"limit": 1})
         
         print(f"   Status: {status_code}")
         print(f"   Response keys: {list(data.keys()) if isinstance(data, dict) else 'N/A'}")
         
         if status_code == 200:
-            print("✅ API funzionante")
+            print(" API funzionante")
         else:
-            print(f"⚠️  Status code: {status_code}")
+            print(f"  Status code: {status_code}")
         
         print()
         print("=" * 60)
-        print("✅ Test completato")
+        print(" Test completato")
         print("=" * 60)
         
     except Exception as e:
-        print(f"❌ Errore: {e}")
+        print(f" Errore: {e}")
         sys.exit(1)
 
 

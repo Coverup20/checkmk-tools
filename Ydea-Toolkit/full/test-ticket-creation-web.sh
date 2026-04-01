@@ -11,7 +11,7 @@ COOKIE_FILE="$SCRIPT_DIR/../config/.ydea-cookies"
 
 # Credenziali (da configurare)
 if [[ ! -f "$SCRIPT_DIR/../config/credentials.sh" ]]; then
-    echo "❌ File credenziali mancante: $SCRIPT_DIR/../config/credentials.sh"
+    echo " File credenziali mancante: $SCRIPT_DIR/../config/credentials.sh"
     echo ""
     echo "Crea il file con:"
     echo "  YDEA_USERNAME='your@email.com'"
@@ -22,13 +22,13 @@ fi
 source "$SCRIPT_DIR/../config/credentials.sh"
 
 echo "════════════════════════════════════════════════════════════════════"
-echo "🧪 TEST CREAZIONE TICKET YDEA - Via Form HTML"
+echo " TEST CREAZIONE TICKET YDEA - Via Form HTML"
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
 
 # Funzione login
 login_ydea() {
-    echo "🔐 Login a YDEA..."
+    echo " Login a YDEA..."
     
     # GET pagina login per CSRF token
     LOGIN_PAGE=$(curl -s -c "$COOKIE_FILE" "${YDEA_BASE_URL}/login")
@@ -37,7 +37,7 @@ login_ydea() {
     CSRF_TOKEN=$(echo "$LOGIN_PAGE" | grep -oP '(?<=name="_csrf_token" value=")[^"]+' || echo "")
     
     if [[ -z "$CSRF_TOKEN" ]]; then
-        echo "❌ Token CSRF non trovato nella pagina login"
+        echo " Token CSRF non trovato nella pagina login"
         return 1
     fi
     
@@ -59,19 +59,19 @@ login_ydea() {
     
     # Debug: salva risposta per analisi
     if [[ "$HTTP_CODE" != "200" ]]; then
-        echo "⚠️  Risposta salvata in /tmp/login_response.html per debug"
+        echo "  Risposta salvata in /tmp/login_response.html per debug"
     fi
     
     # Verifica login riuscito - pattern multipli
     if echo "$LOGIN_RESPONSE" | grep -qi "logout\|esci\|dashboard\|/ticket/new\|benvenuto"; then
-        echo "✅ Login riuscito!"
+        echo " Login riuscito!"
         return 0
     elif echo "$LOGIN_RESPONSE" | grep -qi "invalid\|credenziali\|password\|errato"; then
-        echo "❌ Login fallito - Credenziali non valide"
+        echo " Login fallito - Credenziali non valide"
         echo "   Verifica username/password in credentials.sh"
         return 1
     else
-        echo "❌ Login fallito - Risposta inattesa"
+        echo " Login fallito - Risposta inattesa"
         echo "   Primi 500 caratteri della risposta:"
         echo "$LOGIN_RESPONSE" | head -c 500
         return 1
@@ -80,7 +80,7 @@ login_ydea() {
 
 # Funzione estrazione CSRF token da form ticket
 get_ticket_form_token() {
-    echo "🔍 Estrazione CSRF token da /ticket/new..."
+    echo " Estrazione CSRF token da /ticket/new..."
     
     NEW_TICKET_PAGE=$(curl -s -b "$COOKIE_FILE" "${YDEA_BASE_URL}/ticket/new")
     
@@ -88,7 +88,7 @@ get_ticket_form_token() {
     FORM_TOKEN=$(echo "$NEW_TICKET_PAGE" | grep -oP '(?<=name="appbundle_ticket\[_token\]" value=")[^"]+' || echo "")
     
     if [[ -z "$FORM_TOKEN" ]]; then
-        echo "❌ Token form non trovato"
+        echo " Token form non trovato"
         return 1
     fi
     
@@ -104,7 +104,7 @@ create_ticket() {
     
     echo ""
     echo "────────────────────────────────────────────────────────────────────"
-    echo "📝 Creazione ticket: $titolo"
+    echo " Creazione ticket: $titolo"
     echo "   Contratto: $contratto"
     [[ -n "$sla" ]] && echo "   SLA: $sla"
     echo "────────────────────────────────────────────────────────────────────"
@@ -113,7 +113,7 @@ create_ticket() {
     FORM_TOKEN=$(get_ticket_form_token)
     
     if [[ -z "$FORM_TOKEN" ]]; then
-        echo "❌ Impossibile ottenere token form"
+        echo " Impossibile ottenere token form"
         return 1
     fi
     
@@ -233,17 +233,17 @@ create_ticket() {
     # Se redirect a /ticket/{ID}, estrai ID
     if [[ "$REDIRECT_URL" =~ /ticket/([0-9]+) ]]; then
         TICKET_ID="${BASH_REMATCH[1]}"
-        echo "✅ Ticket creato: ID $TICKET_ID"
-        echo "🔗 URL: ${YDEA_BASE_URL}/ticket/${TICKET_ID}"
+        echo " Ticket creato: ID $TICKET_ID"
+        echo " URL: ${YDEA_BASE_URL}/ticket/${TICKET_ID}"
         return 0
     elif [[ "$HTTP_CODE" == "200" ]] && echo "$RESPONSE" | grep -q "ticket creato\|success"; then
-        echo "✅ Ticket probabilmente creato (HTTP 200)"
+        echo " Ticket probabilmente creato (HTTP 200)"
         # Cerca ID nel body
         TICKET_ID=$(echo "$RESPONSE" | grep -oP '/ticket/\K[0-9]+' | head -1)
-        [[ -n "$TICKET_ID" ]] && echo "🔗 URL: ${YDEA_BASE_URL}/ticket/${TICKET_ID}"
+        [[ -n "$TICKET_ID" ]] && echo " URL: ${YDEA_BASE_URL}/ticket/${TICKET_ID}"
         return 0
     else
-        echo "❌ Creazione fallita (HTTP $HTTP_CODE)"
+        echo " Creazione fallita (HTTP $HTTP_CODE)"
         echo ""
         echo "Response (primi 500 char):"
         echo "$RESPONSE" | head -c 500
@@ -253,13 +253,13 @@ create_ticket() {
 
 # Main
 if ! login_ydea; then
-    echo "❌ Impossibile procedere senza login"
+    echo " Impossibile procedere senza login"
     exit 1
 fi
 
 echo ""
 echo "════════════════════════════════════════════════════════════════════"
-echo "🧪 TEST 1: Ticket con contratto SLA Premium_Mon"
+echo " TEST 1: Ticket con contratto SLA Premium_Mon"
 echo "════════════════════════════════════════════════════════════════════"
 
 # Valori estratti dal HAR
@@ -272,21 +272,21 @@ echo ""
 sleep 2
 
 echo "════════════════════════════════════════════════════════════════════"
-echo "🧪 TEST 2: Ticket SENZA campo SLA (solo contratto)"
+echo " TEST 2: Ticket SENZA campo SLA (solo contratto)"
 echo "════════════════════════════════════════════════════════════════════"
 
 create_ticket "[TEST] Solo contratto, no SLA esplicito" "$CONTRACT_ID" ""
 
 echo ""
 echo "════════════════════════════════════════════════════════════════════"
-echo "✅ Test completati!"
+echo " Test completati!"
 echo ""
-echo "📋 VERIFICA MANUALE su YDEA:"
+echo " VERIFICA MANUALE su YDEA:"
 echo "   1. Vai su https://my.ydea.cloud"
 echo "   2. Controlla i 2 ticket appena creati"
 echo "   3. Verifica quale ha SLA 'Premium_Mon' attivo"
 echo ""
-echo "💡 Questo ti dirà se il campo 'serviceLevelAgreement' è:"
+echo " Questo ti dirà se il campo 'serviceLevelAgreement' è:"
 echo "   - NECESSARIO per applicare lo SLA corretto"
 echo "   - OPZIONALE (lo SLA viene preso dal contratto)"
 echo "════════════════════════════════════════════════════════════════════"

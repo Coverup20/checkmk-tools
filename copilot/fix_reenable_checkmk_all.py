@@ -95,14 +95,14 @@ for host in hosts_to_fix:
         )
         rc = result.returncode
         if rc == 0:
-            print(f"  ✓ {host} OK")
+            print(f"   {host} OK")
             ok += 1
         else:
             out = (result.stdout + result.stderr).strip()[:100]
-            print(f"  ⚠ {host} RC={rc}: {out}")
+            print(f"   {host} RC={rc}: {out}")
             err += 1
     except subprocess.TimeoutExpired:
-        print(f"  ✗ {host} TIMEOUT")
+        print(f"   {host} TIMEOUT")
         err += 1
 
 print(f"\n  cmk --check: {ok} OK, {err} errori/timeout")
@@ -128,10 +128,10 @@ for row in check_rows:
         stale = float(parts[2]) if parts[2].replace('.','').isdigit() else 99
         age = (now - int(parts[3])) // 60 if parts[3].isdigit() else "?"
         if stale < 2.0:
-            print(f"  ✓ {host} | active={active} | staleness={stale:.2f} | {age}min")
+            print(f"   {host} | active={active} | staleness={stale:.2f} | {age}min")
             resolved += 1
         else:
-            print(f"  ✗ {host} | active={active} | staleness={stale:.2f} | {age}min ← ANCORA STALE")
+            print(f"   {host} | active={active} | staleness={stale:.2f} | {age}min ← ANCORA STALE")
             still_stale += 1
 
 # Conta stale totali

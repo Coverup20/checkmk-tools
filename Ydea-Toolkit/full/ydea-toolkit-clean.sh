@@ -91,27 +91,27 @@ log_write() {
 
 log_debug() { 
   [[ "${YDEA_DEBUG}" == "1" ]] && 
-echo "🔧 $*" >&2 || true
+echo " $*" >&2 || true
   log_write "DEBUG" "$*"
 }
 
 log_info() { 
-  echo "ℹ️  $*" >&2
+  echo "ℹ  $*" >&2
   log_write "INFO" "$*"
 }
 
 log_success() { 
-  echo "✅ $*" >&2
+  echo " $*" >&2
   log_write "INFO" "SUCCESS: $*"
 }
 
 log_warn() {
-  echo "⚠️  $*" >&2
+  echo "  $*" >&2
   log_write "WARN" "$*"
 }
 
 log_error() { 
-  echo "❌ $*" >&2
+  echo " $*" >&2
   log_write "ERROR" "$*"
 }
 
@@ -641,7 +641,7 @@ echo "{}")
 echo "$ticket_data" | jq --arg tid "$ticket_id" '[.objs[] | select(.id == ($tid|tonumber))] | .[0] // {}' 2>/dev/null)
     
     if [[ "$ticket_obj" == "{}" ]] || [[ "$ticket_obj" == "null" ]]; then
-      log_warn "⚠️ Ticket 
+      log_warn " Ticket 
 #$ticket_id non trovato, potrebbe essere stato eliminato - contrassegnato come risolto"
       # Contrassegna il ticket come risolto per consentire la pulizia
       jq --arg tid "$ticket_id" --arg now "$now" \
@@ -735,7 +735,7 @@ show_tracking_stats() {
   resolved=$(jq '[.tickets[] | select(.resolved_at != null)] | length' "$YDEA_TRACKING_FILE")
   
   
-echo "📊 Statistiche Ticket Tracking"
+echo " Statistiche Ticket Tracking"
   
 echo "══════════════════════════════"
   
@@ -1002,7 +1002,7 @@ echo "   ID creazione note: $new_note_id"
   
 echo ""
   
-echo "📊 Configurazione Log & Tracking:"
+echo " Configurazione Log & Tracking:"
   
 echo "   File log: $new_log_file"
   

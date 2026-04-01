@@ -37,21 +37,21 @@ def main():
     try:
         api = YdeaAPI()
         
-        print(f"🔍 Ricerca anagrafica: {search_term}")
+        print(f" Ricerca anagrafica: {search_term}")
         print("=" * 60)
         
         data, status = api.api_call("GET", "/anagrafica", {"search": search_term})
         
         if status == 200:
             results = data.get("objs", [])
-            print(f"\n✅ Trovati {len(results)} risultati\n")
+            print(f"\n Trovati {len(results)} risultati\n")
             print(json.dumps(results, indent=2, ensure_ascii=False))
         else:
-            print(f"\n❌ Errore: Status {status}")
+            print(f"\n Errore: Status {status}")
             print(json.dumps(data, indent=2, ensure_ascii=False))
             sys.exit(1)
     except Exception as e:
-        print(f"❌ Errore: {e}", file=sys.stderr)
+        print(f" Errore: {e}", file=sys.stderr)
         sys.exit(1)
 
 

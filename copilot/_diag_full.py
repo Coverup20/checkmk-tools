@@ -31,7 +31,7 @@ if r:
             state = {0:"UP",1:"DOWN",2:"UNREACHABLE"}.get(int(p[1]) if p[1].isdigit() else -1, p[1])
             print(f"  {p[0]} | {state} | last={age}min fa")
 else:
-    print("  tutti UP ✓")
+    print("  tutti UP ")
 
 # ===== STALE >30min =====
 r = live(f"GET services\nFilter: last_check < {th30}\nColumns: host_name description last_check state active_checks_enabled passive_checks_enabled\n").strip()
@@ -46,7 +46,7 @@ if r:
             state = {0:"OK",1:"WARN",2:"CRIT",3:"UNK"}.get(int(p[3]) if p[3].isdigit() else -1, p[3])
             print(f"  [{state}] {p[0]} | {p[1]} | {age}min | active={p[4]} passive={p[5]}")
 else:
-    print("  nessuno ✓")
+    print("  nessuno ")
 
 # ===== PENDING (mai controllati) =====
 r = live("GET services\nFilter: has_been_checked = 0\nColumns: host_name description active_checks_enabled passive_checks_enabled\n").strip()
@@ -59,7 +59,7 @@ if r:
         if len(p) >= 4:
             print(f"  {p[0]} | {p[1]} | active={p[2]} passive={p[3]}")
 else:
-    print("  nessuno ✓")
+    print("  nessuno ")
 
 # ===== CRIT BREAKDOWN =====
 r = live("GET services\nFilter: state = 2\nColumns: host_name description last_check active_checks_enabled\n").strip()

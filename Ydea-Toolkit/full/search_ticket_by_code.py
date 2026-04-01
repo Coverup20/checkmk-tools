@@ -45,7 +45,7 @@ def main():
     try:
         api = YdeaAPI()
         
-        print(f"🔍 Ricerca ticket: {ticket_code}")
+        print(f" Ricerca ticket: {ticket_code}")
         print("=" * 60)
         
         # Search ticket by code
@@ -54,7 +54,7 @@ def main():
         if status_code == 200:
             tickets = data.get("objs", [])
             if tickets:
-                print(f"\n✅ Trovati {len(tickets)} ticket:\n")
+                print(f"\n Trovati {len(tickets)} ticket:\n")
                 for ticket in tickets:
                     print(f"ID: {ticket.get('id')}")
                     print(f"Codice: {ticket.get('codice')}")
@@ -65,14 +65,14 @@ def main():
                 print("\nDettagli completi:")
                 print(json.dumps(tickets, indent=2, ensure_ascii=False))
             else:
-                print(f"\n⚠️  Nessun ticket trovato con codice: {ticket_code}")
+                print(f"\n  Nessun ticket trovato con codice: {ticket_code}")
         else:
-            print(f"\n❌ Errore: Status {status_code}")
+            print(f"\n Errore: Status {status_code}")
             print(json.dumps(data, indent=2, ensure_ascii=False))
             sys.exit(1)
         
     except Exception as e:
-        print(f"❌ Errore: {e}", file=sys.stderr)
+        print(f" Errore: {e}", file=sys.stderr)
         sys.exit(1)
 
 

@@ -5,12 +5,12 @@ Cartella: script-check-ns7/
 Data: 27 Ottobre 2025
 ================================================================================
 
-📁 STRUTTURA CARTELLE
+ STRUTTURA CARTELLE
 ├── nopolling/          (33 script: 17 principali + 16 wrapper remoti)
 └── polling/            (2 script: 1 principale + 1 wrapper remoto)
 
 ================================================================================
-📂 SCRIPT-CHECK-NS7/NOPOLLING/
+ SCRIPT-CHECK-NS7/NOPOLLING/
 ================================================================================
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -27,10 +27,10 @@ Monitora login/logout Cockpit leggendo /var/log/messages.
 Mostra quante sessioni sono attive e notifica ogni accesso.
 
 FUNZIONALITÀ:
-✓ Rileva login Cockpit con indirizzo IP di provenienza
-✓ Rileva logout Cockpit
-✓ Usa statefile per processare solo nuove righe del log
-✓ Alterna WARN/CRIT casualmente per forzare notifiche ad ogni login
+ Rileva login Cockpit con indirizzo IP di provenienza
+ Rileva logout Cockpit
+ Usa statefile per processare solo nuove righe del log
+ Alterna WARN/CRIT casualmente per forzare notifiche ad ogni login
 
 STATI:
 0 (OK)   - Logout rilevato
@@ -63,7 +63,7 @@ DESCRIZIONE:
 Verifica se il servizio Dovecot (server mail IMAP/POP3) è in esecuzione.
 
 FUNZIONALITÀ:
-✓ Check stato servizio systemd
+ Check stato servizio systemd
 
 STATI:
 0 (OK)   - Dovecot running
@@ -82,7 +82,7 @@ DESCRIZIONE:
 Conta e mostra il numero di sessioni Dovecot attive (utenti connessi).
 
 FUNZIONALITÀ:
-✓ Conta sessioni IMAP/POP3 attive
+ Conta sessioni IMAP/POP3 attive
 
 STATI:
 0 (OK)   - Sempre OK, mostra numero sessioni
@@ -104,8 +104,8 @@ Mostra il valore configurato di mail_max_userip_connections in Dovecot.
 Limite massimo connessioni simultanee per IP utente.
 
 FUNZIONALITÀ:
-✓ Legge configurazione Dovecot
-✓ Mostra valore mail_max_userip_connections
+ Legge configurazione Dovecot
+ Mostra valore mail_max_userip_connections
 
 STATI:
 0 (OK)   - Sempre OK, mostra valore o "unset"
@@ -126,7 +126,7 @@ DESCRIZIONE:
 Mostra il limite VSZ (Virtual Size) configurato per i processi Dovecot.
 
 FUNZIONALITÀ:
-✓ Legge default_vsz_limit da configurazione Dovecot
+ Legge default_vsz_limit da configurazione Dovecot
 
 STATI:
 0 (OK)   - Sempre OK, mostra valore
@@ -148,7 +148,7 @@ DESCRIZIONE:
 Verifica se il servizio Postfix (server SMTP) è in esecuzione.
 
 FUNZIONALITÀ:
-✓ Check stato servizio systemd
+ Check stato servizio systemd
 
 STATI:
 0 (OK)   - Postfix running
@@ -167,8 +167,8 @@ DESCRIZIONE:
 Monitora la coda mail di Postfix e segnala accumulo messaggi.
 
 FUNZIONALITÀ:
-✓ Conta messaggi in coda
-✓ Soglie configurate: <20 OK, <100 WARN, ≥100 CRIT
+ Conta messaggi in coda
+ Soglie configurate: <20 OK, <100 WARN, ≥100 CRIT
 
 STATI:
 0 (OK)   - Coda < 20 messaggi
@@ -194,7 +194,7 @@ DESCRIZIONE:
 Conta i processi Postfix attivi.
 
 FUNZIONALITÀ:
-✓ Conta processi 'master' e 'qmgr' di Postfix
+ Conta processi 'master' e 'qmgr' di Postfix
 
 STATI:
 0 (OK)   - Processi presenti
@@ -213,7 +213,7 @@ DESCRIZIONE:
 Verifica se WebTop (groupware) è in esecuzione.
 
 FUNZIONALITÀ:
-✓ Check stato servizio Tomcat WebTop
+ Check stato servizio Tomcat WebTop
 
 STATI:
 0 (OK)   - WebTop running
@@ -232,7 +232,7 @@ DESCRIZIONE:
 Mostra la memoria massima allocata per WebTop (Java heap).
 
 FUNZIONALITÀ:
-✓ Legge MaxMemory da configurazione NethServer
+ Legge MaxMemory da configurazione NethServer
 
 STATI:
 0 (OK)   - Sempre OK, mostra valore in MB o "unset"
@@ -253,7 +253,7 @@ DESCRIZIONE:
 Verifica connettività HTTPS a WebTop.
 
 FUNZIONALITÀ:
-✓ Test connessione HTTPS locale
+ Test connessione HTTPS locale
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -269,8 +269,8 @@ DESCRIZIONE:
 Monitora e notifica sessioni SSH aperte con utente root.
 
 FUNZIONALITÀ:
-✓ Conta sessioni root attive
-✓ Mostra IP di provenienza
+ Conta sessioni root attive
+ Mostra IP di provenienza
 
 STATI:
 0 (OK)   - Nessuna sessione root
@@ -293,8 +293,8 @@ DESCRIZIONE:
 Rileva nuovi login SSH come root dal log /var/log/secure.
 
 FUNZIONALITÀ:
-✓ Usa statefile per processare solo nuove righe
-✓ Notifica ogni nuovo login root via SSH
+ Usa statefile per processare solo nuove righe
+ Notifica ogni nuovo login root via SSH
 
 
 14. check-ssh-failures.sh
@@ -306,8 +306,8 @@ DESCRIZIONE:
 Monitora gli IP attualmente bannati da fail2ban per tentativi di accesso SSH falliti.
 
 FUNZIONALITÀ:
-✓ Interroga fail2ban jail sshd
-✓ Conta IP bannati
+ Interroga fail2ban jail sshd
+ Conta IP bannati
 
 STATI:
 0 (OK)   - Nessun IP bannato o fail2ban non attivo
@@ -334,8 +334,8 @@ DESCRIZIONE:
 Monitora stato sessione SOS (WindMill VPN + SSH reverse) senza mostrare l'ID.
 
 FUNZIONALITÀ:
-✓ Verifica stato servizi don-openvpn e don-sshd
-✓ Rileva SOS attivo/disattivo/parziale
+ Verifica stato servizi don-openvpn e don-sshd
+ Rileva SOS attivo/disattivo/parziale
 
 STATI:
 0 (OK)   - SOS disattivo (entrambi i servizi fermi)
@@ -365,9 +365,9 @@ DESCRIZIONE:
 Monitora sessione SOS e mostra il Session ID quando attiva.
 
 FUNZIONALITÀ:
-✓ Verifica stato servizi SOS
-✓ Estrae Session ID dal comando 'don status'
-✓ Notifica se SOS è attivo ma ID non trovato
+ Verifica stato servizi SOS
+ Estrae Session ID dal comando 'don status'
+ Notifica se SOS è attivo ma ID non trovato
 
 STATI:
 0 (OK)   - SOS non attivo
@@ -398,10 +398,10 @@ Monitora attività di installazione/aggiornamento/rimozione pacchetti YUM.
 Notifica se ci sono state operazioni sui pacchetti negli ultimi N minuti.
 
 FUNZIONALITÀ:
-✓ Legge /var/log/yum.log
-✓ Rileva: Installed, Updated, Erased, Removed
-✓ Usa statefile per tracciare ultimo evento
-✓ Timeout configurabile (default: 5 minuti)
+ Legge /var/log/yum.log
+ Rileva: Installed, Updated, Erased, Removed
+ Usa statefile per tracciare ultimo evento
+ Timeout configurabile (default: 5 minuti)
 
 CONFIGURAZIONE:
 WARN_TIMEOUT_MINUTES=5
@@ -421,7 +421,7 @@ ESEMPIO OUTPUT:
 
 
 ================================================================================
-📂 SCRIPT REMOTI (WRAPPER) - NOPOLLING
+ SCRIPT REMOTI (WRAPPER) - NOPOLLING
 ================================================================================
 
 Tutti gli script con prefisso "r" sono wrapper che scaricano ed eseguono
@@ -453,7 +453,7 @@ https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-check-ns7/
 
 
 ================================================================================
-📂 SCRIPT-CHECK-NS7/POLLING/
+ SCRIPT-CHECK-NS7/POLLING/
 ================================================================================
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -468,10 +468,10 @@ Scansiona tutte le share Samba alla ricerca di file con estensioni sospette
 o ransom notes e logga i risultati.
 
 FUNZIONALITÀ:
-✓ Scansiona tutte le share Samba configurate
-✓ Rileva file con estensioni ransomware comuni
-✓ Rileva ransom notes tipici
-✓ Logga file sospetti trovati
+ Scansiona tutte le share Samba configurate
+ Rileva file con estensioni ransomware comuni
+ Rileva ransom notes tipici
+ Logga file sospetti trovati
 
 ESTENSIONI MONITORATE:
 encrypted, crypt, locked, enc, lock, ransom, pay, recover
@@ -496,8 +496,8 @@ ESEMPIO OUTPUT:
 "2 CRITICAL - Ransomware: file sospetti rilevati. Vedi /var/log/ransomware_monitor.log"
 
 NOTE:
-⚠️ Script in modalità POLLING - esecuzione periodica schedulata
-⚠️ Può avere impatto sulle performance con share molto grandi
+ Script in modalità POLLING - esecuzione periodica schedulata
+ Può avere impatto sulle performance con share molto grandi
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -558,10 +558,10 @@ DIPENDENZE
 ================================================================================
 
 RICHIESTE:
-✓ NethServer 7.9
-✓ CheckMK Raw 2.4.x
-✓ bash
-✓ curl (per script remoti)
+ NethServer 7.9
+ CheckMK Raw 2.4.x
+ bash
+ curl (per script remoti)
 
 SERVIZI MONITORATI:
 - Cockpit (cockpit-ws)
@@ -621,9 +621,9 @@ cp rcheck_ransomware_ns7.sh /usr/lib/check_mk_agent/plugins/
 chmod +x /usr/lib/check_mk_agent/plugins/rcheck_ransomware_ns7.sh
 
 VANTAGGI:
-✓ Aggiornamenti automatici dal repository
-✓ No manutenzione manuale degli script
-✓ Centralized management
+ Aggiornamenti automatici dal repository
+ No manutenzione manuale degli script
+ Centralized management
 
 
 ================================================================================
@@ -736,10 +736,10 @@ SICUREZZA
 ================================================================================
 
 CONSIDERAZIONI:
-✓ Gli script vengono eseguiti come utente checkmk o root
-✓ Accesso a log di sistema richiede permessi adeguati
-✓ Statefile possono contenere timestamp e IP
-✓ Script remoti scaricano codice da GitHub - verificare HTTPS
+ Gli script vengono eseguiti come utente checkmk o root
+ Accesso a log di sistema richiede permessi adeguati
+ Statefile possono contenere timestamp e IP
+ Script remoti scaricano codice da GitHub - verificare HTTPS
 
 PERMESSI CONSIGLIATI:
 - Script: 755 (rwxr-xr-x)

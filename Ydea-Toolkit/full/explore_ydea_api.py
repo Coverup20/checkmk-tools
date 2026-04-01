@@ -31,24 +31,24 @@ YdeaAPI = ydea_toolkit.YdeaAPI
 
 def test_endpoint(api: 'YdeaAPI', endpoint: str, params: dict = None):
     """Test singolo endpoint"""
-    print(f"\n🔍 Testing: {endpoint}")
+    print(f"\n Testing: {endpoint}")
     try:
         data, status = api.api_call("GET", endpoint, params or {})
         if status == 200:
             if isinstance(data, dict) and "objs" in data:
                 count = len(data.get("objs", []))
-                print(f"   ✅ OK - {count} items")
+                print(f"    OK - {count} items")
             else:
-                print(f"   ✅ OK - Response keys: {list(data.keys()) if isinstance(data, dict) else 'N/A'}")
+                print(f"    OK - Response keys: {list(data.keys()) if isinstance(data, dict) else 'N/A'}")
         else:
-            print(f"   ⚠️  Status: {status}")
+            print(f"     Status: {status}")
     except Exception as e:
-        print(f"   ❌ Error: {e}")
+        print(f"    Error: {e}")
 
 
 def main():
     print("=" * 60)
-    print("🔍 EXPLORE YDEA API ENDPOINTS")
+    print(" EXPLORE YDEA API ENDPOINTS")
     print("=" * 60)
     
     try:
@@ -70,11 +70,11 @@ def main():
             test_endpoint(api, endpoint, params)
         
         print("\n" + "=" * 60)
-        print("✅ Esplorazione completata")
+        print(" Esplorazione completata")
         print("=" * 60)
         
     except Exception as e:
-        print(f"\n❌ Errore: {e}", file=sys.stderr)
+        print(f"\n Errore: {e}", file=sys.stderr)
         sys.exit(1)
 
 

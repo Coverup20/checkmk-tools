@@ -11,7 +11,7 @@ ANAGRAFICA_ID=$(jq -r '.anagrafica_id' "$CONFIG_FILE")
 PRIORITA_ID=$(jq -r '.priorita_id' "$CONFIG_FILE")
 
 echo "════════════════════════════════════════════════════════════════════"
-echo "🧪 TEST VARIANTI CAMPO CONTRATTO"
+echo " TEST VARIANTI CAMPO CONTRATTO"
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
 
@@ -64,12 +64,12 @@ for field in "${variants[@]}"; do
   TICKET_CODE=$(echo "$RESPONSE" | jq -r '.codice // .code // .data.codice // empty' 2>/dev/null || echo "")
   
   if [[ -n "$TICKET_ID" && "$TICKET_ID" != "null" && "$TICKET_ID" != "error" ]]; then
-    echo "✅ Ticket creato: $TICKET_CODE (ID: $TICKET_ID)"
+    echo " Ticket creato: $TICKET_CODE (ID: $TICKET_ID)"
     
     # Aspetta e verifica SLA
     sleep 2
     
-    echo "🔍 Verifica SLA su UI: https://my.ydea.cloud/ticket/${TICKET_ID}"
+    echo " Verifica SLA su UI: https://my.ydea.cloud/ticket/${TICKET_ID}"
     
     # Prova a recuperare via API (sappiamo che non espone SLA ma proviamo)
     DETAIL=$(ydea_api GET "/tickets?id=${TICKET_ID}&limit=1" 2>/dev/null | jq '.objs[0] // {}' 2>/dev/null || echo '{}')
@@ -79,21 +79,21 @@ for field in "${variants[@]}"; do
     HAS_CONTRACT=$(echo "$DETAIL" | jq 'has("contratto") or has("contratto_id") or has("contrattoId")' 2>/dev/null || echo "false")
     
     if [[ "$HAS_SLA" == "true" ]]; then
-      echo "   ✅ Campo SLA presente via API!"
+      echo "    Campo SLA presente via API!"
       echo "$DETAIL" | jq '{sla, sla_id, sla_nome}' 2>/dev/null
     else
-      echo "   ⚠️ Campo SLA NON presente via API (normale)"
+      echo "    Campo SLA NON presente via API (normale)"
     fi
     
     if [[ "$HAS_CONTRACT" == "true" ]]; then
-      echo "   ✅ Campo contratto presente via API!"
+      echo "    Campo contratto presente via API!"
       echo "$DETAIL" | jq '{contratto, contratto_id, contrattoId}' 2>/dev/null
     else
-      echo "   ⚠️ Campo contratto NON presente via API"
+      echo "    Campo contratto NON presente via API"
     fi
     
   else
-    echo "❌ Creazione fallita"
+    echo " Creazione fallita"
     echo ""
     echo "Response:"
     echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
@@ -104,11 +104,11 @@ for field in "${variants[@]}"; do
 done
 
 echo "════════════════════════════════════════════════════════════════════"
-echo "✅ Test completato!"
+echo " Test completato!"
 echo ""
-echo "📋 VERIFICA MANUALMENTE su UI YDEA:"
+echo " VERIFICA MANUALMENTE su UI YDEA:"
 echo "   Controlla i ticket creati e vedi quale ha SLA 'Premium_Mon'"
 echo "   invece di 'Standard'"
 echo ""
-echo "🔗 https://my.ydea.cloud"
+echo " https://my.ydea.cloud"
 echo "════════════════════════════════════════════════════════════════════"

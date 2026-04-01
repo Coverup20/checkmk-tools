@@ -23,10 +23,10 @@ sudo bash /opt/checkmk-tools/distributed-monitoring-setup.sh
 ```
 
 Lo script:
-- ✅ Configura il site come remote
-- ✅ Crea automation user
-- ✅ Genera secret per connessione
-- ✅ Mostra le credenziali da usare
+-  Configura il site come remote
+-  Crea automation user
+-  Genera secret per connessione
+-  Mostra le credenziali da usare
 
 **Output atteso:**
 ```
@@ -40,7 +40,7 @@ Automation Secret: (secret string)
 ════════════════════════════════════════════════════
 ```
 
-**⚠️ IMPORTANTE:** Copia il secret, ti servirà dopo!
+** IMPORTANTE:** Copia il secret, ti servirà dopo!
 
 ---
 
@@ -65,7 +65,7 @@ Compila i campi:
 - **Method:** `Connect to the remote site using Livestatus`
 - **Protocol:** `Livestatus over HTTPS`
 - **URL:** `https://<IP-BOX-LOCALE>/monitoring/check_mk/`
-  - ⚠️ Oppure se il box ha hostname: `https://hostname-box.locale/monitoring/check_mk/`
+  -  Oppure se il box ha hostname: `https://hostname-box.locale/monitoring/check_mk/`
 - **Port:** `443`
 
 **Authentication:**
@@ -73,17 +73,17 @@ Compila i campi:
 - **Automation secret:** `<SECRET-COPIATO-PRIMA>`
 
 **Advanced settings:**
-- ✅ Enable configuration replication
-- ✅ Replicate Event Console configuration
-- ✅ Sync with LDAP connections
+-  Enable configuration replication
+-  Replicate Event Console configuration
+-  Sync with LDAP connections
 
 **Status host:**
-- ✅ Create status host
+-  Create status host
 - **Host name:** `Local-Box-Status`
 
 ### 2.4 Test Connection
 1. Click: **Test connection**
-2. Verifica che mostri: ✅ **Connection successful**
+2. Verifica che mostri:  **Connection successful**
 
 ### 2.5 Salva
 1. Click: **Save**
@@ -95,7 +95,7 @@ Compila i campi:
 
 ### 3.1 Verifica su Central (VPS)
 1. Menu: **Setup → General → Distributed monitoring**
-2. Controlla stato: dovrebbe essere 🟢 **Online**
+2. Controlla stato: dovrebbe essere  **Online**
 
 ### 3.2 Aggiungi host sul Remote Site
 Sul box locale:
@@ -158,19 +158,19 @@ cat var/check_mk/web/automation/automation.secret
 
 ## Note Importanti
 
-### ⚠️ Connessione
+###  Connessione
 - Il remote site deve poter raggiungere il central su porta 6557
 - Se il box locale è dietro NAT, considera FRP tunnel
 
-### 🔒 Sicurezza
+###  Sicurezza
 - La connessione usa TLS/SSL
 - L'automation secret è sensibile, trattalo come una password
 
-### 📊 Performance
+###  Performance
 - I dati vengono aggregati in tempo reale
 - Il central interroga il remote ogni 60 secondi di default
 
-### 🔄 Configurazione
+###  Configurazione
 - Modifiche alla configurazione si fanno sul central
 - Il central replica la config sui remote sites
 

@@ -522,7 +522,7 @@ def is_flapping(key: str) -> Tuple[bool, str]:
         if len(recent) >= FLAPPING_THRESHOLD:
             count = len(recent)
             minutes = FLAPPING_WINDOW // 60
-            return True, f"⚠️ FLAPPING: {count} cambi stato in {minutes} minuti"
+            return True, f" FLAPPING: {count} cambi stato in {minutes} minuti"
         
         return False, ""
     except:
@@ -840,7 +840,7 @@ def main():
                                                    YDEA_CATEGORY_ID, hostname, service, output)
                 
                 if new_ticket_id:
-                    log(f"✅ New ticket created: #{new_ticket_id}")
+                    log(f" New ticket created: #{new_ticket_id}")
                     save_ticket_cache(ticket_key, new_ticket_id, state)
                     log_ticket_event("CREATO", new_ticket_id, f"After 404 on #{ticket_id}")
     
@@ -863,11 +863,11 @@ def main():
                                       YDEA_CATEGORY_ID, hostname, service, output)
         
         if ticket_id:
-            log(f"✅ Ticket created: #{ticket_id}")
+            log(f" Ticket created: #{ticket_id}")
             save_ticket_cache(ticket_key, ticket_id, state)
             log_ticket_event("CREATO", ticket_id, f"{hostname}/{service} {state}")
         else:
-            log("❌ Failed to create ticket")
+            log(" Failed to create ticket")
     
     return 0
 
