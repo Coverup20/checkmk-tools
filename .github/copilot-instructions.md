@@ -44,6 +44,17 @@
 - ✅ If a person or brand must be referenced → use only the company name (e.g. "Nethesis")
 - ✅ This rule applies to: code, comments, docstrings, markdown, instructions files — no exceptions
 
+### No hardcoded environment data in files
+
+- ❌ **NEVER hardcode** IP addresses, hostnames, domain names, ports, URLs that refer to a specific environment
+- ❌ **NEVER hardcode** credentials, tokens, API keys, passwords, secrets of any kind
+- ❌ **NEVER hardcode** filesystem paths that are environment-specific (e.g. `/omd/sites/monitoring/`, specific usernames)
+- ❌ **NEVER hardcode** site names, tenant names, customer-specific identifiers
+- ✅ **ALWAYS use** environment variables, config files, or parameters passed at runtime
+- ✅ **ALWAYS use** placeholder values in examples: `YOUR_TOKEN_HERE`, `<hostname>`, `<ip_address>`
+- ✅ If a default is needed → use a clearly fake/generic value that cannot be mistaken for real data
+- ✅ This rule applies to ALL file types: scripts, config templates, markdown, instructions — no exceptions
+
 ---
 
 ## 🎯 FILOSOFIA DI LAVORO FONDAMENTALE
