@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """check_root_access.py - CheckMK local check root access (Python puro)."""
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 import re
 import subprocess
@@ -11,9 +11,25 @@ from pathlib import Path
 LOG_FILE = Path("/var/log/messages")
 
 
+def get_active_root_sessions() -> int:
+    """Count active root SSH sessions. Tries 'who' first, falls back to dropbear process count (OpenWrt)."""
+    try:
+        who = subprocess.run(["who"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=False)
+        if who.returncode == 0:
+            return sum(1 for line in who.stdout.splitlines() if line.startswith("root"))
+    except FileNotFoundError:
+        pass
+    # Fallback for OpenWrt/NethSecurity: each SSH connection = one extra dropbear process
+    try:
+        ps = subprocess.run(["ps"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=False)
+        count = sum(1 for line in ps.stdout.splitlines() if "dropbear" in line)
+        return max(0, count - 1)  # subtract the main daemon
+    except Exception:
+        return 0
+
+
 def main() -> int:
-    who = subprocess.run(["who"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=False)
-    active_sessions = sum(1 for line in (who.stdout or "").splitlines() if line.startswith("root"))
+    active_sessions = get_active_root_sessions()
 
     successful_logins = 0
     failed_logins = 0
