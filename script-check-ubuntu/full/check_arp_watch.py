@@ -8,7 +8,7 @@ Detect:
 
 Baseline: /var/lib/check_mk_agent/arp_watch_state.json
   {
-    "10.155.100.1": {"mac": "aa:bb:cc:dd:ee:ff", "seen": 5, "first_seen": "2026-03-06T10:00:00"},
+    "192.0.2.1": {"mac": "aa:bb:cc:dd:ee:ff", "seen": 5, "first_seen": "2026-01-01T00:00:00"},
     ...
   }
 
@@ -43,7 +43,7 @@ def get_arp_table() -> Dict[str, str]:
             timeout=10,
         )
         for line in proc.stdout.splitlines():
-            # Es: "10.155.100.1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE"
+            # Es: "192.0.2.1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE"
             m = re.match(
                 r"^(\d+\.\d+\.\d+\.\d+)\s+dev\s+\S+\s+lladdr\s+([0-9a-f:]{17})\s+(\w+)",
                 line.strip(),

@@ -12,9 +12,9 @@ Usage:
     python3 update_checkmk_agent.py
 
     # Specify server manually (override or host without local OMD)
-    python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring
-    python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring --dry-run
-    python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring --force
+    python3 update_checkmk_agent.py --server-url https://<your-checkmk-server>/monitoring
+    python3 update_checkmk_agent.py --server-url https://<your-checkmk-server>/monitoring --dry-run
+    python3 update_checkmk_agent.py --server-url https://<your-checkmk-server>/monitoring --force
 
 Version: 0.3.0"""
 
@@ -182,10 +182,10 @@ def parse_server_url(server_url: str) -> Tuple[str, str]:
     """Extracts hostname and site name from the server URL.
 
     Args:
-        server_url: e.g. 'https://monitor.nethlab.it/monitoring'
+        server_url: e.g. 'https://<your-checkmk-server>/monitoring'
 
     Returns:
-        Tuple (hostname, site) e.g. ('monitor.nethlab.it', 'monitoring')"""
+        Tuple (hostname, site) e.g. ('<your-checkmk-server>', 'monitoring')"""  
     parsed = urllib.parse.urlparse(server_url)
     hostname = parsed.netloc
     site = parsed.path.strip('/').split('/')[0] if parsed.path.strip('/') else ''
@@ -203,7 +203,7 @@ def get_server_agent_version(server_url: str, pkg_type: str) -> Optional[str]:
       3. Scraping page /check_mk/agents/ (final fallback)
 
     Args:
-        server_url: base URL of the CheckMK site (e.g. https://monitor.nethlab.it/monitoring)
+        server_url: base URL of the CheckMK site (e.g. https://<your-checkmk-server>/monitoring)
         pkg_type: Package type (to build download URL)
 
     Returns:
@@ -383,9 +383,9 @@ def parse_args() -> argparse.Namespace:
   python3 update_checkmk_agent.py --dry-run
 
   # Specify server manually (monitored hosts without local OMD)
-  python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring
-  python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring --dry-run
-  python3 update_checkmk_agent.py --server-url https://monitor.nethlab.it/monitoring --force""",
+  python3 update_checkmk_agent.py --server-url https://<your-checkmk-server>/monitoring
+  python3 update_checkmk_agent.py --server-url https://<your-checkmk-server>/monitoring --dry-run
+  python3 update_checkmk_agent.py --server-url https://<your-checkmk-server>/monitoring --force""",
     )
     p.add_argument("--server-url", required=False, default=None,
                    help="URL sito CheckMK es. https://hostname/site. "
@@ -418,7 +418,7 @@ def main() -> int:
 
             # Chiedi hostname
             h_prompt = f"[INPUT] Hostname server CheckMK [{det_host}]: " if det_host \
-                       else "[INPUT] Hostname server CheckMK (es. monitor.nethlab.it): "
+                       else "[INPUT] CheckMK server hostname: "
             try:
                 h_answer = input(h_prompt).strip()
             except (EOFError, KeyboardInterrupt):

@@ -1,5 +1,5 @@
 # Full Backup Script CheckMK-Tools Repository
-# Local + optional backup to \\192.168.10.132\usbshare
+# Local + optional backup to network share (configure BACKUP_NETWORK_PATH env var)
 
 param(
     [switch]$Unattended  # Modalità automatica senza prompt
@@ -9,7 +9,7 @@ $ErrorActionPreference = "Stop"
 
 $REPO_PATH = (Split-Path $PSScriptRoot -Parent)
 $LOCAL_BACKUP_BASE = "C:\CheckMK-Backups"
-$NETWORK_BACKUP_BASE = "\\192.168.10.132\usbshare\CheckMK-Backups"
+$NETWORK_BACKUP_BASE = if ($env:BACKUP_NETWORK_PATH) { "$($env:BACKUP_NETWORK_PATH)\CheckMK-Backups" } else { "" }
 $TIMESTAMP = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $LOCAL_BACKUP_PATH = Join-Path $LOCAL_BACKUP_BASE $TIMESTAMP
 $NETWORK_BACKUP_PATH = Join-Path $NETWORK_BACKUP_BASE $TIMESTAMP

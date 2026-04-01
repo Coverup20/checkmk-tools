@@ -12,7 +12,7 @@
 
 **Problem 1: URL Download Error (404)**
 - **Issue:** Script tried Incorrect URL for CheckMK Agent MSI
-- **Fix:** Updated with correct URL `monitoring.nethlab.it/monitoring/check_mk/agents/windows/check_mk_agent.msi`
+- **Fix:** Updated with correct URL `<your-checkmk-server>/monitoring/check_mk/agents/windows/check_mk_agent.msi`
 - **Commit:** `c2f3c3b`
 
 **Problem 2: FRPC Service Not Starting**
@@ -36,12 +36,12 @@
 # BEFORE:
 $CHECKMK_MSI_URLs = @(
     "https://download.checkmk.com/...",
-    "https://monitoring.nethlab.it/monitoring/check_mk/agents/check-mk-agent-2.4.0p14-1_all.msi"
+    "https://<your-checkmk-server>/monitoring/check_mk/agents/check-mk-agent-2.4.0p14-1_all.msi"
 )
 
 # AFTER:
 $CHECKMK_MSI_URLS = @(
-    "https://monitoring.nethlab.it/monitoring/check_mk/agents/windows/check_mk_agent.msi",
+    "https://<your-checkmk-server>/monitoring/check_mk/agents/windows/check_mk_agent.msi",
     "https://download.checkmk.com/..."
 )
 ```

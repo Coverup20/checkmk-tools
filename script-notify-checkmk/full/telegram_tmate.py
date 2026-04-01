@@ -18,7 +18,7 @@ ENV_FILE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "telegram_tmate.env"
 )
-CMK_URL = "https://monitor01.nethlab.it/monitoring"
+CMK_URL = os.environ.get("CMK_URL", "https://<your-checkmk-server>/monitoring")
 SITE = "monitoring"
 # ==============
 

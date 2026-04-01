@@ -382,7 +382,7 @@ def main() -> int:
   generic → balanced weights (backward compact, default)
 
 Examples:
-  check_host_status -H 192.168.10.100 --type server
+  check_host_status -H 192.0.2.100 --type server
   check_host_status -H 192.168.32.55 --type client
   check_host_status -H 192.168.1.1 --type switch
   check_host_status -H host.domain.it --type server --no-arp

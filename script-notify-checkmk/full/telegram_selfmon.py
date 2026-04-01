@@ -20,7 +20,7 @@ VERSION = "1.1.0"
 TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 # CHAT_ID from environment variable TELEGRAM_SELFMON_CHAT_ID (configure for server in OMD environment)
 CHAT_ID = os.environ.get("TELEGRAM_SELFMON_CHAT_ID", "")
-CMK_URL = "https://monitor.nethlab.it/monitoring"
+CMK_URL = os.environ.get("CMK_URL", "https://<your-checkmk-server>/monitoring")
 SITE = "monitoring"
 # ==============
 

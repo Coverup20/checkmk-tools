@@ -71,7 +71,7 @@ Missing monitoring data for all plugins WARN
 
 ### AFTER (Improved Alert)
 ```
- HOST DOWN - hostname (192.168.10.110)
+ HOST DOWN - hostname (<host-ip>)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PROBLEM:
 The host refused the connection. It could be:
@@ -80,7 +80,7 @@ The host refused the connection. It could be:
   • Firewall blocks the port
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SUGGESTED ACTIONS:
-  1. Check if host is reachable: ping 192.168.10.110
+  1. Check if host is reachable: ping <host-ip>
   2. Check agent status: ssh hostname 'systemctl status check-mk-agent'
   3. Check firewall towards port 6556
 ```

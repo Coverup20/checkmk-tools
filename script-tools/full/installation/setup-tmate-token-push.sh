@@ -7,7 +7,7 @@
 # 2. Edit tmate-token.service to push the token to the server
 #
 # Usage: bash setup-tmate-token-push.sh [SERVER_IP] [SERVER_PORT] [KEY_SOURCE]
-# Default: monitor01.nethlab.it port 22 (normal SSH for token push)
+# Default: <your-tmate-server> port 22 (normal SSH for token push)
 #
 # Prerequisite: The private key must be available in ONE of these ways (in order of priority):
 # 1. File /tmp/tmate_token_pusher.key (scp from vps-02:/opt/tmate-tokens/receiver_key)
@@ -15,7 +15,7 @@
 # 3. Key already present in /etc/ssh/tmate_token_pusher (reinstallation)
 
 VERSION="1.2.0"
-SERVER_IP="${1:-monitor01.nethlab.it}"
+SERVER_IP="${1:-<your-tmate-server>}"
 SERVER_PORT="${2:-22}"
 KEY_FILE="/etc/ssh/tmate_token_pusher"
 SERVICE_FILE="/etc/systemd/system/tmate-token.service"

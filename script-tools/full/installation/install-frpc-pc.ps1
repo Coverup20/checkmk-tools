@@ -363,8 +363,8 @@ try {
   $hostName   = Read-NonEmpty "Nome host (es. box-lab00)"
   $remotePort = Read-Int "Remote port (es. 6006)"
 
-  $serverAddr = Read-Host "Server FRP [monitor.nethlab.it]"
-  if ([string]::IsNullOrWhiteSpace($serverAddr)) { $serverAddr = "monitor.nethlab.it" }
+  $serverAddr = Read-Host "FRP server address"
+  if ([string]::IsNullOrWhiteSpace($serverAddr)) { $serverAddr = if ($env:FRP_SERVER) { $env:FRP_SERVER } else { "" } }
 
   $token = Read-NonEmpty "Token FRP"
 

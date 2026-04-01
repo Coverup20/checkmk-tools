@@ -202,13 +202,13 @@ Add note "Alarm cleared" → mark_ticket_resolved() → Set resolved_at: now →
 
 ```bash
 #1. Backup current cache
-ssh monitoring@monitor.nethlab.it "cp /tmp/ydea_checkmk_tickets.json /tmp/ydea_checkmk_tickets.json.pre-v1.9"
+ssh monitoring@<your-checkmk-server> "cp /tmp/ydea_checkmk_tickets.json /tmp/ydea_checkmk_tickets.json.pre-v1.9"
 
 #2. Deploy updated script
-scp script-notify-checkmk/ydea_realip monitoring@monitor.nethlab.it:/opt/omd/sites/monitoring/local/share/check_mk/notifications/
+scp script-notify-checkmk/ydea_realip monitoring@<your-checkmk-server>:/opt/omd/sites/monitoring/local/share/check_mk/notifications/
 
 # 3. Check deployment
-ssh monitoring@monitor.nethlab.it "grep -c 'mark_ticket_resolved' /opt/omd/sites/monitoring/local/share/check_mk/notifications/ydea_realip"
+ssh monitoring@<your-checkmk-server> "grep -c 'mark_ticket_resolved' /opt/omd/sites/monitoring/local/share/check_mk/notifications/ydea_realip"
 # Expected output: 3 (1 definition + 2 calls)
 
 #4. Monitor logs to confirm operation

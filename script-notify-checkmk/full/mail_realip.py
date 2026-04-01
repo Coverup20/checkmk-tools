@@ -14,8 +14,8 @@ from urllib.parse import quote
 VERSION = "1.0.0"
 
 # === CONFIG ===
-CMK_URL = "https://monitor.nethlab.it/monitoring"
-FROM_EMAIL = "checkmk-vps@nethesis.it"
+CMK_URL = os.environ.get("CMK_URL", "https://<your-checkmk-server>/monitoring")
+FROM_EMAIL = os.environ.get("FROM_EMAIL", "checkmk@example.com")
 # ==============
 
 

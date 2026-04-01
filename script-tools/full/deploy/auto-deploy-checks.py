@@ -852,7 +852,7 @@ def install_agent_only() -> int:
         print(f"  Tipo pacchetto: {pkg_type}")
         
         # URL base CheckMK agents
-        base_url = "https://monitoring.nethlab.it/monitoring/check_mk/agents"
+        base_url = os.environ.get("CMK_AGENTS_URL", "https://<your-checkmk-server>/monitoring/check_mk/agents")
         
         # Download listing agent
         print(f"  Recupero lista agent da CheckMK server...")
@@ -1002,8 +1002,8 @@ def install_frpc_only() -> int:
         print(f"Nome host [{default_hostname}]: ", end='', flush=True)
         frpc_hostname = input().strip() or default_hostname
         
-        print(f"Server FRP remoto [monitor.nethlab.it]: ", end='', flush=True)
-        frp_server = input().strip() or "monitor.nethlab.it"
+        print("Remote FRP server: ", end='', flush=True)
+        frp_server = input().strip() or os.environ.get("FRP_SERVER", "")
         
         while True:
             print(f"Porta remota (es: 20001): ", end='', flush=True)

@@ -30,7 +30,7 @@ Exit codes:
   2 = offline confirmed (confidence ≥ threshold)
 
 Usage:
-  python3 check_host_down_confidence.py 192.168.10.100
+  python3 check_host_down_confidence.py 192.0.2.100
   python3 check_host_down_confidence.py ns8.dominio.it --ports 22 6556 443
   python3 check_host_down_confidence.py 10.0.0.50 --no-arp --no-traceroute
   python3 check_host_down_confidence.py 10.0.0.50 --checkmk
@@ -484,7 +484,7 @@ def main():
         description="{} v{} — Diagnosi affidabilita HOST OFFLINE".format(SCRIPT_NAME, VERSION),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-  %(prog)s 192.168.10.100
+  %(prog)s 192.0.2.100
   %(prog)s ns8.dominio.it --ports 22 6556 443 3389
   %(prog)s 10.0.0.50 --no-arp --no-traceroute --threshold 80
   %(prog)s 10.0.0.50 --checkmk

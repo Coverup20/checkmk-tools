@@ -21,7 +21,7 @@ LOG_FILE   = "/omd/sites/monitoring/var/log/notify.log"
 STATE_FILE = "/omd/sites/monitoring/var/log/notify_ticket_watcher_sp.json"
 
 TOKEN   = os.environ.get("TELEGRAM_TOKEN", "")
-CHAT_ID = "-1003770828164"
+CHAT_ID = os.environ.get("TELEGRAM_NOTIFY_CHAT_ID", "")
 
 LIVESTATUS_SOCK = "/omd/sites/monitoring/tmp/run/live"
 

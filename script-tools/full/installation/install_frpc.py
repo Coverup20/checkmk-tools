@@ -86,7 +86,7 @@ class FRPCInstaller:
         hostname = platform.node()
         print("\nConfigurazione:")
         host = input(f"Nome host [{hostname}]: ").strip() or hostname
-        server = input("Server [monitor.nethlab.it]: ").strip() or "monitor.nethlab.it"
+        server = input("FRP server address: ").strip() or os.environ.get("FRP_SERVER", "")
         port = input("Porta remota: ").strip()
         token = input("Token: ").strip()
         

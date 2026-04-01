@@ -50,7 +50,7 @@ CACHE_MAX_AGE=$((30*24*3600))
 
 ```json
 {
-  "192.168.10.100:Memory": {
+  "<host-ip>:Memory": {
     "ticket_id": 1502598,
     "state": "OK",
     "created_at": 1735040400,
@@ -139,13 +139,13 @@ CACHE_MAX_AGE=$((30*24*3600))
 
 ```bash
 # Backup existing cache
-ssh monitoring@monitor.nethlab.it "cp /tmp/ydea_checkmk_tickets.json /tmp/ydea_checkmk_tickets.json.pre-ttl"
+ssh monitoring@<your-checkmk-server> "cp /tmp/ydea_checkmk_tickets.json /tmp/ydea_checkmk_tickets.json.pre-ttl"
 
 # Deploy script updated
-scp script-notify-checkmk/ydea_realip monitoring@monitor.nethlab.it:/opt/omd/sites/monitoring/local/share/check_mk/notifications/
+scp script-notify-checkmk/ydea_realip monitoring@<your-checkmk-server>:/opt/omd/sites/monitoring/local/share/check_mk/notifications/
 
 # Check deployment
-ssh monitoring@monitor.nethlab.it "grep -A5 'mark_ticket_resolved' /opt/omd/sites/monitoring/local/share/check_mk/notifications/ydea_realip"
+ssh monitoring@<your-checkmk-server> "grep -A5 'mark_ticket_resolved' /opt/omd/sites/monitoring/local/share/check_mk/notifications/ydea_realip"
 ```
 
 ## Post-Deploy Monitoring

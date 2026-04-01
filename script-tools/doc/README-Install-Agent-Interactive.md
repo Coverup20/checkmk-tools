@@ -28,7 +28,7 @@ Interactive script for automated installation/uninstallation of CheckMK Agent wi
 2. Download and install FRPC v0.64.0
 3. Interactive configuration with request for:
    - **Hostname** (default: current hostname)
-   - **Remote FRP server** (default: monitor.nethlab.it)
+   - **Remote FRP server** (default: <your-checkmk-server>)
    - **Remote port** (mandatory, e.g.: 20001)
    - **Security token** (default: conduit-reenact-talon-macarena-demotion-vaguely)
 4. Generate `/etc/frp/frpc.toml` file with the configuration
@@ -115,7 +115,7 @@ sudo ./install-agent-interactive.sh --uninstall
  System detected: Ubuntu 22.04 (deb)
 
 ═══ CHECKMK AGENT INSTALLATION ═══
- Download agent from: https://monitoring.nethlab.it/monitoring/...
+ Download agent from: https://<your-checkmk-server>/monitoring/...
  Package installation...
  CheckMK Agent installed
 
@@ -143,7 +143,7 @@ Do you want to install FRPC too? [y/N]: yes
 ═══ FRPC CONFIGURATION ═══
 Enter information for FRPC configuration:
 Hostname [default: myserver]: 
-Remote FRP server [default: monitor.nethlab.it]: 
+Remote FRP server [default: <your-checkmk-server>]: 
 Remote port [ex: 20001]: 20001
 Security token [default: conduit-reenact-talon-macarena-demotion-vaguely]: 
 
@@ -151,7 +151,7 @@ Security token [default: conduit-reenact-talon-macarena-demotion-vaguely]:
  Configuration file created
 
  FRPC Configuration:
-   Server: monitor.nethlab.it:7000
+   Server: <your-checkmk-server>:7000
    Tunnel: myserver
    Remote port: 20001
    Local port: 6556
@@ -167,7 +167,7 @@ Security token [default: conduit-reenact-talon-macarena-demotion-vaguely]:
     CheckMK Agent installed (plain TCP 6556)
     Active systemd socket: check-mk-agent-plain.socket
     FRPC Client installed and configured
-    Active tunnel: monitor.nethlab.it:20001 → localhost:6556
+    Active tunnel: <your-checkmk-server>:20001 → localhost:6556
 
  USEFUL COMMANDS:
    Local test agent: /usr/bin/check_mk_agent
@@ -188,7 +188,7 @@ The `/etc/frp/frpc.toml` file is automatically created with this structure:
 # Generated on 2025-11-06
 
 [common]
-server_addr = "monitor.nethlab.it"
+server_addr = "<your-checkmk-server>"
 server_port = 7000
 auth.method = "token"
 auth.token = "conduit-reenact-talon-macarena-demotion-vaguely"
@@ -342,7 +342,7 @@ systemctl restart check-mk-agent-plain.socket
 journalctl -u frpc -n 50
 
 # Test connection to server
-telnet monitor.nethlab.it 7000
+telnet <your-checkmk-server> 7000
 
 # Check configuration
 cat /etc/frp/frpc.toml

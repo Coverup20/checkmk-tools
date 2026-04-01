@@ -243,7 +243,7 @@ Script tested with:
 cat /tmp/ydea_checkmk_tickets.json | jq .
 
 # Remove specific ticket
-jq 'del(.["192.168.10.100:Memory"])' /tmp/ydea_checkmk_tickets.json > /tmp/ydea_checkmk_tickets.json.tmp
+jq 'del(.["<host-ip>:Memory"])' /tmp/ydea_checkmk_tickets.json > /tmp/ydea_checkmk_tickets.json.tmp
 mv /tmp/ydea_checkmk_tickets.json.tmp /tmp/ydea_checkmk_tickets.json
 
 # Complete cache reset

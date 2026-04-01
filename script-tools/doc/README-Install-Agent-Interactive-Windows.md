@@ -62,7 +62,7 @@ When prompted, provide:
 | Parameters | Description | Example |
 |-----------|-------------|---------|
 | **Hostname** | Display name for the tunnel | `ws-server-01` |
-| **FRP Server** | Remote FRP server address | `monitor.nethlab.it` |
+| **FRP Server** | Remote FRP server address | `<your-checkmk-server>` |
 | **Remote Port** | Remote port tunnel | `20001` |
 | **Auth Token** | Security token (optional) | `secret-token-string` |
 
@@ -70,7 +70,7 @@ When prompted, provide:
 
 ```toml
 [common]
-server_addr = "monitor.nethlab.it"
+server_addr = "<your-checkmk-server>"
 server_port = 7000
 auth.method = "token"
 auth.token = "your-secret-token"
@@ -184,7 +184,7 @@ Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser -Force
 ### MSI Installation Fails
 
 1. Check internet connectivity
-2. Verify firewall allows downloads from monitoring.nethlab.it
+2. Verify firewall allows downloads from <your-checkmk-server>
 3. Check disk space (minimum 500 MB)
 4. View MSI log:
    ```powershell
@@ -199,7 +199,7 @@ Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser -Force
 
 2. Verify network connectivity to FRP server:
    ```powershell
-   Test-NetConnection -ComputerName monitor.nethlab.it -Port 7000
+   Test-NetConnection -ComputerName <your-checkmk-server> -Port 7000
    ```
 
 3. Check FRPC logs for errors:

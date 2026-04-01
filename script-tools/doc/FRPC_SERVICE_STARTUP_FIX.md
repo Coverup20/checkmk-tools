@@ -148,7 +148,7 @@ if (-not $serviceRunning) {
        [OK] FRPC service started successfully
    
    [OK] FRPC Configuration:
-       Server: monitor.nethlab.it:7000
+       Server: <your-checkmk-server>:7000
        Tunnel: <tunnel-name>
        Remote port: 6010
        Local port: 6556
@@ -263,7 +263,7 @@ If the service still doesn't start automatically, you can:
 
 4. **Connectivity Test:**
    ```powershell
-   Test-NetConnection -ComputerName monitor.nethlab.it -Port 7000
+   Test-NetConnection -ComputerName <your-checkmk-server> -Port 7000
    ```
 
 ### Expected Log Output

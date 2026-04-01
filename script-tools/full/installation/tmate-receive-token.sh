@@ -3,7 +3,7 @@
 # Forced command on vps-02 server: receives tmate tokens from clients via SSH
 #
 # Called from: authorized_keys with command="/opt/tmate-receive-token.sh"
-# Stdin: tmate token (e.g. "ssh -p10022 AbCdEf@monitor01.nethlab.it")
+# Stdin: tmate token (e.g. "ssh -p10022 AbCdEf@<your-tmate-server>")
 # SSH_ORIGINAL_COMMAND: client hostname (e.g. "checkmk-z1plus")
 # SSH_CONNECTION: Client IP in field 1
 #

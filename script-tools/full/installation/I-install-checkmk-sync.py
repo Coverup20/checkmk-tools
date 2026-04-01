@@ -42,7 +42,7 @@ SYSTEMD_DIR = Path("/etc/systemd/system")
 LOCAL_TARGET_DEFAULT = "/usr/lib/check_mk_agent/local"
 
 # CheckMK Agent
-CHECKMK_BASE_URL_DEFAULT = "https://monitoring.nethlab.it/monitoring/check_mk/agents"
+CHECKMK_BASE_URL_DEFAULT = os.environ.get("CMK_AGENTS_URL", "https://<your-checkmk-server>/monitoring/check_mk/agents")
 AGENT_PLAIN_SOCKET_NAME = "check-mk-agent-plain.socket"
 AGENT_PLAIN_SERVICE_NAME = "check-mk-agent-plain@.service"
 
@@ -989,7 +989,7 @@ def ask_frpc_config() -> Tuple[str, str, int, str]:
     print()
     print("  Configurazione FRPC:")
     hostname = _ask(f"  Nome host [{default_hostname}]: ").strip().replace("\r", "") or default_hostname
-    server = _ask("  Server FRP remoto [monitor.nethlab.it]: ").strip().replace("\r", "") or "monitor.nethlab.it"
+    server = _ask("  Remote FRP server: ").strip().replace("\r", "") or os.environ.get("FRP_SERVER", "")
 
     while True:
         port_raw = _ask("  Porta remota (es: 20001): ").strip().replace("\r", "")

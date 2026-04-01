@@ -25,10 +25,10 @@ WATO (Host Check Command) configuration:
   Arguments: -H $HOSTADDRESS$ --no-ping
 
 Usage:
-  check_host_alive -H 192.168.10.100
+  check_host_alive -H 192.0.2.100
   check_host_alive -H ns8.dominio.it --ports 22 6556 443
   check_host_alive -H 10.0.0.50 --no-ping --ports 22 443 80
-  check_host_alive -H 192.168.32.100 --timeout 3
+  check_host_alive -H 192.0.2.1 --timeout 3
 
 Version: 1.0.0"""
 
@@ -148,10 +148,10 @@ def main() -> int:
         description=f"CheckMK active check: host UP/DOWN multi-layer v{VERSION}",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-  check_host_alive -H 192.168.10.100
+  check_host_alive -H 192.0.2.100
   check_host_alive -H ns8.dominio.it --ports 22 6556 443
   check_host_alive -H 10.0.0.50 --no-ping --ports 22 443
-  check_host_alive -H 192.168.32.100 --timeout 5"""
+  check_host_alive -H 192.0.2.1 --timeout 5"""
     )
     parser.add_argument(
         "-H", "--host", required=True,

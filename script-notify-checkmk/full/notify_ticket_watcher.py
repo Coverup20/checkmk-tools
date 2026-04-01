@@ -19,8 +19,8 @@ LOG_FILE   = "/omd/sites/monitoring/var/log/notify.log"
 STATE_FILE = "/omd/sites/monitoring/var/log/notify_ticket_watcher.json"
 
 TOKEN    = os.environ.get("TELEGRAM_TOKEN", "")
-CHAT_ID  = "-1003770828164"
-CMK_URL  = "https://monitor.nethlab.it/monitoring"
+CHAT_ID  = os.environ.get("TELEGRAM_NOTIFY_CHAT_ID", "")
+CMK_URL  = os.environ.get("CMK_URL", "https://<your-checkmk-server>/monitoring")
 
 # Match only lines [cmk.base.notify] Output: to avoid duplicates
 PATTERN = re.compile(

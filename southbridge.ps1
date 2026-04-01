@@ -1,8 +1,8 @@
 #!/usr/bin/env pwsh
 # southbridge.ps1 - Double tunnel to srv-monitoring-us via checkmk-vps-02
 # srv-monitoring-us side (from tmate):
-#   ssh -R 1443:127.0.0.1:443 -N root@monitor01.nethlab.it &
-#   ssh -R 2222:127.0.0.1:22  -N root@monitor01.nethlab.it &
+#   ssh -R 1443:127.0.0.1:443 -N root@<your-checkmk-server> &
+#   ssh -R 2222:127.0.0.1:22  -N root@<your-checkmk-server> &
 # This script does the PC side:
 #   local forward localhost:1443 -> checkmk-vps-02:1443  (HTTPS)
 #   local forward localhost:2222 -> checkmk-vps-02:2222  (SSH)
@@ -18,11 +18,11 @@ $check2222 = wsl -d kali-linux bash -c "ssh checkmk-vps-02 'ss -tlnp | grep :222
 if (-not $check1443 -or -not $check2222) {
     if (-not $check1443) {
         Write-Host "WARNING: port 1443 NOT active on checkmk-vps-02!" -ForegroundColor Red
-        Write-Host "on srv-monitoring-us: ssh -R 1443:127.0.0.1:443 -N root@monitor01.nethlab.it &" -ForegroundColor White
+        Write-Host "on srv-monitoring-us: ssh -R 1443:127.0.0.1:443 -N root@<your-checkmk-server> &" -ForegroundColor White
     }
     if (-not $check2222) {
         Write-Host "WARNING: port 2222 NOT active on checkmk-vps-02!" -ForegroundColor Red
-        Write-Host "on srv-monitoring-us: ssh -R 2222:127.0.0.1:22 -N root@monitor01.nethlab.it &" -ForegroundColor White
+        Write-Host "on srv-monitoring-us: ssh -R 2222:127.0.0.1:22 -N root@<your-checkmk-server> &" -ForegroundColor White
     }
     Write-Host "Waiting (Ctrl+C to exit)..." -ForegroundColor Gray
     $timeout = 120

@@ -23,14 +23,14 @@ You ran the installer and encountered:
 
 **Before:**
 ```powershell
-$CHECKMK_MSI_URL = "https://monitoring.nethlab.it/..." # Single URL, fails with 404
+$CHECKMK_MSI_URL = "https://<your-checkmk-server>/..." # Single URL, fails with 404
 ```
 
 **After:**
 ```powershell
 $CHECKMK_MSI_URLS = @(
     "https://download.checkmk.com/...", # Primary (official)
-    "https://monitoring.nethlab.it/..." # Fallback (local)
+    "https://<your-checkmk-server>/..." # Fallback (local)
 )
 
 # Script tries each URL with automatic retry
@@ -88,7 +88,7 @@ If primary fails, then fallback:
 [*] Download CheckMK Agent v2.4.0p14...
     Attempting download from: https://download.checkmk.com/...
     [WARN] URL failed: (404) Not found
-    Attempted download from: https://monitoring.nethlab.it/...
+    Attempted download from: https://<your-checkmk-server>/...
     [OK] Download completed (X.XX MB)
 ```
 
@@ -127,7 +127,7 @@ If primary fails, then fallback:
 When prompted:
 ```
 Hostname [default: COMPUTERNAME]: <your-hostname>
-Remote FRP server [default: monitor.nethlab.it]: <your-server>
+Remote FRP server [default: <your-checkmk-server>]: <your-server>
 Remote port (e.g. 20001): 20001
 Security token: <your-token>
 ```

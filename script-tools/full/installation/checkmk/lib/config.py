@@ -171,7 +171,7 @@ def load_config(*, env_file: Path, interactive: bool) -> InstallerConfig:
     smtp_relay_user = getv("SMTP_RELAY_USER", "")
     smtp_relay_password = getv("SMTP_RELAY_PASSWORD", "")
     smtp_from_address = getv("SMTP_FROM_ADDRESS", "")
-    fail2ban_ignoreip = getv("FAIL2BAN_IGNOREIP", "2.119.67.169")
+    fail2ban_ignoreip = getv("FAIL2BAN_IGNOREIP", "")
 
     if interactive:
         timezone = prompt_str("Timezone", default=timezone)

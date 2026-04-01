@@ -3,7 +3,7 @@
 
 ## Architecture
 ```
-VPS monitor01.nethlab.it (Central Master)
+VPS <your-checkmk-server> (Central Master)
 ├── Site: monitoring
 ├── Livestatus TCP: port 6557 (TLS)
 └── Collect data from remote site
@@ -34,7 +34,7 @@ The script:
 Connection Information for Central Site:
 ══════════════════════════ ══════════════════════════
 Site ID: local-box
-Site URL: https://monitor01.nethlab.it/monitoring/
+Site URL: https://<your-checkmk-server>/monitoring/
 Automation User: automation
 Automation Secret: (secret string)
 ══════════════════════════ ══════════════════════════
@@ -47,7 +47,7 @@ Automation Secret: (secret string)
 ## Phase 2: Central Site (VPS) configuration via UI
 
 ### 2.1 Log in to the CheckMK UI
-1. Open browser: https://monitor01.nethlab.it/monitoring/
+1. Open browser: https://<your-checkmk-server>/monitoring/
 2. Login with your credentials
 
 ### 2.2 Add Remote Site

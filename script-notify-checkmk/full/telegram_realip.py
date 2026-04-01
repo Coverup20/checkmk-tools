@@ -18,7 +18,7 @@ VERSION = "1.0.0"
 # === CONFIG ===
 TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
-CMK_URL = "https://monitor.nethlab.it/monitoring"
+CMK_URL = os.environ.get("CMK_URL", "https://<your-checkmk-server>/monitoring")
 SITE = "monitoring"
 # ==============
 

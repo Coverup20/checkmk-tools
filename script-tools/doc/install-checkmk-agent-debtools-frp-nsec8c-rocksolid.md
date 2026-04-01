@@ -72,7 +72,7 @@ bash install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh --uninstall
 
 | Variable | Default | Description |
 |-----------|---------|-------------|
-| `CMK_SERVER` | `monitor.nethlab.it` | Hostname CheckMK server |
+| `CMK_SERVER` | `<your-checkmk-server>` | Hostname CheckMK server |
 | `CMK_SITE` | `monitoring` | Site Name CheckMK |
 | `CMK_PROTOCOL` | `https` | Protocol (http/https) |
 | `DEB_URL` | (auto-detect) | Direct URL to the .deb agent |
@@ -454,7 +454,7 @@ cat /tmp/pre-upgrade.log /tmp/post-upgrade.log
 ### Q: Does the script work on architectures other than x86_64?
 **A**: Currently only supports x86_64. For ARM/MIPS edit `REPO_BASE` and `REPO_PACKAGES`.
 
-### Q: Can I use CheckMK server other than monitor.nethlab.it?
+### Q: Can I use CheckMK server other than <your-checkmk-server>?
 **A**: Yes, set `export CMK_SERVER="your-server.com"` before running.
 
 ### Q: Is FRP mandatory?

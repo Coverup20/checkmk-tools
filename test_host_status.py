@@ -6,28 +6,28 @@ PLUGIN = "/omd/sites/monitoring/local/lib/nagios/plugins/check_host_status"
 
 TESTS = [
     # (label,              ip,              type,     extra_args)
-    # --- Server with CMK agent ---
-    ("<hostname>", "192.168.32.1",   "server",  ""),
-    ("ns8",                "192.168.33.223", "server",  ""),
-    ("DC01",               "192.168.33.221", "server",  ""),
-    ("HV01eth1",           "192.168.33.220", "server",  ""),
-    # --- Switch ---
-    ("SW-AreaGare",        "192.168.33.231", "switch",  ""),
-    ("SW-AreaStrutture",   "192.168.33.232", "switch",  ""),
-    # --- AP UniFi ---
-    ("AP-AreaProgettazione","192.168.33.246","switch",  ""),
-    ("AP-AreaGare",        "192.168.33.250", "switch",  ""),
-    # --- Client (no agent) ---
-    ("PC03",               "192.168.32.138", "client",  ""),
-    ("WKS01",              "192.168.32.145", "client",  ""),
-    # --- NAS ---
-    ("NAS100_4100",        "192.168.100.241","server",  ""),
-    ("PACI-sede4",         "192.168.200.242","server",  ""),
-    # --- Stampanti ---
-    ("KM4A7A3C-7001",      "192.168.33.216", "generic", ""),
-    ("KM4A85F6-6610",      "192.168.33.215", "generic", ""),
-    # --- Controllo negativo: IP inesistente ---
-    ("IP_INESISTENTE",     "10.255.255.99",  "client",  "--timeout 1"),
+    # --- Servers with CMK agent ---
+    ("server-01",          "192.0.2.1",     "server",  ""),
+    ("server-02",          "192.0.2.2",     "server",  ""),
+    ("server-03",          "192.0.2.3",     "server",  ""),
+    ("server-04",          "192.0.2.4",     "server",  ""),
+    # --- Switches ---
+    ("switch-01",          "192.0.2.10",    "switch",  ""),
+    ("switch-02",          "192.0.2.11",    "switch",  ""),
+    # --- Access Points ---
+    ("ap-01",              "192.0.2.20",    "switch",  ""),
+    ("ap-02",              "192.0.2.21",    "switch",  ""),
+    # --- Clients (no agent) ---
+    ("client-01",          "192.0.2.30",    "client",  ""),
+    ("client-02",          "192.0.2.31",    "client",  ""),
+    # --- NAS / Storage ---
+    ("nas-01",             "192.0.2.40",    "server",  ""),
+    ("nas-02",             "192.0.2.41",    "server",  ""),
+    # --- Printers ---
+    ("printer-01",         "192.0.2.50",    "generic", ""),
+    ("printer-02",         "192.0.2.51",    "generic", ""),
+    # --- Negative test: unreachable IP ---
+    ("UNREACHABLE",        "192.0.2.254",   "client",  "--timeout 1"),
 ]
 
 def run_check(label, ip, htype, extra):

@@ -210,7 +210,7 @@ def main() -> int:
     svc = f"Tmate.{local_hostname}"
     if local_token:
         # Replaces IP with FQDN in token
-        local_token_display = re.sub(r'@[\d.]+', '@monitor01.nethlab.it', local_token)
+        local_token_display = re.sub(r'@[\d.]+', '@' + os.environ.get('TMATE_SERVER_HOST', '<tmate-server>'), local_token)
         print(f"0 {svc} - OK: {local_token_display}")
     else:
         print(f"1 {svc} - WARNING: sessione locale non attiva")

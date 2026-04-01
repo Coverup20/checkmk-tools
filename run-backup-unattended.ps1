@@ -14,7 +14,7 @@ if (-not (Test-Path $LOG_PATH)) {
 "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Inizio backup automatico..." | Out-File -FilePath $LOG_FILE -Append -Encoding UTF8
 
 # Wait for the network share to be available (max 60 seconds)
-$NETWORK_SHARE = "\\192.168.10.132\usbshare"
+$NETWORK_SHARE = if ($env:BACKUP_NETWORK_PATH) { $env:BACKUP_NETWORK_PATH } else { "" }
 $maxRetries = 12
 $retryDelay = 5
 
