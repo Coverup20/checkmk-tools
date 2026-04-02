@@ -699,7 +699,3 @@ MIT License — see [LICENSE](LICENSE) for details.
 | Proxmox VE | 10 | Virtualization platform |
 | tmate Server | 1 | SSH session sharing |
 | Windows | - | PowerShell scripts |
-
----
-
-*Developed for the CheckMK community.*
