@@ -14,6 +14,11 @@
 - `.copilot-preferences.md` → Summary/quick reference (220 lines)
 - `.github/copilot-instructions.md` → **THIS FILE** - Complete rules (~2250 lines, automatically updated)
 
+**MANDATORY: At the start of EVERY conversation, use the memory tool to read these repository memory files:**
+- `/memories/repo/hosts-access.md` → SSH access method per host (key vs password), correct commands
+- `/memories/repo/copilot-scripts-index.md` → Index of all copilot/ scripts and their purpose
+- `/memories/repo/copilot-scripts-policy.md` → Where to save temp scripts, author name, README rules
+
 ---
 
 ## MANDATORY GENERAL RULES
