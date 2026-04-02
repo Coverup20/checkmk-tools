@@ -1,6 +1,6 @@
 # CheckMK Tools Collection
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](LICENSE)
 [![CheckMK](https://img.shields.io/badge/CheckMK-Compatible-green.svg)](https://checkmk.com/)
 [![Python](https://img.shields.io/badge/Python-3.6+-blue.svg)](https://www.python.org/)
 
@@ -684,7 +684,7 @@ python3 checkmk_rclone_space_dyn.py setup
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+GPL-2.0-only — see [LICENSE](LICENSE) for details.
 
 ---
 
