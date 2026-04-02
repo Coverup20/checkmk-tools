@@ -26,7 +26,7 @@ import re
 import time
 from typing import Optional
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 EXCLUDE_IPS = {"127.0.0.1", "::1"}  # esclude il server stesso
 SERVICE = "Tmate.Clients"
 TOKENS_DIR = "/opt/tmate-tokens"
@@ -197,7 +197,7 @@ def main() -> int:
             msg = f"{token} [VIEWER CONNESSO]" if token else "token atteso [VIEWER CONNESSO]"
             print(f"1 {svc} - WARNING: {msg}")
         elif not token:
-            print(f"1 {svc} - WARNING: token atteso (systemctl restart tmate-token-push.service)")
+            print(f"1 {svc} - WARNING: [{prefix}...] token atteso (systemctl restart tmate-token-push.service)")
         elif token_stale:
             print(f"1 {svc} - WARNING: {token} (restart push service)")
         else:
