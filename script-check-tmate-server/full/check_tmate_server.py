@@ -26,7 +26,7 @@ import re
 import time
 from typing import Optional
 
-VERSION = "1.1.2"
+VERSION = "1.2.0"
 EXCLUDE_IPS = {"127.0.0.1", "::1"}  # esclude il server stesso
 SERVICE = "Tmate.Clients"
 TOKENS_DIR = "/opt/tmate-tokens"
@@ -163,6 +163,7 @@ def main() -> int:
 
     # One line per active host
     active_nodenames = set()
+    claimed_file_keys = set()
     for prefix, sess in sorted(sessions.items(), key=lambda x: x[1].get('nodename') or x[1]['ip']):
         nodename = sess.get('nodename') or sess['ip']
         active_nodenames.add(nodename)
@@ -171,10 +172,11 @@ def main() -> int:
 
         # Fallback: Search by prefix in file contents
         if not token:
-            for _, t in token_files.items():
+            for file_key, t in token_files.items():
                 m = re.search(r'ssh -p\d+ (\w+)@', t)
                 if m and m.group(1).startswith(prefix):
                     token = t
+                    claimed_file_keys.add(file_key)
                     break
 
         viewers = sess.get('viewers', 0)
@@ -198,7 +200,7 @@ def main() -> int:
 
     # Host offline (token saved but no longer in ps)
     for hostname, token in sorted(token_files.items()):
-        if hostname not in active_nodenames:
+        if hostname not in active_nodenames and hostname not in claimed_file_keys:
             svc = f"Tmate.{hostname}"
             print(f"1 {svc} - WARNING: [offline] {token}")
 
