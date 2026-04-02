@@ -1,0 +1,22 @@
+========================================================================================
+DETAILED TMATE SERVER SCRIPT LIST
+Repository: checkmk-tools
+Folder: script-check-tmate-server/
+Date: April 2, 2026
+========================================================================================
+
+ FOLDER STRUCTURE
+└── full/ (1 script)
+
+========================================================================================
+CHECK SCRIPTS (full/)
+========================================================================================
+
+check_tmate_watchdog.py
+  - Description : Monitor tmate-ssh-server for unauthorized connection attempts
+  - Service name: Tmate.AuthWatchdog
+  - States      : OK (no attempts), WARN (>=1 attempt), CRIT (>=5 attempts)
+  - Details     : Parses journald logs, detects "Spawning pty client" without
+                  "Client joined" (key check failed), reports IPs of attackers
+  - State file  : /var/tmp/check_tmate_watchdog_state.json
+  - Deploy on   : tmate-ssh-server host (vps-02 / monitor01)
