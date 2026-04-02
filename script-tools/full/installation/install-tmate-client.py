@@ -10,7 +10,7 @@
 # Read token with: cat /run/tmate-ssh.txt
 #
 # Usage:
-#   python3 install-tmate-client.py [--server <host>] [--port <port>]
+#   python3 install-tmate-client.py [--server <host>] [--port <port>] [--authorized-keys /path/to/authorized_keys]
 
 import os
 import sys
@@ -19,7 +19,7 @@ import argparse
 import time
 from datetime import datetime
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 TMATE_SERVER_PORT = "10022"
 TMATE_SERVER_RSA_FP = "SHA256:J71q24ldCtHKvDsVrShV3WAIWVy/73KdgbcqcUo0T80"
@@ -48,7 +48,7 @@ def write_file(path, content, mode=0o644):
 
 ## Install
 
-def install(server_host, server_port):
+def install(server_host, server_port, authorized_keys):
     log(f"=== install-tmate-client.py v{VERSION} ===")
 
     if os.geteuid() != 0:
@@ -61,6 +61,7 @@ def install(server_host, server_port):
                 break
             print("ERROR: value cannot be empty.")
     log(f"Server: {server_host}:{server_port}")
+    log(f"Authorized keys: {authorized_keys}")
 
     # 1. Install tmate
     r = run(["which", "tmate"], capture=True, check=False)
@@ -81,7 +82,8 @@ def install(server_host, server_port):
         f"set -g tmate-server-host {server_host}\n"
         f"set -g tmate-server-port {server_port}\n"
         f"set -g tmate-server-rsa-fingerprint {TMATE_SERVER_RSA_FP}\n"
-        f"set -g tmate-server-ed25519-fingerprint {TMATE_SERVER_ED25519_FP}\n")
+        f"set -g tmate-server-ed25519-fingerprint {TMATE_SERVER_ED25519_FP}\n"
+        f"set -g tmate-authorized-keys \"{authorized_keys}\"\n")
 
     # 4. tmate-token-writer.sh helper
     log("Installing tmate-token-writer.sh...")
@@ -167,5 +169,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description=f"install-tmate-client.py v{VERSION}")
     p.add_argument("--server", default="", help="IP or FQDN of the tmate server")
     p.add_argument("--port", default=TMATE_SERVER_PORT, help=f"tmate server port (default: {TMATE_SERVER_PORT})")
+    p.add_argument("--authorized-keys", default="/root/.ssh/authorized_keys",
+                   help="Path to authorized_keys file for tmate SSH key restriction (default: /root/.ssh/authorized_keys)")
     args = p.parse_args()
-    install(args.server, args.port)
+    install(args.server, args.port, args.authorized_keys)
