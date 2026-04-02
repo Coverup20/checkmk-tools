@@ -26,7 +26,7 @@ import re
 import time
 from typing import Optional
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 EXCLUDE_IPS = {"127.0.0.1", "::1"}  # esclude il server stesso
 SERVICE = "Tmate.Clients"
 TOKENS_DIR = "/opt/tmate-tokens"
@@ -176,6 +176,11 @@ def main() -> int:
                 m = re.search(r'ssh -p\d+ (\w+)@', t)
                 if m and m.group(1).startswith(prefix):
                     token = t
+                    # Prefer the token file hostname over the IP-based nodename
+                    active_nodenames.discard(nodename)
+                    nodename = file_key
+                    svc = f"Tmate.{nodename}"
+                    active_nodenames.add(nodename)
                     claimed_file_keys.add(file_key)
                     break
 
