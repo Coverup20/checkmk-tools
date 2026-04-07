@@ -4,14 +4,14 @@
 TOKEN and CHAT_ID read from OMD standard environment file:
   /omd/sites/monitoring/etc/environment
 
-Version: 1.1.0"""
+Version: 1.2.0"""
 
 import os
 import sys
 import urllib.parse
 import urllib.request
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 # === CONFIG ===
 ENV_FILE = "/omd/sites/monitoring/etc/environment"
@@ -36,17 +36,17 @@ def load_env_file(path: str) -> None:
                 os.environ[key] = value
 
 
-def get_emoji(state: str) -> str:
+def get_status_prefix(state: str) -> str:
     state = state.upper()
     if state in ("OK", "UP"):
-        return ""
+        return "[OK]"
     elif state in ("WARN", "WARNING"):
-        return ""
+        return "[WARN]"
     elif state in ("CRIT", "CRITICAL", "DOWN"):
-        return ""
+        return "[CRIT]"
     elif state == "UNKNOWN":
-        return ""
-    return ""
+        return "[UNKNOWN]"
+    return "[?]"
 
 
 def urlencode(value: str) -> str:
@@ -65,9 +65,13 @@ def send_telegram(token: str, chat_id: str, text: str, reply_markup: str) -> Non
     try:
         req = urllib.request.Request(url, data=data, method="POST")
         with urllib.request.urlopen(req, timeout=10) as resp:
-            resp.read()
-    except Exception:
-        pass  # Notifiche non devono bloccare CheckMK
+            body = resp.read().decode("utf-8", errors="replace")
+        if '"ok":true' not in body and '"ok": true' not in body:
+            sys.stderr.write(f"telegram_tmate v{VERSION}: Telegram API error: {body[:200]}\n")
+            raise RuntimeError(f"Telegram API error: {body[:200]}")
+    except Exception as e:
+        sys.stderr.write(f"telegram_tmate v{VERSION}: send failed: {e}\n")
+        raise
 
 
 def main() -> int:
@@ -93,7 +97,7 @@ def main() -> int:
         state = os.environ.get("NOTIFY_SERVICESTATE", "UNKNOWN")
         service = os.environ.get("NOTIFY_SERVICEDESC", "SERVICE")
         output = os.environ.get("NOTIFY_SERVICEOUTPUT", "N/A")
-        emoji = get_emoji(state)
+        prefix = get_status_prefix(state)
 
         service_enc = urlencode(service)
         service_link = (
@@ -106,18 +110,18 @@ def main() -> int:
         )
 
         msg = (
-            f"[{emoji} {state}] Servizio → {service}\n"
+            f"{prefix} Servizio: {service}\n"
             f"Host: {hostname} ({real_ip})\n"
             f"Output: {output}"
         )
         button = (
-            '{"inline_keyboard":[[{"text":" Servizio","url":"' + service_link + '"},'
-            '{"text":" Host","url":"' + host_link + '"}]]}'
+            '{"inline_keyboard":[[{"text":"Servizio","url":"' + service_link + '"},'
+            '{"text":"Host","url":"' + host_link + '"}]]}'
         )
     else:
         state = os.environ.get("NOTIFY_HOSTSTATE", "UNKNOWN")
         output = os.environ.get("NOTIFY_HOSTOUTPUT", "N/A")
-        emoji = get_emoji(state)
+        prefix = get_status_prefix(state)
 
         host_link = (
             f"{CMK_URL}/check_mk/view.py?view_name=host"
@@ -125,15 +129,15 @@ def main() -> int:
         )
 
         msg = (
-            f"[{emoji} {state}] Host → {hostname}\n"
+            f"{prefix} Host: {hostname}\n"
             f"IP: {real_ip}\n"
             f"Output: {output}"
         )
         button = (
-            '{"inline_keyboard":[[{"text":" Host","url":"' + host_link + '"}]]}'
+            '{"inline_keyboard":[[{"text":"Host","url":"' + host_link + '"}]]}'
         )
 
-    msg = f" [TMATE] {msg}"
+    msg = f"[TMATE] {msg}"
     send_telegram(token, chat_id, msg, button)
     return 0
 
