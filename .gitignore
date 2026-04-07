@@ -1,0 +1,29 @@
+*.iso
+
+.vagrant/
+*.vhdx
+*.vmcx
+*.vmgs
+*.VMRS
+
+# Python
+__pycache__/
+*.pyc
+
+# Personal preferences (not for public repo)
+.copilot-preferences.md
+
+# Backup directories (local only)
+BACKUP_ORIGINALI_PROD*/
+*.BACKUP_*/
+*BACKUP*_202*/
+BACKUP-CORRUPTED-*/
+BACKUP-CORRUPTED-*
+
+# Temporary reports
+integrity-report*.txt
+
+
+# Ydea credentials (NEVER commit!)
+Ydea-Toolkit/config/credentials.sh
+Ydea-Toolkit/config/.ydea-cookies
