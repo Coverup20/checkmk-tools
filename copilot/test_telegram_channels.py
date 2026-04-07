@@ -8,7 +8,7 @@ import base64
 import json
 import re
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 
 # Servers to test: name, SSH host alias (from ~/.ssh/config in WSL), env file path
 # Add "skip": True for password-only hosts (will print manual instructions instead)
@@ -31,7 +31,7 @@ SERVERS = [
     {
         "name": "checkmk-vps-02 (tmate)",
         "host": "checkmk-vps-02",
-        "env": "/opt/omd/sites/monitoring/local/share/check_mk/notifications/telegram_tmate.env",
+        "env": "/omd/sites/monitoring/local/share/check_mk/notifications/telegram_tmate.env",
     },
     {
         "name": "srv-monitoring-us",
