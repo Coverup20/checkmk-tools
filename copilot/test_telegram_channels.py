@@ -8,7 +8,7 @@ import base64
 import json
 import re
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 # Servers to test: name, SSH host alias (from ~/.ssh/config in WSL), env file path
 # Add "skip": True for password-only hosts (will print manual instructions instead)
@@ -32,6 +32,12 @@ SERVERS = [
         "name": "checkmk-vps-02 (tmate)",
         "host": "checkmk-vps-02",
         "env": "/opt/omd/sites/monitoring/local/share/check_mk/notifications/telegram_tmate.env",
+    },
+    {
+        "name": "srv-monitoring-us",
+        "host": "root@195.223.159.26",
+        "ssh_opts": "-J checkmk-vps-01 -p 2333 -i ~/.ssh/copilot_monitoring_us_root",
+        "env": "/omd/sites/monitoring/etc/environment",
     },
 ]
 
@@ -98,9 +104,10 @@ print(json.dumps(results))
 
 ## Utils
 
-def ssh_run_script(host, script, env_file, timeout=30):
+def ssh_run_script(host, script, env_file, timeout=30, ssh_opts=""):
     b64 = base64.b64encode(script.encode()).decode()
-    ssh_cmd = f"ssh -o ConnectTimeout=10 -o BatchMode=yes {host} 'echo {b64} | base64 -d | python3 - {env_file}'"
+    opts = f"{ssh_opts} " if ssh_opts else ""
+    ssh_cmd = f"ssh -o ConnectTimeout=10 -o BatchMode=yes {opts}{host} 'echo {b64} | base64 -d | python3 - {env_file}'"
     cmd = ["wsl", "-d", "kali-linux", "bash", "-c", ssh_cmd]
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     return p.returncode, p.stdout.strip(), p.stderr.strip()
@@ -171,7 +178,10 @@ def main():
 
     for srv in SERVERS:
         try:
-            rc, stdout, stderr = ssh_run_script(srv["host"], REMOTE_SCRIPT, srv["env"])
+            rc, stdout, stderr = ssh_run_script(
+                srv["host"], REMOTE_SCRIPT, srv["env"],
+                ssh_opts=srv.get("ssh_opts", "")
+            )
             print_server_result(srv["name"], rc, stdout, stderr)
 
             # Count for summary
