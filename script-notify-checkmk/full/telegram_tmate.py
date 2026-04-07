@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
 """telegram_tmate.py - Telegram notifications for Check MK Tmate channel
 
-Dedicated notification script. TOKEN and CHAT_ID read from .env file:
-  /omd/sites/monitoring/local/share/check_mk/notifications/telegram_tmate.env
+TOKEN and CHAT_ID read from OMD standard environment file:
+  /omd/sites/monitoring/etc/environment
 
-Version: 1.0.0"""
+Version: 1.1.0"""
 
 import os
 import sys
 import urllib.parse
 import urllib.request
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 # === CONFIG ===
-ENV_FILE = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "telegram_tmate.env"
-)
+ENV_FILE = "/omd/sites/monitoring/etc/environment"
 CMK_URL = os.environ.get("CMK_URL", "https://<your-checkmk-server>/monitoring")
 SITE = "monitoring"
 # ==============
