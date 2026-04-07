@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Telegram
+# Telegram - v1.1.0
 set -euo pipefail
 
 # === CONFIG ===
@@ -61,11 +61,17 @@ fi
 # Prefisso per riconoscere subito la VPS
 MSG=" [VPS]  $MSG"
 
-# Invio silenzioso
-curl -sS -o /dev/null -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+# Invio con logging errori
+RESPONSE=$(curl -sS -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
   -d chat_id="${CHAT_ID}" \
   -d text="$MSG" \
-  --data-urlencode "reply_markup=$BUTTON" >/dev/null 2>&1 || true
+  --data-urlencode "reply_markup=$BUTTON" 2>&1)
 
-exit 0
+if echo "$RESPONSE" | grep -q '"ok":true'; then
+  echo "Telegram OK: message sent"
+  exit 0
+else
+  echo "Telegram ERROR: $RESPONSE"
+  exit 1
+fi
 
