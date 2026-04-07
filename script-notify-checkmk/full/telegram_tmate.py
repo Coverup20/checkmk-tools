@@ -4,14 +4,14 @@
 TOKEN and CHAT_ID read from OMD standard environment file:
   /omd/sites/monitoring/etc/environment
 
-Version: 1.2.0"""
+Version: 1.3.0"""
 
 import os
 import sys
 import urllib.parse
 import urllib.request
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 # === CONFIG ===
 ENV_FILE = "/omd/sites/monitoring/etc/environment"
@@ -59,7 +59,6 @@ def send_telegram(token: str, chat_id: str, text: str, reply_markup: str) -> Non
         "chat_id": chat_id,
         "text": text,
         "reply_markup": reply_markup,
-        "parse_mode": "HTML",
     }).encode("utf-8")
 
     try:
