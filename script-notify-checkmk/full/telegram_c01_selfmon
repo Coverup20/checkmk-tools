@@ -3,7 +3,7 @@
 telegram_c01_selfmon - Notifiche Telegram Self-Monitoring per Urbino Servizi
 Script dedicato per notifiche del server di monitoraggio Urbino (self-monitoring).
 
-Version: 1.0.0
+Version: 1.1.0
 """
 
 import os
@@ -51,9 +51,11 @@ def send_telegram(token: str, chat_id: str, text: str, reply_markup: str) -> Non
     try:
         req = urllib.request.Request(url, data=data, method="POST")
         with urllib.request.urlopen(req, timeout=10) as resp:
-            resp.read()
-    except Exception:
-        pass  # Notifiche non devono bloccare CheckMK
+            body = resp.read()
+            print(f"Telegram OK: {body[:80]}")
+    except Exception as e:
+        print(f"Telegram ERROR: {e}", file=sys.stderr)
+        raise
 
 
 def main() -> int:

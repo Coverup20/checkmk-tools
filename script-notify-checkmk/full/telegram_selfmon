@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Telegram Self-Monitoring
+# Telegram Self-Monitoring - v1.1.0
 # Script dedicato per notifiche dell'host "monitor" (self-monitoring CheckMK)
 set -euo pipefail
 
@@ -62,10 +62,16 @@ fi
 # Prefisso dedicato self-monitoring
 MSG=" [SELF-MONITOR]  $MSG"
 
-# Invio silenzioso
-curl -sS -o /dev/null -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+# Invio con logging errori
+RESPONSE=$(curl -sS -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
   -d chat_id="${CHAT_ID}" \
   -d text="$MSG" \
-  --data-urlencode "reply_markup=$BUTTON" >/dev/null 2>&1 || true
+  --data-urlencode "reply_markup=$BUTTON" 2>&1)
 
-exit 0
+if echo "$RESPONSE" | grep -q '"ok":true'; then
+  echo "Telegram OK: message sent"
+  exit 0
+else
+  echo "Telegram ERROR: $RESPONSE"
+  exit 1
+fi
