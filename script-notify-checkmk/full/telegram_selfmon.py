@@ -5,7 +5,7 @@ Bulk: no
 CheckMK notification script - dedicated for "monitor" host self-monitoring alerts.
 Sends Telegram message with hardcoded CHAT_ID for self-monitoring channel.
 
-Version: 1.1.0"""
+Version: 1.2.0"""
 
 import os
 import sys
@@ -14,7 +14,7 @@ import urllib.request
 import urllib.parse
 from urllib.error import URLError
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 # === CONFIG ===
 TOKEN = os.getenv("TELEGRAM_TOKEN", "")
@@ -29,13 +29,13 @@ def get_emoji(state):
     """Get emoji for notification state."""
     state_upper = state.upper()
     if state_upper in ["OK", "UP"]:
-        return ""
+        return "🟢"
     elif state_upper in ["WARN", "WARNING"]:
-        return ""
+        return "🟡"
     elif state_upper in ["CRIT", "CRITICAL", "DOWN"]:
-        return ""
+        return "🔴"
     elif state_upper == "UNKNOWN":
-        return ""
+        return "🟡"
     else:
         return ""
 
@@ -106,7 +106,7 @@ def main():
         }
     
     # Prefisso dedicato self-monitoring
-    msg = f" [SELF-MONITOR]  {msg}"
+    msg = f"🔍 [SELF-MONITOR] {msg}"
     
     # Send to Telegram
     try:

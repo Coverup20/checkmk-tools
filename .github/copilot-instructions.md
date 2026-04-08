@@ -33,9 +33,14 @@
 
 ### Emojis in files
 
-- **ZERO emojis in files** — no exceptions: scripts, code, comments, markdown, Copilot instruction files
-- **Existing files modified**: Remove all emoji from entire file when tapping
-- **New files**: never insert emojis
+- **ZERO emojis in files** — with ONE exception: colored status circles in script output (see below)
+- **Existing files modified**: Remove all emoji from entire file when editing, EXCEPT status circles
+- **New files**: never insert emojis, EXCEPT status circles in output
+- **ALLOWED**: colored circle indicators used as status markers in script/notification output:
+  - `🔴` red circle — CRITICAL / error / alert
+  - `🟡` yellow circle — WARNING / degraded
+  - `🟢` green circle — OK / healthy / resolved
+  - These are functional indicators, not decorative emojis
 
 ### Chat communications
 

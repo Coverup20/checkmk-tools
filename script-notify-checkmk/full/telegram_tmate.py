@@ -4,14 +4,14 @@
 TOKEN and CHAT_ID read from OMD standard environment file:
   /omd/sites/monitoring/etc/environment
 
-Version: 1.3.0"""
+Version: 1.4.0"""
 
 import os
 import sys
 import urllib.parse
 import urllib.request
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 # === CONFIG ===
 ENV_FILE = "/omd/sites/monitoring/etc/environment"
@@ -39,13 +39,13 @@ def load_env_file(path: str) -> None:
 def get_status_prefix(state: str) -> str:
     state = state.upper()
     if state in ("OK", "UP"):
-        return "[OK]"
+        return "🟢 [OK]"
     elif state in ("WARN", "WARNING"):
-        return "[WARN]"
+        return "🟡 [WARN]"
     elif state in ("CRIT", "CRITICAL", "DOWN"):
-        return "[CRIT]"
+        return "🔴 [CRIT]"
     elif state == "UNKNOWN":
-        return "[UNKNOWN]"
+        return "🟡 [UNKNOWN]"
     return "[?]"
 
 
@@ -136,7 +136,7 @@ def main() -> int:
             '{"inline_keyboard":[[{"text":"Host","url":"' + host_link + '"}]]}'
         )
 
-    msg = f"[TMATE] {msg}"
+    msg = f"🖥️ [TMATE] {msg}"
     send_telegram(token, chat_id, msg, button)
     return 0
 

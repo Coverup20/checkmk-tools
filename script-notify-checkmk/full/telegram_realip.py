@@ -4,7 +4,7 @@ Bulk: no
 
 CheckMK notification script - sends Telegram message with real IP and inline buttons.
 
-Version: 1.0.0"""
+Version: 1.1.0"""
 
 import os
 import sys
@@ -13,7 +13,7 @@ import urllib.request
 import urllib.parse
 from urllib.error import URLError
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 # === CONFIG ===
 TOKEN = os.getenv("TELEGRAM_TOKEN", "")
@@ -27,13 +27,13 @@ def get_emoji(state):
     """Get emoji for notification state."""
     state_upper = state.upper()
     if state_upper in ["OK", "UP"]:
-        return ""
+        return "🟢"
     elif state_upper in ["WARN", "WARNING"]:
-        return ""
+        return "🟡"
     elif state_upper in ["CRIT", "CRITICAL", "DOWN"]:
-        return ""
+        return "🔴"
     elif state_upper == "UNKNOWN":
-        return ""
+        return "🟡"
     else:
         return ""
 
@@ -104,7 +104,7 @@ def main():
         }
     
     # Prefix to identify VPS
-    msg = f" [VPS]  {msg}"
+    msg = f"🖥️ [VPS] {msg}"
     
     # Send to Telegram
     try:
