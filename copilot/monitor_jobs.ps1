@@ -18,7 +18,7 @@ param(
     [int]$Interval = 15
 )
 
-$VERSION   = "1.8.2"
+$VERSION   = "1.8.3"
 $WORKSPACE = Split-Path -Parent $PSScriptRoot
 $LOG_FILE  = Join-Path $WORKSPACE "monitor-jobs.log"
 
@@ -299,6 +299,23 @@ print(f"  Stale >1.5: {stale_n}{'  !!!' if stale_n > 0 else '  OK'}")
 unack = live("GET services\nFilter: state = 2\nFilter: acknowledged = 0\nFilter: host_acknowledged = 0\nStats: state >= 0\n")
 unack_n = int(unack) if unack.isdigit() else 0
 print(f"  Unacked CRIT: {unack_n}{'  !!!' if unack_n > 0 else '  OK'}")
+# stalled services: not updated for >10 min
+t10 = int(time.time()) - 600
+stall_all = live(f"GET services\nFilter: last_check < {t10}\nStats: state >= 0\n")
+stall_nok = live(f"GET services\nFilter: last_check < {t10}\nFilter: state != 0\nStats: state >= 0\n")
+stall_n = int(stall_nok) if str(stall_nok).isdigit() else 0
+stall_a = int(stall_all) if str(stall_all).isdigit() else 0
+warn_s = "  !!!" if stall_n > 0 else "  OK"
+print(f"  Stall >10min: {stall_a} total, {stall_n} non-OK{warn_s}")
+if stall_n > 0:
+    top = live(f"GET services\nColumns: host_name description state last_check\nFilter: last_check < {t10}\nFilter: state != 0\nOutputFormat: csv\n")
+    for row in top.split("\n")[:5]:
+        parts = row.split(";")
+        if len(parts) == 4:
+            h, svc, st, lc = parts
+            age_min = int((time.time() - int(lc)) / 60) if lc.isdigit() else "?"
+            state_str = {"0": "OK", "1": "WARN", "2": "CRIT", "3": "UNKN"}.get(st, st)
+            print(f"    !!! {h} | {svc} | {state_str} | last check {age_min}min ago")
 
 # LAST SUCCESSFUL NOTIFICATION
 sec("LAST SUCCESSFUL NOTIFICATION")
