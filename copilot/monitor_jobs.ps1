@@ -18,7 +18,7 @@ param(
     [int]$Interval = 15
 )
 
-$VERSION   = "1.5.0"
+$VERSION   = "1.6.0"
 $WORKSPACE = Split-Path -Parent $PSScriptRoot
 $LOG_FILE  = Join-Path $WORKSPACE "monitor-jobs.log"
 
@@ -156,6 +156,46 @@ files = [f for f in out.split("\n") if f.strip() and f != "__pycache__"]
 print(f"  Deployed: {len(files)} checks")
 for f in sorted(files):
     print(f"    {f}")
+
+# OWNERSHIP CHECK
+sec("OWNERSHIP CHECK")
+# Files in /omd/sites/monitoring NOT owned by monitoring
+rc, out = run(["bash", "-c",
+    "find /omd/sites/monitoring -maxdepth 6"
+    " ! -user monitoring"
+    " ! -path '*/__pycache__/*'"
+    " ! -path '*/.git/*'"
+    " ! -path '*/tmp/*'"
+    " 2>/dev/null | head -30"])
+bad_mon = [l.strip() for l in out.split("\n") if l.strip()]
+if bad_mon:
+    print(f"  !!! {len(bad_mon)} file/dir in /omd/sites NOT owned by monitoring:")
+    for f in bad_mon[:10]:
+        rc2, stat_out = run(["stat", "-c", "%U:%G  %n", f])
+        print(f"    !!! {stat_out if rc2 == 0 else f}")
+    if len(bad_mon) > 10:
+        print(f"    ... ({len(bad_mon)-10} more, run find manually for full list)")
+else:
+    print("  /omd/sites/monitoring: all files monitoring:monitoring OK")
+# Notification scripts: explicit check
+rc, out = run(["bash", "-c",
+    "stat -c '%U:%G  %n'"
+    " /omd/sites/monitoring/local/share/check_mk/notifications/*"
+    " 2>/dev/null | grep -v '^monitoring:monitoring'"])
+bad_notif = [l.strip() for l in out.split("\n") if l.strip()]
+if bad_notif:
+    for l in bad_notif:
+        print(f"  !!! notifications: {l}")
+else:
+    print("  notifications/: all monitoring:monitoring OK")
+# /opt/checkmk-tools must be root:root
+rc, out = run(["stat", "-c", "%U:%G", "/opt/checkmk-tools"])
+if rc == 0:
+    owner = out.strip()
+    mark = "OK" if owner == "root:root" else "!!! expected root:root"
+    print(f"  /opt/checkmk-tools: {owner}  {mark}")
+else:
+    print("  /opt/checkmk-tools: NOT FOUND !!!")
 
 # TELEGRAM CONNECTIVITY
 sec("TELEGRAM CONNECTIVITY")
@@ -318,6 +358,7 @@ switch ($Command.ToLower()) {
         Write-Host "  key services + stopped services"
         Write-Host "  crontab (root + monitoring user)"
         Write-Host "  repo /opt/checkmk-tools (commit, status, last pull)"
+        Write-Host "  ownership check (omd site files + notifications must be monitoring:monitoring)"
         Write-Host "  deployed local checks"
         Write-Host "  Telegram connectivity + FallbackDNS"
         Write-Host "  notify log errors (last 24h)"
