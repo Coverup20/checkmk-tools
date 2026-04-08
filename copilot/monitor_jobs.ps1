@@ -18,7 +18,7 @@ param(
     [int]$Interval = 15
 )
 
-$VERSION   = "1.6.0"
+$VERSION   = "1.7.0"
 $WORKSPACE = Split-Path -Parent $PSScriptRoot
 $LOG_FILE  = Join-Path $WORKSPACE "monitor-jobs.log"
 
@@ -196,6 +196,71 @@ if rc == 0:
     print(f"  /opt/checkmk-tools: {owner}  {mark}")
 else:
     print("  /opt/checkmk-tools: NOT FOUND !!!")
+
+# BACKUP CHECK - local (mkbackup)
+sec("BACKUP CHECK (local)")
+rc, out = run(["su", "-", "monitoring", "-c", "mkbackup list 2>&1"])
+if rc == 0 and out.strip():
+    for l in out.strip().split("\n")[-15:]:
+        if l.strip():
+            print(f"  {l.strip()[:120]}")
+else:
+    # fallback: search mkbackup log files
+    rc, out = run(["bash", "-c",
+        "find /omd/sites/monitoring/var -maxdepth 3 -name '*mkbackup*' 2>/dev/null | head -5"])
+    if rc == 0 and out.strip():
+        for logf in out.strip().split("\n")[:2]:
+            if logf:
+                rc2, tail = run(["tail", "-8", logf.strip()])
+                print(f"  [{logf.strip()}]")
+                for l in tail.split("\n"):
+                    if l.strip():
+                        print(f"    {l.strip()[:100]}")
+    else:
+        print("  !!! mkbackup log/list not available")
+
+# BACKUP CHECK - cloud (rclone DO bucket)
+sec("BACKUP CHECK (cloud DO bucket)")
+try:
+    r = subprocess.run(
+        ["bash", "-c",
+         "su - monitoring -c 'rclone lsl --max-depth 2 do:testmonbck/checkmk-backups/ 2>&1 | sort | tail -6'"],
+        capture_output=True, text=True, timeout=30
+    )
+    out = (r.stdout + r.stderr).strip()
+    if r.returncode == 0 and out:
+        print("  Latest files do:testmonbck/checkmk-backups/:")
+        for l in out.split("\n"):
+            if l.strip():
+                print(f"    {l[:120]}")
+    else:
+        print(f"  !!! rclone error or empty: {out[:200]}")
+except Exception as e:
+    print(f"  !!! rclone timeout/error: {e}")
+
+# YDEA ACCESS CHECK
+sec("YDEA ACCESS CHECK")
+for f in ["/opt/ydea-toolkit/.env.la", "/opt/ydea-toolkit/.env.ag",
+          "/opt/ydea-toolkit/cache"]:
+    rc, out = run(["stat", "-c", "%U:%G  %A  %n", f])
+    print(f"  {'!!! NOT FOUND: '+f if rc != 0 else out.strip()}")
+for cf in ["ydea_checkmk_tickets.json", "ydea_checkmk_flapping.json"]:
+    path = f"/opt/ydea-toolkit/cache/{cf}"
+    rc, out = run(["stat", "-c", "%s", path])
+    size = int(out.strip()) if rc == 0 and out.strip().isdigit() else -1
+    if size >= 0:
+        print(f"  cache/{cf}: {size} bytes")
+    else:
+        print(f"  !!! MISSING: cache/{cf}")
+rc, out = run(["bash", "-c",
+    "grep -E 'ERROR|FAIL|Exception' /var/log/ydea_health.log 2>/dev/null | tail -5"])
+errs = [l.strip() for l in out.split("\n") if l.strip()]
+if errs:
+    print(f"  ydea_health.log recent errors ({len(errs)}):")
+    for e in errs:
+        print(f"    !!! {e[:120]}")
+else:
+    print("  ydea_health.log: no recent errors")
 
 # TELEGRAM CONNECTIVITY
 sec("TELEGRAM CONNECTIVITY")
