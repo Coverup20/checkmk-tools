@@ -6,8 +6,8 @@
 # monitor_jobs.ps1 - Background jobs and daily baseline checks for monitoring servers
 #
 # Usage:
-#   .\copilot\monitor_jobs.ps1 daily [sp|us|all]
-#   .\copilot\monitor_jobs.ps1 notify [sp|us|all] [-Minutes 60] [-Interval 15]
+#   .\copilot\monitor_jobs.ps1 daily [sp|us|vps01|vps02|all]
+#   .\copilot\monitor_jobs.ps1 notify [sp|us|vps01|vps02|all] [-Minutes 60] [-Interval 15]
 #   .\copilot\monitor_jobs.ps1 status
 #   .\copilot\monitor_jobs.ps1 stop
 
@@ -18,13 +18,15 @@ param(
     [int]$Interval = 15
 )
 
-$VERSION   = "1.0.0"
+$VERSION   = "1.2.0"
 $WORKSPACE = Split-Path -Parent $PSScriptRoot
 $LOG_FILE  = Join-Path $WORKSPACE "monitor-jobs.log"
 
 $SSH_HOSTS = @{
-    sp = "srv-monitoring-sp"
-    us = "srv-monitoring-us"
+    sp    = "srv-monitoring-sp"
+    us    = "srv-monitoring-us"
+    vps01 = "checkmk-vps-01"
+    vps02 = "checkmk-vps-02"
 }
 
 # --- Remote Python script for daily checks ---
@@ -43,22 +45,49 @@ def sec(t):
 
 # SYSTEM
 sec("SYSTEM")
-_, out = run(["uptime", "-p"])
-print(f"  Uptime:   {out}")
 _, out = run(["hostname", "-f"])
 print(f"  Hostname: {out}")
-rc, out = run(["df", "-h", "/"])
-rows = [r for r in out.split("\n") if r.strip()]
-if len(rows) > 1:
-    row = rows[-1].split()
-    if len(row) >= 5:
-        print(f"  Disk /:   {row[3]} free / {row[1]} total ({row[4]} used)")
-rc, out = run(["free", "-h"])
+_, out = run(["uptime", "-p"])
+print(f"  Uptime:   {out}")
+
+# CPU load
+rc, out = run(["cat", "/proc/loadavg"])
+if rc == 0:
+    parts = out.split()
+    load1, load5, load15 = parts[0], parts[1], parts[2]
+    rc2, cpuout = run(["nproc"])
+    ncpu = int(cpuout.strip()) if rc2 == 0 and cpuout.strip().isdigit() else 1
+    warn = " !!!" if float(load1) > ncpu * 1.5 else ""
+    print(f"  CPU load: {load1} / {load5} / {load15} (1m/5m/15m, {ncpu} cores){warn}")
+
+# Active PIDs
+rc, out = run(["bash", "-c", "ps aux --no-headers | wc -l"])
+if rc == 0:
+    print(f"  PIDs:     {out.strip()} active processes")
+
+# Memory
+rc, out = run(["free", "-m"])
 rows = [r for r in out.split("\n") if r.strip()]
 if len(rows) > 1:
     row = rows[1].split()
-    if len(row) >= 3:
-        print(f"  Memory:   {row[2]} used / {row[1]} total")
+    if len(row) >= 7:
+        total_mb, used_mb, free_mb, avail_mb = int(row[1]), int(row[2]), int(row[3]), int(row[6])
+        pct = int(used_mb * 100 / total_mb) if total_mb > 0 else 0
+        warn = " !!!" if pct > 85 else ""
+        print(f"  Memory:   {used_mb}M used / {total_mb}M total ({pct}% used, {avail_mb}M avail){warn}")
+
+# Disk all mountpoints
+rc, out = run(["df", "-h", "--output=target,size,used,avail,pcent"])
+if rc == 0:
+    rows = [r for r in out.split("\n") if r.strip()]
+    for row in rows[1:]:
+        parts = row.split()
+        if len(parts) >= 5:
+            mnt, size, used, avail, pct_s = parts[0], parts[1], parts[2], parts[3], parts[4]
+            if not any(x in mnt for x in ["/sys", "/proc", "/dev", "/run", "/snap"]):
+                pct_n = int(pct_s.replace("%","")) if pct_s.replace("%","").isdigit() else 0
+                warn = " !!!" if pct_n > 85 else ""
+                print(f"  Disk {mnt}: {used}/{size} ({pct_s} used, {avail} free){warn}")
 
 # OMD STATUS
 sec("OMD STATUS")
@@ -171,7 +200,7 @@ print(f"\n{'='*55}\n  CHECK COMPLETE\n{'='*55}\n")
 function Get-Hosts {
     if ($Target -eq "all") { return $SSH_HOSTS.Keys | Sort-Object }
     if ($SSH_HOSTS.ContainsKey($Target)) { return @($Target) }
-    Write-Host "Unknown target '$Target'. Use: sp, us, all" -ForegroundColor Red
+    Write-Host "Unknown target '$Target'. Use: sp, us, vps01, vps02, all" -ForegroundColor Red
     exit 1
 }
 
@@ -261,8 +290,8 @@ switch ($Command.ToLower()) {
         Write-Host "monitor_jobs.ps1 v$VERSION"
         Write-Host ""
         Write-Host "Usage:"
-        Write-Host "  .\copilot\monitor_jobs.ps1 daily  [sp|us|all]"
-        Write-Host "  .\copilot\monitor_jobs.ps1 notify [sp|us|all] [-Minutes 60] [-Interval 15]"
+        Write-Host "  .\copilot\monitor_jobs.ps1 daily  [sp|us|vps01|vps02|all]"
+        Write-Host "  .\copilot\monitor_jobs.ps1 notify [sp|us|vps01|vps02|all] [-Minutes 60] [-Interval 15]"
         Write-Host "  .\copilot\monitor_jobs.ps1 status"
         Write-Host "  .\copilot\monitor_jobs.ps1 stop"
         Write-Host ""
