@@ -18,7 +18,7 @@ param(
     [int]$Interval = 15
 )
 
-$VERSION   = "1.8.0"
+$VERSION   = "1.8.1"
 $WORKSPACE = Split-Path -Parent $PSScriptRoot
 $LOG_FILE  = Join-Path $WORKSPACE "monitor-jobs.log"
 
@@ -360,7 +360,8 @@ try:
         date_str = out.split("=", 1)[1].strip()
         from datetime import datetime as dt
         exp = dt.strptime(date_str, "%b %d %H:%M:%S %Y %Z")
-        days_left = (exp - dt.utcnow()).days
+        now_utc = dt.now(datetime.timezone.utc).replace(tzinfo=None)
+        days_left = (exp - now_utc).days
         warn = "  !!!" if days_left < 30 else ""
         print(f"  HTTPS cert expires: {date_str} ({days_left} days left){warn}")
     else:
@@ -398,7 +399,8 @@ else:
 rc, out = run(["bash", "-c",
     "journalctl -u nagios -u naemon -u cmc --since '7 days ago' 2>/dev/null"
     " | grep -cE 'Started|started|restarted|restart' || echo 0"])
-print(f"  Core restarts (7d): {out.strip()}")
+restarts = out.strip().split()[0] if out.strip() else "0"
+print(f"  Core restarts (7d): {restarts}")
 
 # YDEA CACHE FRESHNESS
 sec("YDEA CACHE FRESHNESS")
@@ -440,7 +442,8 @@ if target_ids:
                 last_size = sizes[0] if sizes else "?"
                 from datetime import datetime as dt2
                 fin_dt = dt2.strptime(last_fin, "%Y-%m-%d %H:%M:%S")
-                age_h = round((dt2.utcnow() - fin_dt).total_seconds() / 3600, 1)
+                now_utc2 = dt2.now(datetime.timezone.utc).replace(tzinfo=None)
+                age_h = round((now_utc2 - fin_dt).total_seconds() / 3600, 1)
                 warn = "  !!!" if age_h > 26 else ""
                 print(f"  [{tid}] last backup: {last_fin}  size: {last_size}  age: {age_h}h{warn}")
                 if len(finished) > 1:
