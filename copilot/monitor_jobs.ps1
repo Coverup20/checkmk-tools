@@ -18,7 +18,7 @@ param(
     [int]$Interval = 15
 )
 
-$VERSION   = "1.7.1"
+$VERSION   = "1.7.2"
 $WORKSPACE = Split-Path -Parent $PSScriptRoot
 $LOG_FILE  = Join-Path $WORKSPACE "monitor-jobs.log"
 
@@ -166,6 +166,8 @@ rc, out = run(["bash", "-c",
     " ! -path '*/__pycache__/*'"
     " ! -path '*/.git/*'"
     " ! -path '*/tmp/*'"
+    " ! -path '/omd/sites/monitoring/.config'"
+    " ! -path '/omd/sites/monitoring/.config/*'"
     " 2>/dev/null | head -30"])
 bad_mon = [l.strip() for l in out.split("\n") if l.strip()]
 if bad_mon:
