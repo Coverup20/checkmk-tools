@@ -18,7 +18,7 @@ param(
     [int]$Interval = 15
 )
 
-$VERSION   = "1.7.2"
+$VERSION   = "1.8.0"
 $WORKSPACE = Split-Path -Parent $PSScriptRoot
 $LOG_FILE  = Join-Path $WORKSPACE "monitor-jobs.log"
 
@@ -32,7 +32,7 @@ $SSH_HOSTS = @{
 
 # --- Remote Python script for daily checks ---
 $DAILY_PY = @'
-import subprocess, datetime, urllib.request
+import subprocess, datetime, urllib.request, socket, os, time
 
 def run(cmd):
     try:
@@ -199,30 +199,8 @@ if rc == 0:
 else:
     print("  /opt/checkmk-tools: NOT FOUND !!!")
 
-# BACKUP CHECK - local (mkbackup)
-sec("BACKUP CHECK (local)")
-rc, tgt_out = run(["su", "-", "monitoring", "-c", "mkbackup targets 2>&1"])
-target_ids = []
-if rc == 0:
-    for l in tgt_out.strip().split("\n")[2:]:
-        if l.strip():
-            target_ids.append(l.split()[0])
-if target_ids:
-    for tid in target_ids[:3]:
-        rc2, lst = run(["su", "-", "monitoring", "-c", f"mkbackup list {tid} 2>&1"])
-        print(f"  Target: {tid}")
-        if rc2 == 0 and lst.strip():
-            for l in lst.strip().split("\n"):
-                if l.strip():
-                    print(f"    {l.strip()[:110]}")
-        else:
-            print(f"    !!! no backups or error: {lst[:100]}")
-else:
-    print(f"  !!! No backup targets or mkbackup unavailable: {tgt_out[:100]}")
-
 # BACKUP CHECK - cloud (rclone DO bucket)
 sec("BACKUP CHECK (cloud DO bucket)")
-import socket
 hostname = socket.gethostname()
 try:
     # fast: list top-level dirs only
@@ -258,30 +236,6 @@ try:
 except Exception as e:
     print(f"  !!! rclone error: {e}")
 
-# YDEA ACCESS CHECK
-sec("YDEA ACCESS CHECK")
-for f in ["/opt/ydea-toolkit/.env.la", "/opt/ydea-toolkit/.env.ag",
-          "/opt/ydea-toolkit/cache"]:
-    rc, out = run(["stat", "-c", "%U:%G  %A  %n", f])
-    print(f"  {'!!! NOT FOUND: '+f if rc != 0 else out.strip()}")
-for cf in ["ydea_checkmk_tickets.json", "ydea_checkmk_flapping.json"]:
-    path = f"/opt/ydea-toolkit/cache/{cf}"
-    rc, out = run(["stat", "-c", "%s", path])
-    size = int(out.strip()) if rc == 0 and out.strip().isdigit() else -1
-    if size >= 0:
-        print(f"  cache/{cf}: {size} bytes")
-    else:
-        print(f"  !!! MISSING: cache/{cf}")
-rc, out = run(["bash", "-c",
-    "grep -E 'ERROR|FAIL|Exception' /var/log/ydea_health.log 2>/dev/null | tail -5"])
-errs = [l.strip() for l in out.split("\n") if l.strip()]
-if errs:
-    print(f"  ydea_health.log recent errors ({len(errs)}):")
-    for e in errs:
-        print(f"    !!! {e[:120]}")
-else:
-    print("  ydea_health.log: no recent errors")
-
 # TELEGRAM CONNECTIVITY
 sec("TELEGRAM CONNECTIVITY")
 try:
@@ -291,7 +245,6 @@ except Exception as e:
     print(f"  api.telegram.org: FAIL !!!  ({e})")
 
 # FALLBACK DNS
-import subprocess as sp2
 rc2, dns_out = run(["resolvectl", "status"])
 fallback = [l.strip() for l in dns_out.split("\n") if "Fallback" in l]
 if fallback:
@@ -317,6 +270,188 @@ try:
         print(f"    {e[:120]}")
 except Exception as e:
     print(f"  Cannot read log: {e}")
+
+# CHECKMK STATUS (LiveStatus)
+sec("CHECKMK STATUS (LiveStatus)")
+def live(q):
+    try:
+        s = socket.socket(socket.AF_UNIX)
+        s.connect("/omd/sites/monitoring/tmp/run/live")
+        s.send((q + "\n").encode())
+        s.shutdown(socket.SHUT_WR)
+        return s.makefile().read().strip()
+    except Exception as e:
+        return f"ERROR: {e}"
+h_ok   = live("GET hosts\nFilter: state = 0\nStats: state = 0\n")
+h_down = live("GET hosts\nFilter: state != 0\nStats: state >= 0\n")
+s_ok   = live("GET services\nFilter: state = 0\nStats: state = 0\n")
+s_warn = live("GET services\nFilter: state = 1\nStats: state >= 0\n")
+s_crit = live("GET services\nFilter: state = 2\nStats: state >= 0\n")
+s_unkn = live("GET services\nFilter: state = 3\nStats: state >= 0\n")
+stale  = live("GET services\nFilter: staleness > 1.5\nStats: state >= 0\n")
+h_down_n = int(h_down) if h_down.isdigit() else 0
+s_crit_n = int(s_crit) if s_crit.isdigit() else 0
+stale_n  = int(stale)  if stale.isdigit()  else 0
+print(f"  Hosts:    OK={h_ok}  DOWN={h_down_n}{'  !!!' if h_down_n > 0 else ''}")
+print(f"  Services: OK={s_ok}  WARN={s_warn}  CRIT={s_crit_n}{'  !!!' if s_crit_n > 0 else ''}  UNKN={s_unkn}")
+print(f"  Stale >1.5: {stale_n}{'  !!!' if stale_n > 0 else '  OK'}")
+# unacknowledged CRIT
+unack = live("GET services\nFilter: state = 2\nFilter: acknowledged = 0\nFilter: host_acknowledged = 0\nStats: state >= 0\n")
+unack_n = int(unack) if unack.isdigit() else 0
+print(f"  Unacked CRIT: {unack_n}{'  !!!' if unack_n > 0 else '  OK'}")
+
+# LAST SUCCESSFUL NOTIFICATION
+sec("LAST SUCCESSFUL NOTIFICATION")
+log_path = "/omd/sites/monitoring/var/log/notify.log"
+try:
+    rc, out = run(["bash", "-c",
+        f"grep 'Telegram OK' {log_path} 2>/dev/null | tail -1"])
+    if out.strip():
+        print(f"  Last OK: {out.strip()[:120]}")
+    else:
+        print("  !!! No successful Telegram notification found in log")
+except Exception as e:
+    print(f"  !!! error: {e}")
+
+# NOTIFICATION BULK QUEUE
+bulk_dir = "/omd/sites/monitoring/var/check_mk/notify/bulk"
+try:
+    files = [f for f in os.listdir(bulk_dir) if not f.startswith(".")]
+    if files:
+        print(f"  !!! Bulk queue: {len(files)} pending notifications")
+        for f in files[:5]:
+            print(f"    {f}")
+    else:
+        print("  Bulk queue: empty OK")
+except Exception:
+    print("  Bulk queue: dir not present (OK)")
+
+# CHECKMK VERSION
+sec("CHECKMK VERSION")
+rc, out = run(["bash", "-c", "su - monitoring -c 'omd version' 2>&1"])
+if rc == 0:
+    print(f"  {out.strip()}")
+else:
+    print(f"  !!! {out.strip()[:100]}")
+# auto-upgrade log (last 5 lines)
+rc, out = run(["bash", "-c",
+    "tail -5 /var/log/auto-upgrade-checkmk.log 2>/dev/null || echo 'NOT FOUND'"])
+for l in out.strip().split("\n"):
+    if l.strip():
+        print(f"  upgrade-log: {l.strip()[:100]}")
+# auto-update (OS packages) last run
+rc, out = run(["bash", "-c",
+    "grep -E 'Starting auto-update|Completed' /var/log/auto-updates.log 2>/dev/null | tail -2 || echo 'NOT FOUND'"])
+for l in out.strip().split("\n"):
+    if l.strip():
+        print(f"  auto-update: {l.strip()[:100]}")
+
+# SSL CERTIFICATE
+sec("SSL CERTIFICATE")
+try:
+    r = subprocess.run(
+        ["bash", "-c",
+         "echo | openssl s_client -connect localhost:443 -servername localhost 2>/dev/null"
+         " | openssl x509 -noout -enddate 2>/dev/null"],
+        capture_output=True, text=True, timeout=10
+    )
+    out = (r.stdout + r.stderr).strip()
+    if "notAfter" in out:
+        date_str = out.split("=", 1)[1].strip()
+        from datetime import datetime as dt
+        exp = dt.strptime(date_str, "%b %d %H:%M:%S %Y %Z")
+        days_left = (exp - dt.utcnow()).days
+        warn = "  !!!" if days_left < 30 else ""
+        print(f"  HTTPS cert expires: {date_str} ({days_left} days left){warn}")
+    else:
+        print(f"  !!! Could not read cert: {out[:100]}")
+except Exception as e:
+    print(f"  !!! SSL check error: {e}")
+
+# SECURITY - SSH failed logins (24h)
+sec("SECURITY")
+rc, out = run(["bash", "-c",
+    "journalctl -u ssh -u sshd --since '24 hours ago' 2>/dev/null"
+    " | grep -c 'Failed password' || echo 0"])
+failed_n = int(out.strip()) if out.strip().isdigit() else 0
+warn = "  !!!" if failed_n > 50 else ""
+print(f"  SSH failed logins (24h): {failed_n}{warn}")
+# listening ports
+rc, out = run(["bash", "-c",
+    "ss -tlnp 2>/dev/null | grep -E ':80|:443|:8080|:5000' | awk '{print $4}'"])
+ports = [p.strip() for p in out.split("\n") if p.strip()]
+print(f"  Listening: {', '.join(ports) if ports else '!!! none of 80/443/8080/5000 open'}")
+
+# RRD STORAGE
+sec("RRD STORAGE")
+for rrd_dir in ["/omd/sites/monitoring/var/check_mk/rrd",
+                "/omd/sites/monitoring/var/pnp4nagios"]:
+    rc, out = run(["du", "-sh", rrd_dir])
+    if rc == 0:
+        size = out.split()[0]
+        print(f"  {rrd_dir}: {size}")
+        break
+else:
+    print("  !!! RRD directory not found")
+
+# CORE RESTARTS (last 7d)
+rc, out = run(["bash", "-c",
+    "journalctl -u nagios -u naemon -u cmc --since '7 days ago' 2>/dev/null"
+    " | grep -cE 'Started|started|restarted|restart' || echo 0"])
+print(f"  Core restarts (7d): {out.strip()}")
+
+# YDEA CACHE FRESHNESS
+sec("YDEA CACHE FRESHNESS")
+for cf in ["ydea_checkmk_tickets.json", "ydea_checkmk_flapping.json"]:
+    path = f"/opt/ydea-toolkit/cache/{cf}"
+    try:
+        mtime = os.path.getmtime(path)
+        age_min = int((time.time() - mtime) / 60)
+        size = os.path.getsize(path)
+        warn = "  !!!" if age_min > 120 else ""
+        print(f"  {cf}: {size}B, updated {age_min}min ago{warn}")
+    except Exception:
+        print(f"  !!! NOT FOUND: {path}")
+# ydea health log last entry
+rc, out = run(["bash", "-c",
+    "tail -3 /var/log/ydea_health.log 2>/dev/null || echo 'NOT FOUND'"])
+for l in out.strip().split("\n"):
+    if l.strip():
+        print(f"  health.log: {l.strip()[:100]}")
+
+# BACKUP AGE
+sec("BACKUP AGE")
+rc, tgt_out = run(["su", "-", "monitoring", "-c", "mkbackup targets 2>&1"])
+target_ids = []
+if rc == 0:
+    for l in tgt_out.strip().split("\n")[2:]:
+        if l.strip():
+            target_ids.append(l.split()[0])
+if target_ids:
+    for tid in target_ids[:3]:
+        rc2, lst = run(["su", "-", "monitoring", "-c", f"mkbackup list {tid} 2>&1"])
+        if rc2 == 0 and lst.strip():
+            # parse most recent Finished timestamp
+            import re
+            finished = re.findall(r'Finished:\s+(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', lst)
+            sizes    = re.findall(r'Size:\s+([\d.]+ \w+)', lst)
+            if finished:
+                last_fin = finished[0]
+                last_size = sizes[0] if sizes else "?"
+                from datetime import datetime as dt2
+                fin_dt = dt2.strptime(last_fin, "%Y-%m-%d %H:%M:%S")
+                age_h = round((dt2.utcnow() - fin_dt).total_seconds() / 3600, 1)
+                warn = "  !!!" if age_h > 26 else ""
+                print(f"  [{tid}] last backup: {last_fin}  size: {last_size}  age: {age_h}h{warn}")
+                if len(finished) > 1:
+                    prev_size = sizes[1] if len(sizes) > 1 else "?"
+                    print(f"  [{tid}] prev backup: {finished[1]}  size: {prev_size}")
+            else:
+                print(f"  [{tid}] !!! cannot parse backup timestamp")
+        else:
+            print(f"  [{tid}] !!! {lst[:100]}")
+else:
+    print("  !!! mkbackup targets unavailable")
 
 print(f"\n{'='*55}\n  CHECK COMPLETE\n{'='*55}\n")
 '@
