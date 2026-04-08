@@ -18,7 +18,7 @@ param(
     [int]$Interval = 15
 )
 
-$VERSION   = "1.3.0"
+$VERSION   = "1.4.0"
 $WORKSPACE = Split-Path -Parent $PSScriptRoot
 $LOG_FILE  = Join-Path $WORKSPACE "monitor-jobs.log"
 
@@ -206,13 +206,29 @@ function Get-Hosts {
 }
 
 function Invoke-Daily {
-    $b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($DAILY_PY))
-    foreach ($key in Get-Hosts) {
-        $alias = $SSH_HOSTS[$key]
+    $b64      = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($DAILY_PY))
+    $hostKeys = @(Get-Hosts)
+    $sshHosts = $SSH_HOSTS
+
+    # launch all hosts in parallel
+    $jobs = @{}
+    foreach ($key in $hostKeys) {
+        $alias = $sshHosts[$key]
+        $jobs[$key] = Start-Job -ScriptBlock {
+            param($alias, $b64)
+            wsl -d kali-linux bash -c "ssh $alias 'echo $b64 | base64 -d | python3 2>&1'" 2>&1
+        } -ArgumentList $alias, $b64
+    }
+
+    Write-Host "Running checks in parallel on: $($hostKeys -join ', ')..." -ForegroundColor Yellow
+
+    # collect results in original order
+    foreach ($key in $hostKeys) {
+        $alias = $sshHosts[$key]
+        $out   = Receive-Job -Job $jobs[$key] -Wait -AutoRemoveJob
         Write-Host "`n$('#'*60)" -ForegroundColor Cyan
         Write-Host "  DAILY CHECK: $($key.ToUpper()) - $alias" -ForegroundColor Cyan
         Write-Host "$('#'*60)" -ForegroundColor Cyan
-        $out = wsl -d kali-linux bash -c "ssh $alias 'echo $b64 | base64 -d | python3 2>&1'" 2>&1
         Write-Host ($out -join "`n")
     }
 }
@@ -225,7 +241,7 @@ function Invoke-NotifyMonitor {
     $ivl      = $Interval
     $jobName  = "NotifyMonitor_$(Get-Date -Format 'HHmm')"
 
-    $job = Start-Job -Name $jobName -ScriptBlock {
+    $null = Start-Job -Name $jobName -ScriptBlock {
         param($hosts, $sshHosts, $mins, $ivl, $logFile)
         $total = [math]::Ceiling($mins / $ivl)
         $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
