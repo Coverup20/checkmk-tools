@@ -18,7 +18,7 @@ param(
     [int]$Interval = 15
 )
 
-$VERSION   = "1.8.1"
+$VERSION   = "1.8.2"
 $WORKSPACE = Split-Path -Parent $PSScriptRoot
 $LOG_FILE  = Join-Path $WORKSPACE "monitor-jobs.log"
 
@@ -410,8 +410,17 @@ for cf in ["ydea_checkmk_tickets.json", "ydea_checkmk_flapping.json"]:
         mtime = os.path.getmtime(path)
         age_min = int((time.time() - mtime) / 60)
         size = os.path.getsize(path)
-        warn = "  !!!" if age_min > 120 else ""
-        print(f"  {cf}: {size}B, updated {age_min}min ago{warn}")
+        # tickets: if {} (empty) → no open tickets, age irrelevant
+        if cf == "ydea_checkmk_tickets.json":
+            if size <= 2:
+                print(f"  {cf}: 0 tickets (OK, no open tickets)")
+            else:
+                warn = "  !!!" if age_min > 120 else ""
+                print(f"  {cf}: {size}B, updated {age_min}min ago{warn}")
+        else:
+            # flapping: updated only on real events, flag only if >24h
+            warn = "  !!!" if age_min > 1440 else ""
+            print(f"  {cf}: {size}B, updated {age_min}min ago{warn}")
     except Exception:
         print(f"  !!! NOT FOUND: {path}")
 # ydea health log last entry
