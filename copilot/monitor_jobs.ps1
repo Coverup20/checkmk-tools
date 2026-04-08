@@ -18,7 +18,7 @@ param(
     [int]$Interval = 15
 )
 
-$VERSION   = "1.7.0"
+$VERSION   = "1.7.1"
 $WORKSPACE = Split-Path -Parent $PSScriptRoot
 $LOG_FILE  = Join-Path $WORKSPACE "monitor-jobs.log"
 
@@ -199,44 +199,62 @@ else:
 
 # BACKUP CHECK - local (mkbackup)
 sec("BACKUP CHECK (local)")
-rc, out = run(["su", "-", "monitoring", "-c", "mkbackup list 2>&1"])
-if rc == 0 and out.strip():
-    for l in out.strip().split("\n")[-15:]:
+rc, tgt_out = run(["su", "-", "monitoring", "-c", "mkbackup targets 2>&1"])
+target_ids = []
+if rc == 0:
+    for l in tgt_out.strip().split("\n")[2:]:
         if l.strip():
-            print(f"  {l.strip()[:120]}")
+            target_ids.append(l.split()[0])
+if target_ids:
+    for tid in target_ids[:3]:
+        rc2, lst = run(["su", "-", "monitoring", "-c", f"mkbackup list {tid} 2>&1"])
+        print(f"  Target: {tid}")
+        if rc2 == 0 and lst.strip():
+            for l in lst.strip().split("\n"):
+                if l.strip():
+                    print(f"    {l.strip()[:110]}")
+        else:
+            print(f"    !!! no backups or error: {lst[:100]}")
 else:
-    # fallback: search mkbackup log files
-    rc, out = run(["bash", "-c",
-        "find /omd/sites/monitoring/var -maxdepth 3 -name '*mkbackup*' 2>/dev/null | head -5"])
-    if rc == 0 and out.strip():
-        for logf in out.strip().split("\n")[:2]:
-            if logf:
-                rc2, tail = run(["tail", "-8", logf.strip()])
-                print(f"  [{logf.strip()}]")
-                for l in tail.split("\n"):
-                    if l.strip():
-                        print(f"    {l.strip()[:100]}")
-    else:
-        print("  !!! mkbackup log/list not available")
+    print(f"  !!! No backup targets or mkbackup unavailable: {tgt_out[:100]}")
 
 # BACKUP CHECK - cloud (rclone DO bucket)
 sec("BACKUP CHECK (cloud DO bucket)")
+import socket
+hostname = socket.gethostname()
 try:
-    r = subprocess.run(
-        ["bash", "-c",
-         "su - monitoring -c 'rclone lsl --max-depth 2 do:testmonbck/checkmk-backups/ 2>&1 | sort | tail -6'"],
-        capture_output=True, text=True, timeout=30
+    # fast: list top-level dirs only
+    r_lsd = subprocess.run(
+        ["su", "-", "monitoring", "-c", "rclone lsd do:testmonbck/ 2>&1"],
+        capture_output=True, text=True, timeout=15
     )
-    out = (r.stdout + r.stderr).strip()
-    if r.returncode == 0 and out:
-        print("  Latest files do:testmonbck/checkmk-backups/:")
-        for l in out.split("\n"):
-            if l.strip():
-                print(f"    {l[:120]}")
+    lsd = (r_lsd.stdout + r_lsd.stderr).strip()
+    dirs = [l.split()[-1] for l in lsd.split("\n") if l.strip() and not l.startswith("ERROR")]
+    # find longest dir name that is a prefix of this hostname
+    matches = [d for d in dirs if hostname.startswith(d)]
+    best = max(matches, key=len) if matches else None
+    if best:
+        r_lsl = subprocess.run(
+            ["bash", "-c",
+             f"su - monitoring -c 'rclone lsl do:testmonbck/{best}/monitoring/ 2>&1 | grep mkbackup.info | sort | tail -5'"],
+            capture_output=True, text=True, timeout=30
+        )
+        lsl = (r_lsl.stdout + r_lsl.stderr).strip()
+        if lsl and "ERROR" not in lsl:
+            print(f"  Latest in do:testmonbck/{best}/monitoring/:")
+            for l in lsl.split("\n"):
+                if l.strip():
+                    parts = l.strip().split()
+                    date_part = parts[1] if len(parts) >= 3 else ""
+                    name = parts[-1].split("/")[0] if parts else ""
+                    print(f"    {date_part}  {name[:80]}")
+        else:
+            print(f"  !!! rclone lsl failed: {lsl[:150]}")
     else:
-        print(f"  !!! rclone error or empty: {out[:200]}")
+        print(f"  !!! no DO folder matches hostname '{hostname}'")
+        print(f"  Available: {dirs}")
 except Exception as e:
-    print(f"  !!! rclone timeout/error: {e}")
+    print(f"  !!! rclone error: {e}")
 
 # YDEA ACCESS CHECK
 sec("YDEA ACCESS CHECK")
