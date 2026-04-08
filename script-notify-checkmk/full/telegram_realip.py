@@ -4,7 +4,7 @@ Bulk: no
 
 CheckMK notification script - sends Telegram message with real IP and inline buttons.
 
-Version: 1.1.0"""
+Version: 1.2.0"""
 
 import os
 import sys
@@ -13,7 +13,7 @@ import urllib.request
 import urllib.parse
 from urllib.error import URLError
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 # === CONFIG ===
 TOKEN = os.getenv("TELEGRAM_TOKEN", "")
@@ -104,7 +104,7 @@ def main():
         }
     
     # Prefix to identify VPS
-    msg = f"🖥️ [VPS] {msg}"
+    msg = f"[VPS] {msg}"
     
     # Send to Telegram
     try:

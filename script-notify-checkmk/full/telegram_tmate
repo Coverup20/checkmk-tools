@@ -134,7 +134,7 @@ def main() -> int:
             '{"inline_keyboard":[[{"text":" Host","url":"' + host_link + '"}]]}'
         )
 
-    msg = f" [TMATE] {msg}"
+    msg = f"[TMATE] {msg}"
     send_telegram(token, chat_id, msg, button)
     return 0
 

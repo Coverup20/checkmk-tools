@@ -3,7 +3,7 @@
 telegram_c01_selfmon - Notifiche Telegram Self-Monitoring per Urbino Servizi
 Script dedicato per notifiche del server di monitoraggio Urbino (self-monitoring).
 
-Version: 1.2.0
+Version: 1.3.0
 """
 
 import os
@@ -11,7 +11,7 @@ import sys
 import urllib.parse
 import urllib.request
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 # === CONFIG ===
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
@@ -104,7 +104,7 @@ def main() -> int:
         )
         button = '{"inline_keyboard":[[{"text":" Host","url":"' + host_link + '"}]]}'
 
-    msg = f"🔍 [URBINO SELF-MONITOR] {msg}"
+    msg = f"[URBINO SELF-MONITOR] {msg}"
 
     send_telegram(TOKEN, CHAT_ID, msg, button)
     return 0

@@ -5,7 +5,7 @@ Bulk: no
 CheckMK notification script - dedicated for "monitor" host self-monitoring alerts.
 Sends Telegram message with hardcoded CHAT_ID for self-monitoring channel.
 
-Version: 1.2.0"""
+Version: 1.3.0"""
 
 import os
 import sys
@@ -14,7 +14,7 @@ import urllib.request
 import urllib.parse
 from urllib.error import URLError
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 # === CONFIG ===
 TOKEN = os.getenv("TELEGRAM_TOKEN", "")
@@ -106,7 +106,7 @@ def main():
         }
     
     # Prefisso dedicato self-monitoring
-    msg = f"🔍 [SELF-MONITOR] {msg}"
+    msg = f"[SELF-MONITOR] {msg}"
     
     # Send to Telegram
     try:
