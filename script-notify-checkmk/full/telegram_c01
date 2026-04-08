@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-telegram_c01 - Notifiche Telegram per Urbino Servizi
-Script dedicato per notifiche degli host del cliente Urbino Servizi.
+telegram_c01 - Telegram notification script for customer C01.
 
-Version: 1.3.0
+Version: 1.4.0
 """
 
 import os
@@ -11,11 +10,12 @@ import sys
 import urllib.parse
 import urllib.request
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 # === CONFIG ===
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 CHAT_ID = os.environ.get("TELEGRAM_C01_CHAT_ID", "")
+CUSTOMER_NAME = os.environ.get("TELEGRAM_C01_NAME", "C01")
 
 CMK_URL = "https://monitor.nethlab.it/monitoring"
 SITE = "monitoring"
@@ -104,7 +104,7 @@ def main() -> int:
         )
         button = '{"inline_keyboard":[[{"text":" Host","url":"' + host_link + '"}]]}'
 
-    msg = f"[URBINO] {msg}"
+    msg = f"[{CUSTOMER_NAME}] {msg}"
 
     send_telegram(TOKEN, CHAT_ID, msg, button)
     return 0

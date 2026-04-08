@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-telegram_paci.py - Notifiche Telegram per Studio Paci
-Script dedicato per notifiche degli host del cliente Studio Paci.
+telegram_cl00 - Telegram notification script for customer CL00.
 
-Version: 1.5.0
+Version: 1.6.0
 """
 
 import os
@@ -11,11 +10,12 @@ import sys
 import urllib.parse
 import urllib.request
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 
 # === CONFIG ===
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 CHAT_ID = os.environ.get("TELEGRAM_NOTIFY_CHAT_ID", "")
+CUSTOMER_NAME = os.environ.get("TELEGRAM_CL00_NAME", "CL00")
 
 CMK_URL = os.environ.get("CMK_URL", "https://monitor.nethlab.it/monitoring")
 SITE = "monitoring"
@@ -104,8 +104,8 @@ def main() -> int:
         )
         button = '{"inline_keyboard":[[{"text":"Host","url":"' + host_link + '"}]]}'
 
-    # Prefisso dedicato Studio Paci
-    msg = f"[STUDIO PACI] {msg}"
+    # Customer prefix
+    msg = f"[{CUSTOMER_NAME}] {msg}"
 
     send_telegram(TOKEN, CHAT_ID, msg, button)
     return 0
