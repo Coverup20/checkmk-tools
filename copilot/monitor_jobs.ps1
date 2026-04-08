@@ -18,15 +18,15 @@ param(
     [int]$Interval = 15
 )
 
-$VERSION   = "1.4.0"
+$VERSION   = "1.5.0"
 $WORKSPACE = Split-Path -Parent $PSScriptRoot
 $LOG_FILE  = Join-Path $WORKSPACE "monitor-jobs.log"
 
 $SSH_HOSTS = @{
     sp    = "srv-monitoring-sp"
     us    = "srv-monitoring-us"
-    vps01 = "checkmk-vps-01"
-    vps02 = "checkmk-vps-02"
+    vps01 = "checkmk-vps-01-c"
+    vps02 = "checkmk-vps-02-c"
     ubnt  = "ubntmarzio-root"
 }
 
