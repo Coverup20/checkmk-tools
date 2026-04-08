@@ -6,8 +6,8 @@
 # monitor_jobs.ps1 - Background jobs and daily baseline checks for monitoring servers
 #
 # Usage:
-#   .\copilot\monitor_jobs.ps1 daily [sp|us|vps01|vps02|all]
-#   .\copilot\monitor_jobs.ps1 notify [sp|us|vps01|vps02|all] [-Minutes 60] [-Interval 15]
+#   .\copilot\monitor_jobs.ps1 daily [sp|us|vps01|vps02|ubnt|all]
+#   .\copilot\monitor_jobs.ps1 notify [sp|us|vps01|vps02|ubnt|all] [-Minutes 60] [-Interval 15]
 #   .\copilot\monitor_jobs.ps1 status
 #   .\copilot\monitor_jobs.ps1 stop
 
@@ -18,7 +18,7 @@ param(
     [int]$Interval = 15
 )
 
-$VERSION   = "1.2.0"
+$VERSION   = "1.3.0"
 $WORKSPACE = Split-Path -Parent $PSScriptRoot
 $LOG_FILE  = Join-Path $WORKSPACE "monitor-jobs.log"
 
@@ -27,6 +27,7 @@ $SSH_HOSTS = @{
     us    = "srv-monitoring-us"
     vps01 = "checkmk-vps-01"
     vps02 = "checkmk-vps-02"
+    ubnt  = "ubntmarzio-root"
 }
 
 # --- Remote Python script for daily checks ---
@@ -200,7 +201,7 @@ print(f"\n{'='*55}\n  CHECK COMPLETE\n{'='*55}\n")
 function Get-Hosts {
     if ($Target -eq "all") { return $SSH_HOSTS.Keys | Sort-Object }
     if ($SSH_HOSTS.ContainsKey($Target)) { return @($Target) }
-    Write-Host "Unknown target '$Target'. Use: sp, us, vps01, vps02, all" -ForegroundColor Red
+    Write-Host "Unknown target '$Target'. Use: sp, us, vps01, vps02, ubnt, all" -ForegroundColor Red
     exit 1
 }
 
