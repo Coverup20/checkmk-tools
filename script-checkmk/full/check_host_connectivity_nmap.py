@@ -22,7 +22,7 @@
 #   Plugin: check_host_connectivity_nmap
 #   Arguments: -H $HOSTADDRESS$
 #
-# Version: 1.0.0
+# Version: 1.1.0
 
 import argparse
 import re
@@ -31,7 +31,7 @@ import subprocess
 import sys
 import time
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 OK       = 0
 WARNING  = 1
@@ -91,6 +91,8 @@ def check():
     parser.add_argument("-H", "--host", required=True, help="Hostname or IP to check")
     parser.add_argument("--timeout", type=float, default=3.0,
                         help="Probe timeout in seconds (default: 3)")
+    parser.add_argument("--retries", type=int, default=2,
+                        help="Number of retry attempts on probe failure (default: 2)")
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
     args = parser.parse_args()
 
@@ -101,7 +103,13 @@ def check():
         print(f"CRITICAL - {host}: DNS resolution failed")
         sys.exit(CRITICAL)
 
-    is_up, rtt, method = nmap_probe(ip, args.timeout)
+    is_up, rtt, method = False, -1, "nmap"
+    for attempt in range(1 + args.retries):
+        is_up, rtt, method = nmap_probe(ip, args.timeout)
+        if is_up:
+            break
+        if attempt < args.retries:
+            time.sleep(1)
 
     if is_up:
         rtt_val = rtt if rtt >= 0 else 0

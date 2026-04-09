@@ -21,7 +21,7 @@
 #   Plugin: check_host_connectivity
 #   Arguments: -H $HOSTADDRESS$
 #
-# Version: 3.0.0
+# Version: 3.1.0
 
 import argparse
 import re
@@ -30,7 +30,7 @@ import subprocess
 import sys
 import time
 
-VERSION = "3.0.0"
+VERSION = "3.1.0"
 
 OK       = 0
 WARNING  = 1
@@ -124,6 +124,8 @@ def main():
     parser.add_argument("-H", "--host", required=True, help="Hostname or IP to check")
     parser.add_argument("--timeout", type=float, default=3.0,
                         help="Probe timeout in seconds (default: 3)")
+    parser.add_argument("--retries", type=int, default=2,
+                        help="Number of retry attempts on probe failure (default: 2)")
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
     args = parser.parse_args()
 
@@ -136,13 +138,18 @@ def main():
 
     local_nets = get_local_networks()
     same_l2 = is_same_subnet(ip, local_nets)
+    method = "ARP" if same_l2 else "ICMP"
 
-    if same_l2:
-        is_up, rtt = nmap_arp(ip, args.timeout)
-        method = "ARP"
-    else:
-        is_up, rtt = nmap_icmp(ip, args.timeout)
-        method = "ICMP"
+    is_up, rtt = False, -1
+    for attempt in range(1 + args.retries):
+        if same_l2:
+            is_up, rtt = nmap_arp(ip, args.timeout)
+        else:
+            is_up, rtt = nmap_icmp(ip, args.timeout)
+        if is_up:
+            break
+        if attempt < args.retries:
+            time.sleep(1)
 
     if is_up:
         rtt_val = rtt if rtt >= 0 else 0
@@ -151,10 +158,6 @@ def main():
     else:
         print(f"CRITICAL - {host} NOT reachable (no {method} response)")
         return CRITICAL
-
-
-if __name__ == "__main__":
-    sys.exit(main())
 
 
 if __name__ == "__main__":
