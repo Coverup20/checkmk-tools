@@ -12,17 +12,21 @@
 # Usage:
 #   python3 copilot/run_agents.py [host_alias] [options]
 #   python3 copilot/run_agents.py ubntmarzio-root
-#   python3 copilot/run_agents.py checkmk-vps-02 --loop 5 --interval 300
+#   python3 copilot/run_agents.py checkmk-vps-02-c --loop 5 --interval 300
 #   python3 copilot/run_agents.py srv-monitoring-sp --save
+#   python3 copilot/run_agents.py --hosts checkmk-vps-01,checkmk-vps-02-c,srv-monitoring-sp
+#   python3 copilot/run_agents.py --all
 #
 # Options:
-#   --loop N       Run N times (0 = infinite loop), default: 1
-#   --interval S   Seconds between loops (default: 300 = 5 min)
-#   --save         Save Sonnet report to /tmp/agent_report_<host>_<ts>.txt
-#   --dry-run      Collect data only, skip AI analysis (for debugging)
+#   --hosts h1,h2,h3   Run on multiple hosts (comma-separated), sequential
+#   --all              Run on ALL configured hosts (see ALL_HOSTS list below)
+#   --loop N           Run N times per host (0 = infinite loop), default: 1
+#   --interval S       Seconds between loops (default: 300 = 5 min)
+#   --save             Save Sonnet report to /tmp/agent_report_<host>_<ts>.txt
+#   --dry-run          Collect data only, skip AI analysis (for debugging)
 #
 # WSL execution (from PowerShell):
-#   wsl -d kali-linux bash -c "python3 /mnt/c/Users/Marzio/Desktop/CheckMK/checkmk-tools/copilot/run_agents.py ubntmarzio-root"
+#   wsl -d kali-linux bash -c "python3 /mnt/c/Users/.../copilot/run_agents.py --all"
 
 import subprocess
 import sys
@@ -32,9 +36,28 @@ import datetime
 import time
 import re
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 COPILOT_BIN = "/home/marzio/.npm-global/bin/copilot"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# All known hosts with SSH key access — used by --all flag.
+# Each entry: (alias, description)
+# Hosts requiring ControlMaster passphrase (vps-01, vps-02) need the socket active first.
+# LAN hosts (10.155.100.x, 192.168.10.x) require Twingate OFF.
+ALL_HOSTS = [
+    # VPS / public servers — autonomous SSH key (no passphrase)
+    ("checkmk-vps-02-c",    "CheckMK Staging VPS (monitor01.nethlab.it) — no passphrase"),
+    ("srv-monitoring-sp",   "CheckMK SP production (45.33.235.86 via sos ProxyJump)"),
+    ("ubntmarzio-root",     "Ubuntu 22.04 lab host (10.155.100.108)"),
+    # VPS with passphrase — require ControlMaster active
+    ("checkmk-vps-01",      "CheckMK Production VPS (monitor.nethlab.it) — needs ControlMaster"),
+    # LAN hosts — require Twingate OFF
+    ("nsec8-stable",        "NethSecurity 8 stable lab (10.155.100.100)"),
+    ("rl94ns8",             "NethServer 8 lab (10.155.100.40)"),
+    ("rl94ns81",            "NethServer 8 lab webtop (10.155.100.41)"),
+    ("checkmk-z1-00",       "CheckMK local (192.168.10.128) — Twingate OFF required"),
+    ("checkmk-z1-01",       "CheckMK local (192.168.10.126) — Twingate OFF required"),
+]
 
 # Full operational context for Sonnet High (complete, authoritative)
 SONNET_FULL_CONTEXT = """
@@ -415,13 +438,16 @@ def run_once(host_alias, save_output, dry_run):
 
 
 def main():
-    host_alias = "ubntmarzio-root"
+    host_alias = None
+    host_list = []
     loop_count = 1
     interval = 300
     save_output = False
     dry_run = False
 
     args = sys.argv[1:]
+
+    # First positional arg (not starting with --) = single host
     if args and not args[0].startswith("--"):
         host_alias = args[0]
         args = args[1:]
@@ -441,21 +467,45 @@ def main():
         elif a == "--dry-run":
             dry_run = True
             i += 1
+        elif a == "--all":
+            host_list = [h for h, _ in ALL_HOSTS]
+            i += 1
+        elif a == "--hosts" and i + 1 < len(args):
+            host_list = [h.strip() for h in args[i + 1].split(",") if h.strip()]
+            i += 2
         else:
             i += 1
+
+    # Resolve final host list
+    if host_list:
+        targets = host_list
+    elif host_alias:
+        targets = [host_alias]
+    else:
+        targets = ["ubntmarzio-root"]
 
     # Resolve loop count: 0 = infinite
     max_iterations = loop_count if loop_count > 0 else None
 
-    print(f"[orchestrator] v{VERSION} — target: {host_alias}")
+    # Print known hosts table if --all or --hosts
+    if len(targets) > 1:
+        print(f"\n[orchestrator] v{VERSION} — multi-host mode ({len(targets)} hosts)")
+        for t in targets:
+            desc = next((d for h, d in ALL_HOSTS if h == t), "")
+            print(f"  • {t:<30} {desc}")
+        print()
+    else:
+        print(f"[orchestrator] v{VERSION} — target: {targets[0]}")
+
     print(f"[orchestrator] agents: Haiku-sysmon + Haiku-netcheck + Sonnet-high")
     print(f"[orchestrator] loop: {loop_count} ({'infinite' if loop_count == 0 else loop_count}x)"
           f" | interval: {interval}s | save: {save_output} | dry-run: {dry_run}")
 
     iteration = 1
     while True:
-        print_header(host_alias, iteration, max_iterations)
-        run_once(host_alias, save_output, dry_run)
+        for target in targets:
+            print_header(target, iteration, max_iterations)
+            run_once(target, save_output, dry_run)
 
         if max_iterations and iteration >= max_iterations:
             break

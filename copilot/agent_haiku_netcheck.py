@@ -69,7 +69,15 @@ CHECKMK_COMMANDS = [
 ]
 
 # Hosts that run CheckMK OMD
-CHECKMK_HOSTS = {"checkmk-vps-01", "checkmk-vps-02", "srv-monitoring-sp", "srv-monitoring-us"}
+CHECKMK_HOSTS = {
+    "checkmk-vps-01",
+    "checkmk-vps-02",
+    "checkmk-vps-02-c",
+    "srv-monitoring-sp",
+    "srv-monitoring-us",
+    "checkmk-z1-00",
+    "checkmk-z1-01",
+}
 
 
 def collect_data(host_alias):
