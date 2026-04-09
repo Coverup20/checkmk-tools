@@ -24,6 +24,7 @@ import argparse
 import os
 import re
 import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -32,7 +33,10 @@ import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "2.1.0"
+VERSION = "2.2.0"
+
+# Global SSL verify flag (set to False via --no-verify-ssl)
+SSL_VERIFY = True
 
 # ─── Costanti ─────────────────────────────────────────────────────────────────
 
@@ -42,7 +46,7 @@ SYSTEMD_DIR = Path("/etc/systemd/system")
 LOCAL_TARGET_DEFAULT = "/usr/lib/check_mk_agent/local"
 
 # CheckMK Agent
-CHECKMK_BASE_URL_DEFAULT = os.environ.get("CMK_AGENTS_URL", "https://<your-checkmk-server>/monitoring/check_mk/agents")
+CHECKMK_BASE_URL_DEFAULT = os.environ.get("CMK_AGENTS_URL", "https://monitor.nethlab.it/monitoring/check_mk/agents")
 AGENT_PLAIN_SOCKET_NAME = "check-mk-agent-plain.socket"
 AGENT_PLAIN_SERVICE_NAME = "check-mk-agent-plain@.service"
 
@@ -208,7 +212,12 @@ def fetch_text(url: str, timeout: int = 15) -> str:
 
     Raises: RuntimeError if it fails."""
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as resp:
+        ctx = None
+        if not SSL_VERIFY:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(url, timeout=timeout, context=ctx) as resp:
             return resp.read().decode("utf-8", errors="ignore")
     except Exception as exc:
         raise RuntimeError(f"fetch_text({url}): {exc}") from exc
@@ -217,9 +226,17 @@ def fetch_text(url: str, timeout: int = 15) -> str:
 def download_file(url: str, outpath: str) -> None:
     """Download binary file with curl or wget."""
     if shutil.which("curl"):
-        run(["curl", "-fsSL", url, "-o", outpath])
+        cmd = ["curl", "-fsSL"]
+        if not SSL_VERIFY:
+            cmd.append("-k")
+        cmd += [url, "-o", outpath]
+        run(cmd)
     elif shutil.which("wget"):
-        run(["wget", "-q", "-O", outpath, url])
+        cmd = ["wget", "-q"]
+        if not SSL_VERIFY:
+            cmd.append("--no-check-certificate")
+        cmd += ["-O", outpath, url]
+        run(cmd)
     else:
         raise RuntimeError("né curl né wget trovati per il download")
 
@@ -1231,6 +1248,8 @@ def parse_args() -> argparse.Namespace:
                    help="Salta l'installazione dell'agente CheckMK (STEP A)")
     p.add_argument("--checkmk-url", default=CHECKMK_BASE_URL_DEFAULT,
                    help=f"URL base agenti CheckMK (default: {CHECKMK_BASE_URL_DEFAULT})")
+    p.add_argument("--no-verify-ssl", action="store_true",
+                   help="Disabilita verifica certificato SSL (utile per HTTPS con cert self-signed)")
 
     # FRPC
     p.add_argument("--install-frpc", action="store_true",
@@ -1266,6 +1285,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     require_root()
+
+    global SSL_VERIFY
+    if args.no_verify_ssl:
+        SSL_VERIFY = False
+        print("[WARN] Verifica SSL disabilitata (--no-verify-ssl)")
 
     repo_path = Path(args.repo)
     openwrt = is_openwrt()
