@@ -1674,6 +1674,65 @@ check()
 
 ---
 
+## MANDATORY RULE - Copilot CLI as Primary Investigation Tool
+
+> **"Devi sempre sfruttare al massimo Copilot CLI"**
+
+### ABSOLUTE RULE - Use Copilot CLI, not direct SSH
+
+- **NEVER do direct SSH** for investigations, diagnostics or multi-step analysis on remote hosts
+- **ALWAYS delegate** to Copilot CLI (the local agent) for any task that requires running multiple commands
+- Direct SSH (`run_in_terminal`) is only allowed for **single, simple, deterministic commands** (e.g. `omd start monitoring`, `git pull`, `systemctl status X`)
+- For anything that requires reasoning, analysis, or iteration → **use Copilot CLI**
+
+### Invocation pattern (MANDATORY)
+
+```powershell
+# ALWAYS use this pattern: async mode + TERM=dumb + --autopilot
+wsl -d kali-linux bash -c "TERM=dumb /home/marzio/.npm-global/bin/copilot -p 'YOUR PROMPT HERE' --allow-all --autopilot 2>&1"
+```
+
+- `TERM=dumb` — disables TUI colors, output readable in terminal
+- `--allow-all` — allows all tool use without confirmation
+- `--autopilot` — runs autonomously without pauses
+- Binary path: `/home/marzio/.npm-global/bin/copilot`
+
+### Non-blocking workflow - Stay available to the user
+
+**NEVER block the conversation waiting for the CLI agent to finish.**
+
+Correct workflow:
+
+1. Launch Copilot CLI in **async mode** (`mode=async` in `run_in_terminal`)
+2. Save the terminal ID returned
+3. **Immediately return control to the user** — say "Agente lanciato, sono qui per qualsiasi altra cosa"
+4. When the user asks for results → call `get_terminal_output(id)` and report
+
+```powershell
+# CORRECT: async launch, immediately available
+# Launch → get ID → tell user "agente lanciato, dimmi pure"
+# When user asks → get_terminal_output and report
+```
+
+**NEVER:**
+
+- Launch in sync mode (`mode=sync`) with long timeout for Copilot CLI investigations
+- Poll `get_terminal_output` in a tight loop blocking the conversation
+- Say "aspetto che finisca..." and stop responding to the user
+
+### When to use Copilot CLI vs direct SSH
+
+| Task | Tool |
+|------|------|
+| Multi-step investigation (why did X stop, what is wrong) | Copilot CLI |
+| Diagnosis with log analysis | Copilot CLI |
+| Any task requiring reasoning over command output | Copilot CLI |
+| Single deterministic command (start/stop/status) | Direct SSH |
+| Single git command | Direct SSH |
+| Single file read (`cat`, `tail`) | Direct SSH |
+
+---
+
 ## SSH Remote Access - VPS and Local Servers
 
 ### WSL SSH setup
