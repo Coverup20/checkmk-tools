@@ -4,7 +4,7 @@
 TOKEN and CHAT_ID read from OMD standard environment file:
   /omd/sites/monitoring/etc/environment
 
-Version: 1.5.1"""
+Version: 1.5.2"""
 
 import json
 import os
@@ -12,12 +12,12 @@ import sys
 import urllib.parse
 import urllib.request
 
-VERSION = "1.5.1"
+VERSION = "1.5.2"
 
 # === CONFIG ===
 ENV_FILE = "/omd/sites/monitoring/etc/environment"
-CMK_URL = os.environ.get("CMK_URL", "https://<your-checkmk-server>/monitoring")
 SITE = "monitoring"
+# CMK_URL is read from ENV_FILE at runtime inside main()
 # ==============
 
 
@@ -78,6 +78,9 @@ def main() -> int:
     # Upload .env file
     load_env_file(ENV_FILE)
 
+    # Read CMK_URL after env file is loaded
+    cmk_url = os.environ.get("CMK_URL", "https://localhost/monitoring")
+
     token = os.environ.get("TELEGRAM_TOKEN", "")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
 
@@ -101,11 +104,11 @@ def main() -> int:
 
         service_enc = urlencode(service)
         service_link = (
-            f"{CMK_URL}/check_mk/view.py?view_name=service"
+            f"{cmk_url}/check_mk/view.py?view_name=service"
             f"&host={hostname}&service={service_enc}&site={SITE}"
         )
         host_link = (
-            f"{CMK_URL}/check_mk/view.py?view_name=host"
+            f"{cmk_url}/check_mk/view.py?view_name=host"
             f"&host={hostname}&site={SITE}"
         )
 
@@ -126,7 +129,7 @@ def main() -> int:
         prefix = get_status_prefix(state)
 
         host_link = (
-            f"{CMK_URL}/check_mk/view.py?view_name=host"
+            f"{cmk_url}/check_mk/view.py?view_name=host"
             f"&host={hostname}&site={SITE}"
         )
 
