@@ -5,8 +5,9 @@ Python wrapper for upgrade-checkmk.sh with outcome management for automations/em
 - No updates available
 - Update completed with final version
 - Update failed with rollback performed
+- Skipped: pre-release (beta/RC) version detected
 
-Version: 1.3.0"""
+Version: 1.4.0"""
 
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 REPORT_FILE = Path("/tmp/checkmk-upgrade-report.txt")
 BACKUP_DIR = Path("/opt/omd/backups")
 EMAIL_FROM = "no-reply@nethesis.it"
@@ -129,6 +130,13 @@ def build_message(status: str, site_name: str, version: str, details: str = "") 
     if status == "NO_UPDATE":
         subject = f"CheckMK Auto-Upgrade - Nessun aggiornamento ({host})"
         body = f"Nessun aggiornamento disponibile per il sito {site_name}.\nVersione corrente: {version}\n"
+    elif status == "SKIPPED_BETA":
+        subject = f"CheckMK Auto-Upgrade - Saltato: versione beta/RC ({host})"
+        body = (
+            f"Auto-upgrade saltato: rilevata versione pre-release ({version}) sul sito {site_name}.\n"
+            f"L'upgrade automatico verso la stable e' disabilitato quando e' installata una beta o RC.\n"
+            f"Aggiornare manualmente quando si e' pronti a passare alla versione stabile.\n"
+        )
     elif status == "SUCCESS":
         subject = f"CheckMK Auto-Upgrade - Completato ({host})"
         body = f"Aggiornamento completato alla versione: {version}\nSito: {site_name}\n"
@@ -175,6 +183,14 @@ def main() -> int:
         subject, body = build_message("NO_UPDATE", site_name, version)
         send_mail(args.email, subject, body)
         print(f"NO_UPDATE: sito {site_name} già alla versione {version}")
+        return 0
+
+    skipped_beta = "SKIPPED_BETA" in report
+    if run.returncode == 0 and skipped_beta:
+        version = get_current_version(site_name)
+        subject, body = build_message("SKIPPED_BETA", site_name, version)
+        send_mail(args.email, subject, body)
+        print(f"SKIPPED_BETA: versione pre-release rilevata ({version}), auto-upgrade disabilitato")
         return 0
 
     if run.returncode == 0:

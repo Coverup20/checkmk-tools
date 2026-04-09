@@ -13,7 +13,7 @@ Features:
 Usage:
     upgrade_checkmk.py [site_name]
 
-Version: 1.2.0"""
+Version: 1.3.0"""
 
 import sys
 import os
@@ -25,6 +25,8 @@ import time
 import argparse
 from datetime import datetime
 from pathlib import Path
+
+VERSION = "1.3.0"
 
 # --- Configuration ---
 DOWNLOAD_DIR = Path("/tmp/checkmk-upgrade")
@@ -71,12 +73,19 @@ def run_cmd(cmd, check=True):
 def get_current_version(site):
     try:
         res = subprocess.check_output(["omd", "version", site], text=True)
-        # OMD - Open Monitoring Distribution Version 2.2.0p12.cre
-        m = re.search(r'(\d+\.\d+\.\d+p\d+)', res)
+        # Match stable (pN), beta (bN), and release candidate (rcN) versions
+        # e.g. 2.4.0p24.cre, 2.5.0b2.cee, 2.5.0rc1.cre
+        m = re.search(r'(\d+\.\d+\.\d+(?:p\d+|b\d+|rc\d+))', res)
         if m: return m.group(1)
     except Exception:
         pass
     Console.error(f"Cannot detect version for site {site}")
+
+
+def is_prerelease_version(version: str) -> bool:
+    """Return True if version is a beta (bN) or release candidate (rcN),
+    not a stable release (pN). Auto-upgrade must never run on pre-release builds."""
+    return bool(re.search(r'\d+\.\d+\.\d+(?:b\d+|rc\d+)$', version))
 
 def _version_key(v: str):
     """Convert 'X.Y.ZpN' to a tuple for numeric comparison."""
@@ -135,7 +144,21 @@ class Upgrader:
         
         Console.log(f"Current: {current}")
         Console.log(f"Latest:  {latest}")
-        
+
+        # Safety guard: never auto-upgrade from a pre-release (beta/RC) version.
+        # Installing a stable package over a beta is a downgrade and breaks the site.
+        if is_prerelease_version(current):
+            Console.warn(
+                f"Pre-release version detected ({current}) — skipping auto-upgrade. "
+                "Upgrade manually when ready to move to stable."
+            )
+            with open(REPORT_FILE, "a") as f:
+                f.write(
+                    f"SKIPPED_BETA: pre-release version {current} detected "
+                    "— auto-upgrade disabled to prevent incompatible version change\n"
+                )
+            return
+
         if not latest or current == latest:
             Console.success("No upgrade needed")
             return
