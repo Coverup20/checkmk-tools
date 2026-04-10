@@ -11,14 +11,14 @@ import sys
 import urllib.parse
 import urllib.request
 
-VERSION = "1.7.0"
+VERSION = "1.7.1"
 
 # === CONFIG ===
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 CHAT_ID = os.environ.get("TELEGRAM_NOTIFY_CHAT_ID", "")
 CUSTOMER_NAME = os.environ.get("TELEGRAM_CL00_NAME", "CL00")
 
-CMK_URL = os.environ.get("CMK_URL", "https://monitor.nethlab.it/monitoring")
+CMK_URL = os.environ.get("CMK_URL", "")
 SITE = "monitoring"
 # ==============
 
