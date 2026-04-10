@@ -1,10 +1,17 @@
 #!/usr/bin/python3
+"""
+telegram - Generic Telegram Notification
+Bulk: no
+
+CheckMK notification script - sends alerts to a Telegram channel.
+Configured via OMD environment variables.
+
+Version: 1.0.0
+"""
 #
 # Copyright (C) 2025 Nethesis S.r.l.
 # SPDX-License-Identifier: GPL-2.0-only
 #
-
-# Generic Telegram notification script for CheckMK alerts
 
 import json
 import os

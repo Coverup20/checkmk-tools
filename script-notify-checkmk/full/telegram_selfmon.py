@@ -1,10 +1,17 @@
 #!/usr/bin/python3
+"""
+telegram_selfmon - Generic Telegram Self-Monitoring Notification
+Bulk: no
+
+CheckMK notification script - sends self-monitoring alerts to a Telegram channel.
+Configured via OMD environment variables.
+
+Version: 1.4.0
+"""
 #
 # Copyright (C) 2025 Nethesis S.r.l.
 # SPDX-License-Identifier: GPL-2.0-only
 #
-
-# Generic Telegram self-monitoring notification script for CheckMK
 
 import os
 import sys
