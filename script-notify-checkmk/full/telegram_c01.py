@@ -12,7 +12,7 @@ import urllib.parse
 import urllib.request
 import socket
 
-VERSION = "1.5.2"
+VERSION = "1.5.3"
 
 # === CONFIG ===
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
@@ -29,7 +29,9 @@ def _cmk_url_valid(url):
 
 
 def get_reverse_dns_url():
-    """Auto-discover CMK_URL via public IP + reverse DNS."""
+    """Auto-discover CMK_URL via public IP + reverse DNS with forward confirmation.
+    Returns URL only if PTR hostname resolves back to the same IP (real server FQDN).
+    Returns None if PTR is ISP-assigned, missing, or does not forward-confirm."""
     try:
         req = urllib.request.Request("https://api.ipify.org")
         req.add_header("User-Agent", "CheckMK-Telegram-Notifier")
@@ -37,7 +39,12 @@ def get_reverse_dns_url():
             public_ip = resp.read().decode().strip()
         hostname = socket.gethostbyaddr(public_ip)[0]
         if hostname:
-            return f"https://{hostname}/monitoring"
+            try:
+                resolved = socket.gethostbyname(hostname)
+                if resolved == public_ip:
+                    return f"https://{hostname}/monitoring"
+            except Exception:
+                pass
     except Exception:
         pass
     return None
@@ -87,7 +94,7 @@ def main() -> int:
 
     global CMK_URL
     if not CMK_URL:
-        CMK_URL = get_reverse_dns_url() or ""
+        CMK_URL = get_reverse_dns_url() or "__NOT_EXPOSED__"
 
     notify_what = os.environ.get("NOTIFY_WHAT", "SERVICE")
     hostname = os.environ.get("NOTIFY_HOSTNAME", "unknown")
@@ -115,6 +122,12 @@ def main() -> int:
                     {"text": " Host", "url": host_link},
                 ]]
             })
+        elif CMK_URL == "__NOT_EXPOSED__":
+            button = json.dumps({
+                "inline_keyboard": [[
+                    {"text": "🔒 Pannello non raggiungibile (server non esposto)", "callback_data": "not_exposed"}
+                ]]
+            })
         else:
             button = None
     else:
@@ -131,6 +144,12 @@ def main() -> int:
             host_link = f"{CMK_URL}/check_mk/view.py?view_name=host&host={hostname}&site={SITE}"
             button = json.dumps({
                 "inline_keyboard": [[{"text": " Host", "url": host_link}]]
+            })
+        elif CMK_URL == "__NOT_EXPOSED__":
+            button = json.dumps({
+                "inline_keyboard": [[
+                    {"text": "🔒 Pannello non raggiungibile (server non esposto)", "callback_data": "not_exposed"}
+                ]]
             })
         else:
             button = None
