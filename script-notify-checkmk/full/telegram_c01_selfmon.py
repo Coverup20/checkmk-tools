@@ -13,7 +13,7 @@ import urllib.parse
 import urllib.request
 import socket
 
-VERSION = "1.5.5"
+VERSION = "1.5.6"
 
 # === CONFIG ===
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
@@ -45,8 +45,9 @@ _ISP_PTR = re.compile(
 
 def get_reverse_dns_url():
     """Auto-discover CMK_URL via public IP + reverse DNS.
-    Returns URL only if PTR hostname passes ISP pattern filter AND forward-confirms
-    (hostname resolves back to the same IP). Returns None otherwise."""
+    Returns URL only if PTR hostname does not match ISP/generic patterns.
+    Forward confirmation is skipped: /etc/hosts on the server itself maps
+    its own hostname to 127.0.1.1, which would break the check."""
     try:
         req = urllib.request.Request("https://api.ipify.org")
         req.add_header("User-Agent", "CheckMK-Telegram-Notifier")
@@ -54,12 +55,7 @@ def get_reverse_dns_url():
             public_ip = resp.read().decode().strip()
         hostname = socket.gethostbyaddr(public_ip)[0]
         if hostname and not _ISP_PTR.search(hostname):
-            try:
-                resolved = socket.gethostbyname(hostname)
-                if resolved == public_ip:
-                    return f"https://{hostname}/monitoring"
-            except Exception:
-                pass
+            return f"https://{hostname}/monitoring"
     except Exception:
         pass
     return None
