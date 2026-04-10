@@ -5,7 +5,7 @@ Bulk: no
 CheckMK notification script - dedicated for "monitor" host self-monitoring alerts.
 Sends Telegram message with hardcoded CHAT_ID for self-monitoring channel.
 
-Version: 1.3.0"""
+Version: 1.3.1"""
 
 import os
 import sys
@@ -14,15 +14,20 @@ import urllib.request
 import urllib.parse
 from urllib.error import URLError
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 
 # === CONFIG ===
 TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 # CHAT_ID from environment variable TELEGRAM_SELFMON_CHAT_ID (configure for server in OMD environment)
 CHAT_ID = os.environ.get("TELEGRAM_SELFMON_CHAT_ID", "")
-CMK_URL = os.environ.get("CMK_URL", "https://<your-checkmk-server>/monitoring")
+CMK_URL = os.environ.get("CMK_URL", "")
 SITE = "monitoring"
 # ==============
+
+
+def _cmk_url_valid(url):
+    """Return True if CMK_URL is set and looks like a real HTTP(S) URL."""
+    return bool(url) and url.startswith(("http://", "https://")) and "<" not in url
 
 
 def get_emoji(state):
@@ -60,27 +65,26 @@ def main():
         
         emoji = get_emoji(service_state)
         
-        # URL encode service name
-        service_enc = urllib.parse.quote(service_desc)
-        
-        # Build links
-        service_link = f"{CMK_URL}/check_mk/view.py?view_name=service&host={hostname}&service={service_enc}&site={SITE}"
-        host_link = f"{CMK_URL}/check_mk/view.py?view_name=host&host={hostname}&site={SITE}"
-        
         # Message
         msg = f"[{emoji} {service_state}] Servizio → {service_desc}\n"
         msg += f"Host: {hostname} ({real_ip})\n"
         msg += f"Output: {service_output}"
         
-        # Inline keyboard with 2 buttons
-        button = {
-            "inline_keyboard": [
-                [
-                    {"text": " Servizio", "url": service_link},
-                    {"text": " Host", "url": host_link}
+        # Inline keyboard only if CMK_URL is a real valid URL
+        if _cmk_url_valid(CMK_URL):
+            service_enc = urllib.parse.quote(service_desc)
+            service_link = f"{CMK_URL}/check_mk/view.py?view_name=service&host={hostname}&service={service_enc}&site={SITE}"
+            host_link = f"{CMK_URL}/check_mk/view.py?view_name=host&host={hostname}&site={SITE}"
+            button = {
+                "inline_keyboard": [
+                    [
+                        {"text": " Servizio", "url": service_link},
+                        {"text": " Host", "url": host_link}
+                    ]
                 ]
-            ]
-        }
+            }
+        else:
+            button = None
     else:
         # Host notification
         host_state = os.getenv("NOTIFY_HOSTSTATE", "UNKNOWN")
@@ -88,22 +92,23 @@ def main():
         
         emoji = get_emoji(host_state)
         
-        # Build link
-        host_link = f"{CMK_URL}/check_mk/view.py?view_name=host&host={hostname}&site={SITE}"
-        
         # Message
         msg = f"[{emoji} {host_state}] Host → {hostname}\n"
         msg += f"IP: {real_ip}\n"
         msg += f"Output: {host_output}"
         
-        # Inline keyboard with 1 button
-        button = {
-            "inline_keyboard": [
-                [
-                    {"text": " Host", "url": host_link}
+        # Inline keyboard only if CMK_URL is a real valid URL
+        if _cmk_url_valid(CMK_URL):
+            host_link = f"{CMK_URL}/check_mk/view.py?view_name=host&host={hostname}&site={SITE}"
+            button = {
+                "inline_keyboard": [
+                    [
+                        {"text": " Host", "url": host_link}
+                    ]
                 ]
-            ]
-        }
+            }
+        else:
+            button = None
     
     # Prefisso dedicato self-monitoring
     msg = f"[SELF-MONITOR] {msg}"
@@ -114,8 +119,9 @@ def main():
         data = {
             "chat_id": CHAT_ID,
             "text": msg,
-            "reply_markup": json.dumps(button)
         }
+        if button is not None:
+            data["reply_markup"] = json.dumps(button)
         
         encoded_data = urllib.parse.urlencode(data).encode('utf-8')
         req = urllib.request.Request(api_url, data=encoded_data)
