@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""mail_realip - HTML Mail Notification with Real IP Support
+"""M@il
 Bulk: yes
 
 CheckMK notification script - sends HTML email with real IP and FRP tunnel detection.
