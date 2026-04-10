@@ -1753,6 +1753,20 @@ Correct workflow:
 
 ---
 
+## CheckMK Server Groups — MANDATORY for ALL agents
+
+When the user (or an agent prompt) references a server group, use EXACTLY these hosts:
+
+| Expression | Hosts to check |
+|---|---|
+| "tutti i server checkmk" / "all checkmk servers" | srv-monitoring-sp, srv-monitoring-us, checkmk-vps-01, checkmk-vps-02 |
+| "server checkmk dei clienti" / "client checkmk servers" | srv-monitoring-sp, srv-monitoring-us |
+| "server checkmk in vps" / "checkmk vps servers" | checkmk-vps-01, checkmk-vps-02 |
+
+This rule applies to every agent: Copilot, Haiku-ops, CheckMK Investigator, and any other.
+
+---
+
 ## SSH Remote Access - VPS and Local Servers
 
 ### WSL SSH setup
