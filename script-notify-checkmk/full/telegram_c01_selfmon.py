@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-telegram_c01 - Telegram notification script for customer C01.
+telegram_c01_selfmon - Telegram self-monitoring notification script for customer C01.
 
-Version: 1.4.1
+Version: 1.5.0
 """
 
 import json
@@ -11,16 +11,20 @@ import sys
 import urllib.parse
 import urllib.request
 
-VERSION = "1.4.1"
+VERSION = "1.5.0"
 
 # === CONFIG ===
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
-CHAT_ID = os.environ.get("TELEGRAM_C01_CHAT_ID", "")
+CHAT_ID = os.environ.get("TELEGRAM_C01_SELFMON_CHAT_ID", "")
 CUSTOMER_NAME = os.environ.get("TELEGRAM_C01_NAME", "C01")
 
-CMK_URL = "https://monitor.nethlab.it/monitoring"
+CMK_URL = os.environ.get("CMK_URL", "https://monitor.nethlab.it/monitoring")
 SITE = "monitoring"
 # ==============
+
+
+def _cmk_url_valid(url):
+    return bool(url) and url.startswith(("http://", "https://")) and "<" not in url
 
 
 def get_emoji(state: str) -> str:
@@ -40,14 +44,12 @@ def urlencode(value: str) -> str:
     return urllib.parse.quote(value, safe='')
 
 
-def send_telegram(token: str, chat_id: str, text: str, reply_markup: str) -> None:
+def send_telegram(token: str, chat_id: str, text: str, reply_markup=None) -> None:
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    data = urllib.parse.urlencode({
-        "chat_id": chat_id,
-        "text": text,
-        "reply_markup": reply_markup,
-        "parse_mode": "HTML",
-    }).encode("utf-8")
+    params = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    if reply_markup is not None:
+        params["reply_markup"] = reply_markup
+    data = urllib.parse.urlencode(params).encode("utf-8")
 
     try:
         req = urllib.request.Request(url, data=data, method="POST")
@@ -64,7 +66,7 @@ def main() -> int:
         print("ERROR: TELEGRAM_TOKEN not set", file=sys.stderr)
         return 0
     if not CHAT_ID:
-        print("ERROR: TELEGRAM_C01_CHAT_ID not set", file=sys.stderr)
+        print("ERROR: TELEGRAM_C01_SELFMON_CHAT_ID not set", file=sys.stderr)
         return 0
 
     notify_what = os.environ.get("NOTIFY_WHAT", "SERVICE")
@@ -78,38 +80,42 @@ def main() -> int:
         output = os.environ.get("NOTIFY_SERVICEOUTPUT", "N/A")
         emoji = get_emoji(state)
 
-        service_enc = urlencode(service)
-        service_link = f"{CMK_URL}/check_mk/view.py?view_name=service&host={hostname}&service={service_enc}&site={SITE}"
-        host_link = f"{CMK_URL}/check_mk/view.py?view_name=host&host={hostname}&site={SITE}"
-
         msg = (
             f"[{emoji} {state}] Servizio → {service}\n"
             f"Host: {hostname} ({real_ip})\n"
             f"Output: {output}"
         )
-        button = json.dumps({
-            "inline_keyboard": [[
-                {"text": " Servizio", "url": service_link},
-                {"text": " Host", "url": host_link},
-            ]]
-        })
+        if _cmk_url_valid(CMK_URL):
+            service_enc = urlencode(service)
+            service_link = f"{CMK_URL}/check_mk/view.py?view_name=service&host={hostname}&service={service_enc}&site={SITE}"
+            host_link = f"{CMK_URL}/check_mk/view.py?view_name=host&host={hostname}&site={SITE}"
+            button = json.dumps({
+                "inline_keyboard": [[
+                    {"text": " Servizio", "url": service_link},
+                    {"text": " Host", "url": host_link},
+                ]]
+            })
+        else:
+            button = None
     else:
         state = os.environ.get("NOTIFY_HOSTSTATE", "UNKNOWN")
         output = os.environ.get("NOTIFY_HOSTOUTPUT", "N/A")
         emoji = get_emoji(state)
-
-        host_link = f"{CMK_URL}/check_mk/view.py?view_name=host&host={hostname}&site={SITE}"
 
         msg = (
             f"[{emoji} {state}] Host → {hostname}\n"
             f"IP: {real_ip}\n"
             f"Output: {output}"
         )
-        button = json.dumps({
-            "inline_keyboard": [[{"text": " Host", "url": host_link}]]
-        })
+        if _cmk_url_valid(CMK_URL):
+            host_link = f"{CMK_URL}/check_mk/view.py?view_name=host&host={hostname}&site={SITE}"
+            button = json.dumps({
+                "inline_keyboard": [[{"text": " Host", "url": host_link}]]
+            })
+        else:
+            button = None
 
-    msg = f"[{CUSTOMER_NAME}] {msg}"
+    msg = f"[{CUSTOMER_NAME} SELF-MONITOR] {msg}"
 
     send_telegram(TOKEN, CHAT_ID, msg, button)
     return 0

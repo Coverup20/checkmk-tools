@@ -13,14 +13,18 @@ import urllib.request
 import urllib.parse
 import sys
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 
 LOG_FILE   = "/omd/sites/monitoring/var/log/notify.log"
 STATE_FILE = "/omd/sites/monitoring/var/log/notify_ticket_watcher.json"
 
 TOKEN    = os.environ.get("TELEGRAM_TOKEN", "")
 CHAT_ID  = os.environ.get("TELEGRAM_NOTIFY_CHAT_ID", "")
-CMK_URL  = os.environ.get("CMK_URL", "https://<your-checkmk-server>/monitoring")
+CMK_URL  = os.environ.get("CMK_URL", "")
+
+
+def _cmk_url_valid(url):
+    return bool(url) and url.startswith(("http://", "https://")) and "<" not in url
 
 # Match only lines [cmk.base.notify] Output: to avoid duplicates
 PATTERN = re.compile(
@@ -84,11 +88,13 @@ def send_telegram(ticket_id: str, hostname: str, service: str, state_str: str,
             truncated += "…"
         output_line = f"\n<code>{truncated}</code>"
 
+    cmk_link = ""
+    if _cmk_url_valid(CMK_URL):
+        cmk_link = f'\n<a href="{CMK_URL}/check_mk/view.py?view_name=host&host={host_enc}">Vai a CheckMK</a>'
     text = (
         f"\U0001f3ab <b>Ticket #{ticket_id} aperto</b>\n"
         f"{emoji} <b>{state_str}</b> \u2014 {host_line}\n"
-        f"\U0001f4cb {service}{output_line}\n"
-        f'<a href="{CMK_URL}/check_mk/view.py?view_name=host&host={host_enc}">Vai a CheckMK</a>'
+        f"\U0001f4cb {service}{output_line}{cmk_link}"
     )
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     data = urllib.parse.urlencode({
