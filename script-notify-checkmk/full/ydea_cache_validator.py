@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
 # ===== CONFIG (Must match ydea_la.py) =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -163,12 +163,17 @@ def iter_env_files() -> List[Optional[str]]:
 
 
 def is_not_found_output(output_lower: str) -> bool:
-    """Detect not-found responses across Ydea toolkit variants."""
+    """Detect not-found responses across Ydea toolkit variants.
+
+    NOTE: 'non trovato' / 'ticket non trovato' are intentionally excluded.
+    The toolkit resolves ticket existence via GET /tickets?limit=100 (list search),
+    not via GET /tickets/{id}. A ticket outside the first 100 results returns
+    'Ticket non trovato' even when it actually exists, causing false cache
+    invalidation. Only explicit HTTP 404 responses are a reliable signal.
+    """
     return (
         '404' in output_lower
         or 'not found' in output_lower
-        or 'ticket non trovato' in output_lower
-        or 'non trovato' in output_lower
     )
 
 
