@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""M@il
-Bulk: yes
-
-CheckMK notification script - sends HTML email with real IP and FRP tunnel detection.
-
-Version: 1.0.0"""
+# M@il
+# Bulk: yes
+# CheckMK notification script - sends HTML email with real IP and FRP tunnel detection.
+# Version: 1.0.0
 
 import os
 import sys
