@@ -13,7 +13,7 @@ import socket
 import urllib.parse
 import urllib.request
 
-VERSION = "1.5.4"
+VERSION = "1.5.5"
 
 # === CONFIG ===
 ENV_FILE = "/omd/sites/monitoring/etc/environment"
@@ -153,7 +153,7 @@ def main() -> int:
         elif CMK_URL == "__NOT_EXPOSED__":
             button = json.dumps({
                 "inline_keyboard": [[
-                    {"text": "🔒 Pannello non raggiungibile (server non esposto)", "callback_data": "not_exposed"}
+                    {"text": "🔒 Panel unreachable (server not exposed)", "callback_data": "not_exposed"}
                 ]]
             })
         else:
@@ -179,7 +179,7 @@ def main() -> int:
         elif CMK_URL == "__NOT_EXPOSED__":
             button = json.dumps({
                 "inline_keyboard": [[
-                    {"text": "🔒 Pannello non raggiungibile (server non esposto)", "callback_data": "not_exposed"}
+                    {"text": "🔒 Panel unreachable (server not exposed)", "callback_data": "not_exposed"}
                 ]]
             })
         else:

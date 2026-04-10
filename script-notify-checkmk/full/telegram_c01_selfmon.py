@@ -12,7 +12,7 @@ import urllib.parse
 import urllib.request
 import socket
 
-VERSION = "1.5.3"
+VERSION = "1.5.4"
 
 # === CONFIG ===
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
@@ -125,7 +125,7 @@ def main() -> int:
         elif CMK_URL == "__NOT_EXPOSED__":
             button = json.dumps({
                 "inline_keyboard": [[
-                    {"text": "🔒 Pannello non raggiungibile (server non esposto)", "callback_data": "not_exposed"}
+                    {"text": "🔒 Panel unreachable (server not exposed)", "callback_data": "not_exposed"}
                 ]]
             })
         else:
@@ -148,7 +148,7 @@ def main() -> int:
         elif CMK_URL == "__NOT_EXPOSED__":
             button = json.dumps({
                 "inline_keyboard": [[
-                    {"text": "🔒 Pannello non raggiungibile (server non esposto)", "callback_data": "not_exposed"}
+                    {"text": "🔒 Panel unreachable (server not exposed)", "callback_data": "not_exposed"}
                 ]]
             })
         else:
