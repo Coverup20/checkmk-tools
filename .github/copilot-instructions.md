@@ -1757,6 +1757,58 @@ Correct workflow:
 - If a `password for ...:`/`[sudo] password for ...:` prompt actually appears → stop only until the password is entered
 - Don't force `sudo`/`sudo -v` “by default”: use `sudo` only when needed and when the user is actually doing it (or requests it)
 
+** MANDATORY RULE - ALL SSH commands with non-trivial content use base64 encoding**
+
+> **"Se usi le virgolette nidificate sbagli. Se usi base64 non sbagli mai."**
+
+- **ALWAYS** encode scripts/commands via base64 before sending over SSH — no exceptions
+- Direct `ssh host 'complex command with quotes'` = guaranteed quoting failures after 1-2 levels of nesting
+- base64 = zero quoting issues, first attempt always works
+
+**Standard pattern (single command or inline script):**
+
+```bash
+wsl -d kali-linux bash -c "
+cat > /tmp/cmk_cmd.sh << 'ENDBODY'
+#!/bin/bash
+# write your script here — no escaping needed
+su - monitoring -c 'crontab -l | grep mkbackup'
+ENDBODY
+B64=\$(base64 -w0 /tmp/cmk_cmd.sh)
+ssh <alias> \"echo \$B64 | base64 -d | bash\"
+rm -f /tmp/cmk_cmd.sh
+"
+```
+
+**Python via base64:**
+
+```bash
+wsl -d kali-linux bash -c "
+cat > /tmp/cmk_py.py << 'ENDBODY'
+import socket
+s = socket.socket(socket.AF_UNIX)
+s.connect('/omd/sites/monitoring/tmp/run/live')
+s.send(b'GET services\nFilter: state = 2\nColumns: host_name description\n')
+s.shutdown(socket.SHUT_WR)
+print(s.makefile().read().strip())
+ENDBODY
+B64=\$(base64 -w0 /tmp/cmk_py.py)
+ssh <alias> \"echo \$B64 | base64 -d | python3\"
+rm -f /tmp/cmk_py.py
+"
+```
+
+**Exceptions (allowed without base64 — trivial single-word commands only):**
+
+```bash
+# OK without base64 — no quotes, no nesting
+wsl -d kali-linux bash -c "ssh <alias> 'uptime'"
+wsl -d kali-linux bash -c "ssh <alias> 'omd status'"
+wsl -d kali-linux bash -c "ssh <alias> 'git pull'"
+```
+
+**Everything else → base64. No second attempt needed.**
+
 ** CRITICAL RULE - Remote SSH Command Timeout:**
 - **ISSUE**: Agent SSH runs too fast and thinks user has aborted (^C), but in reality command was still processing
 - **SOLUTION**: Use GENEROUS timeouts for remote commands
