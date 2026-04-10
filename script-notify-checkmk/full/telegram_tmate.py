@@ -4,15 +4,16 @@
 TOKEN and CHAT_ID read from OMD standard environment file:
   /omd/sites/monitoring/etc/environment
 
-Version: 1.5.2"""
+Version: 1.5.3"""
 
 import json
 import os
 import sys
+import socket
 import urllib.parse
 import urllib.request
 
-VERSION = "1.5.2"
+VERSION = "1.5.3"
 
 # === CONFIG ===
 ENV_FILE = "/omd/sites/monitoring/etc/environment"
@@ -23,6 +24,21 @@ SITE = "monitoring"
 
 def _cmk_url_valid(url):
     return bool(url) and url.startswith(("http://", "https://")) and "<" not in url
+
+
+def get_reverse_dns_url():
+    """Auto-discover CMK_URL via public IP + reverse DNS."""
+    try:
+        req = urllib.request.Request("https://api.ipify.org")
+        req.add_header("User-Agent", "CheckMK-Telegram-Notifier")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            public_ip = resp.read().decode().strip()
+        hostname = socket.gethostbyaddr(public_ip)[0]
+        if hostname:
+            return f"https://{hostname}/monitoring"
+    except Exception:
+        pass
+    return None
 
 
 def load_env_file(path: str) -> None:
@@ -90,6 +106,10 @@ def main() -> int:
             f"Verifica {ENV_FILE}\n"
         )
         return 1
+
+    global CMK_URL
+    if not CMK_URL:
+        CMK_URL = get_reverse_dns_url() or ""
 
     notify_what = os.environ.get("NOTIFY_WHAT", "SERVICE")
     hostname = os.environ.get("NOTIFY_HOSTNAME", "unknown")
