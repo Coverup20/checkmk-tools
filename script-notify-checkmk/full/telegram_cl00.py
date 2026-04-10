@@ -10,8 +10,9 @@ import os
 import sys
 import urllib.parse
 import urllib.request
+import socket
 
-VERSION = "1.7.1"
+VERSION = "1.7.2"
 
 # === CONFIG ===
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
@@ -25,6 +26,21 @@ SITE = "monitoring"
 
 def _cmk_url_valid(url):
     return bool(url) and url.startswith(("http://", "https://")) and "<" not in url
+
+
+def get_reverse_dns_url():
+    """Auto-discover CMK_URL via public IP + reverse DNS."""
+    try:
+        req = urllib.request.Request("https://api.ipify.org")
+        req.add_header("User-Agent", "CheckMK-Telegram-Notifier")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            public_ip = resp.read().decode().strip()
+        hostname = socket.gethostbyaddr(public_ip)[0]
+        if hostname:
+            return f"https://{hostname}/monitoring"
+    except Exception:
+        pass
+    return None
 
 
 def get_status_prefix(state: str) -> str:
@@ -68,6 +84,10 @@ def main() -> int:
     if not TOKEN or not CHAT_ID:
         sys.stderr.write(f"telegram_cl00 v{VERSION}: TOKEN o CHAT_ID mancanti. Verifica /omd/sites/monitoring/etc/environment\n")
         return 1
+
+    global CMK_URL
+    if not CMK_URL:
+        CMK_URL = get_reverse_dns_url() or ""
 
     notify_what = os.environ.get("NOTIFY_WHAT", "SERVICE")
     hostname = os.environ.get("NOTIFY_HOSTNAME", "unknown")
