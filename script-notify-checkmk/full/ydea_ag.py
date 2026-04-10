@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.1.9"
+VERSION = "1.2.0"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -40,6 +40,8 @@ RESOLVE_ON_SERVICE_OK = int(os.getenv("RESOLVE_ON_SERVICE_OK", "0"))
 YDEA_CATEGORY_ID = int(os.getenv("YDEA_CATEGORY_ID", "147"))
 YDEA_USER_ID = int(os.getenv("YDEA_USER_ID", "4675"))  # Alessandro Gaggiano (AG)
 YDEA_TOOLKIT_TIMEOUT = int(os.getenv("YDEA_TOOLKIT_TIMEOUT", "25"))
+YDEA_MAX_RETRIES = int(os.getenv("YDEA_MAX_RETRIES", "3"))   # retry on transient network errors
+YDEA_RETRY_DELAY = int(os.getenv("YDEA_RETRY_DELAY", "10"))   # seconds between retries
 DEBUG_YDEA = os.getenv("DEBUG_YDEA", "0") == "1"
 
 
@@ -550,23 +552,59 @@ def build_cmk_marker(hostname: str, ip: str) -> str:
     return f"[CMK HOST={hostname} IP={ip}]"
 
 
-def create_ydea_ticket(title: str, description: str, priority: str, 
-                       category_id: int, hostname: str, service: str, 
+def is_transient_network_error(text: str) -> bool:
+    """Return True if the error is a transient network/DNS failure worth retrying."""
+    t = text.lower()
+    return any(k in t for k in (
+        "nameresolut",
+        "failed to resolve",
+        "errno -3",
+        "temporary failure in name resolution",
+        "max retries exceeded",
+        "connection refused",
+        "connection timed out",
+        "connectionerror",
+        "connecttimeout",
+        "remotedisconnected",
+        "broken pipe",
+        "network is unreachable",
+    ))
+
+
+def create_ydea_ticket(title: str, description: str, priority: str,
+                       category_id: int, hostname: str, service: str,
                        output: str) -> Optional[int]:
-    """Create Ydea ticket."""
+    """Create Ydea ticket. Retries up to YDEA_MAX_RETRIES times on transient network errors."""
     tipo = determine_tipo(hostname, service, output)
     debug(f"Creating ticket: {title} (category: {category_id}, tipo: {tipo})")
-    
-    exitcode, stdout, stderr = toolkit_cmd(['create', title, description, 
-                                            priority, str(category_id), tipo, 
-                                            str(YDEA_USER_ID)])
-    
-    if exitcode != 0:
+
+    exitcode, stdout, stderr = 1, "", ""
+    for attempt in range(1, YDEA_MAX_RETRIES + 1):
+        exitcode, stdout, stderr = toolkit_cmd(['create', title, description,
+                                                priority, str(category_id), tipo,
+                                                str(YDEA_USER_ID)])
+        if exitcode == 0:
+            break
         err_text = (stderr or stdout or "").strip()
         if exitcode == 124:
-            log(f"ERROR: Create ticket timeout after {YDEA_TOOLKIT_TIMEOUT}s")
-        else:
-            log(f"ERROR: Create ticket failed (code {exitcode}): {err_text}")
+            log(f"ERROR: Create ticket timeout after {YDEA_TOOLKIT_TIMEOUT}s (attempt {attempt}/{YDEA_MAX_RETRIES})")
+            if attempt < YDEA_MAX_RETRIES:
+                log(f"Retrying in {YDEA_RETRY_DELAY}s...")
+                time.sleep(YDEA_RETRY_DELAY)
+            continue
+        if is_transient_network_error(err_text):
+            log(f"ERROR: Create ticket failed (network error, attempt {attempt}/{YDEA_MAX_RETRIES}): {err_text[:200]}")
+            if attempt < YDEA_MAX_RETRIES:
+                log(f"Retrying in {YDEA_RETRY_DELAY}s...")
+                time.sleep(YDEA_RETRY_DELAY)
+            continue
+        # Non-transient error — do not retry
+        log(f"ERROR: Create ticket failed (code {exitcode}): {err_text}")
+        return None
+
+    if exitcode != 0:
+        err_text = (stderr or stdout or "").strip()
+        log(f"ERROR: Create ticket failed after {YDEA_MAX_RETRIES} attempts: {err_text[:200]}")
         return None
     
     response = parse_json_response(stdout)
@@ -594,24 +632,42 @@ def create_ydea_ticket(title: str, description: str, priority: str,
 
 
 def add_private_note(ticket_id: int, note: str) -> int:
-    """Add private note to ticket. Returns: 0=success, 1=error, 2=404."""
+    """Add private note to ticket. Returns: 0=success, 1=error, 2=404.
+    Retries up to YDEA_MAX_RETRIES times on transient network errors."""
     debug(f"Adding private note to ticket #{ticket_id}")
 
-    exitcode, stdout, stderr = toolkit_cmd(['comment', str(ticket_id), note])
+    exitcode, stdout, stderr = 1, "", ""
+    for attempt in range(1, YDEA_MAX_RETRIES + 1):
+        exitcode, stdout, stderr = toolkit_cmd(['comment', str(ticket_id), note])
+        if exitcode == 0:
+            return 0
 
-    if exitcode != 0:
         output_lower = (stdout + stderr).lower()
+
         if '404' in output_lower or 'not found' in output_lower or 'ticket non trovato' in output_lower:
             log(f"WARN: Ticket #{ticket_id} not found (404)")
             return 2
 
         if exitcode == 124:
-            log(f"ERROR: Add note timeout after {YDEA_TOOLKIT_TIMEOUT}s")
-        else:
-            log(f"ERROR: Add note failed: {stderr}")
+            log(f"ERROR: Add note timeout after {YDEA_TOOLKIT_TIMEOUT}s (attempt {attempt}/{YDEA_MAX_RETRIES})")
+            if attempt < YDEA_MAX_RETRIES:
+                log(f"Retrying in {YDEA_RETRY_DELAY}s...")
+                time.sleep(YDEA_RETRY_DELAY)
+            continue
+
+        if is_transient_network_error(output_lower):
+            log(f"ERROR: Add note network error (attempt {attempt}/{YDEA_MAX_RETRIES}): {stderr[:200]}")
+            if attempt < YDEA_MAX_RETRIES:
+                log(f"Retrying in {YDEA_RETRY_DELAY}s...")
+                time.sleep(YDEA_RETRY_DELAY)
+            continue
+
+        # Non-transient error — do not retry
+        log(f"ERROR: Add note failed: {stderr}")
         return 1
 
-    return 0
+    log(f"ERROR: Add note failed after {YDEA_MAX_RETRIES} attempts")
+    return 1
 
 
 def detect_alert_type(output: str, old_state: str, new_state: str) -> str:
