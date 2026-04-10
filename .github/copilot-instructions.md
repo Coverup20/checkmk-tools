@@ -1891,7 +1891,7 @@ wsl -d kali-linux bash -c "ssh <alias> 'git pull'"
 - **NEVER** reissue a command if the previous one already has exit code 0 — the output is already available
 - **If password is wrong once** (output "Permission denied, please try again") → SSH command waits for second password → continue monitoring with `terminal_last_command` until it exits, DO NOT abandon
 
-** GENERAL RULE - Host with PASSWORD authentication (checkmk-z1-00, ns-lab00, laboratory, srv-monitoring, etc.):**
+** GENERAL RULE - Host with PASSWORD authentication (checkmk-z1-00, ns-lab00, laboratory, etc.):**
 - **NEVER** attempt standalone SSH connections via `run_in_terminal` on hosts with passwords
   → the tool cannot enter the password → always fails with `^C` or timeout
 - **IF first attempt `run_in_terminal` on host-password fails** (output `^C` or empty):
@@ -1908,9 +1908,9 @@ wsl -d kali-linux bash -c "ssh <alias> 'git pull'"
     → ControlMaster 30m active in WSL: after the first connection (passphrase), all subsequent ones are autonomous
     → If the socket has expired (>30min), ask the user to reopen: `wsl -d kali-linux ssh checkmk-vps-02`
     → ubntmarzio: key ~/.ssh/copilot_ubntmarzio (ed25519, NO passphrase, installed 2026-03-28) - autonomous always
-  - **SSH KEY** (run_in_terminal OK): srv-monitoring
+  - **SSH KEY** (run_in_terminal OK): srv-monitoring-sp
     → Key: ~/.ssh/copilot_srv_monitoring (ed25519, installed 2026-03-10)
-    → Command: `wsl -d kali-linux bash -c "ssh srv-monitoring 'cmd'"` (NO -tt!)
+    → Command: `wsl -d kali-linux bash -c "ssh srv-monitoring-sp 'cmd'"` (NO -tt!)
     → Completely autonomous access, zero passwords
   - **PASSWORD** (give commands to paste): checkmk-z1-00, checkmk-z1-01, nodo-proxmox, ns-lab00, box-lab00, rl94ns8, rl94ns81, nsec8-stable, laboratory, marziodemo, fwlab, redteam
 
@@ -1947,7 +1947,7 @@ marziodemo # 10.155.100.61:22 (root, Demo environment)
 ubntmarzio # 10.155.100.108:22 (user: marzio) - SSH KEY (self-access OK, NO sudo without password)
                   # Key: ~/.ssh/copilot_ubntmarzio (ed25519, installed 2026-03-28)
                   # Command: ssh ubntmarzio 'cmd' (alias in ~/.ssh/config)
-srv-monitoring #45.33.235.86:2333 (root, Monitoring)
+srv-monitoring-sp #45.33.235.86:2333 (root, Monitoring)
                   # ALWAYS USE root@45.33.235.86 - NEVER admin-nethesis or other users!
                   # DO NOT use sudo (already logged in as root - sudo is not needed)
 # OMD installed: site 'monitoring' in /omd/sites/monitoring/
@@ -1958,29 +1958,24 @@ srv-monitoring #45.33.235.86:2333 (root, Monitoring)
                   # Public firewall 45.33.235.86 port 2333 → DNAT → 127.0.0.1:2222 internal
                   # fail2ban active on firewall - DO NOT make multiple connection attempts
                   # Firewall whitelist only IP 159.65.203.113 (alias sos) - MANDATORY jump via sos
-                  # PASSWORD authentication (not SSH key) - DO NOT install SSH keys
+                  # SSH KEY authentication: ~/.ssh/copilot_srv_monitoring (ed25519, NO passphrase)
                   # Direct access command (from WSL):
-                  # wsl -d kali-linux ssh srv-monitoring (use alias ~/.ssh/config in WSL)
+                  # wsl -d kali-linux ssh srv-monitoring-sp (use alias ~/.ssh/config in WSL)
                   # Config WSL ~/.ssh/config entry REQUIRED:
-                  # Host srv-monitoring
+                  # Host srv-monitoring-sp
                   # HostName 45.33.235.86
                   # Port 2333
                   # User root
                   # ProxyJump sus
-                  # ControlMaster auto
-                  # ControlPath ~/.ssh/sockets/%r@%h:%p
-                  # ControlPersist 60m
-                  # Correct command: wsl -d kali-linux bash -c "ssh srv-monitoring 'cmd'" (NO -tt!)
-                  # First connection asks for password, then socket active for 60 minutes (ControlPersist 60m)
+                  # Correct command: wsl -d kali-linux bash -c "ssh srv-monitoring-sp 'cmd'" (NO -tt!)
                   #
-                  # RULE - srv-monitoring: RUN SELF with run_in_terminal
-                  # → The ControlMaster socket works, we ran commands several times on our own
-                  # → Basic command: wsl -d kali-linux bash -c "ssh srv-monitoring 'cmd'"
+                  # RULE - srv-monitoring-sp: RUN SELF with run_in_terminal
+                  # → SSH key installed, fully autonomous access
+                  # → Basic command: wsl -d kali-linux bash -c "ssh srv-monitoring-sp 'cmd'"
                   # → DO NOT use -tt flag (causes ^C), use without -tt
                   # → For rclone with su - monitoring: escape backslashes for spaces in -c
-                  # FIXED: wsl -d kali-linux bash -c "ssh srv-monitoring 'su - monitoring -c rclone\ ls\ do:testmonbck/...'"
-                  # WRONG: wsl -d kali-linux bash -c "ssh srv-monitoring 'su - monitoring -c \"rclone ls ...\"'"
-                  # → If socket has expired → retry executing anyway, don't delegate to user
+                  # FIXED: wsl -d kali-linux bash -c "ssh srv-monitoring-sp 'su - monitoring -c rclone\ ls\ do:testmonbck/...'"
+                  # WRONG: wsl -d kali-linux bash -c "ssh srv-monitoring-sp 'su - monitoring -c \"rclone ls ...\"'"
                   # → Recommended timeout: 60000ms (60 sec)
                   # Don't use more than one block per operation (avoid unnecessary back-and-forth)
 
@@ -2628,7 +2623,7 @@ fi
 
 ---
 
-## Ydea-Toolkit - CheckMK integration on srv-monitoring
+## Ydea-Toolkit - CheckMK integration on srv-monitoring-sp
 
 ### Path script (CheckMK notification scripts, without extension)
 
