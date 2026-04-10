@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-ydea_la - Ydea Ticketing Integration with Smart Detection (LA Environment)
+ydea_ag - Ydea Ticketing Integration with Smart Detection
 Bulk: no
 
 CheckMK notification script - integrates with Ydea ticketing system.
 Features: smart detection, flapping protection, host aggregation, cache management.
 
-Version: 1.0.4
+Version: 1.0.3
 """
 
 import os
@@ -24,7 +24,7 @@ VERSION = "1.1.9"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
-YDEA_ENV = f"{YDEA_TOOLKIT_DIR}/.env.la"
+YDEA_ENV = f"{YDEA_TOOLKIT_DIR}/.env.ag"
 YDEA_CONFIG = f"{YDEA_TOOLKIT_DIR}/config/premium-mon-config.json"
 YDEA_CACHE_DIR = "/opt/ydea-toolkit/cache"
 TICKET_CACHE = f"{YDEA_CACHE_DIR}/ydea_checkmk_tickets.json"
@@ -40,7 +40,7 @@ EFFETTUATO_GRACE_SECONDS = 24 * 3600  # 24 ore finestra grace post-Effettuato
 AGGREGATE_BY_HOST = int(os.getenv("AGGREGATE_BY_HOST", "1"))
 RESOLVE_ON_SERVICE_OK = int(os.getenv("RESOLVE_ON_SERVICE_OK", "0"))
 YDEA_CATEGORY_ID = int(os.getenv("YDEA_CATEGORY_ID", "147"))
-YDEA_USER_ID = int(os.getenv("YDEA_USER_ID", "12336"))  # Lorenzo Angelini (LA)
+YDEA_USER_ID = int(os.getenv("YDEA_USER_ID", "4675"))  # Alessandro Gaggiano (AG)
 YDEA_TOOLKIT_TIMEOUT = int(os.getenv("YDEA_TOOLKIT_TIMEOUT", "25"))
 DEBUG_YDEA = os.getenv("DEBUG_YDEA", "0") == "1"
 
@@ -820,8 +820,8 @@ def main():
             log(f"Ticket #{ticket_id} not found (404), removing from cache")
             remove_ticket_from_cache(ticket_key)
             
-            # Create new ticket only if CRITICAL/DOWN (not WARNING)
-            if state in ["CRITICAL", "CRIT", "DOWN"]:
+            # Create new ticket if still critical
+            if state in ["CRITICAL", "CRIT", "DOWN", "WARNING", "WARN"]:
                 log("Creating new ticket after 404")
                 
                 alert_type = detect_alert_type(output, last_state, state)
@@ -844,8 +844,8 @@ def main():
                     save_ticket_cache(ticket_key, new_ticket_id, state)
                     log_ticket_event("CREATO", new_ticket_id, f"After 404 on #{ticket_id}")
     
-    elif state in ["CRITICAL", "CRIT", "DOWN"]:
-        # Create new ticket (only CRITICAL/DOWN, WARNING only adds notes to existing tickets)
+    elif state in ["CRITICAL", "CRIT", "DOWN", "WARNING", "WARN"]:
+        # Create new ticket
         log(f"Creating new ticket for {hostname}/{service}")
         
         alert_type = detect_alert_type(output, last_state, state)
