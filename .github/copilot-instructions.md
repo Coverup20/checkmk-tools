@@ -201,23 +201,43 @@ git push upstream main
 
 5. **Stores useful information**
    - If you discover useful patterns/commands/procedures → add them to the copilot-instructions
-- Workflows that work well must be documented
+   - Workflows that work well must be documented
    - Common paths, standard configurations, troubleshooting tips
 
-6. **Clean backup after test**
+6. ** MANDATORY LEARN FROM MISTAKES — memorize solutions immediately**
+
+   > **"Se trovi una soluzione, memorizzala subito. Non imparare dagli stessi errori due volte."**
+
+   - **EVERY TIME** a command fails and you find the correct approach → memorize it before continuing
+   - **EVERY TIME** a tool/pattern/workaround is discovered to work → write it to memory immediately
+   - **WHERE to write**:
+     - Technical pattern (SSH, git, tool usage) → `/memories/repo/<topic>.md`
+     - General insight (approach, strategy) → `/memories/<topic>.md`
+     - Session-specific (task in progress) → `/memories/session/<topic>.md`
+   - **WHAT to write**: the exact working command/pattern + why the wrong approach failed
+   - **WHEN**: immediately after the solution is confirmed — not at the end of the conversation
+   - **DO NOT wait** for the user to say "memorizza" — do it automatically
+   - **Examples of things to memorize**:
+     - SSH quoting failures and the working alternative
+     - Tool invocation patterns that work vs those that fail
+     - Host-specific quirks (auth method, port, path)
+     - CheckMK commands that produce expected output
+     - PowerShell/WSL interaction issues and workarounds
+
+7. **Clean backup after test**
    - When tests on backed up files finish successfully
    - Propose removal of created backup files
    - WAIT for user confirmation before deleting
    - Never delete backups without explicit confirmation
 
-7. **Automatic periodic integrity check**
+8. **Automatic periodic integrity check**
    - During conversations, periodically propose `.\script-ps-tools\check-integrity.ps1 -SendEmail`
    - Check at appropriate times (after changes, major commits, user requests)
    - Send email if even 1 corrupt file is found
    - Email includes: list of corrupt files, error percentage, details
    - Don't send email if everything OK (console output only)
 
-8. ** MANDATORY SENSITIVE DATA CONTROL **
+9. ** MANDATORY SENSITIVE DATA CONTROL **
    - **ALWAYS** check for sensitive data when creating/modifying a script
    - Scan for:
      - **Token**: API keys, auth tokens, access tokens
@@ -1765,49 +1785,71 @@ Correct workflow:
 - Direct `ssh host 'complex command with quotes'` = guaranteed quoting failures after 1-2 levels of nesting
 - base64 = zero quoting issues, first attempt always works
 
-**Standard pattern (single command or inline script):**
+**VERIFIED WORKING PATTERN from PowerShell terminal (tested 2026-04-10):**
 
-```bash
-wsl -d kali-linux bash -c "
-cat > /tmp/cmk_cmd.sh << 'ENDBODY'
+Encode in PowerShell first, then pass the already-encoded string to WSL:
+
+```powershell
+$script = @"
 #!/bin/bash
-# write your script here — no escaping needed
-su - monitoring -c 'crontab -l | grep mkbackup'
-ENDBODY
-B64=\$(base64 -w0 /tmp/cmk_cmd.sh)
-ssh <alias> \"echo \$B64 | base64 -d | bash\"
-rm -f /tmp/cmk_cmd.sh
-"
+omd version
+omd status
+uptime
+df -h --output=target,pcent | grep -v tmpfs
+"@
+$b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($script))
+wsl -d kali-linux bash -c "ssh <alias> 'echo $b64 | base64 -d | bash'"
 ```
 
-**Python via base64:**
+**Python script via base64 (PowerShell):**
 
-```bash
-wsl -d kali-linux bash -c "
-cat > /tmp/cmk_py.py << 'ENDBODY'
+```powershell
+$script = @"
 import socket
 s = socket.socket(socket.AF_UNIX)
 s.connect('/omd/sites/monitoring/tmp/run/live')
 s.send(b'GET services\nFilter: state = 2\nColumns: host_name description\n')
 s.shutdown(socket.SHUT_WR)
 print(s.makefile().read().strip())
+"@
+$b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($script))
+wsl -d kali-linux bash -c "ssh <alias> 'echo $b64 | base64 -d | python3'"
+```
+
+**OMD commands (su - monitoring):**
+
+```powershell
+$script = @"
+#!/bin/bash
+su - monitoring -c 'crontab -l | grep mkbackup'
+"@
+$b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($script))
+wsl -d kali-linux bash -c "ssh <alias> 'echo $b64 | base64 -d | bash'"
+```
+
+**WHY the heredoc approach FAILS from PowerShell:**
+
+```powershell
+# WRONG — PowerShell breaks multiline heredoc inside wsl bash -c quotes (exit code 1)
+wsl -d kali-linux bash -c "
+cat > /tmp/cmk.sh << 'ENDBODY'
+...
 ENDBODY
-B64=\$(base64 -w0 /tmp/cmk_py.py)
-ssh <alias> \"echo \$B64 | base64 -d | python3\"
-rm -f /tmp/cmk_py.py
+B64=\$(base64 -w0 /tmp/cmk.sh)
+ssh host \"echo \$B64 | base64 -d | bash\"
 "
 ```
 
 **Exceptions (allowed without base64 — trivial single-word commands only):**
 
-```bash
+```powershell
 # OK without base64 — no quotes, no nesting
 wsl -d kali-linux bash -c "ssh <alias> 'uptime'"
 wsl -d kali-linux bash -c "ssh <alias> 'omd status'"
 wsl -d kali-linux bash -c "ssh <alias> 'git pull'"
 ```
 
-**Everything else → base64. No second attempt needed.**
+**Everything else → PowerShell base64 encode + `echo $b64 | base64 -d | bash`. No second attempt needed.**
 
 ** CRITICAL RULE - Remote SSH Command Timeout:**
 - **ISSUE**: Agent SSH runs too fast and thinks user has aborted (^C), but in reality command was still processing
