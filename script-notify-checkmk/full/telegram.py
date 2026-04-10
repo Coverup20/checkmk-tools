@@ -4,22 +4,23 @@
 # SPDX-License-Identifier: GPL-2.0-only
 #
 
-# Generic Telegram self-monitoring notification script for CheckMK
+# Generic Telegram notification script for CheckMK alerts
 
-import os
-import sys
 import json
+import os
 import re
-import socket
-import urllib.request
+import sys
 import urllib.parse
+import urllib.request
+import socket
 
-VERSION = "1.4.0"
+VERSION = "1.0.0"
 
 # === CONFIG ===
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
-CHAT_ID = os.environ.get("TELEGRAM_SELFMON_CHAT_ID", "")
+CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 CUSTOMER_NAME = os.environ.get("TELEGRAM_CUSTOMER_NAME", "")
+
 CMK_URL = os.environ.get("CMK_URL", "")
 SITE = "monitoring"
 # ==============
@@ -81,7 +82,7 @@ def send_telegram(token, chat_id, text, reply_markup=None):
     with urllib.request.urlopen(req, timeout=10) as resp:
         body = resp.read().decode("utf-8", errors="replace")
     if '"ok":true' not in body and '"ok": true' not in body:
-        sys.stderr.write(f"telegram_selfmon v{VERSION}: Telegram API error: {body[:200]}\n")
+        sys.stderr.write(f"telegram v{VERSION}: Telegram API error: {body[:200]}\n")
         raise RuntimeError(f"Telegram API error: {body[:200]}")
     sys.stdout.write("Telegram OK: message sent\n")
 
@@ -89,7 +90,7 @@ def send_telegram(token, chat_id, text, reply_markup=None):
 
 def check():
     if not TOKEN or not CHAT_ID:
-        sys.stderr.write(f"telegram_selfmon v{VERSION}: TOKEN o CHAT_ID mancanti. Verifica /omd/sites/monitoring/etc/environment\n")
+        sys.stderr.write(f"telegram v{VERSION}: TOKEN o CHAT_ID mancanti. Verifica /omd/sites/monitoring/etc/environment\n")
         return
 
     global CMK_URL
@@ -144,7 +145,7 @@ def check():
         else:
             button = None
 
-    prefix_label = f"[{CUSTOMER_NAME} SELF-MONITOR] " if CUSTOMER_NAME else "[SELF-MONITOR] "
+    prefix_label = f"[{CUSTOMER_NAME}] " if CUSTOMER_NAME else ""
     msg = f"{prefix_label}{msg}"
     send_telegram(TOKEN, CHAT_ID, msg, button)
 
