@@ -8,11 +8,12 @@ Version: 1.7.0
 import json
 import os
 import sys
+import re
 import urllib.parse
 import urllib.request
 import socket
 
-VERSION = "1.7.4"
+VERSION = "1.7.5"
 
 # === CONFIG ===
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
@@ -28,17 +29,31 @@ def _cmk_url_valid(url):
     return bool(url) and url.startswith(("http://", "https://")) and "<" not in url
 
 
+_ISP_PTR = re.compile(
+    r'\d{1,3}[.\-]\d{1,3}[.\-]\d{1,3}[.\-]\d{1,3}'  # IP octets in hostname
+    r'|\.ppp\.'        # PPP/DSL pool
+    r'|\.dsl\.'        # DSL
+    r'|\.cable\.'      # Cable
+    r'|\.pool\.'       # IP pool
+    r'|\.dynamic\.'   # Dynamic IP
+    r'|\.adsl\.'       # ADSL
+    r'|\.broadband\.'  # Broadband
+    r'|^(res|host|static|ip|ptr|dsl|cable|broadband|dynamic|pool|user|client|customer)[.\-_]',
+    re.IGNORECASE
+)
+
+
 def get_reverse_dns_url():
-    """Auto-discover CMK_URL via public IP + reverse DNS with forward confirmation.
-    Returns URL only if PTR hostname resolves back to the same IP (real server FQDN).
-    Returns None if PTR is ISP-assigned, missing, or does not forward-confirm."""
+    """Auto-discover CMK_URL via public IP + reverse DNS.
+    Returns URL only if PTR hostname passes ISP pattern filter AND forward-confirms
+    (hostname resolves back to the same IP). Returns None otherwise."""
     try:
         req = urllib.request.Request("https://api.ipify.org")
         req.add_header("User-Agent", "CheckMK-Telegram-Notifier")
         with urllib.request.urlopen(req, timeout=5) as resp:
             public_ip = resp.read().decode().strip()
         hostname = socket.gethostbyaddr(public_ip)[0]
-        if hostname:
+        if hostname and not _ISP_PTR.search(hostname):
             try:
                 resolved = socket.gethostbyname(hostname)
                 if resolved == public_ip:
