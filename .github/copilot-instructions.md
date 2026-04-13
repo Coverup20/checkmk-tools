@@ -294,6 +294,34 @@ git push origin main
      4. Validate that the fix does not break functionality
      5. Remind the user to **rotate credentials** if already published
 
+   - ** FULL GIT HISTORY SCAN (when user asks "scansiona dati sensibili" or "verifica dati sensibili")**:
+     - Use `git filter-repo` to scan and purge from the entire history — not just the working tree
+     - **Step-by-step procedure**:
+       1. Find the blob SHA of the offending file:
+          ```bash
+          git log --all --full-history -- "path/to/file" | head -5
+          git ls-tree <commit_sha> -- "path/to/file"
+          # → get blob SHA from output (e.g. d66c3df...)
+          ```
+       2. Purge the blob from all history:
+          ```bash
+          echo "<blob_sha>" | git filter-repo --strip-blobs-with-ids /dev/stdin --force
+          ```
+       3. Re-add remote (filter-repo removes it):
+          ```bash
+          git remote add origin git@github.com:nethesis/checkmk-tools.git
+          ```
+       4. Force push to purge from GitHub:
+          ```bash
+          git push origin main --force
+          git push origin --tags --force
+          ```
+       5. Open GitHub Support ticket to purge CDN cache:
+          - URL: https://support.github.com/contact
+          - Request: "Please purge cached views and CDN for commit <sha> — sensitive data removed via git filter-repo"
+     - `git filter-repo` is installed in WSL: `sudo apt-get install -y git-filter-repo`
+     - **WARNING**: rewrites all commit SHAs — inform user before running, coordinate with any collaborators
+
 9. ** EFFICIENCY AND TOKEN CONTAINMENT - Think Before Acting**
    - **MONTHLY BUDGET**: 1500 usable tokens/month
    - **Extra budgets available BUT prefer NOT to use them** - keep them as an emergency reserve
