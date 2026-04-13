@@ -26,7 +26,7 @@ Before starting any work, read the following memory files in order and internali
 
 ## Key facts to remember immediately:
 - Workspace: C:\Users\Marzio\Desktop\CheckMK\checkmk-tools
-- Git remotes: origin = Coverup20/checkmk-tools, upstream = nethesis/checkmk-tools
+- Git remote: origin = nethesis/checkmk-tools
 - Default push: origin only. Push upstream only on explicit user confirmation.
 - srv-monitoring-sp: 45.33.235.86:2333, root, ProxyJump sos MANDATORY, key ~/.ssh/copilot_srv_monitoring
   - Command: wsl -d kali-linux bash -c "ssh srv-monitoring-sp 'cmd'" (NO -tt flag)

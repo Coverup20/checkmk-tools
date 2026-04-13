@@ -118,45 +118,32 @@
 
 ---
 
-## WORKFLOW GIT - Fork and Upstream
+## WORKFLOW GIT - Direct push to Nethesis
 
 ### Repository structure
 
 | Remote | URL | Role |
 |--------|-----|------|
-| `origin` | `git@github.com:Coverup20/checkmk-tools.git` | **Work forks** — daily pushes |
-| `upstream` | `git@github.com:nethesis/checkmk-tools.git` | **Official Nethesis Repo** — push upon release |
+| `origin` | `git@github.com:nethesis/checkmk-tools.git` | **Official Nethesis Repo** — all pushes go here |
 
-### MANDATORY rule - Due-push workflow
+### MANDATORY rule - Direct workflow
 
-**All day-to-day work goes on `origin` (fork). Only when the job is completed does it push to `upstream`.**
+**All work goes directly on `origin` (nethesis). No fork.**
 
 **Complete Workflow:**
 
 ```bash
-#1. Work normally, commit on fork
+# Work normally, commit and push to nethesis
 git add .
 git commit -m "type(scope): vX.Y.Z - description"
 git push origin main
-
-# 2. Only when the work is FINISHED and tested → push to upstream Nethesis
-git push upstream main
 ```
 
 **Rules:**
 
-- **During development**: push ONLY to `origin` (Coverup20 fork)
-- **When work is completed**: same commit → push also on `upstream` (nethesis)
-- **Same commit message** on both pushes (same commit, same tag/version)
-- **NEVER** push on `upstream` without first testing on `origin`
-- **NEVER** `git push` without specifying `origin` or `upstream` (may go to the wrong one)
-- **Default push**: always `origin` unless otherwise specified by the user
-
-**When to push upstream:**
-
-- Feature/fix completed + tested on remote hosts
-- User gives explicit green light ("ok, push on nethesis too")
-- NEVER during development/debug iterations
+- **Always push to `origin`** (nethesis)
+- **NEVER** `git push` without specifying `origin`
+- **Default push**: always `git push origin main`
 
 ---
 
@@ -626,7 +613,7 @@ git push
 
 #6. Check and update local repo
 wsl -d kali-linux ssh nsec8-stable "[ -d /opt/checkmk-tools ] && echo 'EXISTS' || echo 'MISSING'"
-# If MISSING → git clone https://github.com/Coverup20/checkmk-tools.git /opt/checkmk-tools
+# If MISSING → git clone https://github.com/nethesis/checkmk-tools.git /opt/checkmk-tools
 # If EXISTS → wsl -d kali-linux ssh nsec8-stable "cd /opt/checkmk-tools && git pull"
 
 #7. Test from LOCAL REPO (NOT GitHub!)
@@ -1054,7 +1041,7 @@ If you absolutely have to create a file → delete it immediately afterwards wit
 
 **Order of priority:**
 1. **Local (if available)**: `/opt/checkmk-tools/script-tools/full/script-name.sh` (most convenient)
-2. **GitHub raw**: `https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/...` (works equally well)
+2. **GitHub raw**: `https://raw.githubusercontent.com/nethesis/checkmk-tools/main/...` (works equally well)
 
 **Local execution examples:**
 
@@ -1074,10 +1061,10 @@ bash /opt/checkmk-tools/script-tools/full/script-name.sh
 
 ```bash
 # Cron job - direct execution from GitHub
-0 3 * * * curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash >> /var/log/script.log 2>&1
+0 3 * * * curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash >> /var/log/script.log 2>&1
 
 # Remote manual execution
-curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/script-name.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/script-name.sh | bash
 
 ```text
 
@@ -1108,7 +1095,7 @@ curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script
 wsl -d kali-linux ssh <host> "[ -d /opt/checkmk-tools ] && echo 'REPO EXISTS' || echo 'REPO MISSING'"
 
 # If REPO MISSING → clone
-wsl -d kali-linux ssh <host> "git clone https://github.com/Coverup20/checkmk-tools.git /opt/checkmk-tools"
+wsl -d kali-linux ssh <host> "git clone https://github.com/nethesis/checkmk-tools.git /opt/checkmk-tools"
 
 # If REPO EXISTS → update
 wsl -d kali-linux ssh <host> "cd /opt/checkmk-tools && git pull"
@@ -1284,7 +1271,7 @@ wsl -d kali-linux ssh <host> "/opt/checkmk-tools/script-check-ns7/remote/rcheck-
 /opt/checkmk-tools/script-tools/full/installation/install-agent-interactive.sh
 
 # From GitHub (if repo not cloned)
-curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/installation/install-agent-interactive.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/installation/install-agent-interactive.sh | bash
 
 ```text
 
@@ -2018,10 +2005,10 @@ wsl -d kali-linux ssh ns-lab00 "cd /opt/checkmk-tools && git pull"
 
 ```powershell
 # Direct download and execution of scripts from the repository
-wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash"
+wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash"
 
 # With parameters
-wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/script.sh | bash -s -- arg1 arg2"
+wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/script.sh | bash -s -- arg1 arg2"
 
 ```text
 
@@ -2043,7 +2030,7 @@ wsl -d kali-linux ssh checkmk-vps-01 "ls -lh /opt/omd/sites/monitoring/var/check
 # WRONG: scp script.sh checkmk-vps-01:/usr/local/bin/
 # FIXED: Run from GitHub with curl
 
-wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash"
+wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash"
 
 ```text
 
@@ -2063,7 +2050,7 @@ wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.c
 
 ```powershell
 # Run integrity check on VPS
-wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/Coverup20/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash -n"
+wsl -d kali-linux ssh checkmk-vps-01 "curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/backup_restore/cleanup-checkmk-retention.sh | bash -n"
 
 ```text
 
