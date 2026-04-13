@@ -187,6 +187,8 @@ git push origin main
 
 - `checkmk-z1-00`, `checkmk-z1-01`, `nsec8-stable`, `rl94ns8`, `ns-lab00`
 
+**git push from WSL Kali:** works directly — `~/.ssh/id_ed25519_github` configured (2026-04-13)
+
 ---
 
 ## MANDATORY SAFETY RULES
