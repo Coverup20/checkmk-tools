@@ -145,6 +145,48 @@ git push origin main
 - **NEVER** `git push` without specifying `origin`
 - **Default push**: always `git push origin main`
 
+### Script Testing Workflow (before push)
+
+**MANDATORY — test BEFORE committing to nethesis. Use direct scp to the test server.**
+
+```bash
+# 1. Edit script locally in VSCode
+# ...
+
+# 2. Validate syntax
+wsl bash -n script.sh           # Bash
+python3 -m py_compile script.py # Python
+
+# 3. Copy to test server directly (NO git push yet)
+scp script-check-ubuntu/full/check_service.py checkmk-vps-02:/tmp/check_service_test.py
+
+# 4. Test on test server
+ssh checkmk-vps-02 'python3 /tmp/check_service_test.py; rm -f /tmp/check_service_test.py'
+
+# 5. Only if test passes → commit and push
+git add script-check-ubuntu/full/check_service.py
+git commit -m "feat(ubuntu): check_service v1.0.0 - description"
+git push origin main
+# Servers auto-pull via git cron every minute
+```
+
+**Why scp and not push-first:**
+
+- No point polluting `main` with untested code
+- scp is instant, git push + auto-pull takes 1-2 minutes
+- If test fails → fix locally, re-scp, re-test without any commit history noise
+- Only clean, verified commits reach nethesis/main
+
+**Available test hosts (SSH key access — direct scp/ssh):**
+
+- `checkmk-vps-02` — staging/test CheckMK
+- `checkmk-vps-01` — production (use only after vps-02 validates)
+- `srv-monitoring-sp` — production SP (only for notification scripts)
+
+**Hosts with password (give commands to paste to user instead of running directly):**
+
+- `checkmk-z1-00`, `checkmk-z1-01`, `nsec8-stable`, `rl94ns8`, `ns-lab00`
+
 ---
 
 ## MANDATORY SAFETY RULES
@@ -508,7 +550,8 @@ git commit -m "fix: fixed command error"
 16. ** MANDATORY WORKFLOW - Development and Test Script**
    - **ALWAYS follow this complete workflow** for bash/shell script changes
    - **NEVER** skip steps or declare "completed" without real testing
-- **LOOP until everything works** - don't exit until completely successful
+   - **SCP-FIRST**: test locally via scp BEFORE committing to nethesis
+   - **LOOP until everything works** - don't exit until completely successful
 
 **MANDATORY WORKFLOW (to ALWAYS be followed):**
 
@@ -517,113 +560,95 @@ git commit -m "fix: fixed command error"
 ┌──────────────────────────── ─────────────────────────────┐
 │ 1. EDITING/WRITING SCRIPT │
 │ - Implement requested functionality │
-│ - Follow bash/PowerShell best practices │
+│ - Follow bash/Python best practices │
 └──────────────────────────── ─────────────────────────────┘
                          ↓
 ┌──────────────────────────── ─────────────────────────────┐
 │ 2. SYNTAX TEST │
-│ Bash: wsl bash -n script.sh │
-│ PowerShell: PSParser validation │
+│ Bash:   wsl bash -n script.sh │
+│ Python: python3 -m py_compile script.py │
 │ Exit code MUST be 0 │
 └──────────────────────────── ─────────────────────────────┘
                          ↓
 ┌──────────────────────────── ─────────────────────────────┐
-│ 3. EXECUTABILITY CHECK │
+│ 3. EXECUTABILITY CHECK (bash/sh only) │
 │ git ls-files -s script.sh │
 │ MUST show 100755 (executable) │
 │ If 100644 → git update-index --chmod=+x script.sh │
 └──────────────────────────── ─────────────────────────────┘
                          ↓
 ┌──────────────────────────── ─────────────────────────────┐
-│ 4. ALIGN REPO AND COMMIT (on the fork) │
-│ git add script.sh │
-│ git commit -m "type(scope): vX.Y.Z - description" │
-│ git push origin main ← ONLY on the fork!              │
+│ 4. SCP TO TEST SERVER (NO git push yet!) │
+│ scp script.py checkmk-vps-02:/tmp/script_test.py │
+│ - Use /tmp/ on remote host │
+│ - Immediate, no wait for auto-pull │
 └──────────────────────────── ─────────────────────────────┘
                          ↓
 ┌──────────────────────────── ─────────────────────────────┐
-│ 5. ASK HOST FOR TEST │
-│ "Which host do you want to test on?"                        │
-│ Available hosts: nsec8-stable, laboratory, etc.    │
-└──────────────────────────── ─────────────────────────────┘
-                         ↓
-┌──────────────────────────── ─────────────────────────────┐
-│ 6. CHECK AND UPDATE LOCAL REPO │
-│ - Check existence /opt/checkmk-tools/ │
-│ - If it does NOT exist → git clone │
-│ - If exists → cd /opt/checkmk-tools && git pull │
-│ MANDATORY before each test │
-└──────────────────────────── ─────────────────────────────┘
-                         ↓
-┌──────────────────────────── ─────────────────────────────┐
-│ 7. COMPLETE OPERATION TEST │
-│ - Run script from LOCAL REPO │
-│ - Path: /opt/checkmk-tools/script-check-*/full/xxx │
-│ - Check output/log │
+│ 5. TEST ON HOST + CLEANUP │
+│ ssh checkmk-vps-02 'python3 /tmp/script_test.py; │
+│                     rm -f /tmp/script_test.py' │
+│ - Check output │
 │ - Check exit code │
-│ - Valid expected result │
+│ - Validate expected result │
 └──────────────────────────── ─────────────────────────────┘
                          ↓
               ┌──────────────────┐
-              │ DOES EVERYTHING WORK?  │
+              │ DOES IT WORK?    │
               └──────────────────┘
                     / \
                    / \
               NO ↙ ↘ YES
                 / \
-    ┌──────────────┐ ┌──────────────────────┐
-    │ RETURN TO 1. │ │ EXIT LOOP │
-    │ FIX + RITEST │ │ Task completed!     │
-    └──────────────┘ └──────────────────────┘
+    ┌──────────────┐ ┌──────────────────────────────────┐
+    │ RETURN TO 1. │ │ 6. COMMIT AND PUSH TO NETHESIS   │
+    │ FIX + RETEST │ │ git add script.py                │
+    └──────────────┘ │ git commit -m "type: vX.Y.Z"     │
+                     │ git push origin main              │
+                     │ Servers auto-pull (cron 1 min)   │
+                     └──────────────────────────────────┘
 
 ```text
 
 **CRITICAL RULES:**
 - **NEVER** say "test completed" without REAL testing on remote host
+- **NEVER** commit before testing — scp first, test, then commit
 - **NEVER** exit the loop if there are errors
 - **NEVER** skip workflow steps without explicit user authorization
 - **NEVER** assume it works without testing
 - **ALWAYS** fix errors and re-test automatically
 - **ALWAYS** test ALL scripts modified in the session
-- **ALWAYS** follow ALL steps 1-7 of the workflow
+- **ALWAYS** delete /tmp/ files after test (include `rm -f` in the same SSH command)
 - **Infinite LOOP** until it works or user stops
 - **NO RUSH** - Take all the time you need to do well
-- **STEP 7 ON HOST PASSWORD**: if the target host requires password (e.g. ns-lab00, laboratory)
-  → DO NOT carry out the test yourself → give the commands to paste to the user
+- **HOST PASSWORD** (ns-lab00, nsec8-stable, rl94ns8, etc.)
+  → DO NOT run scp/ssh yourself → give the commands to paste to the user
 
 **Full example:**
 
 ```bash
 #1. Edit
-vi install-script.sh
+# edit script-check-ubuntu/full/check_myservice.py
 
-#2. Syntax Test
-wsl bash -n install-script.sh # Exit: 0 
+#2. Syntax Test (from WSL terminal)
+python3 -m py_compile script-check-ubuntu/full/check_myservice.py # Exit: 0
 
-#3. Check executable
-git ls-files -s install-script.sh #100755 
+#3. Executability (bash/sh only — skip for .py)
 
-#4. Commit
-git add install-script.sh
-git commit -m "fix: dynamic download fix"
-git push
+#4. SCP to test server (NOT git push yet)
+scp script-check-ubuntu/full/check_myservice.py checkmk-vps-02:/tmp/check_myservice_test.py
 
-#5. Ask for hosts
-"On which host do I text? [nsec8-stable]"
+#5. Test + cleanup
+ssh checkmk-vps-02 'python3 /tmp/check_myservice_test.py; rm -f /tmp/check_myservice_test.py'
+# Output: 0 MyService - OK: running correctly
 
-#6. Check and update local repo
-wsl -d kali-linux ssh nsec8-stable "[ -d /opt/checkmk-tools ] && echo 'EXISTS' || echo 'MISSING'"
-# If MISSING → git clone https://github.com/nethesis/checkmk-tools.git /opt/checkmk-tools
-# If EXISTS → wsl -d kali-linux ssh nsec8-stable "cd /opt/checkmk-tools && git pull"
+# OK → move to step 6
 
-#7. Test from LOCAL REPO (NOT GitHub!)
-wsl -d kali-linux ssh nsec8-stable "/opt/checkmk-tools/script-tools/full/install-script.sh"
-# Output: ERROR line 45
-
-# ERROR → RETURN TO 1 (fix + retest)
-# Fix error line 45, recommit, retest...
-
-# OK → Test completed, EXIT LOOP
+#6. Commit and push to nethesis (only after test passes)
+git add script-check-ubuntu/full/check_myservice.py
+git commit -m "feat(ubuntu): check_myservice v1.0.0 - initial version"
+git push origin main
+# Servers auto-pull within 1 minute via cron
 ```
 
 17. **Executable scripts - ALWAYS check Git permissions**

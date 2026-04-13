@@ -26,8 +26,11 @@ Before starting any work, read the following memory files in order and internali
 
 ## Key facts to remember immediately:
 - Workspace: C:\Users\Marzio\Desktop\CheckMK\checkmk-tools
-- Git remote: origin = nethesis/checkmk-tools
-- Default push: origin only. Push upstream only on explicit user confirmation.
+- Git remote: origin = nethesis/checkmk-tools (direct push, no fork)
+- Default push: `git push origin main` — ONLY from PowerShell Extension (WSL has no GitHub SSH key)
+- **Testing workflow**: scp-first — copy file to checkmk-vps-02:/tmp/, test, then commit+push
+  - Key hosts for scp/test: checkmk-vps-02 (staging), checkmk-vps-01 (production, after vps-02 OK)
+  - PASSWORD hosts (nsec8-stable, rl94ns8, ns-lab00): give paste commands, do NOT run directly
 - srv-monitoring-sp: 45.33.235.86:2333, root, ProxyJump sos MANDATORY, key ~/.ssh/copilot_srv_monitoring
   - Command: wsl -d kali-linux bash -c "ssh srv-monitoring-sp 'cmd'" (NO -tt flag)
   - All files must be monitoring:monitoring
