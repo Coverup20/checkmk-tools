@@ -5,8 +5,8 @@ Measures RX/TX throughput on the WAN interface in bytes/s.
 Use ubus dump to detect WAN interface (via default route 0.0.0.0)
 and read the rx_bytes/tx_bytes counters.
 
-Performance data emitted with standard CheckMK metrics names 'in' and 'out'
-for proper graph generation in CheckMK web interface.
+Performance data emitted with standard CheckMK network metrics names 'if_in_octets'
+and 'if_out_octets' for automatic graph generation in CheckMK web interface.
 
 Byte reading strategy (in order of priority):
 1. statistics in ubus dump (rx_bytes/tx_bytes)
@@ -15,7 +15,7 @@ Byte reading strategy (in order of priority):
 Persistent state saved in /tmp/wan_throughput_state.json.
 First run: Initialize state and output WARNING "Initializing".
 
-Version: 1.2.0"""
+Version: 1.3.0"""
 
 import json
 import os
@@ -24,7 +24,7 @@ import sys
 import time
 from typing import Optional, Tuple
 
-SCRIPT_VERSION = "1.2.0"
+SCRIPT_VERSION = "1.3.0"
 SERVICE = "WAN.Throughput"
 STATE_FILE = "/tmp/wan_throughput_state.json"
 PROC_NET_DEV = "/proc/net/dev"
@@ -190,7 +190,7 @@ def main() -> int:
     now = time.time()
     wan_info = get_wan_info()
     if wan_info is None:
-        print(f"2 {SERVICE} - No WAN interface or bytes not available [v{SCRIPT_VERSION}] | in=0 out=0")
+        print(f"2 {SERVICE} - No WAN interface or bytes not available [v{SCRIPT_VERSION}] | if_in_octets=0 if_out_octets=0")
         return 0
 
     iface, device, rx_now, tx_now = wan_info
@@ -201,14 +201,14 @@ def main() -> int:
     # First run or interface changed: Initialize
     if state is None or state.get("iface") != iface:
         save_state(iface, rx_now, tx_now, now)
-        print(f"0 {SERVICE} - [{iface}] Initializing, wait next check [v{SCRIPT_VERSION}] | in=0 out=0")
+        print(f"0 {SERVICE} - [{iface}] Initializing, wait next check [v{SCRIPT_VERSION}] | if_in_octets=0 if_out_octets=0")
         return 0
 
     # 4. Calcola delta
     delta_seconds = now - state["timestamp"]
     if delta_seconds < 1:
         save_state(iface, rx_now, tx_now, now)
-        print(f"0 {SERVICE} - [{iface}] Interval too short ({delta_seconds:.1f}s) | in=0 out=0")
+        print(f"0 {SERVICE} - [{iface}] Interval too short ({delta_seconds:.1f}s) | if_in_octets=0 if_out_octets=0")
         return 0
 
     rx_prev = state["rx_bytes"]
@@ -245,18 +245,18 @@ def main() -> int:
     elif rx_bps >= warn_bps or tx_bps >= warn_bps:
         state_code = 1
 
-    # Performance data con nomi metriche standard CheckMK per grafici
+    # Performance data con nomi metriche standard CheckMK per grafici di rete
     # Formato: metric=value;warn;crit;min;max
-    # - 'in' e 'out' sono i nomi standard per traffico di rete
-    # - valori in bytes/s
+    # - if_in_octets / if_out_octets = nomi standard CheckMK per network interfaces
+    # - valori in bytes/s (octets = bytes in network terminology)
     # - max = velocità interfaccia in bytes/s
     print(
         f"{state_code} {SERVICE} - "
         f"[{iface}] Speed: {speed_str}, "
         f"In: {fmt_bps(rx_bps)} ({rx_pct:.2f}%), "
         f"Out: {fmt_bps(tx_bps)} ({tx_pct:.2f}%) "
-        f"| in={rx_bps:.2f};{warn_bps:.0f};{crit_bps:.0f};0;{speed_bps:.0f} "
-        f"out={tx_bps:.2f};{warn_bps:.0f};{crit_bps:.0f};0;{speed_bps:.0f}"
+        f"| if_in_octets={rx_bps:.2f};{warn_bps:.0f};{crit_bps:.0f};0;{speed_bps:.0f} "
+        f"if_out_octets={tx_bps:.2f};{warn_bps:.0f};{crit_bps:.0f};0;{speed_bps:.0f}"
     )
     return 0
 
