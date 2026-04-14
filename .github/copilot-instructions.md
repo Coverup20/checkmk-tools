@@ -118,32 +118,43 @@
 
 ---
 
-## WORKFLOW GIT - Direct push to Nethesis
+## WORKFLOW GIT - Fork Coverup20 → Nethesis
 
 ### Repository structure
 
 | Remote | URL | Role |
 |--------|-----|------|
-| `origin` | `git@github.com:nethesis/checkmk-tools.git` | **Official Nethesis Repo** — all pushes go here |
+| `origin` | `git@github.com:Coverup20/checkmk-tools.git` | **Personal fork** — daily work, all pushes go here |
+| `upstream` | `git@github.com:nethesis/checkmk-tools.git` | **Official Nethesis repo** — push only on release |
 
-### MANDATORY rule - Direct workflow
+### MANDATORY rule - Fork workflow
 
-**All work goes directly on `origin` (nethesis). No fork.**
+**All daily work goes on `origin` (Coverup20 fork). Push to `upstream` (nethesis) only on release.**
 
-**Complete Workflow:**
+**Daily workflow:**
 
 ```bash
-# Work normally, commit and push to nethesis
+# Work normally, commit and push to fork
 git add .
 git commit -m "type(scope): vX.Y.Z - description"
 git push origin main
+# or just: git push (origin is the default)
+```
+
+**Release workflow (when ready):**
+
+```bash
+# Tag and push to nethesis
+git tag vX.Y.Z
+git push upstream main
+git push upstream --tags
 ```
 
 **Rules:**
 
-- **Always push to `origin`** (nethesis)
-- **NEVER** `git push` without specifying `origin`
-- **Default push**: always `git push origin main`
+- **Default push**: always to `origin` (Coverup20 fork)
+- **NEVER** `git push upstream` unless explicitly releasing to nethesis
+- **Sync from nethesis**: `git fetch upstream && git merge upstream/main`
 
 ### Script Testing Workflow (before push)
 
