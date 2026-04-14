@@ -7,6 +7,7 @@ and read the rx_bytes/tx_bytes counters.
 
 Performance data emitted with standard CheckMK network metrics names 'if_in_octets'
 and 'if_out_octets' for automatic graph generation in CheckMK web interface.
+Simplified perfdata format (metric=value) for PNP4Nagios compatibility.
 
 Byte reading strategy (in order of priority):
 1. statistics in ubus dump (rx_bytes/tx_bytes)
@@ -15,7 +16,7 @@ Byte reading strategy (in order of priority):
 Persistent state saved in /tmp/wan_throughput_state.json.
 First run: Initialize state and output WARNING "Initializing".
 
-Version: 1.3.0"""
+Version: 1.4.0"""
 
 import json
 import os
@@ -24,7 +25,7 @@ import sys
 import time
 from typing import Optional, Tuple
 
-SCRIPT_VERSION = "1.3.0"
+SCRIPT_VERSION = "1.4.0"
 SERVICE = "WAN.Throughput"
 STATE_FILE = "/tmp/wan_throughput_state.json"
 PROC_NET_DEV = "/proc/net/dev"
@@ -246,17 +247,15 @@ def main() -> int:
         state_code = 1
 
     # Performance data con nomi metriche standard CheckMK per grafici di rete
-    # Formato: metric=value;warn;crit;min;max
+    # Formato SEMPLIFICATO: metric=value (senza warn/crit/min/max per compatibilità PNP4Nagios)
     # - if_in_octets / if_out_octets = nomi standard CheckMK per network interfaces
     # - valori in bytes/s (octets = bytes in network terminology)
-    # - max = velocità interfaccia in bytes/s
     print(
         f"{state_code} {SERVICE} - "
         f"[{iface}] Speed: {speed_str}, "
         f"In: {fmt_bps(rx_bps)} ({rx_pct:.2f}%), "
         f"Out: {fmt_bps(tx_bps)} ({tx_pct:.2f}%) "
-        f"| if_in_octets={rx_bps:.2f};{warn_bps:.0f};{crit_bps:.0f};0;{speed_bps:.0f} "
-        f"if_out_octets={tx_bps:.2f};{warn_bps:.0f};{crit_bps:.0f};0;{speed_bps:.0f}"
+        f"| if_in_octets={rx_bps:.2f} if_out_octets={tx_bps:.2f}"
     )
     return 0
 
