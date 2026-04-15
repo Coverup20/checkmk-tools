@@ -790,34 +790,24 @@ git commit -m "feat: new script"
 ---
 ## NethSecurity 8 - Local Checks CheckMK
 
-### DEPLOYMENT RULE - Keep .sh extension
+### INSTALLATION RULE - Official packages only
 
-**Local checks must maintain the `.sh` extension even when deployed:**
-
-```bash
-# CORRECT - Keep extension
-cp /opt/checkmk-tools/script-check-nsec8/full/check_vpn_tunnels.sh \
-   /usr/lib/check_mk_agent/local/check_vpn_tunnels.sh
-# ^^^ WITH .sh
-
-# WRONG - Do not remove extension
-cp script.sh /usr/lib/check_mk_agent/local/script # NO!
-
-```text
-
-**User preference reason:**
-- Consistency with repositories (all .sh scripts)
-- Easier to identify file type
-- CheckMK still runs files with extension
-
-**Auto-restore must use full name with extension:**
+**ONLY these 4 commands to install CheckMK agent on NethSecurity 8:**
 
 ```bash
-# In rocksolid-startup-check.sh
-basename_script=$(basename "$script") # DO NOT remove .sh
-cp "$script" "/usr/lib/check_mk_agent/local/$basename_script"
+wget https://updates.nethsecurity.nethserver.org/checkmk_agent/8.7.2-checkmk_agent+a4de81a27/packages/x86_64/nethsecurity/ns-checkmk-utils_0.0.2-r1_all.ipk
+wget https://nethsecurity.ams3.digitaloceanspaces.com/checkmk_agent/8.7.2-checkmk_agent+a4de81a27/packages/x86_64/nethsecurity/checkmk-agent_2.4.0p24-r1_all.ipk
+opkg install checkmk-agent_2.4.0p24-r1_all.ipk
+opkg install ns-checkmk-utils_0.0.2-r1_all.ipk
+```
 
-```text
+**Rules:**
+- `checkmk-agent` installs: `/usr/sbin/check_mk_agent` + `/etc/init.d/check_mk_agent`
+- `ns-checkmk-utils` installs: 13 local checks in `/usr/lib/check_mk_agent/local/`
+- The packages handle their own sysupgrade.conf persistence
+- **NEVER use** `install-agent-nsec8.py`, `setup-persistent-nsec8.py`, or `install-checkmk-agent-persistent-nsec8.sh`
+- FRPC installation is separate and manual (see FRPC section)
+- sysupgrade.conf entries for FRPC must be added manually after FRPC install
 
 ---
 ## � NethServer - Configuration Management
@@ -1992,10 +1982,10 @@ rl94ns81 #10.155.100.41:22 (root, NethServer 8)
                   # Modules: webtop1 (with Postgres active)
                   # WebTop node for testing email shares
 nsec8-stable #10.155.100.100:22 (root, NethSecurity 8)
-                  # CheckMK agent installed with: install-checkmk-agent-persistent-nsec8.sh
-                  # Path: /opt/checkmk-tools/script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh
+                  # Install: wget ipk files + opkg install (see NethSecurity 8 section)
+                  # DO NOT use install-agent-nsec8.py or setup-persistent-nsec8.py
 lab #10.155.100.1:2222 (root, NethSecurity 8)
-                  # ROCKSOLID Mode validated - resistant to major upgrades
+                  # Install: wget ipk files + opkg install (see NethSecurity 8 section)
 marziodemo # 10.155.100.61:22 (root, Demo environment)
 ubntmarzio # 10.155.100.108:22 (user: marzio) - SSH KEY (self-access OK, NO sudo without password)
                   # Key: ~/.ssh/copilot_ubntmarzio (ed25519, installed 2026-03-28)
@@ -2476,203 +2466,33 @@ Copy-Item -Recurse "$env:USERPROFILE\Desktop\VSCode-User-Backup\*" "$env:APPDATA
 
 ---
 
-## CHECKPOINT - ROCKSOLID NethSecurity 8 system
+## NethSecurity 8 - Installation Status (2026-04-15)
 
-### CURRENT STATUS (2026-02-10): SYSTEM DECOMMITED
+### MANDATORY PROCEDURE
 
-**ATTENTION:**
-- **ROCKSOLID system removed from nsec8-stable and lab** (February 10, 2026)
-- **DO NOT run install-checkmk-agent-persistent-nsec8.sh** on nsec8-stable (10.155.100.100) and lab (10.155.100.1)
-- CheckMK Agent and FRP remain up and running
-- Repository /opt/checkmk-tools still present (git auto-sync working)
-- Removed: /opt/checkmk-backups/, /etc/checkmk-post-upgrade.sh, autocheck rc.local, sysupgrade.conf protections
-
-**Components removed:**
-- Critical binary backups (/opt/checkmk-backups/binaries/)
-- Post-upgrade script (/etc/checkmk-post-upgrade.sh)
-- Autocheck on startup (rocksolid-startup-check.sh)
-- sysupgrade.conf protections (CheckMK, FRP, QEMU-GA entries)
-- FRP Marker (/etc/.frp-installed)
-
-**Components retained:**
-- CheckMK Agent (port 6556) - working
-- FRP Client + tunnel configuration
-- QEMU Guest Agent
-- Repository /opt/checkmk-tools + auto-sync git (cron every minute)
-
----
-
-### Implementation Complete (2026-02-04) - HISTORY
-
-**Goal achieved:**
-- Removed ALL static/hardcoded URLs from installation scripts
-- Dynamic download of packages from OpenWrt/NethSecurity repositories
-- Post major-upgrade self-healing system
-- Complete validation on host production
-
-**Validated and production-ready scripts:**
-
-1. **install-checkmk-agent-persistent-nsec8.sh** (commit b29a2cf)
-   - Path: `script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh`
-   - Function: Full Installation CheckMK Agent + FRP Client + QEMU-GA + Auto Git Sync
-   - Fixes implemented:
-     - Dynamic package download via `download_openwrt_package()`
-     - Pattern fix: `grep "${package_name}_"` (fixes packet detection)
-     - Dependencies chain: libbfd → ar → objdump → binutils with `--force-depends`
-     - Binary corruption management (AR corrupted during upgrade)
-   - Test: nsec8-stable, lab (from GitHub)
-
-2. **rocksolid-startup-check.sh** (commit ea67364)
-   - Path: `script-tools/full/upgrade_maintenance/rocksolid-startup-check.sh`
-   - Function: Verification and auto-remediation at system startup
-   - Fixes implemented:
-     - Logic reordering: backup restore → corruption check → dependencies install
-     - Git auto-install: download git + git-http from OpenWrt if missing
-     - Pattern fix identical to install script
-     - Check AFTER backup restore (not before)
-   - Test: nsec8-stable, lab (from GitHub)
-
-**Validated hosts (production):**
-
-| Hosts | IP | OS | Status | Packages |
-|------|----|----|--------|----------|
-| **nsec8-stable** | 10.155.100.100:22 | NethSecurity 8.7.1 |  ROCKSOLID | ar 2.40-1, git 2.43.2-1, libbfd 2.40-1 |
-| **laboratory** | 10.155.100.1:2222 | NethSecurity 8.7.1 |  ROCKSOLID | ar 2.40-1, git 2.43.2-1, libbfd 2.40-1 |
-
-**Active components:**
-- CheckMK Agent 2.4.0p20 (port 6556)
-- FRP Client (tunnel to monitor.nethlab.it:7000)
-- Auto Git Sync (cron every minute, /opt/checkmk-tools)
-- Rocksolid startup check (rc.local, log: /var/log/rocksolid-startup.log)
-- 12 local checks deployed
-
-**Major upgrade protections:**
-- Critical files in `/etc/sysupgrade.conf`
-- Binaries backed up in `/opt/checkmk-backups/binaries/`
-- Nginx configuration (`/etc/nginx/`) protected
-- Self-recovery script: `/etc/checkmk-post-upgrade.sh`
-
-### Technical Details
-
-**Dynamic Package Download:**
+**ONLY official opkg packages must be used. No custom scripts.**
 
 ```bash
-download_openwrt_package() {
-    local package_name="$1"
-    local repo_url="$2"
-    local output_path="$3"
+wget https://updates.nethsecurity.nethserver.org/checkmk_agent/8.7.2-checkmk_agent+a4de81a27/packages/x86_64/nethsecurity/ns-checkmk-utils_0.0.2-r1_all.ipk
+wget https://nethsecurity.ams3.digitaloceanspaces.com/checkmk_agent/8.7.2-checkmk_agent+a4de81a27/packages/x86_64/nethsecurity/checkmk-agent_2.4.0p24-r1_all.ipk
+opkg install checkmk-agent_2.4.0p24-r1_all.ipk
+opkg install ns-checkmk-utils_0.0.2-r1_all.ipk
+```
 
-    # Download Packages.gz index
-    wget -q -O /tmp/Packages.gz "$repo_url/Packages.gz"
+**NEVER use:**
+- `install-checkmk-agent-persistent-nsec8.sh`
+- `install-agent-nsec8.py`
+- `setup-persistent-nsec8.py`
+- `rocksolid-startup-check.sh`
 
-    # Parse package filename (fix: grep "${package_name}_" not "/$package_name")
-    local package_file=$(gunzip -c /tmp/Packages.gz | grep "^Filename:" | grep "${package_name}_" | head -1 | awk '{print $2}')
+These scripts create unwanted artifacts (/opt/checkmk-backups, /etc/checkmk-post-upgrade.py, rc.local entries, cron jobs) that break the system.
 
-    # Download package
-    wget -q -O "$output_path" "$repo_url/$package_file"
-}
+### Current status of hosts
 
-```text
-
-**Dependencies Chain (circular dependency fix):**
-
-```bash
-# Order matters: libbfd first (shared library), then ar (uses libbfd)
-opkg install --force-depends /tmp/libbfd.ipk
-opkg install --force-depends /tmp/ar.ipk
-opkg install --force-depends /tmp/objdump.ipk
-opkg install --force-depends /tmp/binutils.ipk
-
-```text
-
-**Rocksolid Logic (fixed order):**
-
-```bash
-# STEP 1: Restore backups FIRST
-for backup in /opt/checkmk-backups/binaries/*.backup; do
-cp -p "$backup" "$dest" 2>/dev/null || true
-done
-
-# STEP 2: Check corruption AFTER restore (not before!)
-if [ -x /usr/bin/ar ]; then
-    if ! /usr/bin/ar --version >/dev/null 2>&1; then
-        BINARIES_CORRUPTED=1
-    fi
-fi
-
-# STEP 3: Install dependencies if still corrupted
-if [ $BINARIES_CORRUPTED -eq 1 ]; then
-    download_openwrt_package "libbfd" "$REPO_BASE" "/tmp/libbfd.ipk"
-    opkg install --force-depends /tmp/libbfd.ipk
-    download_openwrt_package "ar" "$REPO_BASE" "/tmp/ar.ipk"
-    opkg install --force-depends /tmp/ar.ipk
-fi
-
-```text
-
-### Testing Workflow Validated
-
-**Mandatory workflow followed:**
-1. Edit script (dynamic download, pattern fix, logic reorder, git auto-install)
-2. Syntax test: `wsl bash -n script.sh` (exit code 0)
-3. Check executable: `git ls-files -s` (100755)
-4. Commit + push: b29a2cf, ea67364, 68661c1, 67f3cbc
-5. Test on nsec8-stable: `curl -fsSL https://raw.githubusercontent.com/.../script.sh | bash`
-6. Lab testing: `curl -fsSL https://raw.githubusercontent.com/.../script.sh | bash`
-7. Output validation: ar/git/libbfd correct versions installed
-
-**Real tests performed:**
-- Post major upgrade scenario (corrupt ar, missing git)
-- Fresh install on clean system
-- Re-install on an already configured system (idempotence)
-- Running from GitHub (not local repo)
-
-### Lessons Learned
-
-**Pattern Matching:**
-- `grep "/$package_name"` → Can't find "package_name_version.ipk"
-- `grep "${package_name}_"` → Fixed for Packages.gz format
-
-**Circular Dependencies:**
-- `opkg install binutils` → "cannot find dependency ar"
-- Install chain: libbfd → ar → objdump → binutils with `--force-depends`
-
-**Backup Restore Timing:**
-- Check corruption BEFORE backup restore → Missing post-upgrade binaries never detected
-- Restore backups FIRST, THEN check corruption → Detects problems even if binary present but corrupt
-
-**Testing:**
-- Test only 1 of 3 modified scripts → Untested scripts fail in production
-- Test ALL scripts modified in the session → 100% coverage
-- Test from local repo → May be bad
-- Test from GitHub raw URL → Guarantees production source
-
-**Git Auto-Install:**
-- Git can be removed during major upgrades
-- Auto-sync repository requires working git
-- Rocksolid must auto-install git if missing
-- Required: git + git-http (dependency)
-
-### Production-Ready system
-
-**Final status:**
-- Both hosts (nsec8-stable, laboratory) ROCKSOLID mode active
-- All critical tracks protected and self-repairable
-- CheckMK Agent, FRP Client, QEMU-GA operational
-- Auto Git Sync working (repository updated every minute)
-- System resilient to NethSecurity/OpenWrt major upgrades
-- Zero hardcoded URLs - all dynamic from upstream repositories
-
-**Upcoming major upgrades:**
-- System auto-repairs corrupt binaries (ar, tar, gzip, libbfd)
-- System auto-installs git if removed
-- System checks and restarts critical services (CheckMK, FRP)
-- Detailed log in `/var/log/rocksolid-startup.log`
-- **Zero manual intervention required**
-
----
-
-**Last update**: 2026-02-04
+| Host | checkmk-agent | ns-checkmk-utils | FRPC |
+|---|---|---|---|
+| nsec8-stable (10.155.100.100) | to install | to install | deferred |
+| laboratory (10.155.100.1) | to install | installed | running port 6051 |
 
 ---
 

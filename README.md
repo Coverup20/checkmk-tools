@@ -357,29 +357,20 @@ Python tools for CheckMK agent deployment, infrastructure management, backup, an
 | Script | Description |
 | -------- | ----------- |
 | `installation/install-checkmk-agent-persistent-nsec8.*` | ROCKSOLID installer for NethSecurity 8 |
-| `install_frpc.py` | FRP client installation |
+| `installation/install_frpc.py` | FRP client installation |
 | `deploy-plain-agent.py` | Deploy agent to a single host |
 | `deploy-plain-agent-multi.py` | Multi-host deployment from list |
 
-#### ROCKSOLID Mode - Upgrade Resistant Installation
-
-Advanced protection system for **NethSecurity 8** that keeps CheckMK Agent and FRP Client operational across major system upgrades.
-
-**Features**:
-
-- Adds critical files to `/etc/sysupgrade.conf` (survive upgrades)
-- Binary backup for `tar`, `ar`, `gzip` (protects against corruption)
-- Startup auto-recovery script
-- FRP v0.x and v1.x support with auto-detection
-- Dynamic package download from OpenWrt repositories
-
-**Installation**:
+#### NethSecurity 8 - Official Installation Procedure
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh | bash
+wget https://updates.nethsecurity.nethserver.org/checkmk_agent/8.7.2-checkmk_agent+a4de81a27/packages/x86_64/nethsecurity/ns-checkmk-utils_0.0.2-r1_all.ipk
+wget https://nethsecurity.ams3.digitaloceanspaces.com/checkmk_agent/8.7.2-checkmk_agent+a4de81a27/packages/x86_64/nethsecurity/checkmk-agent_2.4.0p24-r1_all.ipk
+opkg install checkmk-agent_2.4.0p24-r1_all.ipk
+opkg install ns-checkmk-utils_0.0.2-r1_all.ipk
 ```
 
-**Validated on**: NethSecurity 8.7.1 (OpenWrt 23.05.0), CheckMK Agent 2.4.0p20.
+**Validated on**: NethSecurity 8.7.2 (OpenWrt), CheckMK Agent 2.4.0p24.
 
 ### tmate Integration
 

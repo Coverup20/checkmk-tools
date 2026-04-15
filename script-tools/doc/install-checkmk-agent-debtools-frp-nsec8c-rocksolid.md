@@ -1,63 +1,29 @@
-# install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh
+# NethSecurity 8 - CheckMK Agent Installation
+
 > **Category:** Operational
 
-## Description
+## MANDATORY PROCEDURE
 
-ROCKSOLID installation script for CheckMK Agent and FRP Client on NethSecurity/OpenWrt systems. 
-
-**ROCKSOLID Edition**: Guarantees survival and automatic restoration of services after major operating system upgrades.
-
----
-
-## Features
-
-- **Auto-recovery**: Automatic restoration of services after major upgrades
-- **Filesystem Protection**: Critical files preserved in `/etc/sysupgrade.conf`
-- **Binary backups**: Essential binaries (`tar`, `ar`, `gzip`) saved and restored
-- **Autocheck boot**: Automatically checks and restarts services at each boot
-- **Curl-based execution**: Autocheck script executed by GitHub (never corrupted)
-- **Repository cleanup**: Automatic removal of conflicting repositories
-- **Zero configuration**: Automatically detect CheckMK server version
-- **FRP tunnel**: Optional reverse proxy tunnel configuration
-
----
-
-## Requirements
-
-### Operating System
-- NethSecurity 8.x
-- OpenWrt 23.05.x or higher
-- Architecture: x86_64
-
-### Network
-- Active internet connection
-- Access to CheckMK server (configurable)
-- (Optional) Access to FRP server for tunnels
-
-### Permissions
-- Running as `root`
-
----
-
-## Installation
-
-### Standard installation
+**ONLY these 4 commands must be used:**
 
 ```bash
-# Download and install in one command
-curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/installation/install-checkmk-agent-persistent-nsec8.sh -o /tmp/install-rocksolid.sh
-bash /tmp/install-rocksolid.sh
+wget https://updates.nethsecurity.nethserver.org/checkmk_agent/8.7.2-checkmk_agent+a4de81a27/packages/x86_64/nethsecurity/ns-checkmk-utils_0.0.2-r1_all.ipk
+wget https://nethsecurity.ams3.digitaloceanspaces.com/checkmk_agent/8.7.2-checkmk_agent+a4de81a27/packages/x86_64/nethsecurity/checkmk-agent_2.4.0p24-r1_all.ipk
+opkg install checkmk-agent_2.4.0p24-r1_all.ipk
+opkg install ns-checkmk-utils_0.0.2-r1_all.ipk
 ```
 
-### Installation with Custom Configuration
+**DO NOT use** `install-checkmk-agent-persistent-nsec8.sh` or any other custom script.
+These create unwanted artifacts and break the system after upgrades.
 
-```bash
-# Specify custom CheckMK server
-export CMK_SERVER="monitor.example.com"
-export CMK_SITE="production"
-export CMK_PROTOCOL="https"
+## What gets installed
 
-bash install-checkmk-agent-debtools-frp-nsec8c-rocksolid.sh
+- `checkmk-agent`: `/usr/sbin/check_mk_agent` + `/etc/init.d/check_mk_agent`
+- `ns-checkmk-utils`: 13 local checks in `/usr/lib/check_mk_agent/local/`
+
+## FRPC
+
+Install separately. See FRPC documentation.
 ```
 
 ### Uninstall
