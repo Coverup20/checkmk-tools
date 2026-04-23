@@ -267,6 +267,38 @@ git push origin main
      - CheckMK commands that produce expected output
      - PowerShell/WSL interaction issues and workarounds
 
+   ### 🔴 MANDATORY POST-JOB RETROSPECTIVE — memorize at the end of every complex task
+
+   > **"Ogni lavoro difficile risolto = oro da conservare. Se non lo scrivi, lo perdi."**
+
+   **TRIGGER**: When you complete a task that involved ANY of these:
+   - At least one command/approach that failed before finding the correct one
+   - An API error that required investigation (unexpected HTTP codes, wrong params, wrong URL)
+   - Authentication or permission problems that required specific steps to fix
+   - Quoting/encoding issues in SSH/bash that required a workaround
+   - A non-obvious sequence of operations to achieve the goal
+   - A script that required multiple iterations before working
+
+   **MANDATORY ACTIONS at job completion (before saying "done"):**
+
+   1. **Identify all difficulties encountered** — mentally list every error/obstacle
+   2. **For each difficulty** → write a Q&A entry in `/memories/repo/qa-troubleshooting.md`:
+      - Question: "How do I do X / What causes error Y?"
+      - Answer: the exact working solution with code/commands
+      - Include: what was wrong, what the fix was, why it works
+   3. **For new scripts or tools created** → add an entry in `/memories/repo/copilot-scripts-index.md`
+   4. **For host-specific quirks discovered** → update the relevant host entry in memory
+   5. **DO NOT skip this step** — it is as mandatory as testing before pushing
+   6. **DO NOT wait** for the user to ask "memorizza" — do it automatically at the end of every complex job
+
+   **Examples of what to capture:**
+   ```text
+   - API returned HTTP 428 → needed If-Match: * header → Q&A: CheckMK activate endpoint
+   - POST create host failed with meta_data dict error → whitelist filter needed → Q&A: allowed attrs
+   - git push from WSL: needed SSH key ~/.ssh/id_ed25519_github → note in terminal-setup.md
+   - srv-monitoring-us: automation secret setup exact steps → Q&A: automation user config
+   ```
+
 7. **Clean backup after test**
    - When tests on backed up files finish successfully
    - Propose removal of created backup files
