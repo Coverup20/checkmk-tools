@@ -16,17 +16,12 @@ import urllib.request
 import urllib.error
 import ssl
 
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 
 # Host rename mapping: (old_name, new_name, ip_address, folder)
 # folder is used in --recover mode (hosts already deleted, no GET possible)
 HOSTS_TO_RENAME = [
-    ("192.168.20.24",  "CashWEB01",              "192.168.20.24",  "/sede_principale_20"),
-    ("192.168.20.25",  "CashWEB02",              "192.168.20.25",  "/sede_principale_20"),
-    ("192.168.20.34",  "Idrac-PowerEdge-R450",   "192.168.20.34",  "/sede_principale_20"),
-    ("192.168.20.199", "Vega-ANPR",              "192.168.20.199", "/sede_principale_20"),
-    ("192.168.20.217", "Apache-Haus-01",         "192.168.20.217", "/sede_principale_20"),
-    ("192.168.20.218", "Apache-Haus-02",         "192.168.20.218", "/sede_principale_20"),
+    ("192.168.61.210", "marcatempo-colibri", "192.168.61.210", "/"),
 ]
 
 
