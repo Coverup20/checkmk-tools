@@ -11,19 +11,18 @@
 import subprocess
 import sys
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 # Remote subnet gateways — one entry per VPN tunnel.
 # Format: (service_name, gateway_ip)
 # Local subnet 192.168.10.0/24 is excluded (it is the monitoring server LAN).
 TUNNELS = [
-    ("VPN-net-1",  "192.168.1.254"),
-    ("VPN-net-20", "192.168.20.1"),
-    ("VPN-net-30", "192.168.30.1"),
-    ("VPN-net-40", "192.168.40.1"),
-    ("VPN-net-50", "192.168.50.1"),
-    ("VPN-net-60", "192.168.60.1"),
-    ("VPN-net-61", "192.168.61.1"),
+    ("Infra-Sede-Farmacia",                "192.168.1.254"),
+    ("Infra-Sede-Consorzio",               "192.168.30.1"),
+    ("Infra-Sede-Palazzetto-Dello-Sport-01", "192.168.40.1"),
+    ("Infra-Sede-Palazzetto-Dello-Sport-02", "192.168.50.1"),
+    ("Infra-Sede-Asilo",                   "192.168.60.1"),
+    ("Infra-Sede-Colibri",                 "192.168.61.1"),
 ]
 
 PING_COUNT = 3
