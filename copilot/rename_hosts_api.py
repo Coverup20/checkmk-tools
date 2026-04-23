@@ -16,17 +16,21 @@ import urllib.request
 import urllib.error
 import ssl
 
-VERSION = "1.0.0"
+VERSION = "1.2.0"
 
 # Host rename mapping: (old_name, new_name, ip_address, folder)
 # folder is used in --recover mode (hosts already deleted, no GET possible)
 HOSTS_TO_RENAME = [
-    ("timbrature.urbinoservizi.it",  "marcatempo-uffici",     "192.168.10.145", "/sede_pincipale"),
-    ("192.168.1.190",                "marcatempo-farmacia",   "192.168.1.190",  "/farmacia_1"),
-    ("timbrature2.urbinoservizi.it", "marcatempo-infopoint",  "192.168.20.201", "/sede_principale_20"),
-    ("192.168.40.21",                "marcatempo-palazzetto", "192.168.40.21",  "/palazzetto_dello_sport_40"),
-    ("192.168.60.15",                "marcatempo-asilo",      "192.168.60.15",  "/tartaruga__60"),
-    ("192.168.30.121",               "marcatempo-consorzio",  "192.168.30.121", "/consorzio_30"),
+    ("192.168.20.9",                 "device-embedded-9",    "192.168.20.9",   "/sede_principale_20"),
+    ("dvr-server.urbinoservizi.it",  "dvr-server",           "192.168.20.31",  "/sede_principale_20"),
+    ("192.168.20.106",               "cam-hikvision-106",    "192.168.20.106", "/sede_principale_20"),
+    ("192.168.20.107",               "cam-hikvision-107",    "192.168.20.107", "/sede_principale_20"),
+    ("192.168.20.110",               "cam-hikvision-110",    "192.168.20.110", "/sede_principale_20"),
+    ("192.168.20.111",               "cam-hikvision-111",    "192.168.20.111", "/sede_principale_20"),
+    ("192.168.20.112",               "nvr-hikvision-112",    "192.168.20.112", "/sede_principale_20"),
+    ("192.168.20.113",               "nvr-hikvision-113",    "192.168.20.113", "/sede_principale_20"),
+    ("192.168.20.114",               "nvr-hikvision-114",    "192.168.20.114", "/sede_principale_20"),
+    ("192.168.20.115",               "nvr-hikvision-115",    "192.168.20.115", "/sede_principale_20"),
 ]
 
 
@@ -82,10 +86,10 @@ def create_host(base_url, user, secret, hostname, folder, attributes):
 
 
 def activate_changes(base_url, user, secret):
-    payload = {"force_foreign_changes": False}
+    payload = {"force_foreign_changes": True}
     return api_call(base_url, user, secret, "POST",
                     "domain-types/activation_run/actions/activate-changes/invoke",
-                    body=payload)
+                    body=payload, etag="*")
 
 
 def list_hosts(base_url, user, secret):
