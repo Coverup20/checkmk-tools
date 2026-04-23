@@ -16,19 +16,21 @@ import urllib.request
 import urllib.error
 import ssl
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 # Host rename mapping: (old_name, new_name, ip_address, folder)
 # folder is used in --recover mode (hosts already deleted, no GET possible)
 HOSTS_TO_RENAME = [
-    ("192.168.20.1",   "switch-20-gw",   "192.168.20.1",   "/sede_principale_20"),
-    ("192.168.20.12",  "switch-20-12",   "192.168.20.12",  "/sede_principale_20"),
-    ("192.168.20.13",  "switch-20-13",   "192.168.20.13",  "/sede_principale_20"),
-    ("192.168.20.166", "switch-20-166",  "192.168.20.166", "/sede_principale_20"),
-    ("192.168.20.167", "switch-20-167",  "192.168.20.167", "/sede_principale_20"),
-    ("192.168.20.176", "switch-20-176",  "192.168.20.176", "/sede_principale_20"),
-    ("192.168.20.179", "switch-20-179",  "192.168.20.179", "/sede_principale_20"),
-    ("192.168.20.188", "switch-20-188",  "192.168.20.188", "/sede_principale_20"),
+    ("192.168.20.140", "cam-hikvision-140", "192.168.20.140", "/sede_principale_20"),
+    ("192.168.20.141", "cam-hikvision-141", "192.168.20.141", "/sede_principale_20"),
+    ("192.168.20.142", "cam-hikvision-142", "192.168.20.142", "/sede_principale_20"),
+    ("192.168.20.143", "cam-hikvision-143", "192.168.20.143", "/sede_principale_20"),
+    ("192.168.20.144", "cam-hikvision-144", "192.168.20.144", "/sede_principale_20"),
+    ("192.168.20.145", "cam-hikvision-145", "192.168.20.145", "/sede_principale_20"),
+    ("192.168.20.146", "cam-hikvision-146", "192.168.20.146", "/sede_principale_20"),
+    ("192.168.20.147", "cam-hikvision-147", "192.168.20.147", "/sede_principale_20"),
+    ("192.168.20.148", "cam-hikvision-148", "192.168.20.148", "/sede_principale_20"),
+    ("192.168.20.149", "cam-hikvision-149", "192.168.20.149", "/sede_principale_20"),
 ]
 
 
