@@ -11,7 +11,7 @@
 import subprocess
 import sys
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 # Remote subnet gateways — one entry per VPN tunnel.
 # Format: (service_name, gateway_ip)
@@ -32,7 +32,7 @@ PING_TIMEOUT = 2  # seconds per ping attempt
 ## Utils
 
 def ping(ip):
-    """Ping an IP address. Returns (reachable, rtt_avg_ms_str or None)."""
+    """Ping an IP address. Returns (reachable, rtt_avg_ms float or None, packet_loss_pct int)."""
     try:
         r = subprocess.run(
             ["ping", "-c", str(PING_COUNT), "-W", str(PING_TIMEOUT), "-q", ip],
@@ -40,30 +40,41 @@ def ping(ip):
             text=True,
             timeout=PING_COUNT * PING_TIMEOUT + 3,
         )
-        if r.returncode != 0:
-            return False, None
-        # Parse avg rtt from: rtt min/avg/max/mdev = 1.2/2.3/3.4/0.1 ms
+        rtt_avg = None
+        packet_loss = 100
         for line in r.stdout.splitlines():
-            if "rtt min/avg/max" in line or "round-trip" in line:
+            # Parse packet loss: "3 packets transmitted, 3 received, 0% packet loss"
+            if "packet loss" in line:
                 try:
-                    avg = line.split("=")[1].strip().split("/")[1]
-                    return True, avg + "ms"
+                    packet_loss = int(line.split("%")[0].split()[-1])
                 except:
                     pass
-        return True, "ok"
+            # Parse avg rtt: "rtt min/avg/max/mdev = 1.2/2.3/3.4/0.1 ms"
+            if "rtt min/avg/max" in line or "round-trip" in line:
+                try:
+                    rtt_avg = float(line.split("=")[1].strip().split("/")[1])
+                except:
+                    pass
+        reachable = r.returncode == 0
+        return reachable, rtt_avg, packet_loss
     except:
-        return False, None
+        return False, None, 100
 
 
 ## Check
 
 def check():
     for name, gateway in TUNNELS:
-        ok, rtt = ping(gateway)
+        ok, rtt, pl = ping(gateway)
+        rtt_val = rtt if rtt is not None else 0.0
         if ok:
-            print("0 {} - OK: net to net UP (rtt={})".format(name, rtt))
+            # FORMAT: STATE "SERVICE_NAME" perfdata status_text
+            # perfdata: rtt (ms) and pl (packet loss %) separated by pipe (NO spaces)
+            print('0 "{}" rtt={}|pl={} OK: tunnel UP (rtt={:.1f}ms, loss={}%)'.format(
+                name, round(rtt_val, 2), pl, rtt_val, pl))
         else:
-            print("2 {} - CRITICAL: net to net DOWN - gateway {} unreachable".format(name, gateway))
+            print('2 "{}" rtt=0|pl=100 CRITICAL: tunnel DOWN - gateway {} unreachable'.format(
+                name, gateway))
 
 
 check()
