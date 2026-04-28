@@ -2,14 +2,14 @@
 # M@il
 # Bulk: yes
 # CheckMK notification script - sends HTML email with real IP and FRP tunnel detection.
-# Version: 1.0.0
+# Version: 1.0.1
 
 import os
 import sys
 import subprocess
 from urllib.parse import quote
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 # === CONFIG ===
 CMK_URL = os.environ.get("CMK_URL", "https://<your-checkmk-server>/monitoring")
@@ -56,24 +56,33 @@ def main():
     frp = os.getenv("NOTIFY_HOSTLABEL_frp_tunnel", "no")
     
     # Service or Host notification?
-    service_desc = os.getenv("NOTIFY_SERVICEDESC")
-    
-    if service_desc:
+    # Note: Nagios CRE passes NOTIFY_SERVICEDESC='$SERVICEDESC$' (single-quoted literal)
+    # for HOST notifications when the macro is not applicable. We filter this out.
+    service_desc = os.getenv("NOTIFY_SERVICEDESC", "")
+    is_service = bool(service_desc) and not service_desc.startswith("$")
+
+    if is_service:
         # Service notification
-        old_state = os.getenv("NOTIFY_PREVIOUSSERVICEHARDSHORTSTATE", "OK")
-        new_state = os.getenv("NOTIFY_SERVICESHORTSTATE", "UNKNOWN")
+        # Fallback: NOTIFY_SERVICESHORTSTATE may not be set by Nagios; use NOTIFY_SERVICESTATE
+        old_state = (os.getenv("NOTIFY_PREVIOUSSERVICEHARDSHORTSTATE")
+                     or os.getenv("NOTIFY_LASTSERVICESTATE", "OK"))
+        new_state = (os.getenv("NOTIFY_SERVICESHORTSTATE")
+                     or os.getenv("NOTIFY_SERVICESTATE", "UNKNOWN"))
         output = os.getenv("NOTIFY_SERVICEOUTPUT", "N/A")
         long_output = os.getenv("NOTIFY_LONGSERVICEOUTPUT", "")
         service = service_desc
-        subject = f"Checkmk: {hostname}/{service} {new_state}"
+        subject = f"Checkmk: {hostname}/{service} {get_label(new_state)}"
     else:
         # Host notification
-        old_state = os.getenv("NOTIFY_PREVIOUSHOSTHARDSHORTSTATE", "UP")
-        new_state = os.getenv("NOTIFY_HOSTSHORTSTATE", "DOWN")
+        # Fallback: NOTIFY_HOSTSHORTSTATE may not be set by Nagios; use NOTIFY_HOSTSTATE
+        old_state = (os.getenv("NOTIFY_PREVIOUSHOSTHARDSHORTSTATE")
+                     or os.getenv("NOTIFY_LASTHOSTSTATE", "UP"))
+        new_state = (os.getenv("NOTIFY_HOSTSHORTSTATE")
+                     or os.getenv("NOTIFY_HOSTSTATE", "DOWN"))
         output = os.getenv("NOTIFY_HOSTOUTPUT", "N/A")
         long_output = os.getenv("NOTIFY_LONGHOSTOUTPUT", "")
         service = "Host Check"
-        subject = f"Checkmk: {hostname} {new_state}"
+        subject = f"Checkmk: {hostname} {get_label(new_state)}"
     
     # Replace IP on output
     if host_address and host_address != real_ip:
