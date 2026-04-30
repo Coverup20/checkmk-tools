@@ -10,9 +10,8 @@
 
 import subprocess
 import sys
-import time
 
-VERSION = "1.5.0"
+VERSION = "1.7.0"
 
 # Remote subnet gateways — one entry per VPN tunnel.
 # Format: (service_name, gateway_ip)
@@ -26,9 +25,10 @@ TUNNELS = [
     ("Infra-Sede-Colibri",                 "192.168.61.1"),
 ]
 
-PING_COUNT = 3
-PING_TIMEOUT = 2   # seconds per ping attempt
-PING_RETRIES = 2   # retry attempts on failure (3 total executions before CRIT)
+PING_COUNT = 1
+PING_TIMEOUT = 1   # seconds per ping attempt — kept low to stay within check_mk_agent 10s timeout
+# 6 tunnels × ~1s each = ~6s total, safely within agent timeout
+# WATO max_check_attempts=5 + retry_interval=2min handles resilience at agent level
 
 
 ## Utils
@@ -67,13 +67,7 @@ def ping(ip):
 
 def check():
     for name, gateway in TUNNELS:
-        ok, rtt, pl = False, None, 100
-        for attempt in range(1 + PING_RETRIES):
-            ok, rtt, pl = ping(gateway)
-            if ok:
-                break
-            if attempt < PING_RETRIES:
-                time.sleep(1)
+        ok, rtt, pl = ping(gateway)
         rtt_val = rtt if rtt is not None else 0.0
         if ok:
             # FORMAT: STATE "SERVICE_NAME" perfdata status_text
