@@ -10,8 +10,9 @@
 
 import subprocess
 import sys
+import time
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 
 # Remote subnet gateways — one entry per VPN tunnel.
 # Format: (service_name, gateway_ip)
@@ -26,7 +27,8 @@ TUNNELS = [
 ]
 
 PING_COUNT = 3
-PING_TIMEOUT = 2  # seconds per ping attempt
+PING_TIMEOUT = 2   # seconds per ping attempt
+PING_RETRIES = 2   # retry attempts on failure (3 total executions before CRIT)
 
 
 ## Utils
@@ -65,7 +67,13 @@ def ping(ip):
 
 def check():
     for name, gateway in TUNNELS:
-        ok, rtt, pl = ping(gateway)
+        ok, rtt, pl = False, None, 100
+        for attempt in range(1 + PING_RETRIES):
+            ok, rtt, pl = ping(gateway)
+            if ok:
+                break
+            if attempt < PING_RETRIES:
+                time.sleep(1)
         rtt_val = rtt if rtt is not None else 0.0
         if ok:
             # FORMAT: STATE "SERVICE_NAME" perfdata status_text
