@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""upgrade_checkmk.py - CheckMK RAW Upgrade Automation
+"""upgrade_checkmk.py - CheckMK Upgrade Automation
 
-Automates the CheckMK RAW Edition update process.
+Automates the CheckMK update process (CRE/Community Edition).
 Features:
 - Current and latest available version detection
+- Supports both check-mk-raw (<=2.4.x) and check-mk-free (>=2.5.x Community)
 - Site backup before upgrade
 - Download and install .deb package
 - Stop/Update/Start the site
@@ -13,7 +14,7 @@ Features:
 Usage:
     upgrade_checkmk.py [site_name]
 
-Version: 1.3.0"""
+Version: 1.4.0"""
 
 import sys
 import os
@@ -26,7 +27,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 # --- Configuration ---
 DOWNLOAD_DIR = Path("/tmp/checkmk-upgrade")
@@ -96,17 +97,45 @@ def _version_key(v: str):
 
 
 def get_latest_version():
+    """Return (version, pkg_prefix) of the latest stable CheckMK release.
+
+    Package naming changed between major versions:
+      2.4.x and earlier  ->  check-mk-raw-X.Y.ZpN        (CRE / Raw Edition)
+      2.5.0 and later    ->  check-mk-community-X.Y.ZpN  (Community Edition)
+
+    Detection strategy:
+      - CRE: filename 'check-mk-raw-X.Y.ZpN' appears directly in page HTML
+      - Community: parsed from HTML attribute data-edition="community" data-version="X.Y.ZpN"
+    """
     try:
         url = "https://checkmk.com/download"
         res = requests.get(url, timeout=10)
-        # Only match stable patch releases (X.Y.ZpN) — beta (bN), rc (rcN) excluded
-        versions = re.findall(r'check-mk-raw-(\d+\.\d+\.\d+p\d+)', res.text)
-        if versions:
-            # Return the highest version by numeric comparison (not string order)
-            return max(set(versions), key=_version_key)
+        # 2.4.x and earlier: filename listed verbatim in page source
+        raw_versions = re.findall(r'check-mk-raw-(\d+\.\d+\.\d+p\d+)', res.text)
+        # 2.5.0+: version exposed via HTML data attributes (JS-rendered selector)
+        community_versions = re.findall(
+            r'data-edition=["\']community["\'][^>]*?data-version=["\'](\d+\.\d+\.\d+p\d+)["\']',
+            res.text
+        )
+
+        best_version = None
+        best_prefix  = None
+
+        for v in set(raw_versions):
+            if best_version is None or _version_key(v) > _version_key(best_version):
+                best_version = v
+                best_prefix  = "check-mk-raw"
+
+        for v in set(community_versions):
+            if best_version is None or _version_key(v) > _version_key(best_version):
+                best_version = v
+                best_prefix  = "check-mk-community"
+
+        if best_version:
+            return best_version, best_prefix
     except Exception as e:
         Console.warn(f"Failed to check update: {e}")
-    return None
+    return None, None
 
 def detect_deb_codename():
     try:
@@ -140,10 +169,10 @@ class Upgrader:
             f.write(f"Site: {self.site}\n\n")
 
         current = get_current_version(self.site)
-        latest = get_latest_version()
-        
+        latest, pkg_prefix = get_latest_version()
+
         Console.log(f"Current: {current}")
-        Console.log(f"Latest:  {latest}")
+        Console.log(f"Latest:  {latest} ({pkg_prefix})")
 
         # Safety guard: never auto-upgrade from a pre-release (beta/RC) version.
         # Installing a stable package over a beta is a downgrade and breaks the site.
@@ -163,17 +192,17 @@ class Upgrader:
             Console.success("No upgrade needed")
             return
 
-        Console.log(f"Upgrading {current} -> {latest}")
-        
+        Console.log(f"Upgrading {current} -> {latest} (package: {pkg_prefix})")
+
         # Backups
         BACKUP_DIR.mkdir(parents=True, exist_ok=True)
         backup_file = BACKUP_DIR / f"{self.site}_pre-upgrade_{datetime.now().strftime('%Y%m%d_%H%M%S')}.tar.gz"
         Console.log(f"Backup site to {backup_file}...")
         run_cmd(["omd", "backup", self.site, str(backup_file)])
-        
+
         # Download
         DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        pkg_name = f"check-mk-raw-{latest}_0.{self.codename}_amd64.deb"
+        pkg_name = f"{pkg_prefix}-{latest}_0.{self.codename}_amd64.deb"
         url = f"https://download.checkmk.com/checkmk/{latest}/{pkg_name}"
         local_pkg = DOWNLOAD_DIR / pkg_name
         
