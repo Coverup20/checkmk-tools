@@ -27,7 +27,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-VERSION = "1.4.2"
+VERSION = "1.4.3"
 
 # --- Configuration ---
 DOWNLOAD_DIR = Path("/tmp/checkmk-upgrade")
@@ -211,7 +211,8 @@ class Upgrader:
         BACKUP_DIR.mkdir(parents=True, exist_ok=True)
         backup_file = BACKUP_DIR / f"{self.site}_pre-upgrade_{datetime.now().strftime('%Y%m%d_%H%M%S')}.tar.gz"
         Console.log(f"Backup site to {backup_file}...")
-        run_cmd(["omd", "backup", self.site, str(backup_file)])
+        if not run_cmd(["omd", "backup", self.site, str(backup_file)]):
+            Console.error("Backup failed, aborting upgrade. Check for stale .backup_* files owned by root.")
 
         # Download
         DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
