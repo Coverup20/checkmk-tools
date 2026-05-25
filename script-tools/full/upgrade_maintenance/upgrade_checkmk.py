@@ -27,7 +27,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-VERSION = "1.4.1"
+VERSION = "1.4.2"
 
 # --- Configuration ---
 DOWNLOAD_DIR = Path("/tmp/checkmk-upgrade")
@@ -194,12 +194,13 @@ class Upgrader:
 
         Console.log(f"Upgrading {current} -> {latest} (package: {pkg_prefix})")
 
-        # Clean up stale .backup_ temp files left by previous failed omd backup runs.
+        # Clean up stale .backup_ temp files left by previous failed omd backup runs
+        # or by WATO config edits run as root. Pattern: *.backup_ and *.backup_TIMESTAMP.
         # These are owned by root and block the next omd backup (run as site user).
         site_dir = Path(f"/omd/sites/{self.site}")
-        stale = list(site_dir.rglob("*.backup_"))
+        stale = list(site_dir.rglob("*.backup_*"))
         if stale:
-            Console.log(f"Removing {len(stale)} stale .backup_ file(s) before backup...")
+            Console.log(f"Removing {len(stale)} stale .backup_* file(s) before backup...")
             for f in stale:
                 try:
                     f.unlink()
