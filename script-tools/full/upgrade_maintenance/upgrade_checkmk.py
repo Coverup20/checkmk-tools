@@ -14,7 +14,7 @@ Features:
 Usage:
     upgrade_checkmk.py [site_name]
 
-Version: 1.4.0"""
+Version: 1.4.1"""
 
 import sys
 import os
@@ -27,7 +27,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 
 # --- Configuration ---
 DOWNLOAD_DIR = Path("/tmp/checkmk-upgrade")
@@ -193,6 +193,18 @@ class Upgrader:
             return
 
         Console.log(f"Upgrading {current} -> {latest} (package: {pkg_prefix})")
+
+        # Clean up stale .backup_ temp files left by previous failed omd backup runs.
+        # These are owned by root and block the next omd backup (run as site user).
+        site_dir = Path(f"/omd/sites/{self.site}")
+        stale = list(site_dir.rglob("*.backup_"))
+        if stale:
+            Console.log(f"Removing {len(stale)} stale .backup_ file(s) before backup...")
+            for f in stale:
+                try:
+                    f.unlink()
+                except Exception as e:
+                    Console.warn(f"Could not remove {f}: {e}")
 
         # Backups
         BACKUP_DIR.mkdir(parents=True, exist_ok=True)
