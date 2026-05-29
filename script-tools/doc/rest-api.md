@@ -1,6 +1,21 @@
 # CheckMK REST API — Reference Guide
 
-CheckMK 2.4.x — verified on srv-monitoring-sp and srv-monitoring-us.
+CheckMK 2.4.x and 2.5.x — verified on srv-monitoring-sp and srv-monitoring-us.
+
+## CRITICAL: API version path changed in 2.5.0
+
+| CheckMK version | API path |
+|---|---|
+| 2.4.x | `/monitoring/check_mk/api/1.0/` |
+| 2.5.x | `/monitoring/check_mk/api/v1/` |
+
+**Always check OMD version first:**
+
+```bash
+su - monitoring -c "omd version"
+```
+
+If `2.5.x` → use `api/v1/`. If `2.4.x` → use `api/1.0/`.
 
 ---
 
@@ -56,19 +71,45 @@ On srv-monitoring-us (and likely all OMD servers):
 
 ```bash
 # FAILS — 404
-curl -sk "https://localhost/monitoring/check_mk/api/1.0/..."
+curl -sk "https://localhost/monitoring/check_mk/api/v1/..."
 
 # FAILS — 301 redirect to https, then 404
-curl -sk "http://localhost/monitoring/check_mk/api/1.0/..."
+curl -sk "http://localhost/monitoring/check_mk/api/v1/..."
 
 # FAILS — gunicorn on :8000 does not route the API path
-curl -sk "http://127.0.0.1:8000/monitoring/check_mk/api/1.0/..."
+curl -sk "http://127.0.0.1:8000/monitoring/check_mk/api/v1/..."
+
+# FAILS — 127.0.1.1 (same as above, certificate IP mismatch too)
+curl -sk "https://127.0.1.1/monitoring/check_mk/api/v1/..."
 ```
 
 Root cause: mod_wsgi serving the REST API requires the correct `ServerName` to match
 the incoming `Host:` header. When calling via `localhost` the VirtualHost does not match.
+When calling via IP (127.x or private), SSL certificate does not cover IP addresses.
 
-**Solution A (preferred):** call the API from the Kali local terminal using the external URL, with SSL verification disabled (`ctx.verify_mode = ssl.CERT_NONE`).
+**NEVER run these API calls from inside the server via SSH.**
+
+**Solution A (preferred):** call the API from the Kali local terminal using the private
+IP of the server (e.g. `192.168.10.46`) and SSL verification disabled.
+The certificate CN is `srv-monitoring-us` — use that hostname with `--resolve` or just
+use the private IP with `-sk` (skip verify):
+
+```bash
+# From Kali local terminal (NOT via SSH):
+SECRET=$(ssh srv-monitoring-us "cat /omd/sites/monitoring/var/check_mk/web/automation/automation.secret")
+curl -sk \
+  -H "Authorization: Bearer automation $SECRET" \
+  -H "Accept: application/json" \
+  "https://192.168.10.46/monitoring/check_mk/api/v1/domain-types/folder_config/collections/all"
+```
+
+## CRITICAL: do NOT touch htpasswd for the automation user
+
+The automation user Bearer auth uses ONLY the secret file:
+`/omd/sites/monitoring/var/check_mk/web/automation/automation.secret`
+
+Running `htpasswd -b ... automation <password>` overwrites the htpasswd entry and
+**breaks Bearer authentication** — do not do this. The two auth mechanisms are separate.
 
 **Solution B (always works from anywhere):** edit `rules.mk` directly + reload with `cmk -O`. See section below.
 
