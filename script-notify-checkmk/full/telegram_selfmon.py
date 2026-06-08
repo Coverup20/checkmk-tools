@@ -6,7 +6,7 @@ Bulk: no
 CheckMK notification script - sends self-monitoring alerts to a Telegram channel.
 Configured via OMD environment variables.
 
-Version: 1.4.0
+Version: 1.5.0
 """
 #
 # Copyright (C) 2025 Nethesis S.r.l.
@@ -21,7 +21,14 @@ import socket
 import urllib.request
 import urllib.parse
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
+
+# Force IPv4 globally: avoids [Errno 101] Network is unreachable on systems
+# with IPv6 configured but no IPv6 route to the internet.
+_orig_getaddrinfo = socket.getaddrinfo
+def _getaddrinfo_ipv4(host, port, family=0, socktype=0, proto=0, flags=0):
+    return _orig_getaddrinfo(host, port, socket.AF_INET, socktype, proto, flags)
+socket.getaddrinfo = _getaddrinfo_ipv4
 
 # === CONFIG ===
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
@@ -78,15 +85,54 @@ def get_status_prefix(state):
     return "[?]"
 
 
+def _resolve_via_doh(hostname):
+    """Resolve hostname using Google DNS-over-HTTPS as fallback when system DNS fails."""
+    for doh_url in (
+        f"https://8.8.8.8/resolve?name={hostname}&type=A",
+        f"https://1.1.1.1/dns-query?name={hostname}&type=A",
+    ):
+        try:
+            req = urllib.request.Request(doh_url)
+            req.add_header("Host", "dns.google" if "8.8.8.8" in doh_url else "cloudflare-dns.com")
+            req.add_header("Accept", "application/dns-json")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read())
+            answers = data.get("Answer", [])
+            for ans in answers:
+                if ans.get("type") == 1:  # A record
+                    return ans["data"]
+        except Exception:
+            continue
+    return None
+
+
 def send_telegram(token, chat_id, text, reply_markup=None):
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    api_host = "api.telegram.org"
+    url = f"https://{api_host}/bot{token}/sendMessage"
     params = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
     if reply_markup is not None:
         params["reply_markup"] = reply_markup
     data = urllib.parse.urlencode(params).encode("utf-8")
-    req = urllib.request.Request(url, data=data, method="POST")
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        body = resp.read().decode("utf-8", errors="replace")
+
+    def _do_request(target_url):
+        req = urllib.request.Request(target_url, data=data, method="POST")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.read().decode("utf-8", errors="replace")
+
+    try:
+        body = _do_request(url)
+    except (OSError, urllib.error.URLError) as exc:
+        # DNS or network failure: try resolving api.telegram.org via Google/Cloudflare DoH
+        sys.stderr.write(f"telegram_selfmon v{VERSION}: primary send failed ({exc}), trying DNS fallback\n")
+        resolved_ip = _resolve_via_doh(api_host)
+        if not resolved_ip:
+            raise
+        fallback_url = url.replace(f"https://{api_host}", f"https://{resolved_ip}")
+        req = urllib.request.Request(fallback_url, data=data, method="POST")
+        req.add_header("Host", api_host)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+
     if '"ok":true' not in body and '"ok": true' not in body:
         sys.stderr.write(f"telegram_selfmon v{VERSION}: Telegram API error: {body[:200]}\n")
         raise RuntimeError(f"Telegram API error: {body[:200]}")
