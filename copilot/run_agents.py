@@ -4,7 +4,7 @@
 # Architecture:
 #   Agent 1: agent_haiku_sysmon.py   — claude-haiku-4.5  — system metrics (CPU, RAM, disk)
 #   Agent 2: agent_haiku_netcheck.py — claude-haiku-4.5  — network, services, security
-#   Agent 3: Sonnet Analyst (inline) — claude-sonnet-4.6 high — deep analysis + action plan
+#   Agent 3: Opus Analyst (inline)   — claude-opus-4.8 high — deep analysis + action plan
 #
 # The two Haiku agents run in PARALLEL, then Sonnet receives both reports for deep analysis.
 # Sonnet has full operational context: SSH access, CheckMK rules, forbidden actions, emergency procedures.
@@ -309,7 +309,7 @@ def run_sonnet_analyst(prompt, host_alias, save_output):
 
     r = subprocess.run(
         [COPILOT_BIN, "-p", prompt,
-         "--model", "claude-sonnet-4.6",
+         "--model", "claude-opus-4.8",
          "--reasoning-effort", "high",
          "--allow-all", "--autopilot"],
         capture_output=True, text=True, timeout=180, env=env,
@@ -424,9 +424,9 @@ def run_once(host_alias, save_output, dry_run):
     all_ok = s1 == "OK" and s2 == "OK"
 
     if all_ok:
-        print(f"\n[orchestrator] Both Haiku agents report OK — running Sonnet for brief confirmation...")
+        print(f"\n[orchestrator] Both Haiku agents report OK — running Opus for brief confirmation...")
     else:
-        print(f"\n[orchestrator] Issues detected — invoking Sonnet High for deep analysis...")
+        print(f"\n[orchestrator] Issues detected — invoking Opus High for deep analysis...")
 
     prompt = build_sonnet_prompt(host_alias, sysmon_data, netcheck_data, collected_at)
     sonnet_output = run_sonnet_analyst(prompt, host_alias, save_output)
@@ -497,7 +497,7 @@ def main():
     else:
         print(f"[orchestrator] v{VERSION} — target: {targets[0]}")
 
-    print(f"[orchestrator] agents: Haiku-sysmon + Haiku-netcheck + Sonnet-high")
+    print(f"[orchestrator] agents: Haiku-sysmon + Haiku-netcheck + Opus-high")
     print(f"[orchestrator] loop: {loop_count} ({'infinite' if loop_count == 0 else loop_count}x)"
           f" | interval: {interval}s | save: {save_output} | dry-run: {dry_run}")
 
