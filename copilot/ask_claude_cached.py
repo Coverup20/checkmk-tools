@@ -55,6 +55,16 @@ def parse_args():
         default="5m",
         help="Cache TTL: 5m (ephemeral) or 1h (default: 5m)",
     )
+    parser.add_argument(
+        "--api-url",
+        default="https://api.anthropic.com",
+        help="Anthropic API base URL (default: https://api.anthropic.com)",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug output",
+    )
     return parser.parse_args()
 
 
@@ -134,7 +144,7 @@ def main():
     args = parse_args()
 
     # Check API key
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if not api_key:
         print("ERROR: ANTHROPIC_API_KEY environment variable not set.", file=sys.stderr)
         print("Set it with: export ANTHROPIC_API_KEY='your-key-here'", file=sys.stderr)
@@ -177,8 +187,16 @@ def main():
         }
     ]
 
+    # Debug info
+    if args.debug:
+        print(f"[DEBUG] API URL: {args.api_url}", file=sys.stderr)
+        print(f"[DEBUG] Model: {args.model}", file=sys.stderr)
+        print(f"[DEBUG] API key length: {len(api_key)} (first: {api_key[:10]}...last: {api_key[-10:]})", file=sys.stderr)
+        print(f"[DEBUG] System file: {args.system_file}", file=sys.stderr)
+        print(f"[DEBUG] User prompt length: {len(user_prompt)}", file=sys.stderr)
+
     # Call API
-    client = anthropic.Anthropic(api_key=api_key)
+    client = anthropic.Anthropic(api_key=api_key, base_url=args.api_url)
 
     try:
         response = client.messages.create(
@@ -189,6 +207,8 @@ def main():
         )
     except Exception as e:
         print(f"ERROR: Anthropic API call failed: {e}", file=sys.stderr)
+        if args.debug:
+            print(f"[DEBUG] Full exception: {repr(e)}", file=sys.stderr)
         sys.exit(1)
 
     # Print response
