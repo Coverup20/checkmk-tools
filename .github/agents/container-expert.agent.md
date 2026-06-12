@@ -233,15 +233,54 @@ git status --short
 git --no-pager log -1 --oneline
 ```
 
-## Repository versioning/tag/commit workflow
+## Mandatory versioning/tag/release planning rule
 
-For every Git commit/push operation, regardless of the target remote, the agent must check whether the repository has a versioning/tag/release workflow that should be applied.
+For every Git commit/push operation, the agent must evaluate whether the repository workflow requires versioning, tag creation, release notes, tag push, or release creation.
+
+This evaluation must happen before the commit and before the push.
 
 This applies to:
 - normal `origin` pushes;
 - protected `upstream` pushes;
 - release remotes;
 - any repository where tags/releases are part of the expected workflow.
+
+### Existing versioning detection
+
+If the repository already contains version tags, the agent must treat versioning as an active repository workflow.
+
+Before every commit/push, the agent must inspect existing tags:
+```bash
+git tag --sort=-v:refname | head -10
+```
+
+If version tags exist, the agent must:
+- report the latest tag;
+- list commits since the latest tag;
+- classify the current change;
+- propose the next logical version/tag;
+- include the tag command in the planned workflow;
+- ask for confirmation before creating or pushing the tag.
+
+**Key rule:** Existing repository tags are evidence of an active versioning workflow. If tags exist, versioning/tag planning is mandatory; execution still requires confirmation.
+
+**For docs-only/internal-agent changes:**
+- Do not automatically skip tagging.
+- Classify them as patch-level by default unless policy says otherwise.
+- Propose the next patch tag.
+- Allow the user to decide whether to execute or skip the tag.
+
+### Version tag format rule
+
+For repository operational/versioning workflow commits, use the `v0.0.X` tag sequence by default.
+
+**Rules:**
+- Tags must use the format `v0.0.X`.
+- Increment `X` by 1 from the highest existing `v0.0.X` tag.
+- Ignore unrelated higher-version tags such as `v1.0.0` unless the repository-specific policy explicitly says to use semantic versioning from that point onward.
+- Do not propose `v1.0.1` automatically.
+- Do not switch versioning scheme without explicit user confirmation.
+- If both `v0.0.X` and other tag families exist, ask which family to use unless the embedded custom-agent workflow already specifies `v0.0.X`.
 
 **Required behavior:**
 
@@ -278,20 +317,25 @@ git tag --sort=-v:refname | head -10
 ```
 
 **For each commit/push request, report:**
-- whether this repository has a known versioning/tag workflow;
-- whether the current change requires a version bump;
-- whether a tag should be created;
-- whether a release should be created;
-- whether the push target is normal (`origin`) or protected (`upstream` / release remote);
-- the planned commands;
-- what requires explicit confirmation.
+- repository name;
+- current branch;
+- target remote;
+- latest tags;
+- whether a repository-specific policy exists;
+- whether the embedded agent workflow applies;
+- whether the change requires a version bump;
+- proposed next version/tag if required;
+- whether release notes are required;
+- whether a GitHub/GitLab release is required;
+- full planned command sequence.
 
 **Rules:**
 - Do not invent version numbers.
 - Do not invent release formats.
 - Do not skip versioning evaluation.
 - Do not assume `origin` means "no versioning".
-- Do not create tags or releases without explicit confirmation.
+- If the repository already uses version tags, docs-only changes are normally patch-level and the next patch tag must be proposed unless policy explicitly says to skip tagging.
+- Explicit confirmation protects execution; it does not make required versioning/tag/release steps optional.
 - Do not push to protected remotes without explicit confirmation.
 
 ## Remote Execution Pattern
@@ -357,6 +401,71 @@ EOF
 )
 ssh <host> "echo $b64 | base64 -d | bash"
 ```
+
+## Repository alignment command
+
+When the user says any of the following:
+- "allinea il repo"
+- "align the repo"
+- "sincronizza il repo"
+- "metti in pari il repo"
+- "repo alignment"
+
+the agent must run the repository alignment workflow to bring the repository to a coherent final state.
+
+### Mandatory first step — inspect only
+
+Run read-only checks:
+```bash
+date '+%Y-%m-%d %H:%M:%S %Z'
+git remote -v
+git branch --show-current
+git status --short
+git --no-pager log -8 --oneline
+git tag --sort=-v:refname | head -10
+git fetch --all --prune
+git --no-pager status -sb
+git --no-pager log --oneline --decorate --graph --max-count=12 --all
+```
+
+### Execution rule
+
+1. **Inspect** repository state (read-only checks above).
+2. **Fetch** all remotes.
+3. **Detect** local modifications.
+4. **Classify** modifications:
+   - tracked intentional changes;
+   - untracked artifacts;
+   - local-only files;
+   - unrelated or unsafe changes.
+5. **If tracked intentional changes exist** that belong to the current approved work:
+   - show the diff summary;
+   - evaluate versioning/tag workflow;
+   - propose the commit message;
+   - commit the tracked file(s);
+   - push to `origin` if allowed;
+   - report final state.
+6. **If the repository uses `v0.0.X` tags:**
+   - identify the highest `v0.0.X` tag;
+   - propose the next tag;
+   - do not create the tag without explicit confirmation.
+7. **Never** push to upstream unless explicitly requested.
+8. **Never** create tags/releases unless explicitly confirmed.
+
+**Key rule:** If `git status --short` shows tracked modifications, the repository is **not** fully aligned. The agent must not say "no action required" while tracked modifications are present. It must instead report:
+- working tree is dirty;
+- tracked modified files exist;
+- these files require commit/push or explicit discard decision;
+- proposed commit message;
+- proposed origin push;
+- proposed next `v0.0.X` tag if versioning applies.
+
+**Allowed automatic action** for "allinea il repo" after user approval:
+- commit tracked repository files that are part of the current task;
+- push commit to `origin`;
+- do not tag unless confirmed;
+- do not release unless confirmed;
+- do not upstream unless confirmed.
 
 ## Timestamp reporting rule
 
