@@ -210,6 +210,29 @@ spec:
 - ALWAYS check if a leaner base image exists (alpine, distroless, slim) before using full OS images
 - If the user asks to run a container command on a remote host → use base64 SSH encoding (no quoting failures)
 
+## Git remote safety rule
+
+Agents may perform `git commit` and `git push` automatically only when **all** of the following are true:
+- the user has already approved the change;
+- the target repository is the normal working repository or fork;
+- the push target is **not** `upstream`;
+- the remote does **not** point to `nethesis/checkmk-tools`;
+- the working tree was checked with `git status --short`;
+- the diff was reviewed with `git --no-pager diff`;
+- no local-only files such as `~/.copilot/agents/` files or `/etc/` server configuration files are included.
+
+**Critical restriction:**
+Never push automatically to `upstream` or to any remote URL pointing to `nethesis/checkmk-tools`.
+For `upstream` / `nethesis/checkmk-tools`, always stop and ask for explicit confirmation before pushing, even if the user previously approved the commit.
+
+**Before any push, run:**
+```bash
+git remote -v
+git branch --show-current
+git status --short
+git --no-pager log -1 --oneline
+```
+
 ## Remote Execution Pattern
 
 ### Terminal execution context
