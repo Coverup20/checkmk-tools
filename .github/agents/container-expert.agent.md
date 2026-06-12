@@ -233,41 +233,66 @@ git status --short
 git --no-pager log -1 --oneline
 ```
 
-## Repository release/versioning workflow
+## Repository versioning/tag/commit workflow
 
-When the user explicitly asks to commit and push to `upstream`, or to any protected/release remote, the agent must treat the operation as a release/versioning workflow, not as a normal push.
+For every Git commit/push operation, regardless of the target remote, the agent must check whether the repository has a versioning/tag/release workflow that should be applied.
 
-The agent must first locate and read the repository-specific policy/versioning file if present.
+This applies to:
+- normal `origin` pushes;
+- protected `upstream` pushes;
+- release remotes;
+- any repository where tags/releases are part of the expected workflow.
 
-Known policy file names/locations may include:
-```text
-memories/repo/git-push-policy.md
-.github/copilot-instructions.md
-.copilot-preferences.md
-.copilot-context.md
-README.md
-CONTRIBUTING.md
-RELEASE.md
-```
+**Required behavior:**
 
-The found policy file is the source of truth for:
-- version numbering;
-- commit message format;
-- tag format;
-- release title format;
-- release notes format;
-- upstream push procedure.
+1. Before committing or pushing, check repository-specific workflow instructions if available.
+2. Look for release/versioning policy files such as:
+   ```text
+   memories/repo/git-push-policy.md
+   .github/copilot-instructions.md
+   .copilot-preferences.md
+   .copilot-context.md
+   README.md
+   CONTRIBUTING.md
+   RELEASE.md
+   ```
+3. If a repository-specific policy exists, follow it.
+4. If no repository-specific policy exists, use the versioning/tag/commit workflow embedded in the custom agent instructions.
+5. Do not say that no tag/release is needed only because the push target is `origin`.
+6. The target remote determines the safety level, not whether versioning should be considered.
 
-The agent must not invent version numbers, commit formats, tag names, or release notes format.
+**Distinction:**
+- `origin` may allow normal push after approval, but versioning/tag requirements must still be evaluated.
+- `upstream` or protected remotes require stronger confirmation before push, tag push, or release creation.
+- The versioning/tag workflow is general.
+- The protected-remote safety workflow is additional.
 
-Before any upstream operation, the agent must verify:
+**Before every commit/push, run:**
 ```bash
+date '+%Y-%m-%d %H:%M:%S %Z'
 git remote -v
 git branch --show-current
 git status --short
 git --no-pager log -5 --oneline
 git tag --sort=-v:refname | head -10
 ```
+
+**For each commit/push request, report:**
+- whether this repository has a known versioning/tag workflow;
+- whether the current change requires a version bump;
+- whether a tag should be created;
+- whether a release should be created;
+- whether the push target is normal (`origin`) or protected (`upstream` / release remote);
+- the planned commands;
+- what requires explicit confirmation.
+
+**Rules:**
+- Do not invent version numbers.
+- Do not invent release formats.
+- Do not skip versioning evaluation.
+- Do not assume `origin` means "no versioning".
+- Do not create tags or releases without explicit confirmation.
+- Do not push to protected remotes without explicit confirmation.
 
 ## Remote Execution Pattern
 
