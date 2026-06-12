@@ -235,6 +235,29 @@ wsl -d kali-linux bash -c "ssh <host> 'docker ps'"
 - Never present a raw Linux command as PowerShell-ready unless it is wrapped with `wsl -d kali-linux bash -c`.
 - Before claiming that a command can be pasted into PowerShell, verify that it is valid PowerShell syntax or explicitly wrapped for WSL.
 
+### No-pager rule — NEVER leave the user in an interactive pager
+
+Always disable pagers explicitly. Commands that open a pager (systemctl, journalctl, git, less, more) will hang the terminal waiting for `q`.
+
+**Use these variants:**
+- `systemctl status <service> --no-pager`
+- `journalctl -u <service> -n 100 --no-pager`
+- `git --no-pager log -1 --oneline`
+- `git --no-pager diff`
+- `git --no-pager show --stat`
+- `git --no-pager status --short`
+
+**For commands that lack `--no-pager`, use environment variables:**
+- `GIT_PAGER=cat git log -1 --oneline`
+- `SYSTEMD_PAGER=cat systemctl status <service>`
+
+**Never:**
+- Run `systemctl status` without `--no-pager`
+- Run `journalctl` without `--no-pager`
+- Run `git log` / `git diff` / `git show` without `--no-pager` or `GIT_PAGER=cat`
+- Pipe to `less` or `more`
+- Assume the user will press `q`
+
 ### Base64 encoding (multi-line scripts)
 
 ```bash
