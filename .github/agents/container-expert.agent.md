@@ -210,7 +210,32 @@ spec:
 - ALWAYS check if a leaner base image exists (alpine, distroless, slim) before using full OS images
 - If the user asks to run a container command on a remote host → use base64 SSH encoding (no quoting failures)
 
-## Remote Execution Pattern (Kali WSL terminal — default)
+## Remote Execution Pattern
+
+### Terminal execution context
+
+Before providing commands, determine or state the intended terminal context. There are two supported execution patterns:
+
+**Native Kali WSL terminal (default — VS Code integrated terminal since 2026-04-11):**
+Use direct Linux/SSH commands:
+```bash
+ssh <host> 'docker ps'
+```
+
+**PowerShell / VS Code Extension terminal:**
+Use the explicit WSL wrapper:
+```powershell
+wsl -d kali-linux bash -c "ssh <host> 'docker ps'"
+```
+
+**Rules:**
+- Do not mix the two formats in the same command block unless explicitly comparing them.
+- If the terminal context is unclear, provide both variants and label them clearly.
+- If the command contains complex quoting, prefer a bash heredoc or base64-encoded script executed through WSL.
+- Never present a raw Linux command as PowerShell-ready unless it is wrapped with `wsl -d kali-linux bash -c`.
+- Before claiming that a command can be pasted into PowerShell, verify that it is valid PowerShell syntax or explicitly wrapped for WSL.
+
+### Base64 encoding (multi-line scripts)
 
 ```bash
 # Trivial
