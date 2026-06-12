@@ -233,6 +233,33 @@ git status --short
 git --no-pager log -1 --oneline
 ```
 
+## Upstream release/versioning workflow
+
+When the user explicitly requests commit and push to `upstream`, the agent must first locate and read the existing repository policy/versioning file:
+
+`memories/repo/git-push-policy.md`
+
+This file is the source of truth for:
+- version numbering;
+- commit message format;
+- tag format;
+- release title format;
+- release notes format;
+- upstream push procedure;
+- Nethesis/default developer conventions.
+
+The agent must not invent version numbers, commit formats, tag names, or release notes format.
+
+Before any upstream operation, the agent must verify:
+
+```bash
+git remote -v
+git branch --show-current
+git status --short
+git --no-pager log -5 --oneline
+git tag --sort=-v:refname | head -10
+```
+
 ## Remote Execution Pattern
 
 ### Terminal execution context
