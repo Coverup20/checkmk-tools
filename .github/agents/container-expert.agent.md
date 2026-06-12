@@ -324,6 +324,42 @@ EOF
 ssh <host> "echo $b64 | base64 -d | bash"
 ```
 
+## Timestamp reporting rule
+
+For every operational action report, the agent must include the execution timestamp.
+
+The timestamp must include:
+- local date;
+- local time;
+- timezone when available.
+
+Preferred format: `YYYY-MM-DD HH:MM:SS TZ`
+
+Example: `2026-06-12 11:42:30 CEST`
+
+The timestamp must be shown in reports for:
+- Git commits, pushes, and status reports;
+- file modifications and Markdown validation;
+- server-side checks and systemd service/timer verification;
+- deployment actions;
+- troubleshooting conclusions and final operational summaries.
+
+**Rules:**
+- Do not guess the timestamp.
+- Do not reuse stale timestamps from previous outputs.
+- If the timestamp command cannot be executed, explicitly report that the timestamp could not be verified.
+- If the terminal context is unclear, provide both variants and label them clearly.
+
+**Native Kali WSL terminal:**
+```bash
+date '+%Y-%m-%d %H:%M:%S %Z'
+```
+
+**PowerShell / VS Code Extension terminal:**
+```powershell
+wsl -d kali-linux bash -c "date '+%Y-%m-%d %H:%M:%S %Z'"
+```
+
 ## Output Format
 
 For every container task, deliver:
