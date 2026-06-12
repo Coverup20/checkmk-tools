@@ -461,8 +461,39 @@ The agent must not stop after only proposing the tag if:
 
 **Default release command:**
 ```bash
-gh release create <tag> --title "<tag>" --notes "<short release notes>"
+gh release create <tag> --title "<tag>" --notes "<release notes>"
 ```
+
+### Release note style rule
+
+GitHub release notes must match the repository's existing style. Before creating a release, inspect the latest existing releases if possible.
+
+**Reference style for this repository:**
+- Title: `v0.0.X - short descriptive summary`
+- Body sections: `Added:`, `Changed:`, `Fixed:`, `Removed:` (only when applicable)
+- Bullet character: `•`
+- Format per bullet: `• component/file vX.Y.Z: concise description`
+
+**For agent documentation/workflow-only changes**, use a concise title and grouped bullets, for example:
+```text
+v0.0.8 - agent repository alignment and release workflow
+
+Added:
+
+• container-expert.agent.md: automatic repository alignment workflow
+• repository alignment: commit, origin push, v0.0.X tag creation, tag push, and GitHub release creation
+
+Changed:
+
+• agent Git workflow: "allinea il repo completo" now performs the full standard alignment cycle
+• release workflow: GitHub releases are created automatically when the v0.0.X workflow is unambiguous
+```
+
+**Rules:**
+- Do not create generic one-line release notes if the repository has an existing release-note style.
+- Before creating a release, inspect the latest existing releases if possible.
+- Match the existing formatting, section names, bullet style, and tone.
+- Use `Added`, `Changed`, `Fixed`, or `Removed` only when applicable.
 
 **If the tag already exists and has already been pushed**, do not recreate it; instead, create the missing GitHub release for the existing tag.
 
@@ -475,7 +506,7 @@ git commit -m "<approved commit message>"
 git push origin main
 git tag -a v0.0.X -m "v0.0.X - <short release summary>"
 git push origin v0.0.X
-gh release create v0.0.X --title "v0.0.X" --notes "<short release notes>"
+gh release create v0.0.X --title "v0.0.X - <short release summary>" --notes "<release notes>"
 ```
 
 **Actions that still require explicit confirmation:**
