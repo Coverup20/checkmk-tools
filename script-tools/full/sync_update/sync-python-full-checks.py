@@ -15,8 +15,10 @@ Topics:
                    Ex: check_fail2ban_status,check_disk_space
   --temp-dir Deploy to temp directory instead of --target
                    (preview without real deployment)
+  --exclude-file File with script names to exclude (one per line)
+                   Default: /etc/checkmk-python-full-sync.exclude
 
-Version: 1.2.1"""
+Version: 1.3.0"""
 
 import argparse
 import os
@@ -26,11 +28,12 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Set, Tuple
 
-VERSION = "1.2.1"
+VERSION = "1.3.0"
 TEMP_DIR_DEFAULT = "/tmp/checkmk-sync-preview"
 
 REPO_DEFAULT = Path("/opt/checkmk-tools")
 TARGET_DEFAULT = "/usr/lib/check_mk_agent/local"
+EXCLUDE_FILE_DEFAULT = "/etc/checkmk-python-full-sync.exclude"
 
 
 # ─── Utilities ────────────────────────────────────────────────────────────────
@@ -39,6 +42,36 @@ def set_executable(path: Path) -> None:
     """Makes the file executable (rwxr-xr-x)."""
     current = path.stat().st_mode
     path.chmod(current | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def load_exclude_list(exclude_file: Path) -> Set[str]:
+    """Load exclude file and return a set of script names to skip.
+
+    The exclude file contains one script name per line.
+    Both source filename (check_vpn_tunnels.py) and deployed name
+    (check_vpn_tunnels) are supported — the function strips .py
+    and normalizes to stem-only for matching.
+
+    Returns an empty set if the file does not exist or is empty.
+    """
+    if not exclude_file.is_file():
+        return set()
+
+    excluded: Set[str] = set()
+    try:
+        content = exclude_file.read_text().strip()
+        for line in content.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            # Normalize: strip .py extension if present, keep stem
+            name = line.replace(".py", "") if line.endswith(".py") else line
+            excluded.add(name)
+    except OSError:
+        print(f"  [WARN] Cannot read exclude file: {exclude_file}", file=sys.stderr)
+        return set()
+
+    return excluded
 
 
 def get_categories(repo: Path, category: str, all_categories: bool) -> List[Path]:
@@ -94,27 +127,36 @@ def deploy_name(launcher: Path) -> str:
 # ─── Deploy ───────────────────────────────────────────────────────────────────
 
 def sync_category(category_dir: Path, target_dir: Path,
-                  scripts_filter: Optional[Set[str]] = None) -> Tuple[int, int, int]:
+                  scripts_filter: Optional[Set[str]] = None,
+                  exclude_set: Optional[Set[str]] = None) -> Tuple[int, int, int, int]:
     """Sync launchers in a category.
 
     Args:
         category_dir: Directory script-check-*
         target_dir: Deployment target (real or temp)
         scripts_filter: If specified, deploy only scripts in the set
+        exclude_set: If specified, skip scripts whose stem is in this set
 
     Returns:
-        (deployed, updated, skipped)"""
+        (deployed, updated, skipped, excluded)"""
     launchers = find_launchers(category_dir, scripts_filter)
     if not launchers:
-        return 0, 0, 0
+        return 0, 0, 0, 0
 
     deployed = 0
     updated = 0
     skipped = 0
+    excluded = 0
 
     for launcher in launchers:
         dest_name = deploy_name(launcher)
         dest_path = target_dir / dest_name
+
+        # Check exclude list — skip if the script stem is excluded
+        if exclude_set and launcher.stem in exclude_set:
+            print(f"  [EXCLUDED] {launcher.name} (in exclude list)")
+            excluded += 1
+            continue
 
         # Leggi contenuto sorgente
         try:
@@ -155,20 +197,27 @@ def sync_category(category_dir: Path, target_dir: Path,
                 print(f"  [ERROR] {launcher.name}: {e}")
                 skipped += 1
 
-    return deployed, updated, skipped
+    return deployed, updated, skipped, excluded
 
 
 def run(repo: Path, target_dir: Path, category: str, all_categories: bool,
         scripts_filter: Optional[Set[str]] = None,
-        temp_dir: Optional[Path] = None) -> int:
+        temp_dir: Optional[Path] = None,
+        exclude_file: Optional[Path] = None) -> int:
     """Main entry point.
 
     Args:
         scripts_filter: If specified, deploy only scripts in the set
-        temp_dir: If specified, deploy to this dir (preview)"""
+        temp_dir: If specified, deploy to this dir (preview)
+        exclude_file: If specified, load exclude list from this file"""
     # Destinazione effettiva
     effective_target = temp_dir if temp_dir is not None else target_dir
     is_temp = temp_dir is not None
+
+    # Carica exclude list
+    exclude_set = load_exclude_list(exclude_file) if exclude_file else set()
+    if exclude_set:
+        print(f"  Exclude: {', '.join(sorted(exclude_set))}")
 
     print(f"=== sync-python-full-checks v{VERSION} ===")
     print(f"  Repo:   {repo}")
@@ -205,13 +254,15 @@ def run(repo: Path, target_dir: Path, category: str, all_categories: bool,
     total_deployed = 0
     total_updated = 0
     total_skipped = 0
+    total_excluded = 0
 
     for cat_dir in categories:
         cat_name = cat_dir.name
-        d, u, s = sync_category(cat_dir, effective_target, scripts_filter)
+        d, u, s, e = sync_category(cat_dir, effective_target, scripts_filter, exclude_set)
         total_deployed += d
         total_updated += u
         total_skipped += s
+        total_excluded += e
         if d > 0 or u > 0:
             print()  # separatore visivo tra categorie con output
 
@@ -219,7 +270,7 @@ def run(repo: Path, target_dir: Path, category: str, all_categories: bool,
     if is_temp:
         print(f"[OK] Anteprima in: {effective_target}")
         print(f"     Per deployare davvero: cp {effective_target}/* {target_dir}/")
-    print(f"[OK] Riepilogo: {total_deployed} deployati, {total_updated} aggiornati, {total_skipped} invariati")
+    print(f"[OK] Riepilogo: {total_deployed} deployati, {total_updated} aggiornati, {total_skipped} invariati, {total_excluded} esclusi")
     return 0
 
 
@@ -254,6 +305,8 @@ def parse_args() -> argparse.Namespace:
                    help="Script specifici da deployare (nomi separati da virgola, senza .py)")
     p.add_argument("--temp-dir", default=None,
                    help=f"Deploy in directory temp invece di --target (anteprima)")
+    p.add_argument("--exclude-file", default=EXCLUDE_FILE_DEFAULT,
+                   help=f"File con lista di script da escludere (default: {EXCLUDE_FILE_DEFAULT})")
     p.add_argument("--list", action="store_true",
                    help="Mostra tutti gli script disponibili nel repo ed esce")
     return p.parse_args()
@@ -284,8 +337,13 @@ def main() -> int:
     if args.temp_dir:
         temp_dir = Path(args.temp_dir)
 
+    exclude_file: Optional[Path] = None
+    if args.exclude_file:
+        exclude_file = Path(args.exclude_file)
+
     return run(repo, target, args.category, args.all_categories,
-               scripts_filter=scripts_filter, temp_dir=temp_dir)
+               scripts_filter=scripts_filter, temp_dir=temp_dir,
+               exclude_file=exclude_file)
 
 
 if __name__ == "__main__":
