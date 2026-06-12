@@ -378,6 +378,7 @@ Always disable pagers explicitly. Commands that open a pager (systemctl, journal
 **For commands that lack `--no-pager`, use environment variables:**
 - `GIT_PAGER=cat git log -1 --oneline`
 - `SYSTEMD_PAGER=cat systemctl status <service>`
+- `GH_PAGER=cat gh release view <tag>`
 
 **Never:**
 - Run `systemctl status` without `--no-pager`
