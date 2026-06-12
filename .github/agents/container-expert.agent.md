@@ -233,25 +233,34 @@ git status --short
 git --no-pager log -1 --oneline
 ```
 
-## Upstream release/versioning workflow
+## Repository release/versioning workflow
 
-When the user explicitly requests commit and push to `upstream`, the agent must first locate and read the existing repository policy/versioning file:
+When the user explicitly asks to commit and push to `upstream`, or to any protected/release remote, the agent must treat the operation as a release/versioning workflow, not as a normal push.
 
-`memories/repo/git-push-policy.md`
+The agent must first locate and read the repository-specific policy/versioning file if present.
 
-This file is the source of truth for:
+Known policy file names/locations may include:
+```text
+memories/repo/git-push-policy.md
+.github/copilot-instructions.md
+.copilot-preferences.md
+.copilot-context.md
+README.md
+CONTRIBUTING.md
+RELEASE.md
+```
+
+The found policy file is the source of truth for:
 - version numbering;
 - commit message format;
 - tag format;
 - release title format;
 - release notes format;
-- upstream push procedure;
-- Nethesis/default developer conventions.
+- upstream push procedure.
 
 The agent must not invent version numbers, commit formats, tag names, or release notes format.
 
 Before any upstream operation, the agent must verify:
-
 ```bash
 git remote -v
 git branch --show-current
