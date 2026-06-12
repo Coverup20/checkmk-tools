@@ -411,7 +411,7 @@ When the user says any of the following:
 - "metti in pari il repo"
 - "repo alignment"
 
-the agent must run the repository alignment workflow to bring the repository to a coherent final state.
+the agent must execute the full safe alignment workflow.
 
 ### Mandatory first step — inspect only
 
@@ -428,44 +428,60 @@ git --no-pager status -sb
 git --no-pager log --oneline --decorate --graph --max-count=12 --all
 ```
 
-### Execution rule
+### Automatic execution workflow
+
+When the user says "allinea il repo" and there are approved tracked changes to commit, the agent must execute the full safe alignment workflow:
 
 1. **Inspect** repository state (read-only checks above).
 2. **Fetch** all remotes.
-3. **Detect** local modifications.
-4. **Classify** modifications:
-   - tracked intentional changes;
-   - untracked artifacts;
-   - local-only files;
-   - unrelated or unsafe changes.
-5. **If tracked intentional changes exist** that belong to the current approved work:
-   - show the diff summary;
-   - evaluate versioning/tag workflow;
-   - propose the commit message;
-   - commit the tracked file(s);
-   - push to `origin` if allowed;
-   - report final state.
-6. **If the repository uses `v0.0.X` tags:**
-   - identify the highest `v0.0.X` tag;
-   - propose the next tag;
-   - do not create the tag without explicit confirmation.
-7. **Never** push to upstream unless explicitly requested.
-8. **Never** create tags/releases unless explicitly confirmed.
+3. **Verify** current branch and remotes.
+4. **Verify** the working tree.
+5. **Identify** tracked intentional changes.
+6. **Show** a concise diff summary.
+7. **Commit** the approved tracked changes.
+8. **Push** the commit to `origin/main`.
+9. **Detect** the highest existing `v0.0.X` tag.
+10. **Calculate** the next `v0.0.X` tag (increment X by 1).
+11. **Create** an annotated tag.
+12. **Push** the tag to `origin`.
+13. **Report** final status.
 
-**Key rule:** If `git status --short` shows tracked modifications, the repository is **not** fully aligned. The agent must not say "no action required" while tracked modifications are present. It must instead report:
-- working tree is dirty;
-- tracked modified files exist;
-- these files require commit/push or explicit discard decision;
-- proposed commit message;
-- proposed origin push;
-- proposed next `v0.0.X` tag if versioning applies.
+The agent must not stop after only proposing the tag if:
+- the repository already uses `v0.0.X` tags;
+- the next tag can be calculated unambiguously;
+- the user requested "allinea il repo";
+- the changes are already approved;
+- the target is `origin`, not `upstream`.
 
-**Allowed automatic action** for "allinea il repo" after user approval:
-- commit tracked repository files that are part of the current task;
-- push commit to `origin`;
-- do not tag unless confirmed;
-- do not release unless confirmed;
-- do not upstream unless confirmed.
+**Default tag format:**
+- use `v0.0.X`;
+- increment X by 1 from the highest existing `v0.0.X`;
+- ignore `v1.0.0` for this workflow unless explicitly instructed otherwise.
+
+**Automatic commands equivalent to:**
+```bash
+git add <approved tracked files>
+git commit -m "<approved commit message>"
+git push origin main
+git tag -a v0.0.X -m "v0.0.X - <short release summary>"
+git push origin v0.0.X
+```
+
+**Actions that still require explicit confirmation:**
+- push to `upstream`;
+- force push;
+- reset;
+- clean;
+- merge;
+- rebase;
+- delete tags;
+- overwrite existing tags;
+- create GitHub/GitLab releases;
+- switch from `v0.0.X` to another versioning scheme;
+- commit unrelated/unapproved files;
+- commit local-only files under `~/.copilot/agents/`.
+
+**Key rule:** If `git status --short` shows tracked modifications, the repository is **not** fully aligned. The agent must not say "no action required" while tracked modifications are present.
 
 ## Timestamp reporting rule
 
