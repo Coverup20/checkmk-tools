@@ -411,7 +411,7 @@ When the user says any of the following:
 - "metti in pari il repo"
 - "repo alignment"
 
-the agent must execute the full safe alignment workflow.
+the agent must execute the full standard alignment workflow including GitHub release creation.
 
 ### Mandatory first step — inspect only
 
@@ -430,7 +430,7 @@ git --no-pager log --oneline --decorate --graph --max-count=12 --all
 
 ### Automatic execution workflow
 
-When the user says "allinea il repo" and there are approved tracked changes to commit, the agent must execute the full safe alignment workflow:
+When the user says "allinea il repo" and there are approved tracked changes to commit, the agent must execute the full standard workflow automatically:
 
 1. **Inspect** repository state (read-only checks above).
 2. **Fetch** all remotes.
@@ -444,7 +444,8 @@ When the user says "allinea il repo" and there are approved tracked changes to c
 10. **Calculate** the next `v0.0.X` tag (increment X by 1).
 11. **Create** an annotated tag.
 12. **Push** the tag to `origin`.
-13. **Report** final status.
+13. **Create** the GitHub release for the new tag.
+14. **Report** final status.
 
 The agent must not stop after only proposing the tag if:
 - the repository already uses `v0.0.X` tags;
@@ -458,6 +459,15 @@ The agent must not stop after only proposing the tag if:
 - increment X by 1 from the highest existing `v0.0.X`;
 - ignore `v1.0.0` for this workflow unless explicitly instructed otherwise.
 
+**Default release command:**
+```bash
+gh release create <tag> --title "<tag>" --notes "<short release notes>"
+```
+
+**If the tag already exists and has already been pushed**, do not recreate it; instead, create the missing GitHub release for the existing tag.
+
+**If release creation fails**, report the exact error and the manual command to run.
+
 **Automatic commands equivalent to:**
 ```bash
 git add <approved tracked files>
@@ -465,6 +475,7 @@ git commit -m "<approved commit message>"
 git push origin main
 git tag -a v0.0.X -m "v0.0.X - <short release summary>"
 git push origin v0.0.X
+gh release create v0.0.X --title "v0.0.X" --notes "<short release notes>"
 ```
 
 **Actions that still require explicit confirmation:**
@@ -476,7 +487,6 @@ git push origin v0.0.X
 - rebase;
 - delete tags;
 - overwrite existing tags;
-- create GitHub/GitLab releases;
 - switch from `v0.0.X` to another versioning scheme;
 - commit unrelated/unapproved files;
 - commit local-only files under `~/.copilot/agents/`.
