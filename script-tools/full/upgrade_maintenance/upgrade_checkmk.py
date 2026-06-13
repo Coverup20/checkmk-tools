@@ -27,7 +27,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-VERSION = "1.4.3"
+VERSION = "1.5.0"
 
 # --- Configuration ---
 DOWNLOAD_DIR = Path("/tmp/checkmk-upgrade")
@@ -137,6 +137,50 @@ def get_latest_version():
         Console.warn(f"Failed to check update: {e}")
     return None, None
 
+def cleanup_half_configured_packages():
+    """Remove any check-mk-* packages left in half-configured (iF) state.
+
+    These accumulate when dpkg -i succeeds partially but the post-installation
+    script fails (e.g. update-alternatives pointing to a non-existent OMD version
+    directory). A single iF package blocks all subsequent apt/dpkg operations
+    and causes 'apt-get autoremove' to fail with exit code 100.
+
+    This function must be called:
+    - Before installing a new .deb (preventive cleanup)
+    - After a dpkg -i failure (recovery cleanup)
+    """
+    try:
+        result = subprocess.run(
+            ["dpkg", "-l"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode != 0:
+            return
+
+        half_configured = []
+        for line in result.stdout.splitlines():
+            # State 'iF' = half-configured (install failed)
+            if line.startswith("iF") and "check-mk-" in line:
+                parts = line.split()
+                if len(parts) >= 2:
+                    half_configured.append(parts[1])
+
+        if not half_configured:
+            return
+
+        Console.warn(
+            f"Found {len(half_configured)} half-configured check-mk package(s): "
+            f"{', '.join(half_configured)}. Removing..."
+        )
+        subprocess.run(
+            ["dpkg", "--remove", "--force-depends"] + half_configured,
+            capture_output=True, text=True, timeout=30,
+        )
+        Console.log("Half-configured packages removed successfully")
+    except Exception as e:
+        Console.warn(f"Failed to clean half-configured packages: {e}")
+
+
 def detect_deb_codename():
     try:
         with open("/etc/os-release") as f:
@@ -230,10 +274,14 @@ class Upgrader:
             else:
                 Console.error(f"Download failed: {r.status_code}")
                 
+        # Pre-install: clean any half-configured packages that would block dpkg
+        cleanup_half_configured_packages()
+
         # Install
         Console.log("Installing .deb...")
         if not run_cmd(["dpkg", "-i", str(local_pkg)]):
-            Console.warn("dpkg failed, trying apt-get -f install...")
+            Console.warn("dpkg failed — cleaning half-configured packages and retrying...")
+            cleanup_half_configured_packages()
             run_cmd(["apt-get", "install", "-f", "-y"])
             if not run_cmd(["dpkg", "-i", str(local_pkg)]):
                 Console.error("Install failed")
@@ -274,6 +322,9 @@ class Upgrader:
                         Console.log(f"Removing old version: {v.name}")
                         shutil.rmtree(v)
                     
+        # Fix any remaining broken dependencies before cleanup
+        run_cmd(["apt-get", "install", "-f", "-y"])
+
         # Remove old debs
         run_cmd(["apt-get", "autoremove", "-y"])
         
