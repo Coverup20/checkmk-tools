@@ -13,10 +13,11 @@ import re
 import glob
 import signal
 import subprocess
+import sys
 import time
 import datetime
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 TOKENS_DIR = "/opt/tmate-tokens"
 LOG_FILE = "/var/log/tmate-cleanup.log"
 EXCLUDE_IPS = {"127.0.0.1", "::1"}
@@ -29,7 +30,7 @@ MIN_AGE_SECONDS = 300  # 5 minutes
 def log(msg):
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = f"[{ts}] {msg}"
-    print(line)
+    print(line, file=sys.stderr)
     try:
         with open(LOG_FILE, "a") as f:
             f.write(line + "\n")
