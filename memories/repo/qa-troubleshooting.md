@@ -1,5 +1,33 @@
 # Q&A Troubleshooting - checkmk-tools
 
+## 2026-06-13 - Pacchetti check-mk-raw half-configured (iF) bloccano apt su srv-monitoring-us
+
+**Q:** upgrade_checkmk.py installa il .deb ma la post-installation fallisce, lasciando il pacchetto in stato `iF` (half-configured) che blocca dpkg/apt. Come prevenirlo?
+
+**A:** Il problema si verifica quando `dpkg -i` installa un pacchetto `check-mk-raw-*` la cui post-installation cerca di creare un `update-alternatives` verso `/omd/versions/X.Y.ZpN.cre` che non esiste (perché la versione OMD è stata già rimossa). Un singolo pacchetto `iF` blocca TUTTE le successive operazioni apt, incluso `apt-get autoremove`.
+
+**Fix nello script `upgrade_checkmk.py` v1.5.0:**
+
+1. **`cleanup_half_configured_packages()`**: nuova funzione che scansiona `dpkg -l` per pacchetti `check-mk-*` in stato `iF` e li rimuove con `dpkg --remove --force-depends`
+2. **Chiamata pre-install**: eseguita prima di `dpkg -i` — pulisce eventuali `iF` preesistenti
+3. **Chiamata post-failure**: eseguita dopo un fallimento di `dpkg -i` — rimuove il pacchetto `iF` prima del retry con `apt-get -f install`
+4. **`apt-get install -f -y` prima di `autoremove`**: risolve dipendenze residue prima della pulizia finale
+
+**Comando manuale per pulire pacchetti iF esistenti:**
+```bash
+dpkg --remove --force-depends check-mk-raw-2.4.0p23 check-mk-raw-2.4.0p25 check-mk-raw-2.4.0p26 check-mk-raw-2.4.0p27
+dpkg --purge check-mk-raw-2.4.0p23 check-mk-raw-2.4.0p25 check-mk-raw-2.4.0p26 check-mk-raw-2.4.0p27
+apt-get -f install -y
+apt-get autoremove -y
+```
+
+**Verifica:**
+```bash
+dpkg -l | grep check-mk  # nessun pacchetto in stato iF
+```
+
+---
+
 ## File creati su srv-monitoring-sp devono essere monitoring:monitoring
 
 **Q:** Quando creo file su srv-monitoring-sp (retention.dat backup, script temporanei, ecc.) con quale owner devono essere?
