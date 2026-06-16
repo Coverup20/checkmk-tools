@@ -9,10 +9,8 @@ $ErrorActionPreference = "Stop"
 
 $REPO_PATH = (Split-Path $PSScriptRoot -Parent)
 $LOCAL_BACKUP_BASE = "C:\CheckMK-Backups"
-$NETWORK_BACKUP_BASE = if ($env:BACKUP_NETWORK_PATH) { "$($env:BACKUP_NETWORK_PATH)\CheckMK-Backups" } else { "" }
 $TIMESTAMP = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $LOCAL_BACKUP_PATH = Join-Path $LOCAL_BACKUP_BASE $TIMESTAMP
-$NETWORK_BACKUP_PATH = if ($NETWORK_BACKUP_BASE) { Join-Path $NETWORK_BACKUP_BASE $TIMESTAMP } else { "" }
 
 Write-Host "`n╔═══════════════════════════════════════════════════════╗" -ForegroundColor Cyan
 Write-Host "║ FULL BACKUP CHECKMK-TOOLS REPOSITORY ║" -ForegroundColor White
@@ -283,7 +281,6 @@ if (-not $Unattended) {
 
 Write-Host " Repository locale: $REPO_PATH" -ForegroundColor Gray
 Write-Host "Local backup: $LOCAL_BACKUP_PATH" -ForegroundColor Gray
-Write-Host "Network Backup (optional): $NETWORK_BACKUP_PATH`n" -ForegroundColor Gray
 
 # Create local backup folder
 Write-Host "Creating local backup folder..." -ForegroundColor Yellow
@@ -359,41 +356,7 @@ function Copy-BackupFiles {
 # Local backup
 $localCopied = Copy-BackupFiles -DestinationPath $LOCAL_BACKUP_PATH
 
-# Network backup (optional with timeout)
-Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Yellow
-Write-Host "║ NETWORK BACKUP (OPTIONAL) ║" -ForegroundColor White
-Write-Host "╚═══════════════════════════════════════════════════════╝`n" -ForegroundColor Yellow
-
-if ($Unattended) {
-    # In automatic mode, skip network backup by default
-    $response = 'n'
-    Write-Host "⊗ Network backup skipped (automatic mode)" -ForegroundColor Yellow
-} else {
-    Write-Host "Do you want to back up to $NETWORK_BACKUP_BASE too?" -ForegroundColor Cyan
-    $response = Read-Host "Conferma (S/N)"
-}
-
-$networkCopied = 0
-if ($response -eq 's' -or $response -eq 'S') {
-    Write-Host "Network backup confirmed`n" -ForegroundColor Green
-    
-    # Check network connection
-    Write-Host "Check network connection..." -ForegroundColor Yellow
-    if (-not (Test-Path $NETWORK_BACKUP_BASE)) {
-        Write-Host "Unable to access $NETWORK_BACKUP_BASE" -ForegroundColor Red
-        Write-Host "Local backup complete, network skipped`n" -ForegroundColor Yellow
-    } else {
-        Write-Host "Connection OK`n" -ForegroundColor Green
-        
-        # Create network backup folder
-        New-Item -ItemType Directory -Path $NETWORK_BACKUP_PATH -Force | Out-Null
-        
-        # Perform network backup
-        $networkCopied = Copy-BackupFiles -DestinationPath $NETWORK_BACKUP_PATH
-    }
-} else {
-    Write-Host "⊗ Network backup skipped`n" -ForegroundColor Gray
-}
+# Network backup removed — local-only mode
 
 # Statistiche
 Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Green
@@ -407,16 +370,6 @@ Write-Host "LOCAL BACKUP:" -ForegroundColor Cyan
 Write-Host "Files copied: $localCopied" -ForegroundColor White
 Write-Host "Size: $localSizeMB MB" -ForegroundColor White
 Write-Host "Path: $LOCAL_BACKUP_PATH`n" -ForegroundColor White
-
-if ($networkCopied -gt 0) {
-    $networkSize = (Get-ChildItem -Path $NETWORK_BACKUP_PATH -Recurse -File | Measure-Object -Property Length -Sum).Sum
-    $networkSizeMB = [math]::Round($networkSize / 1MB, 2)
-    
-    Write-Host "NETWORK BACKUP:" -ForegroundColor Cyan
-    Write-Host "Files copied: $networkCopied" -ForegroundColor White
-    Write-Host "Size: $networkSizeMB MB" -ForegroundColor White
-    Write-Host "Path: $NETWORK_BACKUP_PATH`n" -ForegroundColor White
-}
 
 Write-Host " Timestamp:        $TIMESTAMP`n" -ForegroundColor Cyan
 

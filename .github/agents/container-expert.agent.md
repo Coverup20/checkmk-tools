@@ -351,28 +351,114 @@ git tag --sort=-v:refname | head -10
 
 ## Remote Execution Pattern
 
-### Terminal execution context
+## Terminal Context Routing
 
-Before providing commands, determine or state the intended terminal context. There are two supported execution patterns:
+Before executing any command, determine the required operating-system context.
 
-**Native Kali WSL terminal (default — VS Code integrated terminal since 2026-04-11):**
-Use direct Linux/SSH commands:
+### Use the WSL/Kali terminal for
+
+- Linux commands;
+- Bash or Zsh commands;
+- SSH connections;
+- Linux filesystem operations;
+- commands using Linux paths such as `/mnt/c/...`;
+- Linux Git operations;
+- Python tools installed inside WSL;
+- remote server administration.
+
+### Use the native PowerShell terminal for
+
+- PowerShell cmdlets;
+- Windows Scheduled Tasks;
+- Windows Event Log;
+- Windows services;
+- Windows registry operations;
+- Windows filesystem operations using paths such as `C:\...`;
+- UNC paths such as `\\server\share`;
+- Windows Task Scheduler;
+- Windows-native backup scripts;
+- commands that depend on `$PROFILE`, `$env:*`, COM objects, or Windows modules.
+
+### Required behavior
+
+- Do not run native Windows PowerShell tasks inside WSL unless no native PowerShell terminal is available.
+- Do not assume that launching `pwsh.exe` or `powershell.exe` from inside WSL is equivalent to opening a native VS Code PowerShell terminal.
+- Prefer opening or reusing a VS Code terminal whose profile is PowerShell.
+- Prefer opening or reusing a VS Code terminal whose profile is WSL/Kali for Linux and SSH tasks.
+- Reuse an existing terminal only when its shell and operating-system context are correct.
+- Do not send PowerShell syntax to Bash or Zsh.
+- Do not send Bash syntax to PowerShell.
+- Before execution, state the selected terminal context:
+  - `WSL/Kali`
+  - `PowerShell`
+  - `Remote SSH`
+- Verify the current shell before executing commands.
+
+### Shell detection
+
+For WSL/Linux:
+
 ```bash
-ssh <host> 'docker ps'
+printf 'shell=%s\n' "$SHELL"
+uname -a
+pwd
 ```
 
-**PowerShell / VS Code Extension terminal:**
-Use the explicit WSL wrapper:
-```powershell
-wsl -d kali-linux bash -c "ssh <host> 'docker ps'"
+For PowerShell:
+
+```
+$PSVersionTable.PSVersion
+"TERM_PROGRAM=$env:TERM_PROGRAM"
+Get-Location
 ```
 
-**Rules:**
-- Do not mix the two formats in the same command block unless explicitly comparing them.
-- If the terminal context is unclear, provide both variants and label them clearly.
-- If the command contains complex quoting, prefer a bash heredoc or base64-encoded script executed through WSL.
-- Never present a raw Linux command as PowerShell-ready unless it is wrapped with `wsl -d kali-linux bash -c`.
-- Before claiming that a command can be pasted into PowerShell, verify that it is valid PowerShell syntax or explicitly wrapped for WSL.
+### Native PowerShell fallback
+
+If the agent cannot open or select a native PowerShell terminal, it may invoke PowerShell from WSL only as an explicit fallback:
+
+```
+powershell.exe -NoProfile -Command ""
+```
+
+or:
+
+```
+pwsh.exe -NoProfile -Command ""
+```
+
+When using this fallback:
+
+- state clearly that native VS Code PowerShell Shell Integration may not be available;
+- avoid interactive commands;
+- use fully qualified Windows paths;
+- handle quoting carefully;
+- do not treat the fallback process as a native PowerShell terminal;
+- prefer a temporary `.ps1` file for complex or multiline commands.
+
+### Complex PowerShell fallback from WSL
+
+For multiline PowerShell operations, create a temporary script in a safe temporary location rather than embedding complex quoting.
+
+Example:
+
+```
+cat > /tmp/task.ps1 << 'EOF'
+try {
+    Write-Output "exit_code=0"
+}
+catch {
+    Write-Error $_
+    exit 1
+}
+EOF
+powershell.exe -NoProfile -File /tmp/task.ps1
+```
+
+### Safety rule
+
+Never change the VS Code default terminal profile automatically.
+
+Select the correct terminal per task instead of forcing all work into a single shell.
 
 ### No-pager rule — NEVER leave the user in an interactive pager
 

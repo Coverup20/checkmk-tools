@@ -13,26 +13,8 @@ if (-not (Test-Path $LOG_PATH)) {
 # Record start of execution
 "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Inizio backup automatico..." | Out-File -FilePath $LOG_FILE -Append -Encoding UTF8
 
-# Wait for the network share to be available (max 60 seconds)
-$NETWORK_SHARE = if ($env:BACKUP_NETWORK_PATH) { $env:BACKUP_NETWORK_PATH } else { "" }
-$maxRetries = 12
-$retryDelay = 5
-
-"[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Verifica accessibilità share di rete..." | Out-File -FilePath $LOG_FILE -Append -Encoding UTF8
-
-for ($i = 1; $i -le $maxRetries; $i++) {
-    if (Test-Path $NETWORK_SHARE) {
-        "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Share di rete accessibile (tentativo $i/$maxRetries)" | Out-File -FilePath $LOG_FILE -Append -Encoding UTF8
-        break
-    }
-    
-    if ($i -eq $maxRetries) {
-        "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] ATTENZIONE: Share di rete non raggiungibile dopo $maxRetries tentativi. Continuo solo con backup locale." | Out-File -FilePath $LOG_FILE -Append -Encoding UTF8
-    } else {
-        "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Tentativo $i/$maxRetries fallito, attendo $retryDelay secondi..." | Out-File -FilePath $LOG_FILE -Append -Encoding UTF8
-        Start-Sleep -Seconds $retryDelay
-    }
-}
+# Network share check removed — local-only mode
+"[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Backup locale (rete non configurata)" | Out-File -FilePath $LOG_FILE -Append -Encoding UTF8
 
 # Run backups
 try {

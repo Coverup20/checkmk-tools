@@ -5,15 +5,15 @@ param(
     [switch]$Unattended
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 # === CONFIGURATION ===
 $REPO_PATH = (Split-Path $PSScriptRoot -Parent)
 $LOCAL_BACKUP_BASE = "C:\CheckMK-Backups"
-$NETWORK_BACKUP_BASE = if ($env:BACKUP_NETWORK_PATH) { "$($env:BACKUP_NETWORK_PATH)\CheckMK-Backups" } else { "" }
+$LOG_PATH = Join-Path $LOCAL_BACKUP_BASE "logs"
+$LOG_FILE = Join-Path $LOG_PATH "backup_$(Get-Date -Format 'yyyy-MM-dd').log"
 $TIMESTAMP = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $LOCAL_BACKUP_PATH = Join-Path $LOCAL_BACKUP_BASE $TIMESTAMP
-$NETWORK_BACKUP_PATH = if ($NETWORK_BACKUP_BASE) { Join-Path $NETWORK_BACKUP_BASE $TIMESTAMP } else { "" }
 $RETENTION_COUNT = 20
 
 # === EMAIL CONFIGURATION ===
@@ -21,9 +21,9 @@ $SMTP_SERVER = "smtp-relay.nethesis.it"
 $SMTP_PORT = 587
 $SMTP_USE_SSL = $true
 $EMAIL_FROM = "checkmk@nethesis.it"
-$EMAIL_TO = if ($env:NOTIFY_EMAIL) { $env:NOTIFY_EMAIL } else { "admin@example.com" }
-$EMAIL_CREDENTIAL_FILE = Join-Path $LOCAL_BACKUP_BASE "smtp_credential.xml"  # File credenziali crittografato
-$SEND_EMAIL = $true  # Email attivata
+$EMAIL_TO = if ($env:NOTIFY_EMAIL) { $env:NOTIFY_EMAIL } else { "" }
+$EMAIL_CREDENTIAL_FILE = Join-Path $LOCAL_BACKUP_BASE "smtp_credential.xml"
+$SEND_EMAIL = $true
 
 # === GLOBAL VARIABLES FOR EMAIL ERROR ===
 $GLOBAL_ERROR_MESSAGE = ""
@@ -233,7 +233,7 @@ $corruptionPercentage = if ($totalScripts -gt 0) {
 # 15% Threshold: If more than 15% of the scripts are corrupt, block the backup
 $CORRUPTION_THRESHOLD = 15
 
-Write-Host "Error rate: $corruptionPercentage%" -ForegroundColor $(if ($corruptionPercentage -gt $CORRUPTION_THRESHOLD) { "Red" } else { "Yellow" })
+$pctStr = "$corruptionPercentage%"; Write-Host "Error rate: $pctStr" -ForegroundColor $(if ($corruptionPercentage -gt $CORRUPTION_THRESHOLD) { "Red" } else { "Yellow" })
 Write-Host ""
 
 if ($corruptionPercentage -gt $CORRUPTION_THRESHOLD) {
@@ -242,8 +242,8 @@ if ($corruptionPercentage -gt $CORRUPTION_THRESHOLD) {
     Write-Host "╚═══════════════════════════════════════════════════════╝" -ForegroundColor Red
     Write-Host ""
     Write-Host "[CRITICAL ERROR] Massive repository corruption detected!" -ForegroundColor Red
-    Write-Host "  • Script corrotti: $corruptedScripts / $totalScripts ($($corruptionPercentage)%)" -ForegroundColor Red
-    Write-Host "  • Soglia sicurezza: $($CORRUPTION_THRESHOLD)%" -ForegroundColor Yellow
+    $pct1 = "$($corruptionPercentage)%"; Write-Host "  • Script corrotti: $corruptedScripts / $totalScripts ($pct1)" -ForegroundColor Red
+    $pct2 = "$($CORRUPTION_THRESHOLD)%"; Write-Host "  • Soglia sicurezza: $pct2" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "[BACKUP CANCELED] To avoid propagating corruption to existing backups!" -ForegroundColor Red
     Write-Host ""
@@ -363,62 +363,7 @@ if ($errorCount -gt 0) {
 # Calculate local backup size
 $backupSize = (Get-ChildItem -Path $LOCAL_BACKUP_PATH -Recurse -File | Measure-Object -Property Length -Sum).Sum / 1MB
 
-# === NETWORK BACKUP ===
-Write-Host ""
-Write-Host "================================================================"
-Write-Host "NETWORK BACKUP"
-Write-Host "================================================================"
-Write-Host ""
-
-$networkCopied = 0
-$networkSuccess = $false
-
-# Check network connection
-if (Test-Path $NETWORK_BACKUP_BASE) {
-    Write-Host "[INFO] Reachable network share" -ForegroundColor Green
-    Write-Host "[INFO] Destinazione: $NETWORK_BACKUP_PATH" -ForegroundColor Gray
-    Write-Host ""
-    
-    try {
-        # Create network backup folder
-        New-Item -ItemType Directory -Path $NETWORK_BACKUP_PATH -Force -ErrorAction Stop | Out-Null
-        Write-Host "[OK] Network backup folder created" -ForegroundColor Green
-        Write-Host ""
-        Write-Host "[INFO] Copying files to network..." -ForegroundColor Cyan
-        
-        # Copia ricorsiva
-        foreach ($file in $allFiles) {
-            $relativePath = $file.FullName.Replace($REPO_PATH, "").TrimStart('\')
-            $destinationPath = Join-Path $NETWORK_BACKUP_PATH $relativePath
-            $destinationDir = Split-Path $destinationPath -Parent
-            
-            try {
-                if (-not (Test-Path $destinationDir)) {
-                    New-Item -ItemType Directory -Path $destinationDir -Force -ErrorAction Stop | Out-Null
-                }
-                
-                Copy-Item -Path $file.FullName -Destination $destinationPath -Force -ErrorAction Stop
-                $networkCopied++
-                
-                if ($networkCopied % 50 -eq 0) {
-                    Write-Host "Copied $networkCopied / $totalFiles files..." -ForegroundColor Gray
-                }
-            } catch {
-                Write-Host "[WARN] Error copying $relativePath file over network" -ForegroundColor Yellow
-            }
-        }
-        
-        Write-Host "[OK] Network backup complete: $networkCopied files copied" -ForegroundColor Green
-        $networkSuccess = $true
-        
-    } catch {
-        Write-Host "[ERROR] Network backup failed: $_" -ForegroundColor Red
-        Write-Host "[INFO] Local backup is still available" -ForegroundColor Yellow
-    }
-} else {
-    Write-Host "[WARN] Network share unreachable: $NETWORK_BACKUP_BASE" -ForegroundColor Yellow
-    Write-Host "[INFO] I continue only with local backup" -ForegroundColor Yellow
-}
+# Network backup is not configured (local-only mode)
 
 # === STATISTICHE ===
 Write-Host ""
@@ -431,18 +376,9 @@ Write-Host "Copied files: $copiedFiles" -ForegroundColor Gray
 Write-Host "Size: $([math]::Round($backupSize, 2)) MB" -ForegroundColor Gray
 Write-Host "Path: $LOCAL_BACKUP_PATH" -ForegroundColor Gray
 Write-Host ""
-if ($networkSuccess) {
-    Write-Host "NET:" -ForegroundColor Cyan
-    Write-Host "Files copied: $networkCopied" -ForegroundColor Gray
-    Write-Host "Path: $NETWORK_BACKUP_PATH" -ForegroundColor Gray
-} else {
-    Write-Host "NETWORK: Not available" -ForegroundColor Yellow
-}
-Write-Host ""
 Write-Host "  RIEPILOGO RAPIDO:" -ForegroundColor Cyan
 Write-Host "    Script verificati: $totalScripts" -ForegroundColor Gray
 Write-Host "Backed up files (local): $copiedFiles" -ForegroundColor Gray
-Write-Host "Backed up files (network): $(if ($networkSuccess) { $networkCopied } else { '0 (network unavailable)' })" -ForegroundColor Gray
 Write-Host ""
 Write-Host "  Timestamp:        $TIMESTAMP" -ForegroundColor Gray
 Write-Host ""
@@ -454,7 +390,7 @@ Write-Host "================================================================"
 Write-Host ""
 
 $existingBackups = Get-ChildItem -Path $LOCAL_BACKUP_BASE -Directory | 
-    Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$' } |
+    Where-Object { $_.Name -match [regex]::new("^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$") } |
     Sort-Object Name -Descending
 
 $backupCount = $existingBackups.Count
@@ -498,123 +434,104 @@ if ($SEND_EMAIL) {
     
     try {
         $emailSubject = "[CheckMK Backup] Completato - $TIMESTAMP"
-        $networkFilesSummary = if ($networkSuccess) { "$networkCopied" } else { "0 (rete non disponibile)" }
-        
-        $emailBody = @"
-===============================================================
-       REPORT BACKUP REPOSITORY CHECKMK-TOOLS
-===============================================================
 
-Data e ora: $TIMESTAMP
-Host: $env:COMPUTERNAME
-
----------------------------------------------------------------
-  CONTROLLO INTEGRITA SCRIPT
----------------------------------------------------------------
-Script verificati:     $totalScripts
-Script validi:         $validScripts
-Script corrotti:       $corruptedScripts
-Stato:                 $(if ($corruptedScripts -eq 0) { "OK" } else { "WARNING" })
-
----------------------------------------------------------------
-    RIEPILOGO RAPIDO
----------------------------------------------------------------
-Script verificati:     $totalScripts
-File backuppati (loc): $copiedFiles
-File backuppati (ret): $networkFilesSummary
-
-"@
+        # Build email body line by line to avoid PowerShell parser issues with here-strings containing special characters
+        $emailBody = ""
+        $emailBody += "===============================================================" + "`n"
+        $emailBody += "       REPORT BACKUP REPOSITORY CHECKMK-TOOLS" + "`n"
+        $emailBody += "===============================================================" + "`n"
+        $emailBody += "" + "`n"
+        $emailBody += "Data e ora: $TIMESTAMP" + "`n"
+        $emailBody += "Host: $env:COMPUTERNAME" + "`n"
+        $emailBody += "" + "`n"
+        $emailBody += "---------------------------------------------------------------" + "`n"
+        $emailBody += "  CONTROLLO INTEGRITA SCRIPT" + "`n"
+        $emailBody += "---------------------------------------------------------------" + "`n"
+        $emailBody += "Script verificati:     $totalScripts" + "`n"
+        $emailBody += "Script validi:         $validScripts" + "`n"
+        $emailBody += "Script corrotti:       $corruptedScripts" + "`n"
+        if ($corruptedScripts -eq 0) { $stato = "OK" } else { $stato = "WARNING" }
+        $emailBody += "Stato:                 $stato" + "`n"
+        $emailBody += "" + "`n"
+        $emailBody += "---------------------------------------------------------------" + "`n"
+        $emailBody += "    RIEPILOGO RAPIDO" + "`n"
+        $emailBody += "---------------------------------------------------------------" + "`n"
+        $emailBody += "Script verificati:     $totalScripts" + "`n"
+        $emailBody += "File backuppati (loc): $copiedFiles" + "`n"
+        $emailBody += "" + "`n"
         
         # Add error list if present
         if ($corruptedScripts -gt 0 -and $corruptedList.Count -gt 0) {
-            $emailBody += "`nScript con errori sintassi bash:`n"
-            $emailBody += "---------------------------------------------------------------`n"
+            $emailBody += "Script con errori sintassi bash:" + "`n"
+            $emailBody += "---------------------------------------------------------------" + "`n"
             foreach ($errorItem in $corruptedList) {
-                $emailBody += "  - $errorItem`n"
+                $emailBody += "  - $errorItem" + "`n"
             }
         }
         
-        $emailBody += @"
-
----------------------------------------------------------------
-  BACKUP LOCALE
----------------------------------------------------------------
-File copiati:          $copiedFiles
-Dimensione:            $([math]::Round($backupSize, 2)) MB
-Percorso:              $LOCAL_BACKUP_PATH
-
----------------------------------------------------------------
-  BACKUP RETE
----------------------------------------------------------------
-"@
-        
-        if ($networkSuccess) {
-            $emailBody += @"
-Stato:                 COMPLETATO
-File copiati:          $networkCopied
-Percorso:              $NETWORK_BACKUP_PATH
-
-"@
-        } else {
-            $emailBody += @"
-Stato:                 NON DISPONIBILE
-Motivo:                Share di rete non raggiungibile
-
-"@
-        }
-        
-        $emailBody += @"
----------------------------------------------------------------
-  RETENTION POLICY
----------------------------------------------------------------
-Backup totali:         $backupCount
-Retention:             $RETENTION_COUNT
-"@
+        $emailBody += "" + "`n"
+        $emailBody += "---------------------------------------------------------------" + "`n"
+        $emailBody += "  BACKUP LOCALE" + "`n"
+        $emailBody += "---------------------------------------------------------------" + "`n"
+        $bs = [math]::Round($backupSize, 2)
+        $emailBody += "File copiati:          $copiedFiles" + "`n"
+        $emailBody += "Dimensione:            $bs MB" + "`n"
+        $emailBody += "Percorso:              $LOCAL_BACKUP_PATH" + "`n"
+        $emailBody += "" + "`n"
+        $emailBody += "---------------------------------------------------------------" + "`n"
+        $emailBody += "  RETENTION POLICY" + "`n"
+        $emailBody += "---------------------------------------------------------------" + "`n"
+        $emailBody += "Backup totali:         $backupCount" + "`n"
+        $emailBody += "Retention:             $RETENTION_COUNT" + "`n"
         
         if ($backupCount -gt $RETENTION_COUNT) {
             $deleted = $backupCount - $RETENTION_COUNT
-            $emailBody += "Backup eliminati:      $deleted`n"
+            $emailBody += "Backup eliminati:      $deleted" + "`n"
         } else {
-            $emailBody += "Backup eliminati:      0`n"
+            $emailBody += "Backup eliminati:      0" + "`n"
         }
         
-        $emailBody += @"
-
-===============================================================
-  BACKUP COMPLETATO CON SUCCESSO
-===============================================================
-
-Questo e un messaggio automatico generato dal sistema di backup.
-"@
+        $emailBody += "" + "`n"
+        $emailBody += "===============================================================" + "`n"
+        $emailBody += "  BACKUP COMPLETATO CON SUCCESSO" + "`n"
+        $emailBody += "===============================================================" + "`n"
+        $emailBody += "" + "`n"
+        $emailBody += "Questo e un messaggio automatico generato dal sistema di backup." + "`n"
         
-        # Prepare credentials if necessary
-        $smtpParams = @{
-            SmtpServer = $SMTP_SERVER
-            Port = $SMTP_PORT
-            From = $EMAIL_FROM
-            To = $EMAIL_TO
-            Subject = $emailSubject
-            Body = $emailBody
-            Encoding = [System.Text.Encoding]::UTF8
-        }
-        
-        if ($SMTP_USE_SSL) {
-            $smtpParams.UseSsl = $true
-        }
-        
-        # Upload encrypted credentials if they exist
-        if (Test-Path $EMAIL_CREDENTIAL_FILE) {
-            $credential = Import-Clixml -Path $EMAIL_CREDENTIAL_FILE
-            $smtpParams.Credential = $credential
-        } else {
+        # Validate email configuration
+        if ([string]::IsNullOrWhiteSpace($EMAIL_TO)) {
+            Write-Host "[WARN] NOTIFY_EMAIL environment variable not set. Email skipped." -ForegroundColor Yellow
+            Write-Host '[INFO] Set NOTIFY_EMAIL with: [Environment]::SetEnvironmentVariable("NOTIFY_EMAIL", "you@example.com", "User")' -ForegroundColor Cyan
+        } elseif (-not (Test-Path $EMAIL_CREDENTIAL_FILE)) {
             Write-Host "[WARN] Credential file not found: $EMAIL_CREDENTIAL_FILE" -ForegroundColor Yellow
-            Write-Host "[INFO] Run: .\setup-smtp-credentials.ps1 to configure" -ForegroundColor Cyan
-            throw "Credenziali SMTP mancanti"
+            Write-Host "[INFO] Run setup-smtp-credentials.ps1 to configure SMTP credentials" -ForegroundColor Cyan
+        } else {
+            # Force TLS 1.2 for modern SMTP relay compatibility
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            
+            $credential = Import-Clixml -Path $EMAIL_CREDENTIAL_FILE
+            
+            $smtp = New-Object System.Net.Mail.SmtpClient($SMTP_SERVER, $SMTP_PORT)
+            $smtp.EnableSsl = $SMTP_USE_SSL
+            $smtp.Credentials = $credential
+            $smtp.Timeout = 30000
+            
+            $mailMessage = New-Object System.Net.Mail.MailMessage($EMAIL_FROM, $EMAIL_TO, $emailSubject, $emailBody)
+            $mailMessage.BodyEncoding = [System.Text.Encoding]::UTF8
+            $mailMessage.SubjectEncoding = [System.Text.Encoding]::UTF8
+            
+            try {
+                $smtp.Send($mailMessage)
+                Write-Host "[OK] Email sent to: $EMAIL_TO" -ForegroundColor Green
+                "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Email sent OK to $EMAIL_TO" | Out-File -FilePath $LOG_FILE -Append -Encoding UTF8
+            } catch {
+                Write-Host "[WARN] Failed to send email: $_" -ForegroundColor Yellow
+                "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Email FAILED: $_" | Out-File -FilePath $LOG_FILE -Append -Encoding UTF8
+            } finally {
+                $mailMessage.Dispose()
+                $smtp.Dispose()
+            }
         }
-        
-        Send-MailMessage @smtpParams -WarningAction SilentlyContinue
-        
-        Write-Host "[OK] Email inviata a: $EMAIL_TO" -ForegroundColor Green
         
     } catch {
         Write-Host "[WARN] Unable to send email: $_" -ForegroundColor Yellow
@@ -644,60 +561,65 @@ exit 0
         try {
             $emailSubject = "[CheckMK Backup] ERRORE - $TIMESTAMP"
             
-            $emailBody = @"
-===============================================================
-       BACKUP FALLITO - ERRORE CRITICO
-===============================================================
-
-Data e ora: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-Host: $env:COMPUTERNAME
-Repository: $REPO_PATH
-
----------------------------------------------------------------
-  DETTAGLIO ERRORE
----------------------------------------------------------------
-$GLOBAL_ERROR_MESSAGE
-
----------------------------------------------------------------
-  STACK TRACE
----------------------------------------------------------------
-$errorDetails
-
----------------------------------------------------------------
-  AZIONE RICHIESTA
----------------------------------------------------------------
-Verificare manualmente il sistema di backup.
-Log disponibile in: C:\CheckMK-Backups\logs\
-
-===============================================================
-  NOTIFICA AUTOMATICA DI ERRORE
-===============================================================
-
-Questo e un messaggio automatico generato dal sistema di backup.
-"@
+            $now = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+            $emailBody = ""
+            $emailBody += "===============================================================" + "`n"
+            $emailBody += "       BACKUP FALLITO - ERRORE CRITICO" + "`n"
+            $emailBody += "===============================================================" + "`n"
+            $emailBody += "" + "`n"
+            $emailBody += "Data e ora: $now" + "`n"
+            $emailBody += "Host: $env:COMPUTERNAME" + "`n"
+            $emailBody += "Repository: $REPO_PATH" + "`n"
+            $emailBody += "" + "`n"
+            $emailBody += "---------------------------------------------------------------" + "`n"
+            $emailBody += "  DETTAGLIO ERRORE" + "`n"
+            $emailBody += "---------------------------------------------------------------" + "`n"
+            $emailBody += "$GLOBAL_ERROR_MESSAGE" + "`n"
+            $emailBody += "" + "`n"
+            $emailBody += "---------------------------------------------------------------" + "`n"
+            $emailBody += "  STACK TRACE" + "`n"
+            $emailBody += "---------------------------------------------------------------" + "`n"
+            $emailBody += "$errorDetails" + "`n"
+            $emailBody += "" + "`n"
+            $emailBody += "---------------------------------------------------------------" + "`n"
+            $emailBody += "  AZIONE RICHIESTA" + "`n"
+            $emailBody += "---------------------------------------------------------------" + "`n"
+            $emailBody += "Verificare manualmente il sistema di backup." + "`n"
+            $emailBody += "Log disponibile in: C:CheckMK-Backupslogs" + "`n"
+            $emailBody += "" + "`n"
+            $emailBody += "===============================================================" + "`n"
+            $emailBody += "  NOTIFICA AUTOMATICA DI ERRORE" + "`n"
+            $emailBody += "===============================================================" + "`n"
+            $emailBody += "" + "`n"
+            $emailBody += "Questo e un messaggio automatico generato dal sistema di backup." + "`n"
             
-            $smtpParams = @{
-                SmtpServer = $SMTP_SERVER
-                Port = $SMTP_PORT
-                From = $EMAIL_FROM
-                To = $EMAIL_TO
-                Subject = $emailSubject
-                Body = $emailBody
-                Encoding = [System.Text.Encoding]::UTF8
-            }
-            
-            if ($SMTP_USE_SSL) {
-                $smtpParams.UseSsl = $true
-            }
-            
-            if (Test-Path $EMAIL_CREDENTIAL_FILE) {
-                $credential = Import-Clixml -Path $EMAIL_CREDENTIAL_FILE
-                $smtpParams.Credential = $credential
+            if (-not [string]::IsNullOrWhiteSpace($EMAIL_TO) -and (Test-Path $EMAIL_CREDENTIAL_FILE)) {
+                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
                 
-                Send-MailMessage @smtpParams -WarningAction SilentlyContinue
-                Write-Host "[OK] Error email sent to: $EMAIL_TO" -ForegroundColor Green
+                $credential = Import-Clixml -Path $EMAIL_CREDENTIAL_FILE
+                
+                $smtp = New-Object System.Net.Mail.SmtpClient($SMTP_SERVER, $SMTP_PORT)
+                $smtp.EnableSsl = $SMTP_USE_SSL
+                $smtp.Credentials = $credential
+                $smtp.Timeout = 30000
+                
+                $mailMessage = New-Object System.Net.Mail.MailMessage($EMAIL_FROM, $EMAIL_TO, $emailSubject, $emailBody)
+                $mailMessage.BodyEncoding = [System.Text.Encoding]::UTF8
+                $mailMessage.SubjectEncoding = [System.Text.Encoding]::UTF8
+                
+                try {
+                    $smtp.Send($mailMessage)
+                    Write-Host "[OK] Error email sent to: $EMAIL_TO" -ForegroundColor Green
+                    "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Error email sent OK to $EMAIL_TO" | Out-File -FilePath $LOG_FILE -Append -Encoding UTF8
+                } catch {
+                    Write-Host "[WARN] Failed to send error email: $_" -ForegroundColor Yellow
+                    "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Error email FAILED: $_" | Out-File -FilePath $LOG_FILE -Append -Encoding UTF8
+                } finally {
+                    $mailMessage.Dispose()
+                    $smtp.Dispose()
+                }
             } else {
-                Write-Host "[WARN] Unable to send email: missing credentials" -ForegroundColor Yellow
+                Write-Host "[WARN] Unable to send error email: missing credentials or NOTIFY_EMAIL" -ForegroundColor Yellow
             }
             
         } catch {
