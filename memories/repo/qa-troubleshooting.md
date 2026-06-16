@@ -1,5 +1,95 @@
 # Q&A Troubleshooting - checkmk-tools
 
+## 2026-06-16 - PING service rules lost after cmk-update-config on srv-monitoring-us
+
+**Q:** Le regole WATO per il servizio PING (max_check_attempts, retry_interval) create nel folder "Main" vengono perse dopo un `cmk-update-config`. Come verificare se le regole sono attive e come prevenirne la perdita?
+
+**A:** Le regole create via WATO vengono registrate nell'audit log (`wato_audit.log`) ma possono essere perse se:
+1. Vengono create in una sessione WATO
+2. Vengono attivate (snapshot + activate-changes)
+3. Successivamente un `cmk-update-config` (eseguito da system/user `-`) rigenera la configurazione
+
+**Verifica se le regole sono attive:**
+```bash
+# 1. Controlla se la regola esiste nel rules.mk attuale
+grep "<rule_id>" /omd/sites/monitoring/etc/check_mk/conf.d/wato/rules.mk
+
+# 2. Controlla se la regola è nell'audit log
+grep "<rule_id>" /omd/sites/monitoring/var/check_mk/wato/log/wato_audit.log
+
+# 3. Controlla se la regola è in uno snapshot
+tar xzf /omd/sites/monitoring/var/check_mk/wato/snapshots/wato-snapshot-*.tar
+tar xzf check_mk.tar.gz
+grep -r "<rule_id>" .
+
+# 4. Verifica la configurazione Nagios effettiva
+su - monitoring -c "cmk -N <hostname>" | grep -A 10 "define service {"
+```
+
+**Prevenzione:** Dopo aver creato regole WATO, verificare immediatamente con `cmk -N <host>` che appaiano nella configurazione Nagios generata. Se il `cmk-update-config` le sovrascrive, ricrearle e riattivarle.
+
+**Sintomo chiave:** `config-generation.mk` mostra un numero di pending changes > 0 anche dopo l'attivazione.
+
+## 2026-06-16 - Aggiunto notification_interval=480 a regola notifica Marca_Tempi
+
+**Q:** Come limitare le notifiche ripetute per un host group in Checkmk senza modificare le regole di notifica via WATO?
+
+**A:** Aggiungere manualmente `notification_interval` (in minuti) alla regola di notifica nel file `notifications.mk`.
+
+```bash
+# Backup
+cp notifications.mk notifications.mk.bak.$(date +%Y-%m-%d_%H%M%S)
+chown monitoring:monitoring notifications.mk.bak.*
+
+# Modifica con Python (sed non gestisce bene le virgolette nidificate)
+python3 << 'PYEOF'
+with open('notifications.mk', 'r') as f:
+    content = f.read()
+old = "{...regola esistente...}"
+new = "{...regola con notification_interval: 480...}"
+content = content.replace(old, new)
+with open('notifications.mk', 'w') as f:
+    f.write(content)
+PYEOF
+
+# Attivazione
+su - monitoring -c "cmk -U"    # genera configurazione
+su - monitoring -c "cmk -O"    # ricarica core
+```
+
+**Valore:** `notification_interval=480` = 8 ore. Con notification_interval=480, un host che va DOWN riceve max 1 notifica iniziale + 1 ripetuta ogni 8 ore + 1 recovery. Con 3 DOWN/giorno → max 6 notifiche (3 DOWN + 3 UP).
+
+**Differenza tra notification_interval e altri parametri:**
+- `notification_interval`: controlla le NOTIFICHE RIPETUTE mentre il problema persiste
+- `max_check_attempts`: controlla quanti SOFT check prima di HARD state
+- `retry_interval`: controlla ogni quanto ripetere i SOFT check
+
+## 2026-06-16 - Comparative audit di alert time-clock su srv-monitoring-us
+
+**Q:** Come condurre un audit comparativo read-only degli alert Checkmk prima/dopo un cambio configurazione, analizzando Nagios archives, WATO audit log, notification log e configurazione effettiva?
+
+**A:** Workflow completo per audit read-only:
+
+1. **Trova il timestamp del cambio configurazione** → WATO audit log (`wato_audit.log`), cercare `edit-rule` con `max_check_attempts` o `PING`
+2. **Verifica configurazione effettiva** → `cmk -N <host>` per vedere i parametri Nagios reali; `rules.mk` per le regole WATO
+3. **Analizza eventi Nagios** → Cercare `HOST ALERT`, `SERVICE ALERT`, `NOTIFICATION` negli archivi (`var/nagios/archive/`)
+4. **Conteggio per periodi** → Usare `awk -F'[][]' '$2 >= <timestamp_start> && $2 < <timestamp_end>'` per filtrare per timestamp
+5. **Classificazione HARD vs SOFT** → `grep "HARD\|SOFT"` per distinguere stati reali da transienti
+6. **Correlazione PING + host DOWN** → Eventi entro 5 minuti = stesso incidente
+7. **Verifica regole notifica** → `notifications.mk` per capire amplificazione notifiche
+
+**Comandi chiave:**
+```bash
+# Estrai eventi per periodo
+awk -F'[][]' '$2 >= 1779148800 && $2 < 1779753600' /tmp/events.txt | grep "HOST ALERT"
+
+# Conteggio per host
+grep -oP "marcatempo-\w+" events.txt | sort | uniq -c | sort -rn
+
+# Verifica regole notifica
+cat /omd/sites/monitoring/etc/check_mk/conf.d/wato/notifications.mk
+```
+
 ## 2026-06-13 - Pacchetti check-mk-raw half-configured (iF) bloccano apt su srv-monitoring-us
 
 **Q:** upgrade_checkmk.py installa il .deb ma la post-installation fallisce, lasciando il pacchetto in stato `iF` (half-configured) che blocca dpkg/apt. Come prevenirlo?
