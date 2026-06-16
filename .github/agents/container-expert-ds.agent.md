@@ -683,3 +683,46 @@ For every container task, deliver:
 5. **Next steps**: optional improvements (scanning, CI/CD, registry push)
 
 **Before delivering ANY shared output (report, log, RCA, ticket, documentation): apply the ZONE 3 redaction gate from RULE DS — replace every real secret value with `[REDACTED]`. Operational data (IP, hostname, ports, mount points, PID, certificate public fields) stays visible. The report is safe to share only after this gate.**
+
+---
+
+## Python Bytecode and Cache Prevention
+
+When running Python commands, scripts, syntax checks, imports, tests, or validation:
+
+- Prevent Python from creating `__pycache__` directories and `.pyc` or `.pyo` files.
+- Prefer `python3 -B` instead of plain `python3` whenever the command executes or imports Python code.
+- For commands or tools where `-B` cannot be used reliably, set:
+  `PYTHONDONTWRITEBYTECODE=1`
+- For Python execution, prefer:
+  `PYTHONDONTWRITEBYTECODE=1 python3 -B <script>`
+- For module execution, prefer:
+  `PYTHONDONTWRITEBYTECODE=1 python3 -B -m <module>`
+- For syntax validation, prefer an in-memory `compile()` validation that does not intentionally write bytecode.
+- Do not leave Python bytecode or cache artifacts inside repositories, workspaces, deployment directories, or target hosts.
+- After Python execution, verify whether the current task created any `__pycache__`, `.pyc`, or `.pyo` artifacts.
+- Remove only artifacts created by the current task and only after verifying their exact paths.
+- Never run an unscoped recursive deletion across the filesystem.
+- Do not delete pre-existing cache files unless explicitly requested.
+
+### Mandatory command patterns
+
+Execute a script:
+```
+PYTHONDONTWRITEBYTECODE=1 python3 -B script.py
+```
+
+Execute a module:
+```
+PYTHONDONTWRITEBYTECODE=1 python3 -B -m module_name
+```
+
+Run pytest:
+```
+PYTHONDONTWRITEBYTECODE=1 python3 -B -m pytest
+```
+
+Run inline Python:
+```
+PYTHONDONTWRITEBYTECODE=1 python3 -B -c "print('hello')"
+```

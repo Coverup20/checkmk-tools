@@ -8,7 +8,8 @@
 
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 
 # Personal preferences (not for public repo)
 .copilot-preferences.md
