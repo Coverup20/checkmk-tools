@@ -195,7 +195,7 @@ systemctl restart checkmk-SITENAME
 env | grep NOTIFY_HOSTLABEL
 
 # Script debugging
-python3 -c "
+PYTHONDONTWRITEBYTECODE=1 python3 -B -c "
 import os
 real_ip = os.environ.get('NOTIFY_HOSTLABEL_real_ip')
 print(f'Real IP found: {real_ip}')

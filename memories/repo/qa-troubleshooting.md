@@ -204,7 +204,7 @@ cp rules.mk rules.mk.backup_$(date +%Y%m%d_%H%M%S)
 sed -i "s/('<UUID>', {'update_host_labels': ...})/(0, {'update_host_labels': ...})/" rules.mk
 
 # 3. Verifica sintassi Python
-su - monitoring -c "python3 -c \"
+su - monitoring -c "PYTHONDONTWRITEBYTECODE=1 python3 -B -c \"
 with open('etc/check_mk/conf.d/wato/rules.mk') as f:
     compile(f.read(), 'rules.mk', 'exec')
     print('SYNTAX OK')
@@ -241,7 +241,7 @@ echo "[$NOW] PROCESS_SERVICE_CHECK_RESULT;fw.studiopaci.info;Check_MK Discovery;
 **Note:**
 - `PROCESS_SERVICE_CHECK_RESULT` è l'unico comando nagios pipe sicuro — NON usare `ENABLE/DISABLE_SVC_CHECK`
 - Nagios processa il pipe entro pochi secondi — logga `SERVICE ALERT: ...;OK;HARD;1;...`
-- Dopo il fix, verificare con: `su - monitoring -c "python3 -c 'import socket; s=socket.socket(socket.AF_UNIX); s.connect(\"/omd/sites/monitoring/tmp/run/live\"); s.send(b\"GET services\\nFilter: host_name = <host>\\nFilter: description = <service>\\nColumns: state plugin_output\\n\\n\"); s.shutdown(socket.SHUT_WR); print(s.makefile().read().strip())'"`
+- Dopo il fix, verificare con: `su - monitoring -c "PYTHONDONTWRITEBYTECODE=1 python3 -B -c 'import socket; s=socket.socket(socket.AF_UNIX); s.connect(\"/omd/sites/monitoring/tmp/run/live\"); s.send(b\"GET services\\nFilter: host_name = <host>\\nFilter: description = <service>\\nColumns: state plugin_output\\n\\n\"); s.shutdown(socket.SHUT_WR); print(s.makefile().read().strip())'"`
 
 ---
 
@@ -256,3 +256,237 @@ echo "[$NOW] PROCESS_SERVICE_CHECK_RESULT;fw.studiopaci.info;Check_MK Discovery;
 - DOPO ogni backup → `chown monitoring:monitoring /path/to/backup/file`
 - Verificare sempre con `ls -la` dopo aver creato file
 - Il file originale (`rules.mk`) era già `monitoring:monitoring` per fortuna — ma il backup no
+
+---
+
+## 2026-06-18 - Diagnosi alert Virtual memory (Committed_AS) su srv-monitoring-us
+
+**Q:** Il servizio CheckMK "Memory" su srv-monitoring-us va in WARNING/CRITICAL per "Committed: XX% virtual memory". Cosa significa e come si diagnostica?
+
+**A:** L'alert misura **Committed_AS** da `/proc/meminfo` — NON è RAM né swap. Committed_AS è la quantità di spazio di indirizzi virtuali che il kernel ha promesso ai processi. Su un server di monitoring, il core Nagios fork periodicamente figli per eseguire check. Ogni figlio eredita via fork il VSZ del padre (~1.5 GiB). Durante i picchi di check execution, `Committed_AS` può superare il 100% di RAM+swap anche se il sistema ha MemAvailable >60% e swap inutilizzato.
+
+**Sintomi:**
+- Servizio Memory mostra WARNING/CRITICAL per `Committed: >100%`
+- RAM e swap sono ampiamente disponibili (MemAvailable >50%, swap <1% used)
+- Committed_AS oscilla violentemente (es. 4 GiB → 19 GiB → 6 GiB in minuti)
+- Figli Nagios con VSX 1.5 GiB appaiono/scompaiono sincronizzati coi check
+
+**Diagnosi:**
+```bash
+# 1. Verificare se è un falso positivo da fork
+ssh srv-monitoring-us "awk '/Committed_AS/{printf \"%.1f GiB\\n\", \$2/1024/1024}' /proc/meminfo"
+ssh srv-monitoring-us "pgrep -P \$(pgrep -f 'bin/nagios' | head -1) | wc -l"
+
+# 2. Verificare stato reale della memoria
+ssh srv-monitoring-us "free -h; echo '---'; grep MemAvailable /proc/meminfo"
+
+# 3. Vedere cronologia alert
+ssh srv-monitoring-us "grep 'Memory.*ALERT' /omd/sites/monitoring/var/log/nagios.log | tail -10"
+```
+
+**Soluzione:**
+- Aumentare le soglie CheckMK: WARN al 200%, CRIT al 300% del total (RAM+swap)
+- Oppure ignorare l'alert se non ci sono sintomi reali (swap usage, OOM killer, RSS elevata)
+- `vm.overcommit_memory` e `vm.swappiness` NON vanno modificati
+- Swap NON va aumentato
+- Nessun processo leaky — è normale comportamento del fork model di Nagios
+
+---
+
+## 2026-06-17 - Definizione ed applicazione delle soglie di service e host flap su srv-monitoring-us
+
+**Q:** Come modificare le soglie di flapping per servizi ed host in modo che siano persistenti ed applicate al core Nagios?
+
+**A:** Modificare le opzioni all'interno di `/omd/sites/monitoring/etc/nagios/nagios.d/flapping.cfg` da utente `monitoring`, assicurandosi di preservare l'owner `monitoring:monitoring`, quindi eseguire il reload del Core.
+
+**Modifica dei parametri per servizi ed host:**
+```bash
+# 1. Backup chirurgico prima delle modifiche
+TS=$(date +%Y-%m-%d_%H%M%S)
+cp /omd/sites/monitoring/etc/nagios/nagios.d/flapping.cfg /omd/sites/monitoring/etc/nagios/nagios.d/flapping.cfg.bak.$TS
+chown monitoring:monitoring /omd/sites/monitoring/etc/nagios/nagios.d/flapping.cfg.bak.$TS
+
+# 2. Modifica delle righe di service flapping da 20/40 a 10/25
+sed -i "s/^low_service_flap_threshold=.*/low_service_flap_threshold=10.0/" /omd/sites/monitoring/etc/nagios/nagios.d/flapping.cfg
+sed -i "s/^high_service_flap_threshold=.*/high_service_flap_threshold=25.0/" /omd/sites/monitoring/etc/nagios/nagios.d/flapping.cfg
+
+# 3. Modifica delle righe di host flapping da 20/40 a 10/25
+sed -i "s/^low_host_flap_threshold=.*/low_host_flap_threshold=10.0/" /omd/sites/monitoring/etc/nagios/nagios.d/flapping.cfg
+sed -i "s/^high_host_flap_threshold=.*/high_host_flap_threshold=25.0/" /omd/sites/monitoring/etc/nagios/nagios.d/flapping.cfg
+
+# 4. Rigenerazione ed attivazione configurazione core Nagios
+su - monitoring -c "cmk -O"
+```
+
+**Verifica:**
+```bash
+grep -E "threshold" /omd/sites/monitoring/etc/nagios/nagios.d/flapping.cfg
+```
+
+---
+
+## 2026-06-17 - Threshold flapping data-driven su srv-monitoring-us (90gg di log)
+
+**Q:** Quali soglie di flapping usare su srv-monitoring-us basate sui dati reali di 90 giorni?
+
+**A:** Dopo analisi di 3048 eventi START e 3040 eventi STOP nei log Nagios:
+
+| | Cluster globale (~50%) | Cluster custom (~50%) |
+|---|---|---|
+| START host | ~43.2% | ~23% |
+| STOP host | ~17.4% | ~3.8% |
+| START service | ~43.2% | ~20.3% |
+| STOP service | ~17.4% | ~3.8% |
+
+**Scelta finale: LOW=15.0, HIGH=30.0 per host e service.**
+
+- 30% dimezza il gap dai 40 precedenti — cattura flapping ~13 punti % prima
+- 15% è vicino ai 17.4 dove già si ferma il cluster globale — non allunga lo stato
+- 15 punti di banda = stessa ampiezza dei default storici Nagios (5/20)
+- Simmetrico host/service per semplicità
+
+**Config applicata su:** checkmk-vps-02-c (test) e srv-monitoring-us (prod)
+
+**Comandi:**
+```bash
+sed -i "s/^low_service_flap_threshold=.*/low_service_flap_threshold=15.0/" flapping.cfg
+sed -i "s/^high_service_flap_threshold=.*/high_service_flap_threshold=30.0/" flapping.cfg
+sed -i "s/^low_host_flap_threshold=.*/low_host_flap_threshold=15.0/" flapping.cfg
+sed -i "s/^high_host_flap_threshold=.*/high_host_flap_threshold=30.0/" flapping.cfg
+chown monitoring:monitoring flapping.cfg
+su - monitoring -c "cmk -O"
+```
+
+**Verifica attiva:**
+```bash
+grep -E "threshold" /omd/sites/monitoring/tmp/nagios/nagios.cfg
+```
+
+---
+
+## 2026-06-18 - Analisi 90gg marcatempo: flap mai partito, regole PING speciali e notification_interval assenti
+
+**Q:** Dopo aver cambiato le soglie flap da 20/40 a 15/30 su srv-monitoring-us, l'analisi dei log mostra zero eventi flap e nessuna riduzione delle notifiche. Perché?
+
+**A:** Tre cause identificate:
+
+### 1. Flap non si attiva perché i marcatempo non flappano abbastanza
+
+Nonostante Colibri abbia 338 HARD DOWN in 55gg (~6/giorno), gli eventi DOWN sono distribuiti su intervalli di ore, non minuti. La percentuale di cambio stato nella finestra di 20 check (~100 minuti per host check) raramente supera la soglia. Eventi flap erano stati registrati ad aprile-maggio con vecchie soglie 20/40, con percentuali del 20-23% (appena sopra). A giugno non ci sono state finestre di instabilità sufficientemente rapide.
+
+### 2. Regole PING speciali per farmacia/palazzetto NON ATTIVE
+
+Create in WATO il 2026-06-12 (audit log: `extra_service_conf:max_check_attempts` value=3, `extra_service_conf:retry_interval` value=2.0), mai attivate nel Nagios runtime. Tutti i PING mostrano `max_check_attempts=1, check_interval=1, retry_interval=1` in LiveStatus.
+
+**Causa:** Le regole erano nel WATO database ma sono state perse dalla `rules.mk` attiva a causa del noto bug `cmk-update-config` (documentato 2026-06-16).
+
+### 3. notification_interval NON presente nelle regole notifica
+
+Nonostante la modifica documentata in qa-troubleshooting (aggiunta `notification_interval=480`), il file `notifications.mk` attualmente NON contiene `notification_interval` in nessuna regola. Le notifiche ripetute vengono generate a ogni ciclo di notifica (default 1 minuto) finché il problema persiste.
+
+### 4. Flap nei log Nagios usa STARTED/STOPPED, non START/STOP
+
+```bash
+# CORRETTO — i log Nagios usano STARTED e STOPPED
+grep "HOST FLAPPING ALERT.*marcatempo.*STARTED\|STOPPED" /omd/sites/monitoring/var/log/nagios.log
+
+# ERRATO — nessun match
+grep "HOST FLAPPING ALERT.*marcatempo.*START\|STOP" /omd/sites/monitoring/var/log/nagios.log
+```
+
+Esempio di linea reale:
+```
+[1776974920] HOST FLAPPING ALERT: marcatempo-colibri;STARTED; Host appears to have started flapping (22.0% change > 20.0% threshold)
+[1776977610] HOST FLAPPING ALERT: marcatempo-colibri;STOPPED; Host appears to have stopped flapping (3.9% change < 5.0% threshold)
+```
+
+### Verifica regole non attive
+
+```bash
+# LiveStatus mostra max_check_attempts=1 per TUTTI i PING
+echo "GET services
+Columns: host_name description max_check_attempts retry_interval
+Filter: host_name = marcatempo-farmacia
+Filter: description = PING
+" | nc -U /omd/sites/monitoring/tmp/run/live
+# Output: marcatempo-farmacia;PING;1;1  ← dovrebbe essere 3;2
+
+# Verifica notification_interval nelle regole
+grep "notification_interval" /omd/sites/monitoring/etc/check_mk/conf.d/wato/notifications.mk
+# Nessun output = assente
+```
+
+### Verifica soglie flap attuali nel runtime
+
+```bash
+grep -E "threshold" /omd/sites/monitoring/tmp/nagios/nagios.cfg
+# Deve mostrare 15.0 e 30.0, NON 10.0 e 25.0
+```
+
+---
+
+## 2026-06-18 - Python cache cleanup su tutti i repo
+
+**Q:** Come pulire tutti gli artefatti Python cache (`__pycache__/`, `*.pyc`, `*.pyo`) dai repository locali e verificare che non vengano ricreati?
+
+**A:** Workflow completo in 8 fasi:
+
+**Fase 1 — Verifica repo:**
+```bash
+for PATH in "/mnt/c/Users/Marzio/.copilot" \
+  "/mnt/c/Users/Marzio/Desktop/CheckMK/checkmk-tools" \
+  "/mnt/c/Users/Marzio/Desktop/CheckMK/copilot-tools" \
+  "/mnt/c/Users/Marzio/Desktop/CheckMK/ns8-checkmk-agent" \
+  "/mnt/c/Users/Marzio/Desktop/CheckMK/ns8-checkmk-container" \
+  "/mnt/c/Users/Marzio/Desktop/alexa-chatgpt-skill" \
+  "/mnt/c/Users/Marzio/Desktop/CheckMK"; do
+  echo "--- $PATH ---"
+  [ -d "$PATH" ] && echo "EXISTS" || echo "MISSING"
+  git -C "$PATH" rev-parse --show-toplevel 2>/dev/null && \
+    echo "BRANCH: $(git -C "$PATH" branch --show-current)" && \
+    echo "STATUS:" && git -C "$PATH" status --short || echo "NOT A GIT REPO"
+done
+```
+
+**Fase 2 — Inventario read-only:**
+```bash
+find "$REPO" \
+  \( -path "$REPO/.git" -o -path "$REPO/.venv" -o -path "$REPO/venv" -o \
+     -path "$REPO/env" -o -path "$REPO/.tox" -o -path "$REPO/.nox" -o \
+     -path "$REPO/node_modules" \) -prune \
+  -o \( -type d -name '__pycache__' -o -type f \( -name '*.pyc' -o -name '*.pyo' \) \) -print
+```
+
+**Fase 3 — Rimozione:**
+```bash
+find "$REPO" \( ...prune... \) -o -type d -name '__pycache__' -print | while read d; do rm -rf "$d"; done
+```
+
+**Fase 4 — `.gitignore`:**
+```gitignore
+__pycache__/
+*.py[cod]
+*$py.class
+```
+
+**Fase 5 — Baseline:**
+```bash
+date '+%Y-%m-%d %H:%M:%S %Z'
+# Salvare report in /tmp/python-cache-baseline-<timestamp>.txt
+```
+
+**Fase 6 — Test ricorrenza:**
+```bash
+# Test A: safe invocation
+PYTHONDONTWRITEBYTECODE=1 python3 -B -c "print('ok')"
+
+# Test B: in-memory compile
+PYTHONDONTWRITEBYTECODE=1 python3 -B -c "compile(open('script.py').read(), 'script.py', 'exec')"
+```
+
+**Comandi shell utili:**
+```bash
+export PATH="/usr/bin:/usr/local/bin:/bin:/usr/sbin:$PATH"  # se PATH è corrotto
+git -C "$REPO" check-ignore -v -- "$REL_PATH"              # verificare se ignorato
+git -C "$REPO" ls-files --error-unmatch -- "$REL_PATH"      # verificare se tracked
+```

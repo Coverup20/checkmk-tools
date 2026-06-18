@@ -167,7 +167,7 @@ git push upstream --tags
 
 # 2. Validate syntax
 wsl bash -n script.sh           # Bash
-python3 -m py_compile script.py # Python
+PYTHONDONTWRITEBYTECODE=1 python3 -B -c "compile(open('script.py').read(), 'script.py', 'exec')" # Python
 
 # 3. Copy to test server directly (NO git push yet)
 scp script-check-ubuntu/full/check_service.py checkmk-vps-02:/tmp/check_service_test.py
@@ -640,7 +640,7 @@ git commit -m "fix: fixed command error"
 ┌──────────────────────────── ─────────────────────────────┐
 │ 2. SYNTAX TEST │
 │ Bash:   wsl bash -n script.sh │
-│ Python: python3 -m py_compile script.py │
+│ Python: PYTHONDONTWRITEBYTECODE=1 python3 -B -c "compile(open('script.py').read(), 'script.py', 'exec')" │
 │ Exit code MUST be 0 │
 └──────────────────────────── ─────────────────────────────┘
                          ↓
@@ -705,7 +705,7 @@ git commit -m "fix: fixed command error"
 # edit script-check-ubuntu/full/check_myservice.py
 
 #2. Syntax Test (from WSL terminal)
-python3 -m py_compile script-check-ubuntu/full/check_myservice.py # Exit: 0
+PYTHONDONTWRITEBYTECODE=1 python3 -B -c "compile(open('script-check-ubuntu/full/check_myservice.py').read(), 'script-check-ubuntu/full/check_myservice.py', 'exec')" # Exit: 0
 
 #3. Executability (bash/sh only — skip for .py)
 
@@ -1557,7 +1557,7 @@ vim script-check-ubuntu/full/check_service_name.py
 # Implement functionality with template above
 
 #2. Valid Python syntax
-python -m py_compile script-check-ubuntu/full/check_service_name.py
+PYTHONDONTWRITEBYTECODE=1 python3 -B -c "compile(open('script-check-ubuntu/full/check_service_name.py').read(), 'script-check-ubuntu/full/check_service_name.py', 'exec')"
 # EXIT CODE must be 0
 
 #3. Make executable and add to git
@@ -1621,7 +1621,7 @@ wsl -d kali-linux ssh <host> "check_mk_agent 2>/dev/null | grep ServiceName"
 
 **Test checklist before declaring conversion complete:**
 
-- Python syntax validation (py_compile)
+- Python syntax validation (in-memory compile — avoids bytecode)
 - Full script execution on remote host
 - CheckMK compatible output format (`<STATE> <SERVICE> - <msg>`)
 - Check appears in `check_mk_agent` output

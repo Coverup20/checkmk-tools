@@ -2,8 +2,9 @@
 """check_dhcp_leases.py - CheckMK local check DHCP leases per pool (pure Python).
 
 A separate CheckMK service for each DHCP pool active on NethSecurity 8.
-Reads configuration from UCI (dhcp + network) and counts leases from /tmp/dhcp.leases
-mapping each IP to the membership pool via IP range.
+Reads configuration from UCI (dhcp + network) and resolves the active lease file
+from dnsmasq configuration, supporting both /tmp/dhcp.leases (volatile) and
+/mnt/data/dnsmasq/dhcp.leases (persistent storage, NethSecurity >= 8.8).
 
 Version: 2.0.0"""
 
@@ -13,8 +14,8 @@ import sys
 import time
 from pathlib import Path
 
-VERSION = "2.0.4"
-LEASE_FILE = Path("/tmp/dhcp.leases")
+VERSION = "2.1.0"
+LEASE_SOURCE = None  # resolved at runtime by resolve_lease_file()
 
 
 def uci_show_parsed(section: str) -> dict:
@@ -122,12 +123,58 @@ def get_interface_network(iface: str) -> str | None:
     return None
 
 
-def read_leases() -> list:
-    """Reads /tmp/dhcp.leases and returns list of (expire_ts: int, ip: str)."""
-    if not LEASE_FILE.exists():
-        return []
+def resolve_lease_file():
+    """Determine the active dnsmasq lease file using authoritative sources.
+
+    Resolution order:
+    1. Read UCI dhcp.ns_dnsmasq.leasefile (authoritative dnsmasq config).
+    2. If UCI unavailable, check /mnt/data (persistent storage) fallback.
+    3. Final fallback to /tmp/dhcp.leases.
+    Returns (Path, source_description) or (None, error_message).
+    """
+    # Method 1: authoritative UCI config
+    try:
+        rc = subprocess.run(
+            ["uci", "get", "dhcp.ns_dnsmasq.leasefile"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            text=True, check=False
+        )
+        if rc.returncode == 0:
+            path = rc.stdout.strip().strip("'")
+            p = Path(path)
+            if p.is_absolute() and p.is_file():
+                return p, str(p)
+    except Exception:
+        pass
+
+    # Method 2: persistent storage (NethSecurity >= 8.8) — check via /proc/mounts
+    try:
+        mounts = Path("/proc/mounts").read_text()
+        if " /mnt/data " in mounts:
+            p = Path("/mnt/data/dnsmasq/dhcp.leases")
+            if p.is_file():
+                return p, str(p)
+    except Exception:
+        pass
+
+    # Method 3: fallback to volatile /tmp
+    p = Path("/tmp/dhcp.leases")
+    if p.is_file():
+        return p, str(p)
+
+    # No lease file found
+    return None, "no lease file found (checked UCI, /mnt/data, /tmp)"
+
+
+def read_leases():
+    """Reads the resolved lease file and returns list of (expire_ts: int, ip: str)."""
+    lf, src = resolve_lease_file()
+    if lf is None:
+        return [], src
+    if not lf.exists():
+        return [], src
     leases = []
-    for line in LEASE_FILE.read_text(encoding="utf-8", errors="ignore").splitlines():
+    for line in lf.read_text(encoding="utf-8", errors="ignore").splitlines():
         parts = line.split()
         if len(parts) < 3:
             continue
@@ -136,7 +183,7 @@ def read_leases() -> list:
         except ValueError:
             expire = 0
         leases.append((expire, parts[2]))
-    return leases
+    return leases, src
 
 
 def count_leases_in_pool(pool: dict, network_cidr: str, leases: list, now: int) -> tuple:
@@ -173,7 +220,10 @@ def main() -> int:
         print("1 DHCP.Leases - No active DHCP pool found")
         return 0
 
-    leases = read_leases()
+    leases, lease_source = read_leases()
+    if leases is None:
+        print(f"3 DHCP.Leases - UNKNOWN: {lease_source}")
+        return 0
     now = int(time.time())
 
     # Fix network CIDR for each pool, skip orphans silently,
@@ -211,6 +261,7 @@ def main() -> int:
         print(
             f"{status} DHCP.{name} active={active};{warn};{crit};0;{limit} "
             f"[{network_cidr}] Lease attivi: {active}/{limit} ({percent}%) - {status_text} "
+            f"source={lease_source} "
             f"| active={active} expired={expired} max={limit} percent={percent}"
         )
 

@@ -262,7 +262,7 @@ omd reload monitoring
 
 **Rules to follow when editing rules.mk directly:**
 
-- Always generate a fresh UUID for the `'id'` field (use `python3 -c "import uuid; print(uuid.uuid4())"`)
+- Always generate a fresh UUID for the `'id'` field (use `PYTHONDONTWRITEBYTECODE=1 python3 -B -c "import uuid; print(uuid.uuid4())"`)
 - Always backup before editing: `cp rules.mk rules.mk.backup_$(date +%Y-%m-%d_%H-%M-%S)`
 - Regex in conditions uses `'$regex'` key (not `'match_regex'` — that's API format only)
 - After editing run `cmk -O` to reload config without full restart

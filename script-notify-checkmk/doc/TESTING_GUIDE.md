@@ -44,7 +44,7 @@ chmod +x *.sh
 up - $(cat /etc/omd/site)
 
 # Manual test detection
-python3 -c "
+PYTHONDONTWRITEBYTECODE=1 python3 -B -c "
 import os, sys
 # Simulate FRP scenario
 os.environ['NOTIFY_HOSTADDRESS'] = '127.0.0.1:5000'  
@@ -160,7 +160,7 @@ LOGS:
 ls -la /omd/sites/*/local/share/check_mk/notifications/mail_realip_hybrid
 
 # Test Python syntax
-python3 -m py_compile /omd/sites/*/local/share/check_mk/notifications/mail_realip_hybrid
+PYTHONDONTWRITEBYTECODE=1 python3 -B -c "compile(open('/omd/sites/*/local/share/check_mk/notifications/mail_realip_hybrid').read(), '/omd/sites/*/local/share/check_mk/notifications/mail_realip_hybrid', 'exec')"
 
 # Verify environment variables in notification
 env | grep NOTIFY_ | head -10
