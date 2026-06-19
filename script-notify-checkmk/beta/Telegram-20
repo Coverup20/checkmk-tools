@@ -1,0 +1,946 @@
+#!/usr/bin/env python3
+# Telegram-20
+# Bulk: yes
+# Telegram-20 is a beta Checkmk Telegram notification handler with an
+# audit-only fail2ban-style transition rate limiter and adaptive
+# learning for HOST STATE and SERVICE STATE PING notifications.
+#
+# Mode audit (default):  every notification is sent; the rate-limit decision
+#                         is calculated and logged but never enforced.
+#
+# Version: 1.0.0-beta
+
+import os
+import sys
+import json
+import time
+import math
+import fcntl
+import shutil
+import logging
+import tempfile
+import argparse
+import urllib.parse
+import urllib.request
+import re as _re
+import socket as _socket
+from pathlib import Path
+
+SCRIPT_NAME = "Telegram-20"
+SCRIPT_DESCRIPTION = (
+    "Telegram-20 is a beta Checkmk Telegram notification handler with an "
+    "audit-only fail2ban-style transition rate limiter and adaptive "
+    "learning for HOST STATE and SERVICE STATE PING notifications."
+)
+VERSION = "1.0.0-beta"
+
+# ---------------------------------------------------------------------------
+# Configuration — defaults
+# ---------------------------------------------------------------------------
+CONFIG = {
+    "mode": "audit",
+    "host_state": {
+        "enabled": True,
+        "observation_window": 1800,
+        "trigger_transitions": 4,
+        "suppression_time": 3600,
+    },
+    "service_state_ping": {
+        "enabled": True,
+        "observation_window": 1800,
+        "trigger_transitions": 6,
+        "suppression_time": 3600,
+    },
+    "adaptive": {
+        "enabled": True,
+        "mode": "learning",
+        "minimum_learning_days": 14,
+        "minimum_transition_samples": 20,
+        "recalculate_every_hours": 24,
+        "percentile": 95,
+        "safety_margin": 2,
+        "auto_apply": False,
+    },
+}
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+OMD_ROOT = os.environ.get("OMD_ROOT", "")
+STATE_DIR = os.environ.get(
+    "NOTIFY_RATE_LIMIT_STATE_DIR",
+    os.path.join(OMD_ROOT, "var", "check_mk", "Telegram-20"),
+)
+LOG_DIR = os.environ.get(
+    "NOTIFY_RATE_LIMIT_LOG_DIR",
+    os.path.join(OMD_ROOT, "var", "log"),
+)
+_HERE = Path(__file__).resolve().parent
+CONFIG_PATH = str(_HERE / "Telegram-20-config.json")
+
+CONFIG_PATH = os.environ.get(
+    "NOTIFY_RATE_LIMIT_CONFIG",
+    CONFIG_PATH,
+)
+
+# ---------------------------------------------------------------------------
+# Telegram transport constants
+# ---------------------------------------------------------------------------
+CMK_URL = os.environ.get("CMK_URL", "")
+
+_ISP_PTR = _re.compile(
+    r'\d{1,3}[.\-]\d{1,3}[.\-]\d{1,3}[.\-]\d{1,3}'
+    r'|\.ppp\.|\.dsl\.|\.cable\.|\.pool\.|\.dynamic\.'
+    r'|\.adsl\.|\.broadband\.'
+    r'|^(res|host|static|ip|ptr|dsl|cable|broadband|dynamic|pool|user|client|customer)[.\-_]',
+    _re.IGNORECASE,
+)
+
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+
+def setup_logger():
+    log = logging.getLogger(SCRIPT_NAME)
+    log.setLevel(logging.DEBUG)
+    log.handlers.clear()
+    fmt = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    if LOG_DIR and os.path.isdir(LOG_DIR):
+        log_path = os.path.join(LOG_DIR, f"{SCRIPT_NAME}.log")
+        handler = logging.FileHandler(log_path)
+    else:
+        handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(fmt)
+    log.addHandler(handler)
+    return log
+
+
+LOG = setup_logger()
+
+
+# ---------------------------------------------------------------------------
+# Configuration loading
+# ---------------------------------------------------------------------------
+
+def _deep_merge(base, overlay):
+    for key, val in overlay.items():
+        if key in base and isinstance(base[key], dict) and isinstance(val, dict):
+            _deep_merge(base[key], val)
+        else:
+            base[key] = val
+
+
+def load_config():
+    cfg = json.loads(json.dumps(CONFIG))
+    path = Path(CONFIG_PATH)
+    if not path.is_file():
+        LOG.debug("Config file %s not found — using defaults", CONFIG_PATH)
+        return cfg
+    try:
+        data = json.loads(path.read_text())
+        if not isinstance(data, dict):
+            LOG.warning("Config file %s: root is not a dict — using defaults", CONFIG_PATH)
+            return cfg
+        _deep_merge(cfg, data)
+        adaptive = cfg.get("adaptive", {})
+        if adaptive.get("mode") not in ("learning", None):
+            LOG.warning("Unsupported adaptive.mode=%r — forcing learning", adaptive.get("mode"))
+            adaptive["mode"] = "learning"
+        if adaptive.get("auto_apply", False):
+            LOG.warning("adaptive.auto_apply=true is not supported — forcing false")
+            adaptive["auto_apply"] = False
+        if cfg.get("mode") != "audit":
+            LOG.warning("mode=%s is not supported — forcing audit", cfg.get("mode"))
+            cfg["mode"] = "audit"
+        LOG.info("Configuration loaded from %s", CONFIG_PATH)
+    except (json.JSONDecodeError, OSError) as exc:
+        LOG.warning("Cannot load config %s: %s — using defaults", CONFIG_PATH, exc)
+    return cfg
+
+
+CFG = load_config()
+
+
+# ---------------------------------------------------------------------------
+# Telegram Transport
+# ---------------------------------------------------------------------------
+
+def _cmk_url_valid(url):
+    return bool(url) and url.startswith(("http://", "https://")) and "<" not in url
+
+
+def get_reverse_dns_url():
+    try:
+        req = urllib.request.Request("https://api.ipify.org")
+        req.add_header("User-Agent", "Telegram-20-Notifier")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            public_ip = resp.read().decode().strip()
+        hostname = _socket.gethostbyaddr(public_ip)[0]
+        if hostname and not _ISP_PTR.search(hostname):
+            return f"https://{hostname}/monitoring"
+    except Exception:
+        pass
+    return None
+
+
+def get_status_prefix(state):
+    s = state.upper()
+    if s in ("OK", "UP"):
+        return "\U0001f7e2 [OK]"
+    if s in ("WARN", "WARNING"):
+        return "\U0001f7e1 [WARN]"
+    if s in ("CRIT", "CRITICAL", "DOWN"):
+        return "\U0001f534 [CRIT]"
+    if s == "UNKNOWN":
+        return "\U0001f7e1 [UNKNOWN]"
+    return "[?]"
+
+
+def build_telegram_message(event, cmk_url_override=None):
+    """Build a Telegram message dict matching the production telegram script.
+
+    Returns (text, reply_markup) where text is the HTML message body and
+    reply_markup is a JSON-encoded inline keyboard or None.
+    """
+    hostname = event["hostname"]
+    real_ip = event.get("real_ip", event.get("host_address", ""))
+    output = event.get("output", "N/A")
+    button = None
+
+    url = cmk_url_override if cmk_url_override else CMK_URL
+    if not url:
+        url = get_reverse_dns_url() or "__NOT_EXPOSED__"
+
+    if event["is_host"]:
+        state = event["new_state"]
+        prefix = get_status_prefix(state)
+        text = (
+            f"{prefix} Host: {hostname}\n"
+            f"IP: {real_ip}\n"
+            f"Output: {output}"
+        )
+        if _cmk_url_valid(url):
+            host_link = f"{url}/check_mk/view.py?view_name=host&host={hostname}&site=monitoring"
+            button = json.dumps({"inline_keyboard": [[
+                {"text": "Host", "url": host_link},
+            ]]})
+        elif url == "__NOT_EXPOSED__":
+            button = json.dumps({"inline_keyboard": [[
+                {"text": "\U0001f512 Panel unreachable (server not exposed)",
+                 "callback_data": "not_exposed"},
+            ]]})
+    else:
+        state = event["new_state"]
+        service = event.get("service_desc", "SERVICE")
+        prefix = get_status_prefix(state)
+        text = (
+            f"{prefix} Servizio: {service}\n"
+            f"Host: {hostname} ({real_ip})\n"
+            f"Output: {output}"
+        )
+        if _cmk_url_valid(url):
+            svc_enc = urllib.parse.quote(service, safe='')
+            service_link = (
+                f"{url}/check_mk/view.py?view_name=service"
+                f"&host={hostname}&service={svc_enc}&site=monitoring"
+            )
+            host_link = (
+                f"{url}/check_mk/view.py?view_name=host"
+                f"&host={hostname}&site=monitoring"
+            )
+            button = json.dumps({"inline_keyboard": [[
+                {"text": "Servizio", "url": service_link},
+                {"text": "Host", "url": host_link},
+            ]]})
+        elif url == "__NOT_EXPOSED__":
+            button = json.dumps({"inline_keyboard": [[
+                {"text": "\U0001f512 Panel unreachable (server not exposed)",
+                 "callback_data": "not_exposed"},
+            ]]})
+
+    customer_name = os.environ.get("TELEGRAM_CUSTOMER_NAME", "")
+    if customer_name:
+        text = f"[{customer_name}] {text}"
+
+    return text, button
+
+
+def send_telegram(token, chat_id, text, reply_markup=None):
+    """Send a Telegram message via the Bot API.
+
+    Raises RuntimeError on API error.  Returns True on success.
+    Never logs the full bot URL (which contains the secret token).
+    """
+    if not token or not chat_id:
+        raise RuntimeError("TELEGRAM_TOKEN or TELEGRAM_CHAT_ID not set")
+
+    api_url = f"https://api.telegram.org/bot{token}/sendMessage"
+    params = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML",
+    }
+    if reply_markup is not None:
+        params["reply_markup"] = reply_markup
+
+    data = urllib.parse.urlencode(params).encode("utf-8")
+    req = urllib.request.Request(api_url, data=data, method="POST")
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        brief = exc.read().decode("utf-8", errors="replace")[:200]
+        raise RuntimeError(f"Telegram API HTTP {exc.code}: {brief}") from exc
+    except (urllib.error.URLError, OSError) as exc:
+        raise RuntimeError(f"Telegram connection error: {exc}") from exc
+
+    if '"ok":true' not in body and '"ok": true' not in body:
+        raise RuntimeError(f"Telegram API error: {body[:200]}")
+
+    sys.stdout.write("Telegram OK: message sent\n")
+
+
+# ---------------------------------------------------------------------------
+# Rate-limit state management
+# ---------------------------------------------------------------------------
+
+STATE_SCHEMA_VERSION = 2
+
+
+def get_state_path():
+    path = Path(STATE_DIR)
+    path.mkdir(parents=True, exist_ok=True)
+    return path / "state.json"
+
+
+def read_state(state_path):
+    try:
+        raw = state_path.read_bytes()
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            return data
+        LOG.warning("State file %s is not a dict — resetting", state_path)
+    except (FileNotFoundError, json.JSONDecodeError, OSError) as exc:
+        LOG.debug("Cannot read state %s: %s — starting fresh", state_path, exc)
+    return {}
+
+
+def write_state(state_path, state):
+    tmp = None
+    try:
+        fd, tmp_name = tempfile.mkstemp(
+            dir=str(state_path.parent),
+            prefix=".state_tmp_",
+        )
+        os.close(fd)
+        tmp = Path(tmp_name)
+        tmp.write_text(json.dumps(state, indent=2, sort_keys=True))
+        tmp.chmod(0o640)
+        shutil.move(str(tmp), str(state_path))
+    except Exception as exc:
+        LOG.error("Cannot write state file %s: %s", state_path, exc)
+        if tmp and tmp.exists():
+            tmp.unlink(missing_ok=True)
+        raise
+
+
+def get_lock_path(state_path):
+    return state_path.parent / "state.lock"
+
+
+class StateLock:
+    def __init__(self, lock_path):
+        self._lock_path = lock_path
+        self._fd = None
+
+    def __enter__(self):
+        self._lock_path.parent.mkdir(parents=True, exist_ok=True)
+        self._fd = self._lock_path.open("w")
+        fcntl.flock(self._fd.fileno(), fcntl.LOCK_EX)
+        return self
+
+    def __exit__(self, *exc_info):
+        if self._fd:
+            fcntl.flock(self._fd.fileno(), fcntl.LOCK_UN)
+            self._fd.close()
+            self._fd = None
+        self._lock_path.unlink(missing_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# State migration
+# ---------------------------------------------------------------------------
+
+def migrate_state(state):
+    sv = state.get("schema_version", 1)
+    if sv >= STATE_SCHEMA_VERSION:
+        return state
+    if sv == 1:
+        for hostname, rec in list(state.items()):
+            if hostname == "schema_version":
+                continue
+            if not isinstance(rec, dict):
+                continue
+            for cat in ("host_state", "service_state_ping"):
+                cat_rec = rec.get(cat)
+                if isinstance(cat_rec, dict):
+                    if "adaptive" not in cat_rec:
+                        cat_rec["adaptive"] = _fresh_learning_record()
+        state["schema_version"] = 2
+        LOG.info("State schema migrated v1 → v2")
+    return state
+
+
+# ---------------------------------------------------------------------------
+# Transition tracking
+# ---------------------------------------------------------------------------
+
+def now():
+    return int(time.time())
+
+
+def classify_notification():
+    to_email = ""  # not used for Telegram
+    hostname = os.environ.get("NOTIFY_HOSTNAME", "Unknown")
+    site = os.environ.get("NOTIFY_OMD_SITE", "monitoring")
+    date = os.environ.get("NOTIFY_SHORTDATETIME", "")
+    host_address = os.environ.get("NOTIFY_HOSTADDRESS", "N/A")
+    real_ip = os.environ.get("NOTIFY_HOSTLABEL_real_ip", host_address)
+    frp = os.environ.get("NOTIFY_HOSTLABEL_frp_tunnel", "no")
+    output = os.environ.get("NOTIFY_HOSTOUTPUT", "N/A")
+    long_output = os.environ.get("NOTIFY_LONGHOSTOUTPUT", "")
+    service_desc = os.environ.get("NOTIFY_SERVICEDESC", "")
+
+    is_service = bool(service_desc) and not service_desc.startswith("$")
+
+    if is_service:
+        old_state = (
+            os.environ.get("NOTIFY_PREVIOUSSERVICEHARDSHORTSTATE")
+            or os.environ.get("NOTIFY_LASTSERVICESTATE", "OK")
+        )
+        new_state = (
+            os.environ.get("NOTIFY_SERVICESHORTSTATE")
+            or os.environ.get("NOTIFY_SERVICESTATE", "UNKNOWN")
+        )
+        output = os.environ.get("NOTIFY_SERVICEOUTPUT", "N/A")
+        long_output = os.environ.get("NOTIFY_LONGSERVICEOUTPUT", "")
+    else:
+        old_state = (
+            os.environ.get("NOTIFY_PREVIOUSHOSTHARDSHORTSTATE")
+            or os.environ.get("NOTIFY_LASTHOSTSTATE", "UP")
+        )
+        new_state = (
+            os.environ.get("NOTIFY_HOSTSHORTSTATE")
+            or os.environ.get("NOTIFY_HOSTSTATE", "DOWN")
+        )
+
+    return {
+        "is_host": not is_service,
+        "hostname": hostname,
+        "service_desc": service_desc,
+        "old_state": old_state.upper(),
+        "new_state": new_state.upper(),
+        "output": output,
+        "long_output": long_output,
+        "host_address": host_address,
+        "real_ip": real_ip,
+        "frp": frp,
+        "site": site,
+        "date": date,
+        "to_email": to_email,
+    }
+
+
+def is_supported_transition(event):
+    if event["is_host"]:
+        valid_pairs = {("UP", "DOWN"), ("DOWN", "UP")}
+        pair = (event["old_state"], event["new_state"])
+        if pair in valid_pairs:
+            return "host_state", True
+        return "host_state", False
+    else:
+        if event["service_desc"] != "PING":
+            return None, False
+        valid_pairs = {("OK", "CRIT"), ("CRIT", "OK"),
+                       ("OK", "CRITICAL"), ("CRITICAL", "OK")}
+        pair = (event["old_state"], event["new_state"])
+        if pair in valid_pairs:
+            return "service_state_ping", True
+        if event["new_state"] in ("WARNING", "WARN", "UNKNOWN", "UNKN"):
+            LOG.info("%s/%s PING state %s → %s — not counted",
+                     event["hostname"], event["service_desc"],
+                     event["old_state"], event["new_state"])
+            return "service_state_ping", False
+        return "service_state_ping", False
+
+
+def make_category_record():
+    return {
+        "last_state": None,
+        "transitions": [],
+        "suppression_until": 0,
+        "suppressed_count": 0,
+    }
+
+
+def get_host_state(state, hostname):
+    if hostname not in state:
+        state[hostname] = {
+            "host_state": make_category_record(),
+            "service_state_ping": make_category_record(),
+        }
+    return state[hostname]
+
+
+def prune_transitions(transitions, window):
+    cutoff = now() - window
+    return [t for t in transitions if t >= cutoff]
+
+
+def evaluate_rate_limit(event):
+    state_path = get_state_path()
+    lock_path = get_lock_path(state_path)
+    category, is_transition = is_supported_transition(event)
+
+    if category is None:
+        return {
+            "decision": "BYPASS",
+            "category": None,
+            "reason": "Not a tracked notification type",
+        }
+
+    cfg_section = CFG.get(category, {})
+    enabled = cfg_section.get("enabled", True)
+    window = cfg_section.get("observation_window", 1800)
+    trigger = cfg_section.get("trigger_transitions", 4)
+    suppress_time = cfg_section.get("suppression_time", 3600)
+
+    if not enabled:
+        return {
+            "decision": "BYPASS",
+            "category": category,
+            "reason": f"{category} rate-limiting disabled",
+        }
+
+    try:
+        with StateLock(lock_path):
+            state = read_state(state_path)
+            state = migrate_state(state)
+            host_rec = get_host_state(state, event["hostname"])
+            cat_rec = host_rec[category]
+
+            last_state = cat_rec.get("last_state")
+            transitions = cat_rec.get("transitions", [])
+            suppression_until = cat_rec.get("suppression_until", 0)
+            suppressed_count = cat_rec.get("suppressed_count", 0)
+
+            if is_transition and last_state is not None:
+                if event["new_state"] == last_state:
+                    is_transition = False
+
+            ts = now()
+            cat_rec["last_state"] = event["new_state"]
+
+            decision = "SEND"
+            reason = "Normal notification"
+
+            if suppression_until > ts:
+                if is_transition:
+                    suppressed_count += 1
+                    cat_rec["suppressed_count"] = suppressed_count
+
+                mode = CFG.get("mode", "audit")
+                if mode == "enforce":
+                    decision = "SUPPRESS"
+                    reason = (
+                        f"Suppression active until {suppression_until} "
+                        f"(transition #{suppressed_count} suppressed)"
+                    )
+                else:
+                    decision = "WOULD_SUPPRESS"
+                    reason = (
+                        f"Audit mode — would suppress (active until "
+                        f"{suppression_until}, "
+                        f"transition #{suppressed_count} counted)"
+                    )
+            else:
+                if is_transition:
+                    transitions.append(ts)
+                    transitions = prune_transitions(transitions, window)
+                    count = len(transitions)
+
+                    if count >= trigger:
+                        suppression_until = ts + suppress_time
+                        suppressed_count = 0
+                        cat_rec["suppression_until"] = suppression_until
+                        cat_rec["suppressed_count"] = 0
+
+                        mode = CFG.get("mode", "audit")
+                        if mode == "enforce":
+                            decision = "SEND"
+                            reason = (
+                                f"Suppression entered "
+                                f"(transition #{count}/{trigger} in {window}s)"
+                            )
+                            LOG.info(
+                                "%s/%s %s suppression started — "
+                                "%d transitions in %ds, ban until %d",
+                                event["hostname"], category, category,
+                                count, window, suppression_until,
+                            )
+                        else:
+                            decision = "SEND"
+                            reason = (
+                                f"Audit — threshold reached "
+                                f"({count}/{trigger}) — "
+                                f"would suppress next, "
+                                f"suppression_until={suppression_until}"
+                            )
+                            LOG.info(
+                                "%s/%s %s threshold reached (audit mode) — "
+                                "%d transitions in %ds",
+                                event["hostname"], category, category,
+                                count, window,
+                            )
+                    else:
+                        decision = "SEND"
+                        reason = (
+                            f"Transition #{count}/{trigger} in {window}s"
+                        )
+                else:
+                    decision = "SEND"
+                    reason = (
+                        f"State {event['old_state']} → "
+                        f"{event['new_state']} — no transition counted"
+                    )
+
+            cat_rec["transitions"] = transitions
+            cat_rec["suppression_until"] = suppression_until
+            cat_rec["suppressed_count"] = suppressed_count
+
+            _update_adaptive(cat_rec, category, is_transition, ts)
+
+            write_state(state_path, state)
+            _cleanup_stale_records(state)
+
+        return {
+            "decision": decision,
+            "category": category,
+            "reason": reason,
+            "transition_count": len(transitions),
+            "suppression_until": suppression_until,
+        }
+
+    except Exception as exc:
+        LOG.error(
+            "FAIL_OPEN: rate-limit state error for %s: %s — "
+            "Telegram will be sent",
+            event["hostname"], exc,
+        )
+        return {
+            "decision": "FAIL_OPEN",
+            "category": category,
+            "reason": f"Rate-limit error: {exc} — Telegram sent anyway",
+        }
+
+
+def _cleanup_stale_records(state):
+    stale = []
+    now_ts = now()
+    for hostname, rec in state.items():
+        if hostname == "schema_version" or not isinstance(rec, dict):
+            continue
+        h = rec.get("host_state", {})
+        s = rec.get("service_state_ping", {})
+        if (not h.get("transitions") and not s.get("transitions")
+                and h.get("suppression_until", 0) <= now_ts
+                and s.get("suppression_until", 0) <= now_ts):
+            stale.append(hostname)
+    for hostname in stale:
+        del state[hostname]
+    if stale:
+        LOG.debug("Cleaned up %d stale records", len(stale))
+
+
+# ---------------------------------------------------------------------------
+# Adaptive learning
+# ---------------------------------------------------------------------------
+
+def _fresh_learning_record():
+    return {
+        "schema_version": 1,
+        "first_observation": 0,
+        "last_recalculation": 0,
+        "transition_samples": [],
+        "window_counts_30m": [],
+        "window_counts_60m": [],
+        "daily_transition_counts": {},
+        "peak_30m": 0,
+        "peak_60m": 0,
+        "recommended_threshold": None,
+        "recommendation_status": "INSUFFICIENT_DATA",
+    }
+
+
+def _ensure_adaptive(cat_rec):
+    if "adaptive" not in cat_rec:
+        cat_rec["adaptive"] = _fresh_learning_record()
+    return cat_rec["adaptive"]
+
+
+def _update_adaptive(cat_rec, category, is_transition, ts):
+    adaptive_cfg = CFG.get("adaptive", {})
+    if not adaptive_cfg.get("enabled", True):
+        return
+    if adaptive_cfg.get("mode") != "learning":
+        return
+    try:
+        ad = _ensure_adaptive(cat_rec)
+        if ad["first_observation"] == 0:
+            ad["first_observation"] = ts
+        if is_transition:
+            samples = ad.get("transition_samples", [])
+            samples.append(ts)
+            retention = 30 * 86400
+            cutoff = ts - retention
+            samples[:] = [s for s in samples if s >= cutoff]
+            ad["transition_samples"] = samples
+            day_key = time.strftime("%Y-%m-%d", time.gmtime(ts))
+            daily = ad.get("daily_transition_counts", {})
+            daily[day_key] = daily.get(day_key, 0) + 1
+            old_days = [k for k in daily if k < time.strftime(
+                "%Y-%m-%d", time.gmtime(ts - 90 * 86400))]
+            for k in old_days:
+                del daily[k]
+            ad["daily_transition_counts"] = daily
+            obs_window = CFG.get(category, {}).get("observation_window", 1800)
+            window_30m = obs_window
+            window_60m = max(obs_window, 3600)
+            recent_30m = [s for s in samples if s >= ts - window_30m]
+            recent_60m = [s for s in samples if s >= ts - window_60m]
+            wc30 = ad.get("window_counts_30m", [])
+            wc30.append(len(recent_30m))
+            ad["window_counts_30m"] = wc30[-100:]
+            ad["peak_30m"] = max(ad.get("peak_30m", 0), len(recent_30m))
+            wc60 = ad.get("window_counts_60m", [])
+            wc60.append(len(recent_60m))
+            ad["window_counts_60m"] = wc60[-100:]
+            ad["peak_60m"] = max(ad.get("peak_60m", 0), len(recent_60m))
+        recalc_every = adaptive_cfg.get("recalculate_every_hours", 24) * 3600
+        if ts - ad.get("last_recalculation", 0) >= recalc_every:
+            _recalculate_recommendation(cat_rec, category, adaptive_cfg, ts)
+            ad["last_recalculation"] = ts
+    except Exception as exc:
+        LOG.warning(
+            "FAIL_OPEN: adaptive learning error for category=%s: %s",
+            category, exc,
+        )
+
+
+def _recalculate_recommendation(cat_rec, category, adaptive_cfg, ts):
+    ad = _ensure_adaptive(cat_rec)
+    samples = ad.get("transition_samples", [])
+    first_obs = ad.get("first_observation", 0)
+    min_days = adaptive_cfg.get("minimum_learning_days", 14)
+    min_samples = adaptive_cfg.get("minimum_transition_samples", 20)
+    pct = adaptive_cfg.get("percentile", 95)
+    margin = adaptive_cfg.get("safety_margin", 2)
+    learning_days = (ts - first_obs) / 86400 if first_obs else 0
+    total_samples = len(samples)
+    if learning_days < min_days or total_samples < min_samples:
+        ad["recommended_threshold"] = None
+        ad["recommendation_status"] = "INSUFFICIENT_DATA"
+        return
+    if category == "host_state":
+        window_counts = ad.get("window_counts_30m", [])
+    else:
+        window_counts = ad.get("window_counts_30m", [])
+    if not window_counts:
+        ad["recommended_threshold"] = None
+        ad["recommendation_status"] = "INSUFFICIENT_DATA"
+        return
+    sorted_counts = sorted(window_counts)
+    idx = int(math.ceil(pct / 100.0 * len(sorted_counts))) - 1
+    idx = max(0, min(idx, len(sorted_counts) - 1))
+    p95_value = sorted_counts[idx]
+    raw_recommendation = p95_value + margin
+    if category == "host_state":
+        hard_min, hard_max = 4, 10
+    else:
+        hard_min, hard_max = 6, 20
+    clamped = max(hard_min, min(hard_max, raw_recommendation))
+    if raw_recommendation > hard_max:
+        status = "EXCESSIVE_INSTABILITY"
+        clamped = hard_max
+    elif clamped > CFG.get(category, {}).get("trigger_transitions", hard_min):
+        status = "RECOMMEND_HIGHER_THRESHOLD"
+    elif clamped < CFG.get(category, {}).get("trigger_transitions", hard_min):
+        status = "RECOMMEND_LOWER_THRESHOLD"
+    else:
+        status = "STABLE"
+    ad["recommended_threshold"] = clamped
+    ad["recommendation_status"] = status
+
+
+# ---------------------------------------------------------------------------
+# Logging helpers
+# ---------------------------------------------------------------------------
+
+def log_decision(decision, event, rate_info):
+    adaptive = CFG.get("adaptive", {})
+    category = decision.get("category", "?")
+    cat_cfg = CFG.get(category, {}) if category else {}
+    LOG.info(
+        "DECISION=%s host=%s category=%s old=%s new=%s "
+        "transitions=%s window=%s suppress_until=%s reason=%s",
+        decision.get("decision", "?"),
+        event["hostname"], category,
+        event["old_state"], event["new_state"],
+        decision.get("transition_count", "?"),
+        cat_cfg.get("observation_window", "?"),
+        decision.get("suppression_until", "?"),
+        decision.get("reason", "?"),
+    )
+    LOG.debug(
+        "adaptive_enabled=%s adaptive_mode=%s auto_apply=%s",
+        adaptive.get("enabled", "?"),
+        adaptive.get("mode", "?"),
+        adaptive.get("auto_apply", False),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Learning report
+# ---------------------------------------------------------------------------
+
+def print_learning_report():
+    state_path = get_state_path()
+    lock_path = get_lock_path(state_path)
+    try:
+        with StateLock(lock_path):
+            state = read_state(state_path)
+            state = migrate_state(state)
+    except Exception as exc:
+        print(f"ERROR: cannot read state: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"{'=' * 72}")
+    print(f"  {SCRIPT_NAME} — Adaptive Learning Report")
+    print(f"  Mode: {CFG.get('mode', 'audit')}  "
+          f"Adaptive: {CFG.get('adaptive', {}).get('mode', '?')}")
+    print(f"{'=' * 72}")
+
+    hosts_found = 0
+    for hostname, rec in sorted(state.items()):
+        if hostname == "schema_version" or not isinstance(rec, dict):
+            continue
+        hosts_found += 1
+        print(f"\n  Host: {hostname}")
+        print(f"  {'\u2500' * 68}")
+        for cat_label, cat_key in [
+            ("HOST STATE", "host_state"),
+            ("SERVICE STATE PING", "service_state_ping"),
+        ]:
+            cat_rec = rec.get(cat_key, {})
+            ad = cat_rec.get("adaptive", {})
+            configured = CFG.get(cat_key, {}).get("trigger_transitions", "?")
+            recommended = ad.get("recommended_threshold", "\u2014")
+            status = ad.get("recommendation_status", "\u2014")
+            first_obs = ad.get("first_observation", 0)
+            samples = len(ad.get("transition_samples", []))
+            peak_30m = ad.get("peak_30m", 0)
+            last_recalc = ad.get("last_recalculation", 0)
+            learning_days = (now() - first_obs) / 86400 if first_obs else 0
+            print(f"\n    {cat_label}:")
+            print(f"      configured threshold:    {configured}")
+            print(f"      recommended threshold:   {recommended}")
+            print(f"      learning period:         {learning_days:.1f} days")
+            print(f"      sample count:            {samples}")
+            print(f"      peak 30m transitions:    {peak_30m}")
+            print(f"      last recalculation:      "
+                  f"{time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime(last_recalc)) if last_recalc else 'never'}")
+            print(f"      recommendation status:   {status}")
+
+    if hosts_found == 0:
+        print("\n  No hosts in state yet.")
+    print(f"\n{'=' * 72}")
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=SCRIPT_DESCRIPTION,
+        add_help=False,
+    )
+    parser.add_argument(
+        "--learning-report", action="store_true",
+        help="Print a read-only adaptive learning report",
+    )
+    parser.add_argument(
+        "--version", action="store_true",
+        help="Print version and exit",
+    )
+    args, _ = parser.parse_known_args()
+
+    if args.version:
+        print(f"{SCRIPT_NAME} {VERSION}")
+        return 0
+
+    if args.learning_report:
+        return print_learning_report()
+
+    # Normal notification processing
+    event = classify_notification()
+    decision = evaluate_rate_limit(event)
+
+    log_decision(decision, event, {})
+
+    do_suppress = (decision["decision"] == "SUPPRESS")
+    if do_suppress:
+        LOG.info(
+            "SUPPRESS %s/%s: Telegram NOT sent",
+            event["hostname"], decision.get("category", "?"),
+        )
+        return 0
+
+    # Build and send Telegram message
+    token = os.environ.get("TELEGRAM_TOKEN", "")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+
+    if not token or not chat_id:
+        sys.stderr.write(
+            f"{SCRIPT_NAME} v{VERSION}: TELEGRAM_TOKEN or TELEGRAM_CHAT_ID "
+            "not set. Check OMD environment.\n"
+        )
+        return 1
+
+    text, button = build_telegram_message(event)
+
+    try:
+        send_telegram(token, chat_id, text, button)
+        rc = 0
+    except RuntimeError as exc:
+        LOG.error("Telegram send failed: %s", exc)
+        sys.stderr.write(f"{SCRIPT_NAME} v{VERSION}: {exc}\n")
+        rc = 1
+
+    if decision["decision"] in ("WOULD_SUPPRESS", "FAIL_OPEN"):
+        LOG.info(
+            "WOULD_SUPPRESS/FAIL_OPEN %s/%s: Telegram SENT (audit mode)",
+            event["hostname"], decision.get("category", "?"),
+        )
+
+    return rc
+
+
+if __name__ == "__main__":
+    sys.exit(main())

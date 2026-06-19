@@ -1,0 +1,25 @@
+{
+    "mode": "audit",
+    "host_state": {
+        "enabled": true,
+        "observation_window": 1800,
+        "trigger_transitions": 4,
+        "suppression_time": 3600
+    },
+    "service_state_ping": {
+        "enabled": true,
+        "observation_window": 1800,
+        "trigger_transitions": 6,
+        "suppression_time": 3600
+    },
+    "adaptive": {
+        "enabled": true,
+        "mode": "learning",
+        "minimum_learning_days": 14,
+        "minimum_transition_samples": 20,
+        "recalculate_every_hours": 24,
+        "percentile": 95,
+        "safety_margin": 2,
+        "auto_apply": false
+    }
+}
