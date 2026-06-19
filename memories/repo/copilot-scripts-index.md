@@ -64,3 +64,43 @@ python3 -B script-tools/full/misc/python-cache-cleanup.py --inventory-only
 - Default repo list is hardcoded for the WSL Kali environment (`/mnt/c/Users/Marzio/...`)
 - Skips `.git/`, `.venv/`, `venv/`, `env/`, `.tox/`, `.nox/`, `node_modules/` during traversal
 - Validates `.gitignore` has `__pycache__/`, `*.py[cod]`, `*$py.class` patterns
+
+---
+
+## script-tools/full/monitoring_diagnostics/flapping_analyzer.py
+
+| Field | Value |
+|-------|-------|
+| **Purpose** | Interactive flapping threshold analysis. Reads Nagios logs and Livestatus, computes flap% distributions, searches historical flapping events, interactively suggests threshold values with option to apply via `cmk -O`. |
+| **Language** | Python 3 |
+| **CLI** | `--hosts HOST1,HOST2` (or positional args), `--days N`, `--no-recommend`, `--no-apply`, `--check-interval N`, `--version` |
+| **Execution** | `python3 -B script-tools/full/monitoring_diagnostics/flapping_analyzer.py <host1> <host2>` |
+| **Safety** | Read-only analysis phase; write/activate phase requires interactive confirmation. `--no-recommend` for audit-only mode. |
+| **Outputs** | Current config, historical flapping events, flap% statistics by host/service, threshold recommendations, cross-host comparison table. Optionally: apply new thresholds and run `cmk -O`. |
+| **Dependencies** | Python 3 stdlib only (socket, re, os, sys, argparse, pathlib, datetime, collections) |
+| **Run as** | `monitoring` user on the CheckMK OMD server |
+
+### Examples
+
+```bash
+# Audit-only: analyze two hosts, skip recommendation phase
+python3 -B flapping_analyzer.py marcatempo-colibri marcatempo-asilo --no-recommend
+
+# Full interactive analysis with recommendation
+python3 -B flapping_analyzer.py --hosts marcatempo-colibri,marcatempo-asilo
+
+# Analyze with different check interval and shorter window
+python3 -B flapping_analyzer.py host1 host2 --check-interval 60 --days 30
+
+# Run directly on CheckMK server
+su - monitoring -c "python3 -B /opt/checkmk-tools/script-tools/full/monitoring_diagnostics/flapping_analyzer.py --hosts marcatempo-colibri,marcatempo-asilo"
+```
+
+### Notes
+
+- Designed for Nagios-based CheckMK (CRE). Uses Livestatus (`/omd/sites/*/tmp/run/live`).
+- Reads `flapping.cfg` from the standard OMD path (overridable via `NAGIOS_CFG` env).
+- Flap% simulation uses the standard Nagios 21-check window.
+- Thresholds are suggested in 5% increments (Nagios resolution).
+- Interactive mode lets the user choose recommended, sensitive, conservative, or custom values.
+- Apply mode creates a timestamped backup before writing and runs `cmk -O` for activation.

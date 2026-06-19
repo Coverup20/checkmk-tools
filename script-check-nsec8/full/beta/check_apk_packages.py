@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""check_apk_packages.py - CheckMK APK packages check (pyuci beta).
+
+BLOCKED: Package management statistics require the 'apk' command.
+No Python-native API exists to:
+  - query APK installed packages database
+  - list available upgrades
+  - determine APKINDEX age
+
+APKINDEX files at /var/cache/apk/APKINDEX.*.tar.gz are binary hashed
+indexes, not parseable text files.
+The installed package database at /lib/apk/db/installed is a structured
+text file, but parsing it alone cannot provide upgrade information.
+
+Keeping shutil.disk_usage for /overlay (Python stdlib).
+"""
+
+import sys
+import time
+from pathlib import Path
+
+BETA = True
+VERSION = "1.0.0b1"
+SERVICE = "APK.Packages"
+
+try:
+    from euci import EUci
+except ImportError:
+    EUci = None
+
+
+def main():
+    # APK package info: BLOCKED (requires 'apk' command or binary parsing)
+    installed_count = 0
+    updates_available = 0
+
+    # Try to parse APK installed database as best-effort
+    db_path = Path("/lib/apk/db/installed")
+    if db_path.exists():
+        try:
+            text = db_path.read_text(encoding="utf-8", errors="ignore")
+            installed_count = text.count("\nP:")  # Each package starts with P:name
+        except Exception:
+            installed_count = 0
+
+    # APKINDEX age: file-based
+    last_update_age = 0
+    cache_dir = Path("/var/cache/apk")
+    if cache_dir.is_dir():
+        mtimes = []
+        for f in cache_dir.rglob("*"):
+            if f.is_file() and "APKINDEX" in f.name:
+                mtimes.append(int(f.stat().st_mtime))
+        if mtimes:
+            last_update_age = int((time.time() - max(mtimes)) / 86400)
+
+    # Recent installs/removes from log
+    recent_installs = 0
+    recent_removes = 0
+    for log_path in [Path("/var/log/apk.log"), Path("/var/log/messages")]:
+        if log_path.exists():
+            try:
+                for line in log_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    if "apk" not in line:
+                        continue
+                    if "add" in line or "install" in line:
+                        recent_installs += 1
+                    if "del" in line or "remove" in line:
+                        recent_removes += 1
+            except Exception:
+                pass
+            break
+
+    # /overlay disk usage (Python stdlib)
+    overlay_used_pct = 0
+    overlay_free = 0
+    try:
+        usage = Path("/overlay").stat()
+        # shutil.disk_usage uses statvfs internally
+        import shutil
+        du = shutil.disk_usage("/overlay")
+        overlay_free = int(du.free / 1024)
+        overlay_used_pct = int((du.used * 100) / du.total) if du.total else 0
+    except Exception:
+        pass
+
+    # Status
+    if overlay_used_pct >= 95:
+        st, txt = 2, f"CRITICAL - /overlay: {overlay_used_pct}%"
+    elif overlay_used_pct >= 85:
+        st, txt = 1, f"WARNING - /overlay: {overlay_used_pct}%"
+    elif updates_available >= 10:
+        st, txt = 1, f"WARNING - {updates_available} updates [beta: BLOCKED]"
+    elif last_update_age >= 30:
+        st, txt = 1, f"WARNING - APKINDEX outdated ({last_update_age}d) [beta]"
+    elif updates_available > 0:
+        st, txt = 0, f"OK - {updates_available} updates [beta: BLOCKED]"
+    else:
+        st, txt = 0, f"OK - ~{installed_count} packages (approx) [beta]"
+
+    print(
+        f"{st} {SERVICE} - {txt} "
+        f"| installed={installed_count} "
+        f"updates_available={updates_available} "
+        f"overlay_free_kb={overlay_free} "
+        f"overlay_used_pct={overlay_used_pct} "
+        f"last_update_age_days={last_update_age} "
+        f"recent_installs={recent_installs} "
+        f"recent_removes={recent_removes}"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -440,7 +440,7 @@ def compute_flap_stats(events, host, label="HOST", check_interval=CHECK_INTERVAL
     return {
         "label": label,
         "total_changes": len(events),
-        "total_checks": len(results) if (results := []) else n + window_checks,
+        "total_checks": n + window_checks,
         "flap_windows": n,
         "mean": sum(pcts) / n,
         "median": sorted_pcts[n // 2],
@@ -879,26 +879,18 @@ def apply_config(file_path, new_values):
 
     updated = content
     replacements = {
-        "enable_flap_detection": "enable_flap_detection",
-        "low_service_flap_threshold": "low_service_flap_threshold",
-        "high_service_flap_threshold": "high_service_flap_threshold",
-        "low_host_flap_threshold": "low_host_flap_threshold",
-        "high_host_flap_threshold": "high_host_flap_threshold",
+        "enable_flap_detection",
+        "low_service_flap_threshold",
+        "high_service_flap_threshold",
+        "low_host_flap_threshold",
+        "high_host_flap_threshold",
     }
 
-    for key, line_prefix in replacements.items():
+    for key in replacements:
         if key in new_values and new_values[key] is not None:
-            old_line = f"{line_prefix}={new_values.get('_' + key, current_cfg.get(key, ''))}"
-            # Actually we need the current value... this is tricky.
-            # Let's find and replace the actual line.
-
-    # Simpler approach: find each line and replace
-    # enable_flap_detection
-    for key, line_prefix in replacements.items():
-        if key in new_values and new_values[key] is not None:
-            pattern = re.compile(rf"^{re.escape(line_prefix)}=.*$", re.MULTILINE)
+            pattern = re.compile(rf"^{re.escape(key)}=.*$", re.MULTILINE)
             if pattern.search(updated):
-                updated = pattern.sub(f"{line_prefix}={new_values[key]}", updated)
+                updated = pattern.sub(f"{key}={new_values[key]}", updated)
 
     if updated == content:
         return False, "No changes generated (values unchanged)"
