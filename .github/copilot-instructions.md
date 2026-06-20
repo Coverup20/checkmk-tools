@@ -18,7 +18,21 @@
 - `/memories/repo/hosts-access.md` → SSH access method per host (key vs password), correct commands
 - `/memories/repo/copilot-scripts-index.md` → Index of all copilot/ scripts and their purpose
 - `/memories/repo/copilot-scripts-policy.md` → Where to save temp scripts, author name, README rules
-- `/memories/repo/git-push-policy.md` → Git commit format, versioning (v0.0.x), tag + release workflow (CRITICAL)
+- `/memories/repo/git-push-policy.md` → Git commit format, versioning (v0.0.X PATCH progression), tag + release workflow (CRITICAL)
+
+### MANDATORY VERSION CLASSIFICATION AND PATCH PROGRESSION
+
+For fixes, maintenance changes, policy updates, documentation corrections,
+backward-compatible refactors, validation improvements, and internal
+operational hardening, increment PATCH only.
+
+Required sequence:
+v1.0.0 → v1.0.1 → ... → v1.0.9 → v1.0.10 → v1.0.11
+
+Do not increment MINOR unless a real new backward-compatible feature has
+been explicitly classified and approved as a MINOR release.
+
+Never abbreviate v1.0.10 as v1.10.
 
 ---
 

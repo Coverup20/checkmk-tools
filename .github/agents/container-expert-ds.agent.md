@@ -370,15 +370,34 @@ If version tags exist, the agent must:
 
 ### Version tag format rule
 
-For repository operational/versioning workflow commits, use the `v0.0.X` tag sequence by default.
+Identify the highest existing version tag and increment PATCH unless the
+change is explicitly classified and approved as MINOR or MAJOR.
 
 **Rules:**
-- Tags must use the format `v0.0.X`.
-- Increment `X` by 1 from the highest existing `v0.0.X` tag.
-- Ignore unrelated higher-version tags such as `v1.0.0` unless the repository-specific policy explicitly says to use semantic versioning from that point onward.
-- Do not propose `v1.0.1` automatically.
+- Tags must use the format `vMAJOR.MINOR.PATCH` (three numeric components).
+- Calculate the next PATCH version from the highest existing version tag.
+- Never abbreviate: `v1.0.10` is correct; `v1.10` is wrong
+  (v1.10 = v1.10.0 = MINOR 10, not PATCH 10).
+- Never increment MINOR for maintenance work, fixes, documentation,
+  policy updates, refactors, or internal improvements.
+- Only increment MINOR when a real new backward-compatible feature has been
+  explicitly classified and approved as a MINOR release.
+- Only increment MAJOR for an explicitly approved breaking change.
 - Do not switch versioning scheme without explicit user confirmation.
-- If both `v0.0.X` and other tag families exist, ask which family to use unless the embedded custom-agent workflow already specifies `v0.0.X`.
+
+### MANDATORY VERSION CLASSIFICATION AND PATCH PROGRESSION
+
+For fixes, maintenance changes, policy updates, documentation corrections,
+backward-compatible refactors, validation improvements, and internal
+operational hardening, increment PATCH only.
+
+Required sequence:
+v1.0.0 → v1.0.1 → ... → v1.0.9 → v1.0.10 → v1.0.11
+
+Do not increment MINOR unless a real new backward-compatible feature has
+been explicitly classified and approved as a MINOR release.
+
+Never abbreviate v1.0.10 as v1.10.
 
 **Required behavior:**
 
@@ -474,24 +493,24 @@ When the user says "allinea il repo" and there are approved tracked changes to c
 6. **Show** a concise diff summary.
 7. **Commit** the approved tracked changes.
 8. **Push** the commit to `origin/main`.
-9. **Detect** the highest existing `v0.0.X` tag.
-10. **Calculate** the next `v0.0.X` tag (increment X by 1).
+9. **Detect** the highest existing version tag.
+10. **Calculate** the next PATCH version (increment PATCH by 1).
 11. **Create** an annotated tag.
 12. **Push** the tag to `origin`.
 13. **Create** the GitHub release for the new tag.
 14. **Report** final status.
 
 The agent must not stop after only proposing the tag if:
-- the repository already uses `v0.0.X` tags;
+- the repository already uses version tags;
 - the next tag can be calculated unambiguously;
 - the user requested "allinea il repo";
 - the changes are already approved;
 - the target is `origin`, not `upstream`.
 
 **Default tag format:**
-- use `v0.0.X`;
-- increment X by 1 from the highest existing `v0.0.X`;
-- ignore `v1.0.0` for this workflow unless explicitly instructed otherwise.
+- use PATCH-only progression (`v<MAJOR>.<MINOR>.<PATCH>`);
+- increment PATCH by 1 from the highest existing version tag;
+- do not ignore any existing tag family; use the highest existing SemVer tag.
 
 **Default release command:**
 ```bash
@@ -503,24 +522,24 @@ gh release create <tag> --title "<tag>" --notes "<release notes>"
 GitHub release notes must match the repository's existing style. Before creating a release, inspect the latest existing releases if possible.
 
 **Reference style for this repository:**
-- Title: `v0.0.X - short descriptive summary`
+- Title: `v<MAJOR>.<MINOR>.<PATCH> - short descriptive summary`
 - Body sections: `Added:`, `Changed:`, `Fixed:`, `Removed:` (only when applicable)
 - Bullet character: `•`
 - Format per bullet: `• component/file vX.Y.Z: concise description`
 
 **For agent documentation/workflow-only changes**, use a concise title and grouped bullets, for example:
 ```text
-v0.0.8 - agent repository alignment and release workflow
+v0.0.8 (historical example)
 
 Added:
 
 • container-expert.agent.md: automatic repository alignment workflow
-• repository alignment: commit, origin push, v0.0.X tag creation, tag push, and GitHub release creation
+• repository alignment: commit, origin push, PATCH version tag creation, tag push, and GitHub release creation
 
 Changed:
 
 • agent Git workflow: "allinea il repo completo" now performs the full standard alignment cycle
-• release workflow: GitHub releases are created automatically when the v0.0.X workflow is unambiguous
+• release workflow: GitHub releases are created automatically when the PATCH progression workflow is unambiguous
 ```
 
 **Rules:**
@@ -538,9 +557,9 @@ Changed:
 git add <approved tracked files>
 git commit -m "<approved commit message>"
 git push origin main
-git tag -a v0.0.X -m "v0.0.X - <short release summary>"
-git push origin v0.0.X
-gh release create v0.0.X --title "v0.0.X - <short release summary>" --notes "<release notes>"
+git tag -a v<PATCH_VERSION> -m "v<PATCH_VERSION> - <short release summary>"
+git push origin v<PATCH_VERSION>
+gh release create v<PATCH_VERSION> --title "v<PATCH_VERSION> - <short release summary>" --notes "<release notes>"
 ```
 
 **Actions that still require explicit confirmation:**
@@ -552,7 +571,7 @@ gh release create v0.0.X --title "v0.0.X - <short release summary>" --notes "<re
 - rebase;
 - delete tags;
 - overwrite existing tags;
-- switch from `v0.0.X` to another versioning scheme;
+- switch from the current versioning scheme to a different one;
 - commit unrelated/unapproved files;
 - commit local-only files under `~/.copilot/agents/`.
 
