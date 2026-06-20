@@ -1,5 +1,33 @@
 # Q&A Troubleshooting - checkmk-tools
 
+## PROCEDURE - Notification investigation (srv-monitoring-us)
+
+**Primary source of truth:** Web UI notification view on srv-monitoring-us
+```
+https://192.168.10.46/monitoring/check_mk/index.py?start_url=%2Fmonitoring%2Fcheck_mk%2Fview.py%3Fview_name%3Dnotifications%26wato_folder%3Dmarca_tempo_infopoint
+```
+
+**Mandatory rules:**
+- Access in read-only mode.
+- Do not modify notification rules, WATO, Nagios, contacts, or scripts unless user explicitly asks.
+- Do not rely only on local files / logs / assumptions when the live view is available.
+- Correlate with notify.log only when deeper validation is required.
+- Report: time range, host, service, state transition, notification method, contact, result.
+- Clearly distinguish: host vs service notifications, sent vs suppressed vs failed vs repeated vs flapping.
+- Never expose credentials, session cookies, tokens, or sensitive URL parameters.
+- If page is unavailable, report explicitly and use server-side evidence as fallback.
+- Adjust or remove `wato_folder` filter when necessary — do not assume analysis is limited to that folder.
+
+## 2026-06-19 - Notifiche non recapitate dopo CRLF shebang fix
+
+**Q:** Dopo aver fixato gli script di notifica (CRLF→LF), le notifiche per un host già DOWN continuano a non arrivare. Perché?
+
+**A:** CheckMK notifica solo sui **cambi di stato**, non sullo stato corrente. Se la notifica DOWN è fallita a causa della shebang CRLF, una volta fixato lo script il core NON ritriggera automaticamente la notifica perché lo stato è ancora DOWN (stesso stato dell'ultima notifica fallita). Bisogna forzare un reinoltro con:
+```bash
+su - monitoring -c "cmk --notify --resend-all"
+```
+Oppure aspettare il prossimo cambio stato (es. DOWN→UP o DOWN→nuovo DOWN dopo un ACKNOWLEDGEMENT).
+
 ## 2026-06-16 - PING service rules lost after cmk-update-config on srv-monitoring-us
 
 **Q:** Le regole WATO per il servizio PING (max_check_attempts, retry_interval) create nel folder "Main" vengono perse dopo un `cmk-update-config`. Come verificare se le regole sono attive e come prevenirne la perdita?
@@ -528,3 +556,36 @@ export PATH="/usr/bin:/usr/local/bin:/bin:/usr/sbin:$PATH"  # se PATH è corrott
 git -C "$REPO" check-ignore -v -- "$REL_PATH"              # verificare se ignorato
 git -C "$REPO" ls-files --error-unmatch -- "$REL_PATH"      # verificare se tracked
 ```
+
+## 2026-06-20 - `--help` triggered real Telegram delivery because `add_help=False` + `parse_known_args()`
+
+**Q:** Why did running `python3 Telegram-20 --help` send a real Telegram message?
+
+**A:** Two argparse misconfigurations combined to turn `--help` into a real delivery:
+
+1. **`add_help=False`**: The `ArgumentParser` was created with `add_help=False`, which suppresses argparse's built-in `-h`/`--help` handler. With `add_help=True` (default), argparse captures `--help` and calls `sys.exit(0)` before any business logic runs.
+
+2. **`parse_known_args()` instead of `parse_args()`**: `parse_known_args()` returns unrecognized arguments silently as a second return value. Since the code ignores that second value (`args, _ = parser.parse_known_args()`), `--help` is treated as an unknown argument and silently discarded. The script falls through to normal notification processing.
+
+**Result:** `--help` triggered the complete notification delivery pipeline: config loading, state loading, environment variable reading (`TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`), HTTP POST to Telegram API, and "Telegram OK: message sent" output — all without the operator's knowledge.
+
+**Fix** (applied in v1.3.1-beta):
+```python
+# BEFORE (vulnerable):
+parser = argparse.ArgumentParser(description=..., add_help=False)
+args, _ = parser.parse_known_args()
+
+# AFTER (safe):
+parser = argparse.ArgumentParser(description=...)
+args = parser.parse_args()
+```
+
+**Key rules:**
+- Notification scripts must **never** use `add_help=False` unless `-h`/`--help` is explicitly re-added with `action='help'`
+- Notification scripts must **never** use `parse_known_args()` — unrecognized arguments must be rejected with exit code 2
+- CLI validation must happen before any configuration loading, state loading, or provider initialization
+- `-h` and `--help` exit 0 with help text
+- Unknown options exit 2 with error message
+- The same pattern was present in both `M@il-20` and `Telegram-20` (both fixed)
+
+**Affects:** `M@il-20` and `Telegram-20` v1.3.0-beta (and earlier)
