@@ -8,7 +8,7 @@
 # Mode audit (default):  every notification is sent; the rate-limit decision
 #                         is calculated and logged but never enforced.
 #
-# Version: 1.0.0-beta
+# Version: 1.3.0-beta
 
 import os
 import sys
@@ -21,6 +21,8 @@ import logging
 import tempfile
 import argparse
 import subprocess
+import uuid as _uuid
+import re as _re
 from pathlib import Path
 from urllib.parse import quote
 
@@ -30,7 +32,7 @@ SCRIPT_DESCRIPTION = (
     "audit-only fail2ban-style transition rate limiter and adaptive "
     "learning for HOST STATE and SERVICE STATE PING notifications."
 )
-VERSION = "1.0.0-beta"
+VERSION = "1.3.0-beta"
 
 # ---------------------------------------------------------------------------
 # Configuration — defaults (overridden by config file values)
@@ -59,6 +61,11 @@ CONFIG = {
         "safety_margin": 2,
         "auto_apply": False,
     },
+    "state_retention": {
+        "stale_host_days": 30,
+        "max_transitions_per_category": 500,
+        "cleanup_interval_seconds": 3600,
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -71,7 +78,7 @@ STATE_DIR = os.environ.get(
 )
 LOG_DIR = os.environ.get(
     "NOTIFY_RATE_LIMIT_LOG_DIR",
-    os.path.join(OMD_ROOT, "var", "log"),
+    os.path.join(OMD_ROOT, "var", "log", "notifications"),
 )
 _HERE = Path(__file__).resolve().parent
 CONFIG_PATH = str(_HERE / "M@il-20-config.json")
@@ -89,14 +96,35 @@ FROM_EMAIL = os.environ.get("FROM_EMAIL", "checkmk@example.com")
 
 
 # ---------------------------------------------------------------------------
+# Safe handler — never raises into business logic
+# ---------------------------------------------------------------------------
+
+class _SafeFileHandler(logging.FileHandler):
+    """FileHandler that never raises on emit().
+
+    Defense-in-depth: catches every emit() exception so no LOG call
+    can ever propagate into business logic.  Falls back to stderr.
+    """
+    def emit(self, record):
+        try:
+            super().emit(record)
+        except Exception:
+            try:
+                sys.stderr.write("%s: log write failed\n" % SCRIPT_NAME)
+                sys.stderr.flush()
+            except Exception:
+                pass
+
+
+# ---------------------------------------------------------------------------
 # Logging setup
 # ---------------------------------------------------------------------------
 
 def setup_logger():
     """Configure a file logger under the Checkmk site log area.
 
-    Falls back to stderr when the log directory is unavailable or outside
-    an OMD site — this is safe for testing and development.
+    Best-effort: falls back to stderr if the log directory or file
+    cannot be created.
     """
     log = logging.getLogger(SCRIPT_NAME)
     log.setLevel(logging.DEBUG)
@@ -107,10 +135,16 @@ def setup_logger():
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    if LOG_DIR and os.path.isdir(LOG_DIR):
-        log_path = os.path.join(LOG_DIR, f"{SCRIPT_NAME}.log")
-        handler = logging.FileHandler(log_path)
-    else:
+    handler = None
+    try:
+        if LOG_DIR:
+            os.makedirs(LOG_DIR, exist_ok=True)
+            log_path = os.path.join(LOG_DIR, "mail-20.log")
+            handler = _SafeFileHandler(log_path)
+    except Exception:
+        pass
+
+    if handler is None:
         handler = logging.StreamHandler(sys.stderr)
 
     handler.setFormatter(fmt)
@@ -119,6 +153,91 @@ def setup_logger():
 
 
 LOG = setup_logger()
+
+# ---------------------------------------------------------------------------
+# Sanitization and safe logging helpers
+# ---------------------------------------------------------------------------
+
+# Known secret environment variable values to redact from all logged output
+_KNOWN_SECRET_ENV_VARS = ["TELEGRAM_TOKEN", "SMTP_PASSWORD", "API_KEY"]
+_SECRET_VALUES_CACHE = None
+
+
+def _load_secret_values():
+    """Cache known secret values from environment variables."""
+    global _SECRET_VALUES_CACHE
+    if _SECRET_VALUES_CACHE is not None:
+        return _SECRET_VALUES_CACHE
+    secrets = []
+    for var in _KNOWN_SECRET_ENV_VARS:
+        val = os.environ.get(var, "")
+        if val:
+            secrets.append(val)
+    _SECRET_VALUES_CACHE = secrets
+    return secrets
+
+
+_SANITIZE_REGEX = [
+    (_re.compile(r'/bot[A-Za-z0-9_:.-]+/'), "/bot[REDACTED]/"),
+    (_re.compile(r'(Bearer\s+)[A-Za-z0-9._~+/=-]+', _re.IGNORECASE), r'\1[REDACTED]'),
+    (_re.compile(r'((?:[?&])(?:token|key|secret|password|api_key|apiKey)=)[^&\s]+', _re.IGNORECASE), r'\1[REDACTED]'),
+    (_re.compile(r'(Authorization:\s*)[^\r\n]+', _re.IGNORECASE), r'\1[REDACTED]'),
+]
+
+
+def _sanitize_text(text):
+    """Redact known secrets and sensitive patterns from a string.
+
+    Safe to call with any string — never raises.
+    """
+    if not isinstance(text, str):
+        return str(text) if text is not None else ""
+    try:
+        for env_val in _load_secret_values():
+            if env_val and env_val in text:
+                text = text.replace(env_val, "[REDACTED]")
+        for pattern, replacement in _SANITIZE_REGEX:
+            text = pattern.sub(replacement, text)
+    except Exception:
+        pass
+    return text
+
+
+def _safe_log(level, record):
+    """Emit a structured JSON Lines log record.
+
+    Best-effort — never raises, never blocks delivery.
+    Falls back to a single sanitized stderr line on failure.
+    """
+    try:
+        record["level"] = level
+        # Sanitize all writable string fields in-place
+        for k in list(record.keys()):
+            v = record[k]
+            if isinstance(v, str):
+                record[k] = _sanitize_text(v)
+            elif isinstance(v, dict):
+                for k2 in list(v.keys()):
+                    if isinstance(v[k2], str):
+                        v[k2] = _sanitize_text(v[k2])
+        line = "NOTIFY_EVENT " + json.dumps(record, default=str, ensure_ascii=False)
+        if level == "ERROR":
+            LOG.error("%s", line)
+        elif level == "WARNING":
+            LOG.warning("%s", line)
+        else:
+            LOG.info("%s", line)
+    except Exception:
+        try:
+            sys.stderr.write("%s: log failure\n" % SCRIPT_NAME)
+            sys.stderr.flush()
+        except Exception:
+            pass
+
+
+def _debug_enabled():
+    """Check whether debug logging is enabled via environment variable."""
+    return os.environ.get("MAIL20_DEBUG") == "1"
 
 
 # ---------------------------------------------------------------------------
@@ -380,8 +499,26 @@ def get_state_path():
     return path / "state.json"
 
 
+_STATE_SIZE_LIMIT = 10 * 1024 * 1024  # 10 MB safety threshold
+
+
 def read_state(state_path):
-    """Read the JSON state file, returning an empty dict on failure."""
+    """Read the JSON state file, returning an empty dict on failure.
+
+    Guards against oversized files: if the file exceeds the safety
+    threshold, a warning is logged and normal loading is still
+    attempted.  If parsing fails, an empty dict is returned.
+    """
+    try:
+        size = state_path.stat().st_size
+        if size > _STATE_SIZE_LIMIT:
+            LOG.warning(
+                "State file %s is %d bytes — exceeds %d byte limit. "
+                "Attempting to load anyway.",
+                state_path, size, _STATE_SIZE_LIMIT,
+            )
+    except OSError:
+        pass
     try:
         raw = state_path.read_bytes()
         data = json.loads(raw)
@@ -405,7 +542,7 @@ def write_state(state_path, state):
         tmp = Path(tmp_name)
         tmp.write_text(json.dumps(state, indent=2, sort_keys=True))
         tmp.chmod(0o640)
-        shutil.move(str(tmp), str(state_path))
+        os.replace(str(tmp), str(state_path))
     except Exception as exc:
         LOG.error("Cannot write state file %s: %s", state_path, exc)
         if tmp and tmp.exists():
@@ -724,8 +861,9 @@ def evaluate_rate_limit(event):
             # --- Adaptive learning update ---
             _update_adaptive(cat_rec, category, is_transition, ts)
 
-            write_state(state_path, state)
+            # Cleanup stale records BEFORE write so pruned state is persisted
             _cleanup_stale_records(state)
+            write_state(state_path, state)
 
         return {
             "decision": decision,
@@ -748,23 +886,80 @@ def evaluate_rate_limit(event):
         }
 
 
+def _cap_transitions(transitions, max_count):
+    """Cap a transition list after age-based pruning."""
+    if len(transitions) > max_count:
+        return transitions[-max_count:]
+    return transitions
+
+
 def _cleanup_stale_records(state):
-    """Remove hosts with no recent activity."""
-    stale = []
+    """Remove hosts and categories with no recent activity.
+
+    Full stale-host scan is rate-limited to once per cleanup interval.
+    Per-category pruning (empty categories, child dicts) runs every time.
+    """
     now_ts = now()
-    for hostname, rec in state.items():
-        if hostname == "schema_version" or not isinstance(rec, dict):
+    stale_host_days = CFG.get("state_retention", {}).get(
+        "stale_host_days", 30)
+    cleanup_interval = CFG.get("state_retention", {}).get(
+        "cleanup_interval_seconds", 3600)
+    max_transitions = CFG.get("state_retention", {}).get(
+        "max_transitions_per_category", 500)
+
+    # Always prune the current host's transitions for all categories
+    # (handled inline in evaluate_rate_limit via prune_transitions)
+
+    # Full scan: rate-limited
+    last_cleanup = state.get("_cleanup_last", 0)
+    if now_ts - last_cleanup < cleanup_interval:
+        return
+
+    state["_cleanup_last"] = now_ts
+    stale_cutoff = now_ts - stale_host_days * 86400
+    stale_hosts = []
+
+    for hostname, rec in list(state.items()):
+        if hostname.startswith("_") or not isinstance(rec, dict):
             continue
-        h = rec.get("host_state", {})
-        s = rec.get("service_state_ping", {})
-        if (not h.get("transitions") and not s.get("transitions")
-                and h.get("suppression_until", 0) <= now_ts
-                and s.get("suppression_until", 0) <= now_ts):
-            stale.append(hostname)
-    for hostname in stale:
+
+        for cat_key in ("host_state", "service_state_ping"):
+            cat_rec = rec.get(cat_key)
+            if not isinstance(cat_rec, dict):
+                continue
+
+            # Cap transition lists
+            transitions = cat_rec.get("transitions", [])
+            if transitions:
+                cat_rec["transitions"] = _cap_transitions(
+                    transitions, max_transitions)
+
+            # Remove empty category if no transitions and suppression expired
+            if (not transitions
+                    and cat_rec.get("suppression_until", 0) <= now_ts):
+                # Check adaptive learning — keep if still observing
+                ad = cat_rec.get("adaptive", {})
+                if ad.get("first_observation", 0) == 0 or ad.get("first_observation", 0) > stale_cutoff:
+                    rec.pop(cat_key, None)
+
+        # After cleaning categories, check if host is completely stale
+        remaining_cats = [k for k in ("host_state", "service_state_ping")
+                          if isinstance(rec.get(k), dict)]
+        if not remaining_cats:
+            # Also check suppression: if any active, keep
+            any_suppression = any(
+                isinstance(rec.get(k), dict)
+                and rec[k].get("suppression_until", 0) > now_ts
+                for k in ("host_state", "service_state_ping")
+            )
+            if not any_suppression:
+                stale_hosts.append(hostname)
+
+    for hostname in stale_hosts:
         del state[hostname]
-    if stale:
-        LOG.debug("Cleaned up %d stale records", len(stale))
+
+    if stale_hosts:
+        LOG.debug("Cleaned up %d stale host records", len(stale_hosts))
 
 
 # ---------------------------------------------------------------------------
@@ -822,6 +1017,11 @@ def _update_adaptive(cat_rec, category, is_transition, ts):
             retention = 30 * 86400
             cutoff = ts - retention
             samples[:] = [s for s in samples if s >= cutoff]
+            # Cap by count after age pruning
+            max_samples = CFG.get("state_retention", {}).get(
+                "max_transitions_per_category", 500)
+            if len(samples) > max_samples:
+                samples[:] = samples[-max_samples:]
             ad["transition_samples"] = samples
 
             # Daily count
@@ -942,38 +1142,29 @@ def _recalculate_recommendation(cat_rec, category, adaptive_cfg, ts):
 # ---------------------------------------------------------------------------
 
 def log_decision(decision, event, rate_info):
-    """Write a structured log line for a rate-limit decision."""
+    """Write a structured log line for a rate-limit decision.
+
+    Uses _safe_log so that logging failures never propagate into
+    business logic.  Output is JSON Lines format.
+    """
     adaptive = CFG.get("adaptive", {})
     category = decision.get("category", "?")
     cat_cfg = CFG.get(category, {}) if category else {}
-    LOG.info(
-        "DECISION=%s host=%s category=%s old=%s new=%s "
-        "transitions=%s window=%s suppress_until=%s reason=%s "
-        "adaptive_enabled=%s adaptive_mode=%s",
-        decision.get("decision", "?"),
-        event["hostname"],
-        category,
-        event["old_state"],
-        event["new_state"],
-        decision.get("transition_count", "?"),
-        cat_cfg.get("observation_window", "?"),
-        decision.get("suppression_until", "?"),
-        decision.get("reason", "?"),
-        adaptive.get("enabled", "?"),
-        adaptive.get("mode", "?"),
-    )
-    # Append adaptive fields when available
-    LOG.debug(
-        "adaptive_enabled=%s adaptive_mode=%s "
-        "learning_days=%s transition_samples=%s "
-        "recommended_threshold=%s configured_threshold=%s "
-        "recommendation_status=%s auto_apply=%s",
-        adaptive.get("enabled", "?"),
-        adaptive.get("mode", "?"),
-        0, 0,
-        "?", "?",
-        "?", adaptive.get("auto_apply", False),
-    )
+    _safe_log("INFO", {
+        "status": "DECISION",
+        "host": event["hostname"],
+        "category": category,
+        "old_state": event["old_state"],
+        "new_state": event["new_state"],
+        "decision": decision.get("decision", "?"),
+        "transition_count": decision.get("transition_count", "?"),
+        "window": cat_cfg.get("observation_window", "?"),
+        "suppress_until": decision.get("suppression_until", "?"),
+        "reason": decision.get("reason", "?"),
+        "adaptive_enabled": adaptive.get("enabled", "?"),
+        "adaptive_mode": adaptive.get("mode", "?"),
+        "auto_apply": adaptive.get("auto_apply", False),
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -1052,9 +1243,9 @@ def main():
     """Entry point.
 
     Supports --learning-report for read-only report output.
-    When called as a Checkmk notification handler, processes one event.
+    When called as a Checkmk notification handler, processes one event
+    with structured diagnostic logging.
     """
-    # CLI mode (--learning-report)
     parser = argparse.ArgumentParser(
         description=SCRIPT_DESCRIPTION,
         add_help=False,
@@ -1076,59 +1267,151 @@ def main():
     if args.learning_report:
         return print_learning_report()
 
-    # Normal notification processing
-    event = classify_notification()
-    decision = evaluate_rate_limit(event)
+    # --- Notification processing with structured logging ---
+    execution_id = _uuid.uuid4().hex
+    start_time = time.monotonic()
 
-    log_decision(decision, event, {})
-    LOG.debug(
-        "Mode=%s host=%s svc=%s old=%s new=%s decision=%s",
-        CFG.get("mode", "audit"),
-        event["hostname"],
-        event.get("service_desc", "(host)"),
-        event["old_state"],
-        event["new_state"],
-        decision["decision"],
-    )
+    notify_type = os.environ.get("NOTIFY_NOTIFICATIONTYPE", "PROBLEM")
+    notify_reason = os.environ.get("NOTIFY_NOTIFICATIONREASON", "")
 
-    do_suppress = (decision["decision"] == "SUPPRESS")
-    if do_suppress:
-        LOG.info(
-            "SUPPRESS %s/%s: mail NOT sent",
-            event["hostname"],
-            decision.get("category", "?"),
+    _safe_log("INFO", {
+        "execution_id": execution_id,
+        "status": "INVOKED",
+        "notification_type": notify_type,
+        "notification_reason": notify_reason,
+    })
+
+    delivery_attempted = False
+    delivery_result = "NOT_ATTEMPTED"
+    final_rc = 0
+    final_result = "DELIVERED"
+
+    try:
+        event = classify_notification()
+        _safe_log("INFO", {
+            "execution_id": execution_id,
+            "status": "ACCEPTED",
+            "host": event["hostname"],
+            "service": event.get("service_desc", "(host)"),
+            "old_state": event["old_state"],
+            "new_state": event["new_state"],
+            "notification_type": notify_type,
+            "notification_reason": notify_reason,
+        })
+
+        decision = evaluate_rate_limit(event)
+        log_decision(decision, event, {})
+
+        do_suppress = (decision["decision"] == "SUPPRESS")
+        if do_suppress:
+            final_result = "SUPPRESSED"
+            delivery_result = "NOT_ATTEMPTED"
+            _safe_log("INFO", {
+                "execution_id": execution_id,
+                "status": "SUPPRESSED",
+                "host": event["hostname"],
+                "category": decision.get("category", "?"),
+                "reason": decision.get("reason", "?"),
+            })
+            _safe_log("INFO", {
+                "execution_id": execution_id,
+                "status": "COMPLETE",
+                "result": final_result,
+                "exit_code": 0,
+                "delivery_attempted": False,
+                "delivery_result": delivery_result,
+                "duration_ms": int((time.monotonic() - start_time) * 1000),
+            })
+            return 0
+
+        service_label = event.get("service_desc", "")
+        if event["is_host"]:
+            service_label = "Host Check"
+
+        delivery_attempted = True
+        _safe_log("INFO", {
+            "execution_id": execution_id,
+            "status": "DELIVERING",
+            "host": event["hostname"],
+            "service": service_label,
+        })
+
+        email = build_email_content(
+            to_email=event["to_email"],
+            hostname=event["hostname"],
+            service=service_label,
+            old_state=event["old_state"],
+            new_state=event["new_state"],
+            output=event["output"],
+            long_output=event["long_output"],
+            host_address=event["host_address"],
+            real_ip=event["real_ip"],
+            frp=event["frp"],
+            site=event["site"],
+            date=event["date"],
         )
-        return 0
 
-    service_label = event.get("service_desc", "")
-    if event["is_host"]:
-        service_label = "Host Check"
+        rc = send_email(email)
 
-    email = build_email_content(
-        to_email=event["to_email"],
-        hostname=event["hostname"],
-        service=service_label,
-        old_state=event["old_state"],
-        new_state=event["new_state"],
-        output=event["output"],
-        long_output=event["long_output"],
-        host_address=event["host_address"],
-        real_ip=event["real_ip"],
-        frp=event["frp"],
-        site=event["site"],
-        date=event["date"],
-    )
+        if rc == 0:
+            final_result = "DELIVERED"
+            delivery_result = "SUCCESS"
+            _safe_log("INFO", {
+                "execution_id": execution_id,
+                "status": "DELIVERED",
+                "host": event["hostname"],
+                "service": service_label,
+                "rc": rc,
+            })
+        else:
+            final_result = "FAILED"
+            delivery_result = "FAILED"
+            _safe_log("ERROR", {
+                "execution_id": execution_id,
+                "status": "FAILED",
+                "host": event["hostname"],
+                "service": service_label,
+                "rc": rc,
+            })
 
-    rc = send_email(email)
+        if decision["decision"] in ("WOULD_SUPPRESS", "FAIL_OPEN"):
+            _safe_log("INFO", {
+                "execution_id": execution_id,
+                "status": "AUDIT_NOT_SUPPRESSED",
+                "host": event["hostname"],
+                "category": decision.get("category", "?"),
+                "reason": decision.get("reason", "?"),
+            })
 
-    if decision["decision"] in ("WOULD_SUPPRESS", "FAIL_OPEN"):
-        LOG.info(
-            "WOULD_SUPPRESS/FAIL_OPEN %s/%s: mail SENT (audit mode)",
-            event["hostname"],
-            decision.get("category", "?"),
-        )
+        final_rc = rc
 
-    return rc
+    except Exception:
+        exc_info = sys.exc_info()
+        exception_type = exc_info[0].__name__ if exc_info[0] else "?"
+        exc_str = str(exc_info[1]) if exc_info[1] else ""
+        final_result = "ERROR"
+        delivery_result = "NOT_ATTEMPTED"
+        final_rc = 2
+        _safe_log("ERROR", {
+            "execution_id": execution_id,
+            "status": "ERROR",
+            "exception_type": exception_type,
+            "sanitized_error": exc_str,
+            "delivery_attempted": delivery_attempted,
+            "delivery_result": delivery_result,
+        })
+
+    _safe_log("INFO", {
+        "execution_id": execution_id,
+        "status": "COMPLETE",
+        "result": final_result,
+        "exit_code": final_rc,
+        "delivery_attempted": delivery_attempted,
+        "delivery_result": delivery_result,
+        "duration_ms": int((time.monotonic() - start_time) * 1000),
+    })
+
+    return final_rc
 
 
 if __name__ == "__main__":

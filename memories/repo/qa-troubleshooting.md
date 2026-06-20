@@ -143,6 +143,44 @@ ssh srv-monitoring-sp "chown monitoring:monitoring /omd/sites/monitoring/fix.py"
 
 ---
 
+## 2026-06-20 - Fail-safe logging pattern for notification scripts
+
+**Q:** How do you prevent a logging failure from blocking email or Telegram delivery in Checkmk notification scripts?
+
+**A:** Use a three-layer fail-safe logging strategy:
+
+1. **Handler-level**: Replace `logging.FileHandler` with a custom `_SafeFileHandler` that wraps `emit()` in try/except and falls back to a single sanitized stderr line. This prevents any single handler from crashing the logging framework.
+
+2. **Call-site-level**: Route all lifecycle records through `_safe_log()` which wraps the LOG call in try/except. Never call `LOG.*` directly in business-logic functions that run before or during delivery.
+
+3. **No global monkeypatch**: Do NOT patch `logging.Logger._log`. The handler-level and call-site-level protections are sufficient. A global patch cannot be removed safely in multi-module contexts.
+
+Python 3.13's `Handler.handle()` does NOT catch `emit()` exceptions (the try/except was removed). Therefore every handler MUST be self-protecting.
+
+**Key verification test**: Add a handler that raises `OSError(28)` on every `emit()` and verify:
+- delivery still proceeds (rc preserved)
+- `_safe_log()` catches the exception and writes a fallback to stderr
+- existing `LOG.info()` calls in functions like `log_decision()`, `evaluate_rate_limit()`, and `read_state()` are protected by `_SafeFileHandler`
+
+## 2026-06-20 - JSON state retention for notification scripts
+
+**Q:** How is JSON state-file growth bounded in M@il-20 and Telegram-20?
+
+**A:** Three mechanisms work together:
+
+1. **Pruning order bug**: Originally `_cleanup_stale_records()` ran AFTER `write_state()`, so cleaned records were never persisted. Fix: run cleanup BEFORE write.
+
+2. **Retention defaults** (configurable via `state_retention`):
+   - `stale_host_days`: 30 — remove hosts with no transitions and expired suppression
+   - `max_transitions_per_category`: 500 — cap transition arrays after age-based pruning
+   - `cleanup_interval_seconds`: 3600 — rate-limit full stale-host scans
+
+3. **Oversized-file handling**: If the state file exceeds 10 MB, a warning is logged but loading proceeds normally. Valid oversized JSON is parsed successfully. Corrupted files follow the existing recovery path (empty dict returned).
+
+**Atomic write pattern**: Temporary file created in the same directory via `tempfile.mkstemp(dir=str(state_path.parent))`, then `os.replace()` for atomic rename. If write fails, original file is preserved and temp file is cleaned up.
+
+---
+
 ## ABSOLUTE RULE - MAI usare ENABLE/DISABLE_HOST_SVC_CHECKS sul nagios pipe
 
 **Q:** Come si gestisce un overload di check o servizi stale sui client?

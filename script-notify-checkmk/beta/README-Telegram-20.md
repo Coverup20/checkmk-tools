@@ -97,8 +97,52 @@ errors retain their own error behaviour.
 
 | Resource | Path |
 |---|---|
-| State | `$OMD_ROOT/var/check_mk/Telegram-20/state.json` |
-| Log | `$OMD_ROOT/var/log/Telegram-20.log` |
+| State file | `$OMD_ROOT/var/check_mk/Telegram-20/state.json` |
+| Lock file | `$OMD_ROOT/var/check_mk/Telegram-20/state.lock` |
+| Log file | `$OMD_ROOT/var/log/notifications/telegram-20.log` |
+
+## Logging format
+
+All lifecycle records use JSON Lines format with the `NOTIFY_EVENT ` prefix:
+
+```
+NOTIFY_EVENT {"level":"INFO","execution_id":"...","status":"INVOKED",...}
+```
+
+Each physical line is exactly one JSON object, parseable with `json.loads()` after
+stripping the `NOTIFY_EVENT ` prefix.  The log is also grep-compatible:
+
+```bash
+grep "NOTIFY_EVENT" $OMD_ROOT/var/log/notifications/telegram-20.log
+```
+
+## Debug logging
+
+Set the environment variable `TELEGRAM20_DEBUG=1` before invoking the script to enable
+additional diagnostic output in the log:
+
+```bash
+TELEGRAM20_DEBUG=1 /opt/checkmk-tools/script-notify-checkmk/beta/Telegram-20
+```
+
+## State retention
+
+The state file is bounded by the following defaults (configurable via
+`state_retention` in the JSON configuration):
+
+| Setting | Default | Description |
+|---|---|---|
+| `stale_host_days` | 30 | Remove hosts with no activity after this many days |
+| `max_transitions_per_category` | 500 | Cap transition lists after age-based pruning |
+| `cleanup_interval_seconds` | 3600 | Minimum seconds between full stale-host scans |
+
+Cleanup runs under the state lock; expired records are removed, active
+suppression and recent adaptive-learning data are preserved.
+
+If the state file exceeds 10 MB, a warning is logged but the file is still
+loaded.  Corrupted files are replaced with an empty state.  Writes use an
+atomic temporary-file + `os.replace()` pattern.  If a write fails, the
+original state file remains intact and temporary files are cleaned up.
 
 ## Configuration
 
