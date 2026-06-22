@@ -15,7 +15,6 @@
 - `.github/copilot-instructions.md` → **THIS FILE** - Complete rules (~2250 lines, automatically updated)
 
 **MANDATORY: At the start of EVERY conversation, use the memory tool to read these repository memory files:**
-- `/memories/repo/hosts-access.md` → SSH access method per host (key vs password), correct commands
 - `/memories/repo/copilot-scripts-index.md` → Index of all copilot/ scripts and their purpose
 - `/memories/repo/copilot-scripts-policy.md` → Where to save temp scripts, author name, README rules
 - `/memories/repo/git-push-policy.md` → Git commit format, versioning (v0.0.X PATCH progression), tag + release workflow (CRITICAL)
@@ -2004,74 +2003,8 @@ wsl -d kali-linux bash -c "ssh <alias> 'git pull'"
     → Completely autonomous access, zero passwords
   - **PASSWORD** (give commands to paste): checkmk-z1-00, checkmk-z1-01, nodo-proxmox, ns-lab00, box-lab00, rl94ns8, rl94ns81, nsec8-stable, laboratory, marziodemo, fwlab, redteam
 
-**Available hosts:**
-
-```bash
-# VPS CheckMK (key: ~/.ssh/checkmk + passphrase)
-checkmk-vps-01 # monitor.nethlab.it (CheckMK 2.4.0p19.cre) - PRODUCTION
-                  # rclone configured inside the OMD site (not root)
-                  # Path: /opt/omd/sites/monitoring/.config/rclone/rclone.conf
-                  # Commands: omd on monitoring -c "rclone ..."
-checkmk-vps-02 # monitor01.nethlab.it - CRITICAL TESTS / STAGING
-
-# CheckMK local servers (password authentication)
-checkmk-z1-00 #192.168.10.128 (local)
-checkmk-z1-01 #192.168.10.126 (user: admin_nethesis)
-
-# Other local servers (password authentication)
-proxmox-node #10.155.100.20:22 (root, Proxmox VE)
-ns-lab00 #192.168.10.100:2222 (root, NethServer 7)
-box-lab00 # 192.168.10.132:22 (root) - Host share \\192.168.10.132\usbshare
-rl94ns8 #10.155.100.40:22 (root, NethServer 8)
-                  # Modules: samba1, mail2, webtop1, webtop3
-                  # Full node for NS8 fortnightly report testing (AD + Mail + WebTop)
-rl94ns81 #10.155.100.41:22 (root, NethServer 8)
-                  # Modules: webtop1 (with Postgres active)
-                  # WebTop node for testing email shares
-nsec8-stable #10.155.100.100:22 (root, NethSecurity 8)
-                  # Install: wget ipk files + opkg install (see NethSecurity 8 section)
-                  # DO NOT use install-agent-nsec8.py or setup-persistent-nsec8.py
-lab #10.155.100.1:2222 (root, NethSecurity 8)
-                  # Install: wget ipk files + opkg install (see NethSecurity 8 section)
-marziodemo # 10.155.100.61:22 (root, Demo environment)
-ubntmarzio # 10.155.100.108:22 (user: marzio) - SSH KEY (self-access OK, NO sudo without password)
-                  # Key: ~/.ssh/copilot_ubntmarzio (ed25519, installed 2026-03-28)
-                  # Command: ssh ubntmarzio 'cmd' (alias in ~/.ssh/config)
-srv-monitoring-sp #45.33.235.86:2333 (root, Monitoring)
-                  # ALWAYS USE root@45.33.235.86 - NEVER admin-nethesis or other users!
-                  # DO NOT use sudo (already logged in as root - sudo is not needed)
-# OMD installed: site 'monitoring' in /omd/sites/monitoring/
-                  # rclone configured: /opt/omd/sites/monitoring/.config/rclone/rclone.conf (remote 'do', bucket 'testmonbck')
-                  # Local backups in: /var/backups/checkmk/
-                  # Cloud push: checkmk-cloud-backup-push@monitoring.timer (every minute)
-                  # OMD commands as root: su - monitoring -c "command"
-                  # Public firewall 45.33.235.86 port 2333 → DNAT → 127.0.0.1:2222 internal
-                  # fail2ban active on firewall - DO NOT make multiple connection attempts
-                  # Firewall whitelist only IP 159.65.203.113 (alias sos) - MANDATORY jump via sos
-                  # SSH KEY authentication: ~/.ssh/copilot_srv_monitoring (ed25519, NO passphrase)
-                  # Direct access command (from WSL):
-                  # wsl -d kali-linux ssh srv-monitoring-sp (use alias ~/.ssh/config in WSL)
-                  # Config WSL ~/.ssh/config entry REQUIRED:
-                  # Host srv-monitoring-sp
-                  # HostName 45.33.235.86
-                  # Port 2333
-                  # User root
-                  # ProxyJump sus
-                  # Correct command: wsl -d kali-linux bash -c "ssh srv-monitoring-sp 'cmd'" (NO -tt!)
-                  #
-                  # RULE - srv-monitoring-sp: RUN SELF with run_in_terminal
-                  # → SSH key installed, fully autonomous access
-                  # → Basic command: wsl -d kali-linux bash -c "ssh srv-monitoring-sp 'cmd'"
-                  # → DO NOT use -tt flag (causes ^C), use without -tt
-                  # → For rclone with su - monitoring: escape backslashes for spaces in -c
-                  # FIXED: wsl -d kali-linux bash -c "ssh srv-monitoring-sp 'su - monitoring -c rclone\ ls\ do:testmonbck/...'"
-                  # WRONG: wsl -d kali-linux bash -c "ssh srv-monitoring-sp 'su - monitoring -c \"rclone ls ...\"'"
-                  # → Recommended timeout: 60000ms (60 sec)
-                  # Don't use more than one block per operation (avoid unnecessary back-and-forth)
-
-# Other servers
-fwlab #192.168.5.117:2222 (root)
-redteam # redteam.security.nethesis.it (root)
+Host access information is stored in the private `.copilot` repository
+(`Coverup20/.copilot`), file `memories/repo/hosts-access.md`.
 
 ```text
 
