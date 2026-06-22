@@ -7,7 +7,7 @@ Python wrapper for upgrade-checkmk.sh with outcome management for automations/em
 - Update failed with rollback performed
 - Skipped: pre-release (beta/RC) version detected
 
-Version: 1.4.0"""
+Version: 1.4.1"""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 REPORT_FILE = Path("/tmp/checkmk-upgrade-report.txt")
 BACKUP_DIR = Path("/opt/omd/backups")
 EMAIL_FROM = "no-reply@nethesis.it"
@@ -116,6 +116,71 @@ def execute_rollback(site_name: str, backup_file: Path) -> tuple[bool, str]:
     return True, "rollback eseguito"
 
 
+def fix_site_ownership(site_name: str) -> int:
+    """Fix files under /omd/sites/<site>/ not owned by the site user.
+
+    Root-owned files inside the OMD tree make 'omd backup' (run as the site
+    user) fail with Permission denied, which blocks both scheduled backups
+    and pre-upgrade backups.
+
+    This function finds and corrects such files. It excludes var/log/ and .git/
+    to avoid touching active log files or the repository metadata.
+
+    Returns the number of files fixed, or -1 on error.
+    """
+    site_root = Path(f"/omd/sites/{site_name}")
+    if not site_root.is_dir():
+        return 0
+
+    try:
+        result = subprocess.run(
+            [
+                "find", str(site_root),
+                "-not", "-path", f"{site_root}/var/log/*",
+                "-not", "-path", f"{site_root}/.git/*",
+                "-type", "f",
+                "!", "(", "-user", site_name, "-a", "-group", site_name, ")",
+            ],
+            text=True, capture_output=True, timeout=30,
+        )
+        if result.returncode != 0:
+            return -1
+
+        files = [f for f in result.stdout.splitlines() if f.strip()]
+        if not files:
+            return 0
+
+        fixed = 0
+        for f in files:
+            try:
+                subprocess.run(
+                    ["chown", f"{site_name}:{site_name}", f],
+                    capture_output=True, timeout=5,
+                )
+                fixed += 1
+            except Exception:
+                pass
+
+        # Also fix __pycache__ directories with wrong ownership
+        subprocess.run(
+            [
+                "find", str(site_root),
+                "-not", "-path", f"{site_root}/var/log/*",
+                "-type", "d", "-name", "__pycache__",
+                "-exec", "chown", "-R", f"{site_name}:{site_name}", "{}", "+",
+            ],
+            capture_output=True, timeout=30,
+        )
+
+        return fixed
+    except subprocess.TimeoutExpired:
+        print(f"[WARN] Ownership check timed out for site {site_name}", file=sys.stderr)
+        return -1
+    except Exception as e:
+        print(f"[WARN] Ownership check failed: {e}", file=sys.stderr)
+        return -1
+
+
 def send_mail(recipient: str, subject: str, body: str) -> None:
     if not recipient:
         return
@@ -173,6 +238,17 @@ def main() -> int:
     if forward and forward[0] == "--":
         forward = forward[1:]
 
+    # Fix ownership before upgrade to prevent backup failures caused by
+    # root-owned files inside the OMD site tree
+    if Path("/omd/sites").is_dir():
+        for site_dir in Path("/omd/sites").iterdir():
+            if site_dir.is_dir() and (site_dir / "etc").exists():
+                fixed = fix_site_ownership(site_dir.name)
+                if fixed > 0:
+                    print(f"[INFO] Fixed {fixed} file(s) owned by wrong user in site {site_dir.name}")
+                elif fixed < 0:
+                    print(f"[WARN] Ownership check failed for site {site_dir.name}")
+
     run = subprocess.run([runner, str(script), *forward], text=True)
     report = read_report()
     site_name = detect_site_from_report(report)
@@ -195,6 +271,11 @@ def main() -> int:
 
     if run.returncode == 0:
         version = get_current_version(site_name)
+        # Fix ownership after upgrade (upgrade may create root-owned artifacts)
+        if site_name:
+            fixed = fix_site_ownership(site_name)
+            if fixed > 0:
+                print(f"[INFO] Fixed {fixed} file(s) owned by wrong user in site {site_name}")
         subject, body = build_message("SUCCESS", site_name, version)
         send_mail(args.email, subject, body)
         print(f"SUCCESS: aggiornamento completato alla versione {version}")
