@@ -96,6 +96,30 @@ su - monitoring -c "cmk -O"    # ricarica core
 
 **Q:** Come condurre un audit comparativo read-only degli alert Checkmk prima/dopo un cambio configurazione, analizzando Nagios archives, WATO audit log, notification log e configurazione effettiva?
 
+## 2026-06-22 - OMD Apache does not restart after SIGTERM (Web UI unreachable 33h)
+
+**Q:** Why was the CheckMK web interface unreachable for approximately 33 hours?
+
+**A:** The OMD Apache process (port 5000, WSGI backend) received a SIGTERM and did not restart automatically. At the same time, `apt full-upgrade` at 03:00 failed with `dpkg error code (1)`, leaving the system in an inconsistent state.
+
+**Symptom:** The user sees "Connection refused" or "502 Bad Gateway" on the CheckMK web URL. System Apache (*:443) is up, but the OMD backend (127.0.0.1:5000) is down.
+
+**Verification:**
+```bash
+# Check if OMD backend is listening
+ss -tlnp | grep 5000
+# Should show apache2 processes on 127.0.0.1:5000
+# If not, OMD Apache is down
+
+# Check system Apache error log
+tail -20 /var/log/apache2/error.log | grep "5000"
+
+# Restart OMD Apache
+su - monitoring -c "omd restart apache"
+```
+
+**Lesson:** OMD-managed Apache (not systemd) may not restart automatically after SIGTERM if the OMD restart mechanism fails silently. Monitor port 5000 separately, not just port 443.
+
 **A:** Workflow completo per audit read-only:
 
 1. **Trova il timestamp del cambio configurazione** → WATO audit log (`wato_audit.log`), cercare `edit-rule` con `max_check_attempts` o `PING`
@@ -184,6 +208,31 @@ ssh srv-monitoring-sp "chown monitoring:monitoring /omd/sites/monitoring/fix.py"
 3. **No global monkeypatch**: Do NOT patch `logging.Logger._log`. The handler-level and call-site-level protections are sufficient. A global patch cannot be removed safely in multi-module contexts.
 
 Python 3.13's `Handler.handle()` does NOT catch `emit()` exceptions (the try/except was removed). Therefore every handler MUST be self-protecting.
+
+---
+
+## 2026-06-22 - Samba USB share inaccessible
+
+**Q:** Why can't I access a Samba USB share from Windows?
+
+**A:** Two separate issues:
+
+**1. USB disk not mounted**
+A Seagate M3 Portable 4TB disk (`/dev/sdb1`, NTFS) was not mounted to the Samba share path. Samba was serving an empty directory. Fix:
+```bash
+mount -t ntfs-3g /dev/sdb1 /mnt/usbshare
+# Add persistent auto-mount in /etc/fstab:
+echo "/dev/sdb1 /mnt/usbshare ntfs-3g defaults,uid=0,gid=0,umask=000 0 0" >> /etc/fstab
+```
+
+**2. Samba password expired / invalid**
+The Samba user existed in the database but the password was out of sync. Fix:
+```bash
+# Replace <PASSWORD> with the actual password
+printf "<PASSWORD>\n<PASSWORD>\n" | smbpasswd -s <username>
+```
+
+**Verification:** `smbclient -L //<HOST>/<SHARE> -U "<username>%<password>"` from Linux, or Explorer with Samba credentials from Windows.
 
 **Key verification test**: Add a handler that raises `OSError(28)` on every `emit()` and verify:
 - delivery still proceeds (rc preserved)
