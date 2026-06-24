@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # Telegram-20
 # Bulk: yes
-# Telegram-20 is a beta Checkmk Telegram notification handler with an
-# audit-only fail2ban-style transition rate limiter and adaptive
-# learning for HOST STATE and SERVICE STATE PING notifications.
+# Telegram-20 is a beta Checkmk Telegram notification handler with a
+# per-host per-category cooldown and a fail2ban-style transition rate
+# limiter with adaptive learning for HOST STATE and SERVICE STATE
+# PING notifications.
 #
-# Mode audit (default):  every notification is sent; the rate-limit decision
-#                         is calculated and logged but never enforced.
+# Cooldown (default): after a successful delivery for a host+category,
+#                      subsequent notifications for the same pair are
+#                      suppressed for cooldown_seconds.
 #
-# Version: 1.3.1-beta
+# Version: 1.4.0-beta
 
 import os
 import sys
@@ -29,11 +31,12 @@ from pathlib import Path
 
 SCRIPT_NAME = "Telegram-20"
 SCRIPT_DESCRIPTION = (
-    "Telegram-20 is a beta Checkmk Telegram notification handler with an "
-    "audit-only fail2ban-style transition rate limiter and adaptive "
-    "learning for HOST STATE and SERVICE STATE PING notifications."
+    "Telegram-20 is a beta Checkmk Telegram notification handler with a "
+    "per-host per-category cooldown and a fail2ban-style transition "
+    "rate limiter with adaptive learning for HOST STATE and SERVICE "
+    "STATE PING notifications."
 )
-VERSION = "1.3.1-beta"
+VERSION = "1.4.0-beta"
 
 # ---------------------------------------------------------------------------
 # Configuration — defaults
@@ -61,6 +64,24 @@ CONFIG = {
         "percentile": 95,
         "safety_margin": 2,
         "auto_apply": False,
+        "cooldown": {
+            "enabled": True,
+            "auto_apply": False,
+            "minimum_learning_days": 3,
+            "minimum_notification_samples": 20,
+            "minimum_expected_reduction_percent": 30,
+            "candidate_cooldowns": [1800, 3600, 7200, 10800, 21600],
+        },
+    },
+    "cooldown": {
+        "enabled": True,
+        "mode": "audit",
+        "default_seconds": 3600,
+        "per_category": {
+            "host_state": 3600,
+            "service_state_ping": 3600,
+        },
+        "preserve_recovery": True,
     },
     "state_retention": {
         "stale_host_days": 30,
@@ -417,7 +438,7 @@ def send_telegram(token, chat_id, text, reply_markup=None):
 # Rate-limit state management
 # ---------------------------------------------------------------------------
 
-STATE_SCHEMA_VERSION = 2
+STATE_SCHEMA_VERSION = 3
 
 
 def get_state_path():
@@ -514,6 +535,28 @@ def migrate_state(state):
                         cat_rec["adaptive"] = _fresh_learning_record()
         state["schema_version"] = 2
         LOG.info("State schema migrated v1 → v2")
+    if sv == 2:
+        if "cooldown" not in state:
+            state["cooldown"] = {
+                "last_delivered": {},
+                "samples": {},
+            }
+        for cat in ("host_state", "service_state_ping"):
+            if cat not in state["cooldown"]["last_delivered"]:
+                state["cooldown"]["last_delivered"][cat] = {}
+            if cat not in state["cooldown"]["samples"]:
+                state["cooldown"]["samples"][cat] = []
+        for hostname, rec in list(state.items()):
+            if hostname.startswith("_") or not isinstance(rec, dict):
+                continue
+            for cat in ("host_state", "service_state_ping"):
+                cat_rec = rec.get(cat)
+                if isinstance(cat_rec, dict):
+                    ldt = cat_rec.pop("last_delivery_ts", 0)
+                    if ldt:
+                        state["cooldown"]["last_delivered"][cat][hostname] = ldt
+        state["schema_version"] = 3
+        LOG.info("State schema migrated v2 → v3 (cooldown tracking)")
     return state
 
 
@@ -746,6 +789,44 @@ def evaluate_rate_limit(event):
 
             _update_adaptive(cat_rec, category, is_transition, ts)
 
+            # --- Cooldown evaluation (after transition limiter) ---
+            cd_decision, cd_reason = _evaluate_cooldown(state, event, category, ts)
+
+            # Safe combine: transition enforce suppression can never be overridden.
+            # Cooldown can only add suppression, never remove it.
+            if decision == "SUPPRESS":
+                # Transition enforce suppression — keep it, cooldown cannot override
+                pass
+            elif cd_decision == "SUPPRESSED_COOLDOWN":
+                # Cooldown enforce suppression — overrides transition's SEND/WOULD_SUPPRESS
+                decision = cd_decision
+                reason = cd_reason
+            elif cd_decision == "WOULD_SUPPRESS_COOLDOWN" and decision == "SEND":
+                # Cooldown audit — only overrides transition's SEND
+                decision = cd_decision
+                reason = cd_reason
+            elif cd_decision == "COOLDOWN_BYPASS_RECOVERY":
+                _safe_log("INFO", {
+                    "status": "COOLDOWN_BYPASS_RECOVERY",
+                    "host": event["hostname"],
+                    "category": category,
+                    "old_state": event["old_state"],
+                    "new_state": event["new_state"],
+                    "reason": cd_reason,
+                })
+
+            # --- Cooldown adaptive sample collection ---
+            was_delivered = decision not in ("SUPPRESS", "SUPPRESSED_COOLDOWN",
+                                              "WOULD_SUPPRESS", "WOULD_SUPPRESS_COOLDOWN")
+            _update_cooldown_adaptive(state, event, category, ts, was_delivered)
+
+            # --- Cooldown adaptive recommendation (rate-limited) ---
+            ad_cooldown = CFG.get("adaptive", {}).get("cooldown", {})
+            if ad_cooldown.get("enabled", True):
+                cd_samples = state.get("cooldown", {}).get("samples", {}).get(category, [])
+                if len(cd_samples) % 5 == 0:
+                    _recalculate_cooldown_recommendation(state, event, category, ts)
+
             # Cleanup stale records BEFORE write so pruned state is persisted
             _cleanup_stale_records(state)
             write_state(state_path, state)
@@ -756,6 +837,7 @@ def evaluate_rate_limit(event):
             "reason": reason,
             "transition_count": len(transitions),
             "suppression_until": suppression_until,
+            "cooldown_blocked": decision in ("WOULD_SUPPRESS_COOLDOWN", "SUPPRESSED_COOLDOWN"),
         }
 
     except Exception as exc:
@@ -830,6 +912,167 @@ def _cleanup_stale_records(state):
 
     if stale_hosts:
         LOG.debug("Cleaned up %d stale host records", len(stale_hosts))
+
+    # Cooldown sample retention
+    cd_tracking = state.get("cooldown", {})
+    cd_samples = cd_tracking.get("samples", {})
+    for cat in ("host_state", "service_state_ping"):
+        samples = cd_samples.get(cat, [])
+        if not samples:
+            continue
+        cutoff = now_ts - 30 * 86400
+        samples[:] = [s for s in samples if s >= cutoff]
+        if len(samples) > 500:
+            samples[:] = samples[-500:]
+        cd_samples[cat] = samples
+
+
+# ---------------------------------------------------------------------------
+# Cooldown evaluation
+# ---------------------------------------------------------------------------
+
+
+def _get_cooldown_seconds(category):
+    cd = CFG.get("cooldown", {})
+    per_cat = cd.get("per_category", {})
+    if category in per_cat and per_cat[category]:
+        return per_cat[category]
+    return cd.get("default_seconds", 3600)
+
+
+def _is_recovery(event):
+    if event["is_host"]:
+        return event["new_state"] in ("UP",)
+    return event["new_state"] in ("OK",)
+
+
+def _evaluate_cooldown(state, event, category, ts):
+    cd = CFG.get("cooldown", {})
+    if not cd.get("enabled", True):
+        return ("BYPASS", "Cooldown disabled")
+    cd_mode = cd.get("mode", "audit")
+    preserve = cd.get("preserve_recovery", True)
+    if preserve and _is_recovery(event):
+        return ("COOLDOWN_BYPASS_RECOVERY",
+                "Recovery notification — bypassing cooldown")
+    cd_sec = _get_cooldown_seconds(category)
+    if cd_sec <= 0:
+        return ("BYPASS", "Cooldown seconds is zero or negative")
+    cd_tracking = state.get("cooldown", {})
+    last_delivered = cd_tracking.get("last_delivered", {})
+    cat_map = last_delivered.get(category, {})
+    last_ts = cat_map.get(event["hostname"], 0)
+    if last_ts <= 0:
+        return ("BYPASS", "No previous delivery for this host+category")
+    elapsed = ts - last_ts
+    if elapsed >= cd_sec:
+        return ("BYPASS", "Cooldown expired")
+    remaining = cd_sec - elapsed
+    if cd_mode == "enforce":
+        return ("SUPPRESSED_COOLDOWN",
+                f"Cooldown active — {remaining}s remaining since last delivery")
+    return ("WOULD_SUPPRESS_COOLDOWN",
+            f"Audit mode — would suppress ({remaining}s cooldown remaining)")
+
+
+def _update_delivery_cooldown(event):
+    category, _ = is_supported_transition(event)
+    if category is None:
+        return
+    state_path = get_state_path()
+    lock_path = get_lock_path(state_path)
+    try:
+        with StateLock(lock_path):
+            state = read_state(state_path)
+            state = migrate_state(state)
+            if "cooldown" not in state:
+                state["cooldown"] = {"last_delivered": {}, "samples": {}}
+            cd_tracking = state["cooldown"]
+            if "last_delivered" not in cd_tracking:
+                cd_tracking["last_delivered"] = {}
+            if category not in cd_tracking["last_delivered"]:
+                cd_tracking["last_delivered"][category] = {}
+            cd_tracking["last_delivered"][category][event["hostname"]] = now()
+            write_state(state_path, state)
+    except Exception as exc:
+        LOG.warning("FAIL_OPEN: cooldown state update error: %s", exc)
+
+
+def _update_cooldown_adaptive(state, event, category, ts, was_delivered):
+    ad = CFG.get("adaptive", {}).get("cooldown", {})
+    if not ad.get("enabled", True):
+        return
+    try:
+        if "cooldown" not in state:
+            state["cooldown"] = {"last_delivered": {}, "samples": {}}
+        samples = state["cooldown"].setdefault("samples", {})
+        if category not in samples:
+            samples[category] = []
+        samples[category].append(ts)
+        cutoff = ts - 30 * 86400
+        samples[category] = [s for s in samples[category] if s >= cutoff]
+        if len(samples[category]) > 500:
+            samples[category] = samples[category][-500:]
+    except Exception as exc:
+        LOG.warning("FAIL_OPEN: cooldown adaptive sample error: %s", exc)
+
+
+def _recalculate_cooldown_recommendation(state, event, category, ts):
+    ad = CFG.get("adaptive", {}).get("cooldown", {})
+    if not ad.get("enabled", True):
+        return
+    min_samples = ad.get("minimum_notification_samples", 20)
+    min_days = ad.get("minimum_learning_days", 3)
+    min_reduction = ad.get("minimum_expected_reduction_percent", 30)
+    candidates = ad.get("candidate_cooldowns", [1800, 3600, 7200, 10800, 21600])
+    try:
+        tracking = state.get("cooldown", {})
+        samples = tracking.get("samples", {}).get(category, [])
+        if len(samples) < min_samples:
+            LOG.info("ADAPTIVE_COOLDOWN_RECOMMENDATION: "
+                     "insufficient samples (%d < %d) for %s/%s",
+                     len(samples), min_samples, event["hostname"], category)
+            return
+        first_ts = min(samples) if samples else ts
+        learning_days = (ts - first_ts) / 86400
+        if learning_days < min_days:
+            LOG.info("ADAPTIVE_COOLDOWN_RECOMMENDATION: "
+                     "learning period too short (%.1f < %d days) for %s/%s",
+                     learning_days, min_days, event["hostname"], category)
+            return
+        total_notifications = len(samples)
+        best_candidate = candidates[0]
+        best_reduction = 0
+        for cd_sec in candidates:
+            would_pass = 0
+            would_block = 0
+            last_delivery = 0
+            for s_ts in sorted(samples):
+                if last_delivery and (s_ts - last_delivery) < cd_sec:
+                    would_block += 1
+                else:
+                    would_pass += 1
+                    last_delivery = s_ts
+            reduction = (would_block / total_notifications * 100) if total_notifications else 0
+            if reduction > best_reduction:
+                best_reduction = reduction
+                best_candidate = cd_sec
+        if best_reduction >= min_reduction:
+            LOG.info("ADAPTIVE_COOLDOWN_RECOMMENDATION: "
+                     "%s/%s best_candidate=%ds expected_reduction=%.0f%% "
+                     "samples=%d learning_days=%.1f auto_apply=false",
+                     event["hostname"], category,
+                     best_candidate, best_reduction,
+                     total_notifications, learning_days)
+        else:
+            LOG.info("ADAPTIVE_COOLDOWN_RECOMMENDATION: "
+                     "%s/%s insufficient reduction (%.0f%% < %d%%) "
+                     "for any candidate — samples=%d learning_days=%.1f",
+                     event["hostname"], category,
+                     best_reduction, min_reduction,
+                     total_notifications, learning_days)
+    except Exception as exc:
+        LOG.warning("FAIL_OPEN: cooldown recommendation error: %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -969,6 +1212,9 @@ def log_decision(decision, event, rate_info):
     adaptive = CFG.get("adaptive", {})
     category = decision.get("category", "?")
     cat_cfg = CFG.get(category, {}) if category else {}
+    cd_cfg = CFG.get("cooldown", {})
+    cd_mode = cd_cfg.get("mode", "audit")
+    cd_sec = _get_cooldown_seconds(category) if category else 0
     _safe_log("INFO", {
         "status": "DECISION",
         "host": event["hostname"],
@@ -983,6 +1229,9 @@ def log_decision(decision, event, rate_info):
         "adaptive_enabled": adaptive.get("enabled", "?"),
         "adaptive_mode": adaptive.get("mode", "?"),
         "auto_apply": adaptive.get("auto_apply", False),
+        "cooldown_mode": cd_mode,
+        "cooldown_seconds": cd_sec,
+        "cooldown_blocked": decision.get("cooldown_blocked", False),
     })
 
 
@@ -1163,16 +1412,20 @@ def main():
         decision = evaluate_rate_limit(event)
         log_decision(decision, event, {})
 
-        do_suppress = (decision["decision"] == "SUPPRESS")
-        if do_suppress:
+        suppress_decisions = {"SUPPRESS", "SUPPRESSED_COOLDOWN"}
+        would_suppress_decisions = {"WOULD_SUPPRESS", "WOULD_SUPPRESS_COOLDOWN"}
+
+        if decision["decision"] in suppress_decisions:
             final_result = "SUPPRESSED"
             delivery_result = "NOT_ATTEMPTED"
+            log_status = "SUPPRESSED_COOLDOWN" if "COOLDOWN" in decision["decision"] else "SUPPRESSED"
             _safe_log("INFO", {
                 "execution_id": execution_id,
-                "status": "SUPPRESSED",
+                "status": log_status,
                 "host": event["hostname"],
                 "category": decision.get("category", "?"),
                 "reason": decision.get("reason", "?"),
+                "cooldown_blocked": "COOLDOWN" in decision["decision"],
             })
             _safe_log("INFO", {
                 "execution_id": execution_id,
@@ -1184,6 +1437,15 @@ def main():
                 "duration_ms": int((time.monotonic() - start_time) * 1000),
             })
             return 0
+
+        if decision["decision"] in would_suppress_decisions:
+            _safe_log("INFO", {
+                "execution_id": execution_id,
+                "status": "WOULD_SUPPRESS_COOLDOWN",
+                "host": event["hostname"],
+                "category": decision.get("category", "?"),
+                "reason": decision.get("reason", "?"),
+            })
 
         # Build and send Telegram message
         token = os.environ.get("TELEGRAM_TOKEN", "")
@@ -1240,6 +1502,7 @@ def main():
         if rc == 0:
             final_result = "DELIVERED"
             delivery_result = "SUCCESS"
+            _update_delivery_cooldown(event)
             _safe_log("INFO", {
                 "execution_id": execution_id,
                 "status": "DELIVERED",
