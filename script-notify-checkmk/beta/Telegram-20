@@ -66,11 +66,11 @@ CONFIG = {
         "auto_apply": False,
         "cooldown": {
             "enabled": True,
-            "auto_apply": False,
+            "auto_apply": True,
             "minimum_learning_days": 3,
             "minimum_notification_samples": 20,
             "minimum_expected_reduction_percent": 30,
-            "candidate_cooldowns": [1800, 3600, 7200, 10800, 21600],
+            "candidate_cooldowns": [7200, 10800, 21600],
         },
     },
     "cooldown": {
@@ -1057,13 +1057,43 @@ def _recalculate_cooldown_recommendation(state, event, category, ts):
             if reduction > best_reduction:
                 best_reduction = reduction
                 best_candidate = cd_sec
+        auto_apply_msg = str(ad.get("auto_apply", False)).lower()
         if best_reduction >= min_reduction:
             LOG.info("ADAPTIVE_COOLDOWN_RECOMMENDATION: "
                      "%s/%s best_candidate=%ds expected_reduction=%.0f%% "
-                     "samples=%d learning_days=%.1f auto_apply=false",
+                     "samples=%d learning_days=%.1f auto_apply=%s",
                      event["hostname"], category,
                      best_candidate, best_reduction,
-                     total_notifications, learning_days)
+                     total_notifications, learning_days, auto_apply_msg)
+            # --- Auto-apply cooldown if enabled ---
+            if ad.get("auto_apply", False):
+                try:
+                    cfg_path = Path(CONFIG_PATH)
+                    cfg_data = json.loads(cfg_path.read_text()) if cfg_path.is_file() else {}
+                    prev_sec = cfg_data.get("cooldown", {}).get("default_seconds")
+                    if "cooldown" not in cfg_data:
+                        cfg_data["cooldown"] = {}
+                    cfg_data["cooldown"]["default_seconds"] = best_candidate
+                    if "per_category" not in cfg_data["cooldown"]:
+                        cfg_data["cooldown"]["per_category"] = {}
+                    cfg_data["cooldown"]["per_category"][category] = best_candidate
+                    cfg_path.write_text(json.dumps(cfg_data, indent=4))
+                    LOG.info("ADAPTIVE_COOLDOWN_AUTO_APPLY: "
+                             "%s/%s cooldown=%ds (was %s) "
+                             "expected_reduction=%.0f%%",
+                             event["hostname"], category,
+                             best_candidate, str(prev_sec or "default"),
+                             best_reduction)
+                    # Update in-memory CFG for current invocation
+                    if "cooldown" not in CFG:
+                        CFG["cooldown"] = {}
+                    CFG["cooldown"]["default_seconds"] = best_candidate
+                    if "per_category" not in CFG["cooldown"]:
+                        CFG["cooldown"]["per_category"] = {}
+                    CFG["cooldown"]["per_category"][category] = best_candidate
+                except Exception as aa_exc:
+                    LOG.warning("AUTO_APPLY_ERROR: %s/%s: %s",
+                               event["hostname"], category, aa_exc)
         else:
             LOG.info("ADAPTIVE_COOLDOWN_RECOMMENDATION: "
                      "%s/%s insufficient reduction (%.0f%% < %d%%) "
@@ -1228,7 +1258,7 @@ def log_decision(decision, event, rate_info):
         "reason": decision.get("reason", "?"),
         "adaptive_enabled": adaptive.get("enabled", "?"),
         "adaptive_mode": adaptive.get("mode", "?"),
-        "auto_apply": adaptive.get("auto_apply", False),
+        "auto_apply": adaptive.get("cooldown", {}).get("auto_apply", False),
         "cooldown_mode": cd_mode,
         "cooldown_seconds": cd_sec,
         "cooldown_blocked": decision.get("cooldown_blocked", False),
