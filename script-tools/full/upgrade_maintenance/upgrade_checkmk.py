@@ -301,6 +301,12 @@ class Upgrader:
         
         self.cleanup(current, new_ver)
 
+        # Fix notification backup directory ownership (created as root by omd update)
+        notif_backup = Path(f"/omd/sites/{self.site}/local/share/check_mk/notifications/backup")
+        if notif_backup.exists():
+            Console.log("Fixing notification backup directory ownership...")
+            run_cmd(["chown", "-R", f"{self.site}:{self.site}", str(notif_backup)])
+
     def cleanup(self, old_ver, new_ver):
         Console.log("Cleanup...")
 
