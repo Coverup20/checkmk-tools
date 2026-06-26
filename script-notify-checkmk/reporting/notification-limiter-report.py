@@ -761,11 +761,377 @@ class ReportEngine:
         lines.append("")
         return "\n".join(lines)
 
-    # --- Section 9: Data quality ---
+
+    # --- Section 9: Recurring pattern analysis ---
+
+    def section_recurring_patterns(self):
+        """Section 9: Recurring pattern analysis across the selected period."""
+        lines = []
+        lines.append(self._make_separator("9. RECURRING PATTERN ANALYSIS"))
+        lines.append("")
+
+        valid_execs = [e for e in self.executions if not e.get("_skip")]
+        if not valid_execs:
+            lines.append("  No executions in this period; no patterns to analyze.")
+            lines.append("")
+            return "\n".join(lines)
+
+        any_pattern = False
+
+        # ------------------------------------------------------------------
+        # 9.1 Top noisy hosts
+        # ------------------------------------------------------------------
+        lines.append("")
+        lines.append(self._make_sub_separator("9.1 Top Noisy Hosts"))
+        lines.append("")
+
+        host_counter = Counter()
+        host_delivered = Counter()
+        host_suppressed = Counter()
+        host_recovery = Counter()
+        host_cat = {}
+        host_last_ts = {}
+
+        for e in valid_execs:
+            h = e.get("host", "unknown")
+            host_counter[h] += 1
+            if e.get("delivered"):
+                host_delivered[h] += 1
+            if e.get("suppressed"):
+                host_suppressed[h] += 1
+            if e.get("recovery_bypass"):
+                host_recovery[h] += 1
+            cat = e.get("category", "?")
+            if h not in host_cat:
+                host_cat[h] = cat
+            if e.get("timestamps"):
+                ts = e["timestamps"][0]
+                if h not in host_last_ts or ts > host_last_ts[h]:
+                    host_last_ts[h] = ts
+
+        top_hosts = host_counter.most_common(15)
+        if top_hosts:
+            any_pattern = True
+            lines.append(f"  {'Host':<30} {'Total':>6} {'Deliv.':>7} {'Suppr.':>7} "
+                         f"{'Recov.':>7} {'Top Cat.':>20} {'Last Event':>20}")
+            lines.append(f"  {'-'*30} {'-'*6} {'-'*7} {'-'*7} {'-'*7} {'-'*20} {'-'*20}")
+            for host, cnt in top_hosts:
+                if cnt < 2:
+                    continue
+                d = host_delivered.get(host, 0)
+                s = host_suppressed.get(host, 0)
+                r = host_recovery.get(host, 0)
+                cat = host_cat.get(host, "?")[:20]
+                last_ts = host_last_ts.get(host)
+                last_ts_str = last_ts.strftime("%Y-%m-%d %H:%M:%S") if hasattr(last_ts, "strftime") else str(last_ts)[:20] if last_ts else ""
+                lines.append(f"  {host:<30} {cnt:>6} {d:>7} {s:>7} {r:>7} "
+                             f"{cat:>20} {last_ts_str[:20]:>20}")
+        else:
+            lines.append("  No hosts with significant activity found.")
+
+        # ------------------------------------------------------------------
+        # 9.2 Flapping candidates
+        # ------------------------------------------------------------------
+        lines.append("")
+        lines.append(self._make_sub_separator("9.2 Flapping Candidates"))
+        lines.append("")
+
+        # Define opposite transition pairs
+        OPPOSITE_MAP = {
+            ("UP", "DOWN"): ("DOWN", "UP"),
+            ("DOWN", "UP"): ("UP", "DOWN"),
+            ("OK", "CRIT"): ("CRIT", "OK"),
+            ("CRIT", "OK"): ("OK", "CRIT"),
+            ("WARN", "OK"): ("OK", "WARN"),
+            ("OK", "WARN"): ("WARN", "OK"),
+            ("UP", "CRIT"): ("CRIT", "UP"),
+            ("CRIT", "UP"): ("UP", "CRIT"),
+        }
+
+        # Group by (host, category) and sort by timestamp
+        flap_groups = defaultdict(list)
+        for e in valid_execs:
+            h = e.get("host", "unknown")
+            cat = e.get("category", "unknown")
+            old = e.get("old_state")
+            new = e.get("new_state")
+            if old and new:
+                key = (h, cat)
+                ts = None
+                if e.get("timestamps"):
+                    ts = e["timestamps"][0]
+                flap_groups[key].append((ts, old, new, e.get("script", "?"), e["execution_id"]))
+
+        flap_results = []  # (host, cat, transition_count, examples)
+        for (h, cat), transitions in flap_groups.items():
+            # Sort by timestamp
+            transitions.sort(key=lambda x: x[0] if x[0] else datetime.datetime.min)
+            opp_count = 0
+            examples = []
+            for i in range(1, len(transitions)):
+                prev = (transitions[i-1][1], transitions[i-1][2])
+                curr = (transitions[i][1], transitions[i][2])
+                if prev in OPPOSITE_MAP and OPPOSITE_MAP[prev] == curr:
+                    opp_count += 1
+                    if len(examples) < 3:
+                        ts_str = transitions[i-1][0].strftime("%m-%d %H:%M") if transitions[i-1][0] else "?"
+                        examples.append(f"{ts_str} {prev[0]}->{prev[1]} / {curr[0]}->{curr[1]}")
+
+            if opp_count >= 2:
+                flap_results.append((opp_count, h, cat, examples))
+
+        flap_results.sort(key=lambda x: x[0], reverse=True)
+
+        if flap_results:
+            any_pattern = True
+            lines.append(f"  {'Host':<30} {'Category':<20} {'Flips':>6} {'Examples':<45}")
+            lines.append(f"  {'-'*30} {'-'*20} {'-'*6} {'-'*45}")
+            for cnt, h, cat, examples in flap_results[:10]:
+                ex_str = "; ".join(examples)[:45]
+                lines.append(f"  {h:<30} {cat[:20]:<20} {cnt:>6} {ex_str:<45}")
+        else:
+            lines.append("  No flapping candidates detected in this period.")
+
+        # ------------------------------------------------------------------
+        # 9.3 Burst detection
+        # ------------------------------------------------------------------
+        lines.append("")
+        lines.append(self._make_sub_separator("9.3 Burst Detection (5-minute window)"))
+        lines.append("")
+
+        BURST_WINDOW_MINUTES = 5
+
+        # Collect all executions with their first timestamp
+        timed_execs = []
+        for e in valid_execs:
+            ts = None
+            if e.get("timestamps"):
+                ts = e["timestamps"][0]
+            if ts:
+                timed_execs.append((ts, e))
+
+        timed_execs.sort(key=lambda x: x[0])
+
+        bursts = []
+        if timed_execs:
+            i = 0
+            while i < len(timed_execs):
+                window_start = timed_execs[i][0]
+                window_end = window_start + datetime.timedelta(minutes=BURST_WINDOW_MINUTES)
+                window_execs = []
+                j = i
+                while j < len(timed_execs) and timed_execs[j][0] <= window_end:
+                    window_execs.append(timed_execs[j][1])
+                    j += 1
+
+                # Deduplicate hosts in this window
+                hosts_in_window = set()
+                cat_counter = Counter()
+                deliv_in_window = 0
+                suppr_in_window = 0
+                recov_in_window = 0
+                for we in window_execs:
+                    h = we.get("host", "unknown")
+                    hosts_in_window.add(h)
+                    cat_counter[we.get("category", "unknown")] += 1
+                    if we.get("delivered"):
+                        deliv_in_window += 1
+                    if we.get("suppressed"):
+                        suppr_in_window += 1
+                    if we.get("recovery_bypass"):
+                        recov_in_window += 1
+
+                num_hosts = len(hosts_in_window)
+                if num_hosts >= 2:
+                    dom_cat = cat_counter.most_common(1)[0][0] if cat_counter else "?"
+                    host_examples = sorted(hosts_in_window)[:5]
+                    bursts.append({
+                        "window_start": window_start,
+                        "window_end": window_end,
+                        "hosts": num_hosts,
+                        "dominant_cat": dom_cat,
+                        "delivered": deliv_in_window,
+                        "suppressed": suppr_in_window,
+                        "recovery": recov_in_window,
+                        "host_examples": host_examples,
+                    })
+
+                i = j
+
+        if bursts:
+            any_pattern = True
+            # Merge overlapping bursts (where end of one overlaps start of next)
+            # Actually, let's just deduplicate by sliding window more carefully
+            merged_bursts = []
+            for b in bursts:
+                if not merged_bursts:
+                    merged_bursts.append(b)
+                else:
+                    last = merged_bursts[-1]
+                    if b["window_start"] <= last["window_end"]:
+                        # Merge: extend the window, combine stats
+                        last["window_end"] = b["window_end"]
+                        last["hosts"] = max(last["hosts"], b["hosts"])
+                        # Pick dominant cat from the larger window
+                        # Recompute would be best, but just keep the larger
+                        if b["hosts"] > last["hosts"]:
+                            last["dominant_cat"] = b["dominant_cat"]
+                        last["delivered"] += b["delivered"]
+                        last["suppressed"] += b["suppressed"]
+                        last["recovery"] += b["recovery"]
+                        last["host_examples"] = sorted(set(last["host_examples"] + b["host_examples"]))[:5]
+                    else:
+                        merged_bursts.append(b)
+
+            lines.append(f"  {'Window Start':<20} {'Window End':<20} {'Hosts':>6} "
+                         f"{'Dom.Cat':<20} {'Deliv.':>7} {'Suppr.':>7} {'Recov.':>7} {'Examples':<30}")
+            lines.append(f"  {'-'*20} {'-'*20} {'-'*6} "
+                         f"{'-'*20} {'-'*7} {'-'*7} {'-'*7} {'-'*30}")
+            for mb in merged_bursts[:10]:
+                ws = mb["window_start"].strftime("%Y-%m-%d %H:%M")
+                we = mb["window_end"].strftime("%Y-%m-%d %H:%M")
+                ex = ", ".join(mb["host_examples"][:3])[:30]
+                lines.append(f"  {ws:<20} {we:<20} {mb['hosts']:>6} "
+                             f"{mb['dominant_cat'][:20]:<20} {mb['delivered']:>7} "
+                             f"{mb['suppressed']:>7} {mb['recovery']:>7} {ex:<30}")
+        else:
+            lines.append("  No burst clusters detected in this period.")
+
+        # ------------------------------------------------------------------
+        # 9.4 Suppression-heavy hosts
+        # ------------------------------------------------------------------
+        lines.append("")
+        lines.append(self._make_sub_separator("9.4 Suppression-Heavy Hosts"))
+        lines.append("")
+
+        # Group by host
+        host_data = defaultdict(lambda: {"delivered": 0, "suppressed": 0, "category": "?"})
+        for e in valid_execs:
+            h = e.get("host", "unknown")
+            host_data[h]["delivered"] += 1 if e.get("delivered") else 0
+            host_data[h]["suppressed"] += 1 if e.get("suppressed") else 0
+            cat = e.get("category", "?")
+            if host_data[h]["category"] == "?" or cat != "?":
+                host_data[h]["category"] = cat
+
+        sup_heavy = []
+        for h, data in host_data.items():
+            d = data["delivered"]
+            s = data["suppressed"]
+            if s > 0 and d > 0:
+                ratio = s / d
+                sup_heavy.append((ratio, s, d, h, data["category"]))
+
+        sup_heavy.sort(key=lambda x: x[0], reverse=True)
+
+        if sup_heavy:
+            any_pattern = True
+            lines.append(f"  {'Host':<30} {'Category':<20} {'Suppressed':>10} {'Delivered':>10} {'Ratio':>8}")
+            lines.append(f"  {'-'*30} {'-'*20} {'-'*10} {'-'*10} {'-'*8}")
+            for ratio, s, d, h, cat in sup_heavy[:10]:
+                lines.append(f"  {h:<30} {cat[:20]:<20} {s:>10} {d:>10} {ratio:>7.1f}x")
+        else:
+            lines.append("  No suppression-heavy hosts detected (need both suppressed and delivered > 0).")
+
+        # ------------------------------------------------------------------
+        # 9.5 Recovery-heavy hosts
+        # ------------------------------------------------------------------
+        lines.append("")
+        lines.append(self._make_sub_separator("9.5 Recovery-Heavy Hosts"))
+        lines.append("")
+
+        # Group by host
+        host_recovery_data = defaultdict(lambda: {"recovery": 0, "delivered": 0, "suppressed": 0, "category": "?"})
+        for e in valid_execs:
+            h = e.get("host", "unknown")
+            host_recovery_data[h]["recovery"] += 1 if e.get("recovery_bypass") else 0
+            host_recovery_data[h]["delivered"] += 1 if e.get("delivered") else 0
+            host_recovery_data[h]["suppressed"] += 1 if e.get("suppressed") else 0
+            cat = e.get("category", "?")
+            if host_recovery_data[h]["category"] == "?" or cat != "?":
+                host_recovery_data[h]["category"] = cat
+
+        recov_heavy = []
+        for h, data in host_recovery_data.items():
+            r = data["recovery"]
+            if r > 0:
+                recov_heavy.append((r, h, data["category"], data["delivered"], data["suppressed"]))
+
+        recov_heavy.sort(key=lambda x: x[0], reverse=True)
+
+        if recov_heavy:
+            any_pattern = True
+            lines.append(f"  {'Host':<30} {'Category':<20} {'Recov.':>7} {'Deliv.':>7} {'Suppr.':>7}")
+            lines.append(f"  {'-'*30} {'-'*20} {'-'*7} {'-'*7} {'-'*7}")
+            for r, h, cat, d, s in recov_heavy[:10]:
+                lines.append(f"  {h:<30} {cat[:20]:<20} {r:>7} {d:>7} {s:>7}")
+        else:
+            lines.append("  No recovery-heavy hosts detected in this period.")
+
+        # ------------------------------------------------------------------
+        # 9.6 Repeated time-of-day patterns
+        # ------------------------------------------------------------------
+        lines.append("")
+        lines.append(self._make_sub_separator("9.6 Repeated Time-of-Day Patterns"))
+        lines.append("")
+
+        # Group by (host, category, hour) and collect unique days
+        hour_patterns = defaultdict(set)  # (host, cat, hour) -> set of day strings
+        day_hosts = defaultdict(set)      # day -> set of (host, cat, hour)
+
+        for e in valid_execs:
+            ts = None
+            if e.get("timestamps"):
+                ts = e["timestamps"][0]
+            if ts and hasattr(ts, "strftime"):
+                hour = ts.hour
+                day_key = ts.strftime("%Y-%m-%d")
+                h = e.get("host", "unknown")
+                cat = e.get("category", "unknown")
+                key = (h, cat, hour)
+                hour_patterns[key].add(day_key)
+                day_hosts[day_key].add(key)
+
+        # Only report if we have at least 2 different days of data
+        unique_days = set()
+        for e in valid_execs:
+            ts = None
+            if e.get("timestamps"):
+                ts = e["timestamps"][0]
+            if ts and hasattr(ts, "strftime"):
+                unique_days.add(ts.strftime("%Y-%m-%d"))
+
+        if len(unique_days) >= 2:
+            # Find patterns appearing on at least 2 different days
+            recurring = [(key, days) for key, days in hour_patterns.items() if len(days) >= 2]
+            recurring.sort(key=lambda x: len(x[1]), reverse=True)
+
+            if recurring:
+                any_pattern = True
+                lines.append(f"  {'Host':<30} {'Category':<20} {'Hour':>6} {'Days':>6} {'Occurrences (sample dates)':<35}")
+                lines.append(f"  {'-'*30} {'-'*20} {'-'*6} {'-'*6} {'-'*35}")
+                for (h, cat, hour), days in recurring[:10]:
+                    day_list = sorted(days)[:3]
+                    day_str = ", ".join(day_list)
+                    lines.append(f"  {h:<30} {cat[:20]:<20} {hour:>6d} {len(days):>6} {day_str:<35}")
+            else:
+                lines.append("  No recurring time-of-day patterns found (host/category/hour combos appear in only 1 day).")
+        else:
+            lines.append("  Not enough data for recurring time-of-day patterns (need at least 2 different days in the selected period).")
+
+        # If no patterns at all
+        if not any_pattern:
+            lines.append("")
+            lines.append("  No recurring patterns detected in this period.")
+
+        lines.append("")
+        return "\n".join(lines)
+
+        # --- Section 10: Data quality ---
 
     def section_data_quality(self):
         lines = []
-        lines.append(self._make_separator("9. DATA QUALITY"))
+        lines.append(self._make_separator("10. DATA QUALITY"))
         lines.append("")
         lines.append(f"  Files read:              {len(self.dq.files_read)}")
         for f in self.dq.files_read:
@@ -800,6 +1166,7 @@ class ReportEngine:
             self.section_blocked(),
             self.section_recovery(),
             self.section_adaptive(),
+            self.section_recurring_patterns(),
             self.section_data_quality(),
         ]
         return "\n".join(parts)
