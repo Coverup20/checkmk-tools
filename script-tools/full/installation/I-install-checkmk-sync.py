@@ -612,10 +612,13 @@ if ! git fetch origin main >> "$LOG_FILE" 2>&1; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARN: git fetch failed" >> "$LOG_FILE"
     exit 0
 fi
+# Fetch tags for release traceability
+git fetch --tags origin >> "$LOG_FILE" 2>&1
 git reset --hard origin/main >> "$LOG_FILE" 2>&1
 git clean -fd >> "$LOG_FILE" 2>&1
 SHA=$(git rev-parse --short HEAD 2>/dev/null)
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Sync OK ($SHA)" >> "$LOG_FILE""""
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Sync OK ($SHA)" >> "$LOG_FILE"
+"""
 
 _GIT_SYNC_SERVICE_TPL = """\
 [Unit]
@@ -690,6 +693,7 @@ def install_git_sync_cron(repo_path: Path) -> None:
     cron_line = (
         f"* * * * * cd {repo_path} && "
         f"git fetch origin main >> {GIT_SYNC_LOG} 2>&1 && "
+        f"git fetch --tags origin >> {GIT_SYNC_LOG} 2>&1 && "
         f"git reset --hard origin/main >> {GIT_SYNC_LOG} 2>&1  # {GIT_SYNC_CRON_MARKER}"
     )
     cron_update(GIT_SYNC_CRON_MARKER, cron_line, openwrt=is_openwrt())
