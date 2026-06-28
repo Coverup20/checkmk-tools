@@ -58,6 +58,7 @@ DEFAULT_LOG_PATHS = {
 
 DEFAULT_DETAIL_LIMIT = 200
 DEFAULT_SINCE_HOURS = 24
+DEFAULT_PATTERN_HISTORY_DAYS = 7
 DEFAULT_FROM_EMAIL = "srv-monitoring-us@nethesis.it"
 
 
@@ -242,7 +243,7 @@ def get_event_ts(rec):
 class ReportEngine:
     """Processes parsed records and produces the report using execution-based aggregation."""
 
-    def __init__(self, all_records, args, dq=None):
+    def __init__(self, all_records, args, dq=None, pattern_engine=None):
         self.records = all_records
         self.args = args
         self.dq = dq or DataQuality()
@@ -250,6 +251,13 @@ class ReportEngine:
         self.adaptive_records = []  # ADAPTIVE_COOLDOWN_RECOMMENDATION records
         self.error_count = 0
         self._build_executions()
+
+        # Store reference to pattern history engine (built externally, used by section 9.6)
+        self.pattern_history_execs = []
+        if pattern_engine:
+            self.pattern_history_execs = [
+                e for e in pattern_engine.executions if not e.get("_skip")
+            ]
 
     def _build_executions(self):
         """Group records into normalized execution objects.
@@ -1069,55 +1077,233 @@ class ReportEngine:
             lines.append("  No recovery-heavy hosts detected in this period.")
 
         # ------------------------------------------------------------------
-        # 9.6 Repeated time-of-day patterns
+        # 9.6 Time-of-Day Recurrence Insights
         # ------------------------------------------------------------------
         lines.append("")
-        lines.append(self._make_sub_separator("9.6 Repeated Time-of-Day Patterns"))
+        lines.append(self._make_sub_separator("9.6 Time-of-Day Recurrence Insights"))
         lines.append("")
 
-        # Group by (host, category, hour) and collect unique days
-        hour_patterns = defaultdict(set)  # (host, cat, hour) -> set of day strings
-        day_hosts = defaultdict(set)      # day -> set of (host, cat, hour)
+        history_execs = getattr(self, "pattern_history_execs", [])
+        phs = self.args.pattern_history_start
+        phe = self.args.window_end
+        lines.append(f"  Pattern history period: {phs.strftime('%Y-%m-%d %H:%M')} — "
+                     f"{phe.strftime('%Y-%m-%d %H:%M')} "
+                     f"({self.args.pattern_history_days} days, "
+                     f"{len(history_execs)} total executions)")
+        lines.append("")
 
-        for e in valid_execs:
-            ts = None
-            if e.get("timestamps"):
-                ts = e["timestamps"][0]
-            if ts and hasattr(ts, "strftime"):
-                hour = ts.hour
-                day_key = ts.strftime("%Y-%m-%d")
-                h = e.get("host", "unknown")
-                cat = e.get("category", "unknown")
-                key = (h, cat, hour)
-                hour_patterns[key].add(day_key)
-                day_hosts[day_key].add(key)
-
-        # Only report if we have at least 2 different days of data
-        unique_days = set()
-        for e in valid_execs:
-            ts = None
-            if e.get("timestamps"):
-                ts = e["timestamps"][0]
-            if ts and hasattr(ts, "strftime"):
-                unique_days.add(ts.strftime("%Y-%m-%d"))
-
-        if len(unique_days) >= 2:
-            # Find patterns appearing on at least 2 different days
-            recurring = [(key, days) for key, days in hour_patterns.items() if len(days) >= 2]
-            recurring.sort(key=lambda x: len(x[1]), reverse=True)
-
-            if recurring:
-                any_pattern = True
-                lines.append(f"  {'Host':<30} {'Category':<20} {'Hour':>6} {'Days':>6} {'Occurrences (sample dates)':<35}")
-                lines.append(f"  {'-'*30} {'-'*20} {'-'*6} {'-'*6} {'-'*35}")
-                for (h, cat, hour), days in recurring[:10]:
-                    day_list = sorted(days)[:3]
-                    day_str = ", ".join(day_list)
-                    lines.append(f"  {h:<30} {cat[:20]:<20} {hour:>6d} {len(days):>6} {day_str:<35}")
+        def _half_hour_bucket(dt):
+            """Round timestamp to nearest half-hour (±15 min tolerance)."""
+            if dt.minute < 15:
+                return dt.replace(minute=0, second=0, microsecond=0)
+            elif dt.minute < 45:
+                return dt.replace(minute=30, second=0, microsecond=0)
             else:
-                lines.append("  No recurring time-of-day patterns found (host/category/hour combos appear in only 1 day).")
+                return (dt + datetime.timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+
+        # Collect time-of-day patterns from history executions
+        # key = (host, category, transition, bucket) -> set of day strings
+        pattern_days = defaultdict(set)
+        pattern_timestamps = defaultdict(list)
+
+        for e in history_execs:
+            if not e.get("timestamps"):
+                continue
+            ts = e["timestamps"][0]
+            if not hasattr(ts, "strftime"):
+                continue
+            h = e.get("host", "unknown")
+            cat = e.get("category", "unknown")
+            old = e.get("old_state", "")
+            new = e.get("new_state", "")
+            if not old or not new:
+                continue
+            transition = f"{old}->{new}"
+            bucket = _half_hour_bucket(ts)
+            day_key = ts.strftime("%Y-%m-%d")
+            key = (h, cat, transition, bucket)
+            pattern_days[key].add(day_key)
+            if ts not in pattern_timestamps[key]:
+                pattern_timestamps[key].append(ts)
+
+        # Separate confirmed (>= 2 days) from insufficient (single day)
+        confirmed = {}
+        insufficient = {}
+        for key, days in pattern_days.items():
+            if len(days) >= 2:
+                confirmed[key] = {
+                    "days": days,
+                    "timestamps": pattern_timestamps[key],
+                }
+            else:
+                insufficient[key] = {
+                    "days": days,
+                    "timestamps": pattern_timestamps[key],
+                }
+
+        # Helper: convert bucket (datetime) to time string
+        def _bucket_time(bucket):
+            return bucket.strftime("%H:%M")
+
+        # Helper: interpret transition
+        INTERPRETATION_MAP = {
+            "UP->DOWN": "possible scheduled shutdown",
+            "DOWN->UP": "possible startup after scheduled downtime",
+            "OK->CRIT": "possible unstable connectivity",
+            "CRIT->OK": "possible recovery after incident",
+            "OK->WARN": "possible performance degradation pattern",
+            "WARN->OK": "possible recovery from degraded state",
+            "UP->CRIT": "possible device reboot or power issue",
+            "CRIT->UP": "possible recovery after reboot",
+        }
+
+        def _interpret(transition):
+            return INTERPRETATION_MAP.get(transition, "possible recurring state change")
+
+        # -- confirmed patterns --
+        lines.append("")
+        lines.append("  Confirmed recurring patterns (same host/category/transition "
+                     "at same time on ≥ 2 different days):")
+        lines.append("")
+
+        if confirmed:
+            any_pattern = True
+            # Sort: most days first, then most total observations
+            sorted_confirmed = sorted(
+                confirmed.items(),
+                key=lambda x: (len(x[1]["days"]), len(x[1]["timestamps"])),
+                reverse=True,
+            )
+
+            lines.append(
+                f"  {'Host':<28} {'Category':<22} {'Transition':<16} "
+                f"{'Time':>8} {'Days':>5} {'Obs.':>5} {'Conf.':>10} "
+                f"{'First':<12} {'Last':<12} {'Interpretation':<35}"
+            )
+            lines.append(
+                f"  {'-'*28} {'-'*22} {'-'*16} "
+                f"{'-'*8} {'-'*5} {'-'*5} {'-'*10} "
+                f"{'-'*12} {'-'*12} {'-'*35}"
+            )
+
+            for (h, cat, transition, bucket), info in sorted_confirmed:
+                day_count = len(info["days"])
+                all_ts = sorted(info["timestamps"])
+                obs_count = len(all_ts)
+                if day_count >= 5:
+                    confidence = "high"
+                elif day_count >= 3:
+                    confidence = "medium"
+                else:
+                    confidence = "low"
+                first_seen = all_ts[0].strftime("%Y-%m-%d")
+                last_seen = all_ts[-1].strftime("%Y-%m-%d")
+                btime = _bucket_time(bucket)
+                interp = _interpret(transition)
+
+                lines.append(
+                    f"  {h:<28} {cat[:22]:<22} {transition:<16} "
+                    f"{btime:>8} {day_count:>5} {obs_count:>5} {confidence:>10} "
+                    f"{first_seen:<12} {last_seen:<12} {interp:<35}"
+                )
         else:
-            lines.append("  Not enough data for recurring time-of-day patterns (need at least 2 different days in the selected period).")
+            lines.append("  No confirmed recurring patterns found in the historical period.")
+        lines.append("")
+
+        # -- candidate observations from current report period --
+        lines.append("")
+        lines.append("  Candidate observations (host/category/transition in current "
+                     "report period, insufficient evidence yet):")
+        lines.append("")
+
+        # Build set of already-confirmed (host, category, transition) to exclude candidates
+        confirmed_set = set()
+        for (h, cat, transition, _bucket), _info in confirmed.items():
+            confirmed_set.add((h, cat, transition))
+
+        candidates = []
+        for e in valid_execs:
+            if not e.get("timestamps"):
+                continue
+            ts = e["timestamps"][0]
+            if not hasattr(ts, "strftime"):
+                continue
+            h = e.get("host", "unknown")
+            cat = e.get("category", "unknown")
+            old = e.get("old_state", "")
+            new = e.get("new_state", "")
+            if not old or not new:
+                continue
+            transition = f"{old}->{new}"
+            pattern_key = (h, cat, transition)
+            if pattern_key in confirmed_set:
+                continue  # already reported as confirmed
+            bucket = _half_hour_bucket(ts)
+            hist_key = (h, cat, transition, bucket)
+            hist_days = pattern_days.get(hist_key, set())
+            candidates.append({
+                "host": h,
+                "category": cat,
+                "transition": transition,
+                "timestamp": ts,
+                "hist_days": len(hist_days),
+            })
+
+        if candidates:
+            any_pattern = True
+            # Deduplicate: keep the most recent timestamp per (host, cat, transition)
+            seen_candidates = {}
+            for c in candidates:
+                ck = (c["host"], c["category"], c["transition"])
+                if ck not in seen_candidates or c["timestamp"] > seen_candidates[ck]["timestamp"]:
+                    seen_candidates[ck] = c
+            unique_candidates = sorted(
+                seen_candidates.values(),
+                key=lambda x: x["timestamp"],
+                reverse=True,
+            )
+
+            lines.append(
+                f"  {'Host':<28} {'Category':<22} {'Transition':<16} "
+                f"{'Timestamp':<20} {'Hist.Days':>9} {'Status':<12} {'Interpretation':<35}"
+            )
+            lines.append(
+                f"  {'-'*28} {'-'*22} {'-'*16} "
+                f"{'-'*20} {'-'*9} {'-'*12} {'-'*35}"
+            )
+
+            for c in unique_candidates[:15]:
+                interp = _interpret(c["transition"])
+                lines.append(
+                    f"  {c['host']:<28} {c['category'][:22]:<22} {c['transition']:<16} "
+                    f"{c['timestamp'].strftime('%Y-%m-%d %H:%M'):<20} "
+                    f"{c['hist_days']:>9} {'candidate':<12} {interp:<35}"
+                )
+        else:
+            lines.append("  No candidate observations in the current report period.")
+        lines.append("")
+
+        # -- insufficient evidence summary --
+        if insufficient:
+            any_pattern = True
+            lines.append("")
+            lines.append("  Patterns with insufficient evidence (single day in history, "
+                         "not in current report period):")
+            lines.append("")
+            sorted_insuff = sorted(
+                insufficient.items(),
+                key=lambda x: len(x[1]["timestamps"]),
+                reverse=True,
+            )
+            for (h, cat, transition, bucket), info in sorted_insuff[:5]:
+                btime = _bucket_time(bucket)
+                obs = len(info["timestamps"])
+                day_str = ", ".join(sorted(info["days"]))
+                lines.append(
+                    f"    {h:<28} {cat[:22]:<22} {transition:<16} "
+                    f"{btime:>8}  {obs} obs on {day_str}"
+                )
+            lines.append("")
 
         # If no patterns at all
         if not any_pattern:
@@ -1198,6 +1384,11 @@ def parse_args(argv=None):
     parser.add_argument("--to", dest="to_ts", default=None,
                         help="Explicit window end: YYYY-MM-DDTHH:MM:SS (default: now)")
 
+    # Pattern history
+    parser.add_argument("--pattern-history-days", type=int, default=DEFAULT_PATTERN_HISTORY_DAYS,
+                        help="Days to look back for time-of-day recurrence analysis in section 9.6 "
+                             "(default: %(default)s, range 1-30)")
+
     # Email
     parser.add_argument("--to-email", default=None,
                         help="Recipient email address")
@@ -1250,6 +1441,11 @@ def parse_args(argv=None):
             parser.error(f"Invalid --from format: {args.from_ts!r} (use YYYY-MM-DDTHH:MM:SS)")
     else:
         args.window_start = args.window_end - datetime.timedelta(hours=args.since_hours)
+
+    # Validate pattern history days
+    if args.pattern_history_days < 1 or args.pattern_history_days > 30:
+        parser.error("--pattern-history-days must be between 1 and 30")
+    args.pattern_history_start = args.window_end - datetime.timedelta(days=args.pattern_history_days)
 
     # Validate
     if not args.dry_run and not args.to_email:
@@ -1313,8 +1509,19 @@ def main(argv=None):
         else:
             dq.outside_period += 1
 
+    # ---- Filter for pattern history ----
+    pattern_records = []
+    for rec in all_records:
+        if in_window(rec, args.pattern_history_start, args.window_end):
+            pattern_records.append(rec)
+
+    # ---- Build pattern history engine ----
+    pattern_engine = None
+    if args.pattern_history_days > 0 and pattern_records:
+        pattern_engine = ReportEngine(pattern_records, args)
+
     # ---- Build report ----
-    engine = ReportEngine(filtered, args, dq=dq)
+    engine = ReportEngine(filtered, args, dq=dq, pattern_engine=pattern_engine)
     # dq is now passed directly to ReportEngine
 
     report_body = engine.generate_text()
