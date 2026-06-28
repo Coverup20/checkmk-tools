@@ -779,10 +779,12 @@ class ReportEngine:
         lines.append("")
 
         valid_execs = [e for e in self.executions if not e.get("_skip")]
-        if not valid_execs:
-            lines.append("  No executions in this period; no patterns to analyze.")
+        has_current_period_execs = bool(valid_execs)
+
+        if not has_current_period_execs:
+            lines.append("  No executions in the current report period; "
+                         "running pattern history analysis only.")
             lines.append("")
-            return "\n".join(lines)
 
         any_pattern = False
 
