@@ -35,6 +35,7 @@ Usage:
 import argparse
 import datetime
 import json
+import gzip
 import os
 import re
 import subprocess
@@ -63,8 +64,57 @@ DEFAULT_FROM_EMAIL = "srv-monitoring-us@nethesis.it"
 
 
 # ---------------------------------------------------------------------------
+# Archive discovery helpers
+# ---------------------------------------------------------------------------
+
+
+def _discover_log_files(base_path):
+    """Discover all active and rotated log files for a given channel base path.
+
+    Returns a sorted list of Path objects (oldest first) including the active
+    log file and any rotated/compressed archives.
+    """
+    base = Path(base_path)
+    parent = base.parent
+    stem = base.name
+    files = set()
+
+    # Active log
+    if base.exists():
+        files.add(base)
+
+    # Rotated files: stem.N and stem.N.gz
+    if parent.is_dir():
+        for p in parent.iterdir():
+            name = p.name
+            if name == stem:
+                continue
+            if name.startswith(stem + "."):
+                rest = name[len(stem) + 1:]
+                # stem.N  or  stem.N.gz
+                if rest.isdigit():
+                    files.add(p)
+                elif "." in rest:
+                    num_part, ext = rest.rsplit(".", 1)
+                    if num_part.isdigit() and ext == "gz":
+                        files.add(p)
+
+    # Sort from oldest (highest rotation number) to newest (active file)
+    def _sort_key(p):
+        name = p.name
+        rest = name[len(stem) + 1:]
+        num_str = rest.split(".")[0]
+        if num_str.isdigit():
+            return -int(num_str)  # negative -> descending -> oldest first
+        return 0  # active file goes last
+
+    return sorted(files, key=_sort_key)
+
+
+# ---------------------------------------------------------------------------
 # Timestamp helpers
 # ---------------------------------------------------------------------------
+
 
 _LOG_TS_RE = re.compile(r"(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})")
 
@@ -131,8 +181,16 @@ class LogFileStats:
         return len(self.records)
 
 
+def _open_log_file(path):
+    """Open a log file for reading — supports plain text and gzip."""
+    p = Path(path)
+    if p.suffix == ".gz":
+        return gzip.open(p, "rt", encoding="utf-8", errors="replace")
+    return open(p, "r", encoding="utf-8", errors="replace")
+
+
 def parse_log_file(path, label, logger):
-    """Parse a JSON Lines log file.
+    """Parse a JSON Lines log file (plain text or gzip compressed).
 
     Returns a LogFileStats object.  Never raises — bad lines are counted.
     """
@@ -144,29 +202,55 @@ def parse_log_file(path, label, logger):
 
     logger.files_read.append(str(path))
 
-    for line in pp.read_text(errors="replace").splitlines():
-        stats.total_lines += 1
-        # Find the JSON part after NOTIFY_EVENT marker
-        if "NOTIFY_EVENT " not in line:
-            continue
-        raw = line.split("NOTIFY_EVENT ", 1)[1]
-        try:
-            rec = json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            stats.bad_json += 1
-            continue
+    f = _open_log_file(path)
+    try:
+        for line in f:
+            stats.total_lines += 1
+            # Find the JSON part after NOTIFY_EVENT marker
+            if "NOTIFY_EVENT " not in line:
+                continue
+            raw = line.split("NOTIFY_EVENT ", 1)[1]
+            try:
+                rec = json.loads(raw)
+            except (json.JSONDecodeError, ValueError):
+                stats.bad_json += 1
+                continue
 
-        # Attach the log-line timestamp as a fallback
-        log_ts = _parse_log_line_ts(line)
-        if log_ts is not None and "timestamp" not in rec:
-            rec["_log_ts"] = log_ts
+            # Attach the log-line timestamp as a fallback
+            log_ts = _parse_log_line_ts(line)
+            if log_ts is not None and "timestamp" not in rec:
+                rec["_log_ts"] = log_ts
 
-        rec["_source"] = label
-        rec["_raw_line"] = line
-        stats.records.append(rec)
+            rec["_source"] = label
+            rec["_raw_line"] = line
+            stats.records.append(rec)
+    finally:
+        f.close()
 
     logger.total_raw_lines += stats.total_lines
     return stats
+
+
+def parse_log_channel(base_path, label, logger):
+    """Discover all rotated archives for a notification channel and parse them.
+
+    Returns a LogFileStats object aggregating all discovered files.
+    Never raises — missing directories or files are silently skipped.
+    """
+    files = _discover_log_files(base_path)
+    if not files:
+        logger.missing_files.append(base_path)
+        return LogFileStats(label)
+
+    combined = LogFileStats(label)
+    for f in files:
+        fs = parse_log_file(str(f), label, logger)
+        combined.total_lines += fs.total_lines
+        combined.bad_json += fs.bad_json
+        combined.records.extend(fs.records)
+        combined.unknown_events += fs.unknown_events
+
+    return combined
 
 
 # ---------------------------------------------------------------------------
@@ -1496,8 +1580,16 @@ def main(argv=None):
     # ---- Parse logs ----
     dq = DataQuality()
 
-    mail_stats = parse_log_file(args.mail_log, "M@il-20", dq)
-    telegram_stats = parse_log_file(args.telegram_log, "Telegram-20", dq)
+    # Use channel discovery for default paths, single-file mode for custom overrides
+    if args.mail_log == DEFAULT_LOG_PATHS["mail"]:
+        mail_stats = parse_log_channel(args.mail_log, "M@il-20", dq)
+    else:
+        mail_stats = parse_log_file(args.mail_log, "M@il-20", dq)
+
+    if args.telegram_log == DEFAULT_LOG_PATHS["telegram"]:
+        telegram_stats = parse_log_channel(args.telegram_log, "Telegram-20", dq)
+    else:
+        telegram_stats = parse_log_file(args.telegram_log, "Telegram-20", dq)
 
     dq.add_bad_json(mail_stats.bad_json + telegram_stats.bad_json)
 
