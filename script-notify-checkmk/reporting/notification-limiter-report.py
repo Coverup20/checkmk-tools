@@ -324,6 +324,12 @@ def get_event_ts(rec):
 # ---------------------------------------------------------------------------
 
 
+# Minimum width for report separators (fallback if content is shorter)
+MIN_REPORT_WIDTH = 72
+
+# Maximum width for report separators (cap to prevent excessively wide lines)
+MAX_REPORT_WIDTH = 160
+
 class ReportEngine:
     """Processes parsed records and produces the report using execution-based aggregation."""
 
@@ -1471,6 +1477,45 @@ class ReportEngine:
 
     # --- Assemble full report ---
 
+    def _calculate_report_width(self, lines):
+        """Calculate the maximum visible line width in the report.
+
+        Returns the bounded width: min(MAX_REPORT_WIDTH, max(MIN_REPORT_WIDTH, max_content_width))
+        """
+        max_width = MIN_REPORT_WIDTH
+        for line in lines:
+            # Ignore separator lines (all = or all -)
+            if line and set(line) in ({"="}, {"-"}):
+                continue
+            # Calculate visible length (without trailing newline)
+            visible_len = len(line.rstrip())
+            max_width = max(max_width, visible_len)
+        # Apply bounded width formula
+        return min(MAX_REPORT_WIDTH, max(MIN_REPORT_WIDTH, max_width))
+
+    def _adjust_separators_to_computed_width(self, report_text):
+        """Replace separator lines with dynamic width based on actual report content."""
+        lines = report_text.split("\n")
+
+        # Compute maximum content width (excluding separator lines)
+        computed_width = self._calculate_report_width(lines)
+
+        # Replace separator lines with correct width
+        adjusted_lines = []
+        for line in lines:
+            # Check if line is a pure separator (all = or all -)
+            if line and set(line) == {"="}:
+                # Main separator
+                adjusted_lines.append("=" * computed_width)
+            elif line and set(line) == {"-"}:
+                # Subsection separator
+                adjusted_lines.append("-" * computed_width)
+            else:
+                # Regular content line
+                adjusted_lines.append(line)
+
+        return "\n".join(adjusted_lines)
+
     def generate_text(self):
         parts = [
             self.section_executive_summary(),
@@ -1484,7 +1529,8 @@ class ReportEngine:
             self.section_recurring_patterns(),
             self.section_data_quality(),
         ]
-        return "\n".join(parts)
+        report_text = "\n".join(parts)
+        return self._adjust_separators_to_computed_width(report_text)
 
 
 # ---------------------------------------------------------------------------
