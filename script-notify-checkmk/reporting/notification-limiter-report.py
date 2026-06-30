@@ -601,14 +601,24 @@ class ReportEngine:
         lines = []
         lines.append(self._make_separator("1. EXECUTIVE SUMMARY"))
         lines.append("")
+
+        # Verdict line
+        enforce_status = "active" if self.suppressed_count > 0 else "not triggered"
+        verdict = (f"Verdict: ENFORCE {enforce_status} — {self.delivered_count} delivered, "
+                   f"{self.suppressed_count} suppressed, {self.error_count} errors")
+        lines.append(f"  {verdict}")
+        lines.append("")
+
         lines.append(f"  Report period:         {self.args.window_start.strftime('%Y-%m-%d %H:%M')}"
                      f" — {self.args.window_end.strftime('%Y-%m-%d %H:%M')}")
         lines.append(f"  Log records parsed:    {len(self.records)}")
         lines.append(f"  Notification executions: {self.total_executions}")
+        lines.append("")
         lines.append(f"  Delivered:             {self.delivered_count}")
         lines.append(f"  Would suppress (audit):  {self.would_suppress_count}")
         lines.append(f"  Suppressed (enforce):    {self.suppressed_count}")
         lines.append(f"  Recovery bypasses:     {self.recovery_count}")
+        lines.append("")
         lines.append(f"  Cooldown decisions:    {self.suppressed_count + self.would_suppress_count}")
         lines.append(f"  Transition decisions:  {self.total_executions}")
         lines.append(f"  Errors/failures:       {self.error_count}")
@@ -924,10 +934,13 @@ class ReportEngine:
             lines.append("  No hosts with significant activity found.")
 
         # ------------------------------------------------------------------
-        # 9.2 Flapping candidates
+        # 9.2 Recurring transition candidates
         # ------------------------------------------------------------------
         lines.append("")
-        lines.append(self._make_sub_separator("9.2 Flapping Candidates"))
+        lines.append(self._make_sub_separator("9.2 Recurring Transition Candidates"))
+        lines.append("")
+        lines.append("  These are repeated state transitions in the selected report period;")
+        lines.append("  they are recurrence candidates, not necessarily Checkmk flapping events.")
         lines.append("")
 
         # Define opposite transition pairs
@@ -978,13 +991,13 @@ class ReportEngine:
 
         if flap_results:
             any_pattern = True
-            lines.append(f"  {'Host':<30} {'Category':<20} {'Flips':>6} {'Examples':<45}")
-            lines.append(f"  {'-'*30} {'-'*20} {'-'*6} {'-'*45}")
+            lines.append(f"  {'Host':<30} {'Category':<20} {'Transitions':>11} {'Examples':<45}")
+            lines.append(f"  {'-'*30} {'-'*20} {'-'*11} {'-'*45}")
             for cnt, h, cat, examples in flap_results[:10]:
                 ex_str = "; ".join(examples)[:45]
-                lines.append(f"  {h:<30} {cat[:20]:<20} {cnt:>6} {ex_str:<45}")
+                lines.append(f"  {h:<30} {cat[:20]:<20} {cnt:>11} {ex_str:<45}")
         else:
-            lines.append("  No flapping candidates detected in this period.")
+            lines.append("  No recurring transition candidates detected in this period.")
 
         # ------------------------------------------------------------------
         # 9.3 Burst detection
@@ -1296,9 +1309,9 @@ class ReportEngine:
             lines.append("  No confirmed recurring patterns found in the historical period.")
         lines.append("")
 
-        # -- candidate observations from current report period --
+        # -- operational recurring candidates from current report period --
         lines.append("")
-        lines.append("  Candidate observations (host/category/transition in current "
+        lines.append("  Operational recurring candidates (host/category/transition in current "
                      "report period, insufficient evidence yet):")
         lines.append("")
 
@@ -1366,7 +1379,7 @@ class ReportEngine:
                     f"{c['hist_days']:>9} {'candidate':<12} {interp:<35}"
                 )
         else:
-            lines.append("  No candidate observations in the current report period.")
+            lines.append("  No operational recurring candidates observed in the current report period.")
         lines.append("")
 
         # -- insufficient evidence summary --
@@ -1391,10 +1404,20 @@ class ReportEngine:
                 )
             lines.append("")
 
+        # Summary verdict for 9.6
+        confirmed_count = len(confirmed)
+        candidate_count = len([c for c in candidates if (c['host'], c['category'], c['transition']) not in confirmed_set])
+        insufficient_count = len(insufficient)
+        lines.append("")
+        lines.append(f"  9.6 Summary: {confirmed_count} confirmed recurring, "
+                     f"{candidate_count} operational candidates, {insufficient_count} insufficient-evidence patterns")
+        lines.append("")
+
         # If no patterns at all
         if not any_pattern:
             lines.append("")
-            lines.append("  No recurring patterns detected in this period.")
+            lines.append("  No confirmed recurring patterns detected yet.")
+            lines.append("  Operational recurring candidates require more historical days for confirmation.")
 
         lines.append("")
         return "\n".join(lines)
@@ -1405,25 +1428,45 @@ class ReportEngine:
         lines = []
         lines.append(self._make_separator("10. DATA QUALITY"))
         lines.append("")
-        lines.append(f"  Files read:              {len(self.dq.files_read)}")
-        for f in self.dq.files_read:
-            lines.append(f"    - {f}")
-        lines.append(f"  Files missing:           {len(self.dq.missing_files)}")
-        for f in self.dq.missing_files:
-            lines.append(f"    - {f}")
-        lines.append(f"  Malformed JSON lines:    {self.dq.bad_json_records}")
-        lines.append(f"  Records outside period:  {self.dq.outside_period}")
-        lines.append(f"  Unknown event types:     {len(self.dq.unknown_events)}")
-        for ev, cnt in self.dq.unknown_events.most_common():
-            lines.append(f"    - {ev}: {cnt}")
-        # Data quality is now based on execution normalization, not raw records
+
+        # Files read
+        lines.append(f"  Files read ({len(self.dq.files_read)} total):")
+        if self.dq.files_read:
+            for f in self.dq.files_read:
+                lines.append(f"    ✓ {f}")
+        else:
+            lines.append("    (none)")
+        lines.append("")
+
+        # Files missing
+        lines.append(f"  Files missing ({len(self.dq.missing_files)} total):")
+        if self.dq.missing_files:
+            for f in self.dq.missing_files:
+                lines.append(f"    ✗ {f}")
+        else:
+            lines.append("    (none)")
+        lines.append("")
+
+        # Parse statistics
+        lines.append("  Parse statistics:")
+        lines.append(f"    • Malformed JSON lines:    {self.dq.bad_json_records}")
+        lines.append(f"    • Records outside period:  {self.dq.outside_period}")
+        lines.append(f"    • Unknown event types:     {len(self.dq.unknown_events)}")
+        if self.dq.unknown_events:
+            for ev, cnt in self.dq.unknown_events.most_common():
+                lines.append(f"      - {ev}: {cnt}")
+        lines.append("")
+
+        # Execution statistics
+        lines.append("  Execution normalization:")
         exec_host_unknown = sum(1 for e in self.executions if e.get("host") == "unknown" and not e.get("_skip"))
         exec_cat_unknown = sum(1 for e in self.executions if e.get("category") == "unknown" and not e.get("_skip"))
         exec_missing_eid = sum(1 for e in self.executions if e["execution_id"].startswith("noeid_"))
-        lines.append(f"  Executions with unknown host:     {exec_host_unknown}")
-        lines.append(f"  Executions with unknown category: {exec_cat_unknown}")
-        lines.append(f"  Executions with synthetic EID:    {exec_missing_eid}")
+        lines.append(f"    • Executions with unknown host:     {exec_host_unknown}")
+        lines.append(f"    • Executions with unknown category: {exec_cat_unknown}")
+        lines.append(f"    • Executions with synthetic EID:    {exec_missing_eid}")
         lines.append("")
+
         return "\n".join(lines)
 
     # --- Assemble full report ---
