@@ -9,7 +9,7 @@ Python wrapper for upgrade-checkmk.sh with outcome management for automations/em
 - Post-upgrade self-agent update from the upgraded Checkmk site
 - Self-agent update version verification and test mode
 
-Version: 1.6.0"""
+Version: 1.6.1"""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.6.0"
+VERSION = "1.6.1"
 REPORT_FILE = Path("/tmp/checkmk-upgrade-report.txt")
 BACKUP_DIR = Path("/opt/omd/backups")
 EMAIL_FROM = "no-reply@nethesis.it"
@@ -316,18 +316,22 @@ def update_self_checkmk_agent(site_name: str, dry_run: bool = False) -> dict:
     result["site_agent_package_path"] = str(agent_pkg)
     result["site_agent_package_version"] = get_agent_package_version(agent_pkg)
 
-    # Phase 4: Dry-run or real installation
+    # Phase 4: Early return for dry-run before any real installation
     if dry_run:
         result["success"] = True
-        result["agent_version_after"] = result["agent_version_before"]
+        result["agent_version_after"] = "NOT_EXECUTED_DRY_RUN"
         result["detail"] = f"DRY_RUN: would install agent {result['site_agent_package_version']} from {agent_pkg.name}"
-        # Check if already aligned
-        if result["agent_version_before"] == result["site_agent_package_version"]:
+
+        # Determine dry-run status based on version alignment
+        if result["agent_version_before"] == "UNKNOWN" or result["site_agent_package_version"] == "UNKNOWN":
+            result["version_match"] = False
+            result["update_status"] = "DRY_RUN_SELF_AGENT_VERSION_UNKNOWN"
+        elif result["agent_version_before"] == result["site_agent_package_version"]:
             result["version_match"] = True
-            result["update_status"] = "SELF_AGENT_UPDATE_SUCCESS"
+            result["update_status"] = "DRY_RUN_SELF_AGENT_ALREADY_ALIGNED"
         else:
             result["version_match"] = False
-            result["update_status"] = "SELF_AGENT_UPDATE_VERSION_MISMATCH"
+            result["update_status"] = "DRY_RUN_SELF_AGENT_UPDATE_WOULD_RUN"
         return result
 
     # Phase 5: Real installation
@@ -446,7 +450,7 @@ def main() -> int:
             return 1
 
         print(f"[TEST_MODE] Testing self-agent update on site: {site_name}")
-        agent_result = update_self_checkmk_agent(site_name, dry_run=False)
+        agent_result = update_self_checkmk_agent(site_name, dry_run=args.dry_run)
 
         print("\n=== TEST_MODE SELF-AGENT UPDATE REPORT ===")
         print(f"SERVER_UPGRADE: not executed, test mode")
@@ -457,7 +461,9 @@ def main() -> int:
         print(f"LOCAL_AGENT_VERSION_AFTER: {agent_result['agent_version_after']}")
         print(f"SELF_AGENT_VERSION_MATCH: {'yes' if agent_result['version_match'] else 'no'}")
         print(f"UPDATE_STATUS: {agent_result['update_status']}")
-        print(f"FINAL_STATUS: TEST_{agent_result['update_status']}")
+        # Add test mode prefix for dry-run operations
+        final_status = f"TEST_SELF_AGENT_UPDATE_DRY_RUN" if args.dry_run else f"TEST_{agent_result['update_status']}"
+        print(f"FINAL_STATUS: {final_status}")
         print(f"DETAIL: {agent_result['detail']}")
 
         return 0 if agent_result["success"] else 1
