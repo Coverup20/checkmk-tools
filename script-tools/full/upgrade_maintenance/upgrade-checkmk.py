@@ -6,8 +6,10 @@ Python wrapper for upgrade-checkmk.sh with outcome management for automations/em
 - Update completed with final version
 - Update failed with rollback performed
 - Skipped: pre-release (beta/RC) version detected
+- Post-upgrade self-agent update from the upgraded Checkmk site
+- Self-agent update version verification and test mode
 
-Version: 1.4.1"""
+Version: 1.6.0"""
 
 from __future__ import annotations
 
@@ -18,7 +20,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.4.1"
+VERSION = "1.6.0"
 REPORT_FILE = Path("/tmp/checkmk-upgrade-report.txt")
 BACKUP_DIR = Path("/opt/omd/backups")
 EMAIL_FROM = "no-reply@nethesis.it"
@@ -181,6 +183,203 @@ def fix_site_ownership(site_name: str) -> int:
         return -1
 
 
+def get_omd_version(site_name: str) -> str:
+    """Get the Checkmk/OMD version for the site.
+
+    Returns version string or "UNKNOWN" if detection fails.
+    """
+    if not site_name:
+        return "UNKNOWN"
+    out = run_cmd(["omd", "version", site_name])
+    if out.returncode != 0:
+        return "UNKNOWN"
+    # Extract version line (usually first line with format like "2.5.0p7")
+    match = re.search(r"[0-9]+\.[0-9]+\.[0-9]+p[0-9]+", out.stdout)
+    return match.group(0) if match else "UNKNOWN"
+
+
+def get_installed_agent_version() -> str:
+    """Get the local installed Checkmk agent version.
+
+    Uses dpkg-query on Debian/Ubuntu.
+    Returns version string, "NOT_INSTALLED" if not found, or "UNKNOWN" if detection fails.
+    """
+    result = run_cmd(["dpkg-query", "-W", "-f=${Version}", "check-mk-agent"])
+    if result.returncode != 0:
+        return "NOT_INSTALLED"
+    version = result.stdout.strip()
+    return version if version else "NOT_INSTALLED"
+
+
+def get_agent_package_version(agent_package_path: Path) -> str:
+    """Get the version from an agent .deb package.
+
+    Uses dpkg-deb to read package metadata.
+    Returns version string, or "PACKAGE_VERSION_UNKNOWN" if detection fails.
+    """
+    if not agent_package_path or not agent_package_path.exists():
+        return "PACKAGE_VERSION_UNKNOWN"
+    result = run_cmd(["dpkg-deb", "-f", str(agent_package_path), "Version"])
+    if result.returncode != 0:
+        return "PACKAGE_VERSION_UNKNOWN"
+    version = result.stdout.strip()
+    return version if version else "PACKAGE_VERSION_UNKNOWN"
+
+
+def verify_self_agent_version(expected_version: str, installed_version: str) -> tuple[bool, str]:
+    """Verify that the installed agent version matches the expected version.
+
+    Returns (match: bool, status_str: str).
+    Status string is one of:
+    - "SELF_AGENT_UPDATE_SUCCESS"
+    - "SELF_AGENT_UPDATE_VERSION_MISMATCH"
+    - "SELF_AGENT_UPDATE_VERIFY_FAILED"
+    - "SELF_AGENT_UPDATE_DONE_VERSION_UNKNOWN"
+    """
+    if expected_version == "PACKAGE_VERSION_UNKNOWN":
+        return False, "SELF_AGENT_UPDATE_DONE_VERSION_UNKNOWN"
+    if installed_version == "UNKNOWN" or installed_version == "NOT_INSTALLED":
+        return False, "SELF_AGENT_UPDATE_VERIFY_FAILED"
+    if expected_version == installed_version:
+        return True, "SELF_AGENT_UPDATE_SUCCESS"
+    return False, "SELF_AGENT_UPDATE_VERSION_MISMATCH"
+
+
+def find_agent_package(site_name: str) -> Path | None:
+    """Find the newest Checkmk agent .deb package in the upgraded site.
+
+    Search in /omd/sites/<site>/share/check_mk/agents/ for check-mk-agent_*_all.deb.
+    Returns the newest package path or None if not found.
+    """
+    if not site_name:
+        return None
+
+    agent_dir = Path(f"/omd/sites/{site_name}/share/check_mk/agents")
+    if not agent_dir.exists():
+        return None
+
+    candidates = sorted(agent_dir.glob("check-mk-agent_*_all.deb"), reverse=True)
+    return candidates[0] if candidates else None
+
+
+def update_self_checkmk_agent(site_name: str, dry_run: bool = False) -> dict:
+    """Update the local Checkmk agent from the upgraded site with version verification.
+
+    Search for the agent package in the upgraded site and install it locally.
+    Track and verify versions before, during, and after the update.
+
+    Returns dict with keys:
+    - success (bool): whether update succeeded
+    - detail (str): human-readable summary
+    - omd_version (str): detected OMD version
+    - agent_version_before (str): local agent version before update
+    - site_agent_package_path (str): path to discovered package
+    - site_agent_package_version (str): version from package metadata
+    - agent_version_after (str): local agent version after update
+    - version_match (bool): whether after version matches package version
+    - update_status (str): one of SELF_AGENT_UPDATE_* constants
+    """
+    result = {
+        "success": False,
+        "detail": "",
+        "omd_version": "UNKNOWN",
+        "agent_version_before": "UNKNOWN",
+        "site_agent_package_path": "",
+        "site_agent_package_version": "UNKNOWN",
+        "agent_version_after": "UNKNOWN",
+        "version_match": False,
+        "update_status": "SELF_AGENT_UPDATE_FAILED",
+    }
+
+    if not site_name:
+        result["detail"] = "site name not determined"
+        return result
+
+    # Phase 1: Collect pre-update versions
+    result["omd_version"] = get_omd_version(site_name)
+    result["agent_version_before"] = get_installed_agent_version()
+
+    # Phase 2: Verify site is running after upgrade
+    status_res = run_cmd(["omd", "status", site_name])
+    if status_res.returncode != 0:
+        result["detail"] = f"site {site_name} not running after upgrade"
+        result["update_status"] = "SELF_AGENT_UPDATE_FAILED"
+        return result
+
+    # Phase 3: Find agent package in the upgraded site
+    agent_pkg = find_agent_package(site_name)
+    if not agent_pkg:
+        result["detail"] = "no agent package found in site"
+        result["update_status"] = "SELF_AGENT_UPDATE_FAILED"
+        return result
+
+    result["site_agent_package_path"] = str(agent_pkg)
+    result["site_agent_package_version"] = get_agent_package_version(agent_pkg)
+
+    # Phase 4: Dry-run or real installation
+    if dry_run:
+        result["success"] = True
+        result["agent_version_after"] = result["agent_version_before"]
+        result["detail"] = f"DRY_RUN: would install agent {result['site_agent_package_version']} from {agent_pkg.name}"
+        # Check if already aligned
+        if result["agent_version_before"] == result["site_agent_package_version"]:
+            result["version_match"] = True
+            result["update_status"] = "SELF_AGENT_UPDATE_SUCCESS"
+        else:
+            result["version_match"] = False
+            result["update_status"] = "SELF_AGENT_UPDATE_VERSION_MISMATCH"
+        return result
+
+    # Phase 5: Real installation
+    install_res = run_cmd(["dpkg", "-i", str(agent_pkg)])
+    if install_res.returncode != 0:
+        result["detail"] = f"dpkg install failed: {install_res.stderr.strip() or install_res.stdout.strip()}"
+        result["update_status"] = "SELF_AGENT_UPDATE_FAILED"
+        return result
+
+    # Phase 6: Verify agent command exists and runs
+    # Use bash because 'command' is a shell builtin, not an executable
+    verify_res = subprocess.run(
+        ["bash", "-c", "command -v check_mk_agent"],
+        text=True, capture_output=True,
+    )
+    if verify_res.returncode != 0:
+        result["detail"] = "check_mk_agent command not found after install"
+        result["update_status"] = "SELF_AGENT_UPDATE_FAILED"
+        return result
+
+    # Phase 7: Run agent to verify it works
+    agent_run = run_cmd(["check_mk_agent"], check=False)
+    if agent_run.returncode != 0:
+        result["detail"] = f"check_mk_agent execution failed: {agent_run.stderr.strip()}"
+        result["update_status"] = "SELF_AGENT_UPDATE_FAILED"
+        return result
+
+    # Phase 8: Collect post-update version and verify
+    result["agent_version_after"] = get_installed_agent_version()
+    version_match, update_status = verify_self_agent_version(
+        result["site_agent_package_version"],
+        result["agent_version_after"],
+    )
+    result["version_match"] = version_match
+    result["update_status"] = update_status
+
+    if version_match:
+        result["success"] = True
+        result["detail"] = (
+            f"agent updated from {result['agent_version_before']} "
+            f"to {result['agent_version_after']} (OMD: {result['omd_version']})"
+        )
+    else:
+        result["success"] = False
+        result["detail"] = (
+            f"agent version after install ({result['agent_version_after']}) "
+            f"does not match package version ({result['site_agent_package_version']})"
+        )
+
+    return result
+
+
 def send_mail(recipient: str, subject: str, body: str) -> None:
     if not recipient:
         return
@@ -205,6 +404,12 @@ def build_message(status: str, site_name: str, version: str, details: str = "") 
     elif status == "SUCCESS":
         subject = f"CheckMK Auto-Upgrade - Completato ({host})"
         body = f"Aggiornamento completato alla versione: {version}\nSito: {site_name}\n"
+    elif status == "SUCCESS_WITH_AGENT_UPDATE_FAILED":
+        subject = f"CheckMK Auto-Upgrade - Completato, ma agent update fallito ({host})"
+        body = (
+            f"Aggiornamento server completato alla versione: {version}\nSito: {site_name}\n"
+            f"ATTENZIONE: Aggiornamento agent locale fallito.\nDettagli: {details}\n"
+        )
     elif status == "FAILED_ROLLBACK":
         subject = f"CheckMK Auto-Upgrade - Fallito con rollback ({host})"
         body = f"Aggiornamento fallito: eseguito rollback.\nSito: {site_name}\nDettagli: {details}\n"
@@ -217,12 +422,46 @@ def build_message(status: str, site_name: str, version: str, details: str = "") 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Wrapper upgrade-checkmk con esiti strutturati")
     parser.add_argument("--email", default="", help="Email destinatario report esito")
+    parser.add_argument("--dry-run", action="store_true", help="Simulate upgrade and agent update without making changes")
+    parser.add_argument("--test-self-agent-update", action="store_true", help="Test only the self-agent update phase without server upgrade")
     parser.add_argument("forward_args", nargs=argparse.REMAINDER, help="Argomenti da inoltrare allo script shell")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+
+    # Handle test mode: run only self-agent update without server upgrade
+    if args.test_self_agent_update:
+        print("[TEST_MODE] Running self-agent update test without server upgrade")
+        site_name = detect_site_from_report("")
+        if not site_name:
+            # Try to find a site directly
+            for site_dir in Path("/omd/sites").iterdir():
+                if site_dir.is_dir() and (site_dir / "etc").exists():
+                    site_name = site_dir.name
+                    break
+        if not site_name:
+            print("ERROR: Could not determine site name for test mode", file=sys.stderr)
+            return 1
+
+        print(f"[TEST_MODE] Testing self-agent update on site: {site_name}")
+        agent_result = update_self_checkmk_agent(site_name, dry_run=False)
+
+        print("\n=== TEST_MODE SELF-AGENT UPDATE REPORT ===")
+        print(f"SERVER_UPGRADE: not executed, test mode")
+        print(f"OMD_VERSION_AFTER: {agent_result['omd_version']}")
+        print(f"LOCAL_AGENT_VERSION_BEFORE: {agent_result['agent_version_before']}")
+        print(f"SITE_AGENT_PACKAGE_PATH: {agent_result['site_agent_package_path']}")
+        print(f"SITE_AGENT_PACKAGE_VERSION: {agent_result['site_agent_package_version']}")
+        print(f"LOCAL_AGENT_VERSION_AFTER: {agent_result['agent_version_after']}")
+        print(f"SELF_AGENT_VERSION_MATCH: {'yes' if agent_result['version_match'] else 'no'}")
+        print(f"UPDATE_STATUS: {agent_result['update_status']}")
+        print(f"FINAL_STATUS: TEST_{agent_result['update_status']}")
+        print(f"DETAIL: {agent_result['detail']}")
+
+        return 0 if agent_result["success"] else 1
+
     result = detect_backend()
     if result is None:
         print(
@@ -237,6 +476,10 @@ def main() -> int:
     forward = args.forward_args
     if forward and forward[0] == "--":
         forward = forward[1:]
+
+    # Add --dry-run to forward args if specified
+    if args.dry_run:
+        forward = ["--dry-run"] + forward
 
     # Fix ownership before upgrade to prevent backup failures caused by
     # root-owned files inside the OMD site tree
@@ -276,10 +519,52 @@ def main() -> int:
             fixed = fix_site_ownership(site_name)
             if fixed > 0:
                 print(f"[INFO] Fixed {fixed} file(s) owned by wrong user in site {site_name}")
-        subject, body = build_message("SUCCESS", site_name, version)
-        send_mail(args.email, subject, body)
-        print(f"SUCCESS: aggiornamento completato alla versione {version}")
-        return 0
+
+        # POST_UPGRADE_SITE_VERIFY and SELF_AGENT_UPDATE phase
+        if not args.dry_run:
+            agent_result = update_self_checkmk_agent(site_name, dry_run=False)
+        else:
+            agent_result = update_self_checkmk_agent(site_name, dry_run=True)
+            print(f"[DRY_RUN] Agent update: {agent_result['detail']}")
+
+        # Report version information
+        print(f"\n=== SELF_AGENT_UPDATE VERSION REPORT ===")
+        print(f"OMD_VERSION_AFTER: {agent_result['omd_version']}")
+        print(f"LOCAL_AGENT_VERSION_BEFORE: {agent_result['agent_version_before']}")
+        print(f"SITE_AGENT_PACKAGE_PATH: {agent_result['site_agent_package_path']}")
+        print(f"SITE_AGENT_PACKAGE_VERSION: {agent_result['site_agent_package_version']}")
+        print(f"LOCAL_AGENT_VERSION_AFTER: {agent_result['agent_version_after']}")
+        print(f"SELF_AGENT_VERSION_MATCH: {'yes' if agent_result['version_match'] else 'no'}")
+        print(f"UPDATE_STATUS: {agent_result['update_status']}")
+
+        if agent_result["success"]:
+            subject, body = build_message("SUCCESS", site_name, version)
+            body += f"\n=== Agent Update Details ===\n"
+            body += f"OMD Version: {agent_result['omd_version']}\n"
+            body += f"Agent Version Before: {agent_result['agent_version_before']}\n"
+            body += f"Agent Version After: {agent_result['agent_version_after']}\n"
+            body += f"Package Version: {agent_result['site_agent_package_version']}\n"
+            body += f"Version Match: {'yes' if agent_result['version_match'] else 'no'}\n"
+            body += f"Status: {agent_result['update_status']}\n"
+            body += f"Detail: {agent_result['detail']}\n"
+            send_mail(args.email, subject, body)
+            print(f"SUCCESS: aggiornamento completato alla versione {version}")
+            print(f"SELF_AGENT_UPDATE: {agent_result['detail']}")
+            return 0
+        else:
+            # Server upgrade succeeded but agent update failed
+            subject, body = build_message("SUCCESS_WITH_AGENT_UPDATE_FAILED", site_name, version, agent_result["detail"])
+            body += f"\n=== Agent Update Details ===\n"
+            body += f"OMD Version: {agent_result['omd_version']}\n"
+            body += f"Agent Version Before: {agent_result['agent_version_before']}\n"
+            body += f"Agent Version After: {agent_result['agent_version_after']}\n"
+            body += f"Package Version: {agent_result['site_agent_package_version']}\n"
+            body += f"Status: {agent_result['update_status']}\n"
+            body += f"Detail: {agent_result['detail']}\n"
+            send_mail(args.email, subject, body)
+            print(f"SUCCESS_WITH_AGENT_UPDATE_FAILED: server upgrade OK, agent update failed")
+            print(f"[WARN] Agent update detail: {agent_result['detail']}")
+            return 0
 
     backup = get_latest_backup(site_name)
     if backup is not None:
