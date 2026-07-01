@@ -410,12 +410,21 @@ opkg install ns-checkmk-utils_0.0.2-r1_all.ipk
 
 ### Repository Sync
 
+The repository is automatically synchronized on CheckMK servers using a Python-managed, systemd timer-based model:
+
 ```bash
-# Install auto-sync as systemd service or cron
-python3 /opt/checkmk-tools/script-tools/full/install-auto-git-sync.py
+# Install auto-sync (systemd timer-based, with fallback to cron on systems without systemd)
+python3 install-checkmk-sync.py --enable-auto-git-sync --auto-git-sync-interval 30
 ```
 
-The repository is automatically synchronized on CheckMK servers. After cloning to `/opt/checkmk-tools/`, the sync service runs `git pull` periodically. Never edit files directly in `/opt/checkmk-tools/` — changes will be overwritten.
+**Active Model:**
+- **Architecture:** Python orchestration with minimal Bash runtime wrapper
+- **Systemd Mode:** Timer (`auto-git-sync.timer`) + oneshot service (`auto-git-sync.service`)
+- **Sync Logic:** `git fetch origin main` → `git reset --hard origin/main` → `git clean -fd`
+- **Cron Fallback:** On systems without systemd (OpenWrt, NethSecurity 8), sync runs every minute via cron
+- **Log:** `/var/log/auto-git-sync.log`
+
+**Important:** `/opt/checkmk-tools/` is a read-only deploy clone managed by auto-sync. Never edit files directly in `/opt/checkmk-tools/` — all changes will be overwritten on the next sync cycle. Real editing must occur in your editable source workspace, then committed and pushed to the repository. The auto-sync timer will automatically pull updates.
 
 ---
 
@@ -620,24 +629,44 @@ check()
 The repository uses an automatic synchronization system on CheckMK servers:
 
 ```text
-GitHub (nethesis/checkmk-tools)
-    ↓ [auto-git-sync - every 1-5 minutes]
-/opt/checkmk-tools/ (on servers)
-    ↓ [execute scripts from local repo]
+Local Editable Workspace
+    ↓ [git commit & push]
+GitHub (Coverup20/checkmk-tools)
+    ↓ [auto-git-sync timer - configurable interval, default 30s]
+/opt/checkmk-tools/ (read-only deploy clone on servers)
+    ↓ [execute scripts from synchronized repo]
 Production
 ```
+
+**Sync Model:**
+- **Timer:** `auto-git-sync.timer` runs on a configurable schedule (default 30 seconds)
+- **Service:** `auto-git-sync.service` (Type=oneshot) is triggered by the timer
+- **Runtime:** Minimal Bash wrapper (`/usr/local/bin/checkmk-git-sync.sh`) generated during installation
+- **Behavior:** Fetch origin/main, reset hard, clean working directory
+- **Logging:** All sync operations logged to `/var/log/auto-git-sync.log`
 
 ### Check Sync Status
 
 ```bash
+# Timer status
+systemctl status auto-git-sync.timer
+
 # Service status
 systemctl status auto-git-sync.service
 
-# Force manual sync
-cd /opt/checkmk-tools && git pull
+# View recent logs
+journalctl -u auto-git-sync.service -f
+tail -f /var/log/auto-git-sync.log
 
-# Recent logs
-journalctl -u auto-git-sync.service -n 50
+# List scheduled timer runs
+systemctl list-timers auto-git-sync.timer
+```
+
+### Manual Sync (Force Immediate Pull)
+
+```bash
+# Trigger sync immediately (do NOT edit /opt/checkmk-tools directly)
+systemctl start auto-git-sync.service
 ```
 
 ---

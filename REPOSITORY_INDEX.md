@@ -8,7 +8,7 @@ Organized repository for CheckMK management, Ydea integration, and monitoring sc
 Script for CheckMK management, deployment and maintenance.
 
 - **`full/`** - Complete standalone scripts
-  - Automatic Git sync (`auto-git-sync.sh`, `install-auto-git-sync.sh`)
+  - Automatic Git sync via systemd timer (`install-checkmk-sync.py` — Python-first orchestration)
   - Update & upgrade (`update-all-scripts.sh`, `upgrade-checkmk.sh`)
   - Deployment agents (`deploy-plain-agent.sh`, `smart-deploy-hybrid.sh`)
   - Installation FRPC (`install-frpc.sh`, `install-frpc2.sh`)
