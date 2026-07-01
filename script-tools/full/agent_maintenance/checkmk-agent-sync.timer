@@ -5,8 +5,7 @@ Requires=checkmk-agent-sync.service
 
 [Timer]
 # Run daily at 03:00 AM UTC
-OnCalendar=daily
-OnCalendar=*-*-* 03:00:00
+OnCalendar=*-*-* 03:00:00 UTC
 
 # Randomize by up to 5 minutes to avoid thundering herd
 RandomizedDelaySec=5min

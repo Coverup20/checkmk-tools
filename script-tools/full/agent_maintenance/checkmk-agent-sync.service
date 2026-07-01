@@ -6,11 +6,12 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+EnvironmentFile=-/etc/checkmk-agent-sync/checkmk-agent-sync.env
 ExecStart=/usr/bin/python3 -B /opt/checkmk-tools/script-tools/full/agent_maintenance/checkmk-agent-sync.py \
     --server-url ${CHECKMK_SERVER_URL} \
     --site ${CHECKMK_SITE} \
     --target auto \
-    --install \
+    --verify-only \
     --verbose
 
 StandardOutput=journal
@@ -29,7 +30,7 @@ ProtectHome=yes
 ReadWritePaths=/var /opt/checkmk-tools /usr/lib/check_mk_agent /usr/bin
 
 # Resource limits
-MemoryLimit=512M
+MemoryMax=512M
 CPUQuota=50%
 
 [Install]
