@@ -2,10 +2,11 @@
 """install-checkmk-sync.py - CheckMK unified installer
 
 Execute in sequence:
-  STEP A → CheckMK Agent install (download from CMK server, plain TCP 6556)
-             + optional FRPC (tunnel to FRP server)
-  STEP 1 → auto-git-sync (automatic git pull every N seconds)
-  STEP 2 → checkmk-python-full-sync (deploy check Python every 5 minutes)
+  STEP A  → CheckMK Agent install (download from CMK server, plain TCP 6556)
+              + optional FRPC (tunnel to FRP server)
+  STEP 1  → auto-git-sync (automatic git pull every N seconds)
+  STEP 2  → checkmk-python-full-sync (deploy check Python every 5 minutes)
+  STEP 3  → checkmk-agent-sync (daily agent version verification, verify-only)
 
 Compatibility:
   - Debian/Ubuntu → deb + systemd socket
@@ -69,6 +70,14 @@ PYTHON_SYNC_LOG = "/var/log/checkmk-python-full-sync.log"
 PYTHON_SYNC_CRON_MARKER = "sync-python-full-checks"
 
 OPENWRT_CRONTAB = Path("/etc/crontabs/root")
+
+# checkmk-agent-sync (agent auto-update verification)
+AGENT_SYNC_SERVICE_NAME = "checkmk-agent-sync.service"
+AGENT_SYNC_TIMER_NAME = "checkmk-agent-sync.timer"
+AGENT_SYNC_ENV_DIR = Path("/etc/checkmk-agent-sync")
+AGENT_SYNC_ENV_FILE = AGENT_SYNC_ENV_DIR / "checkmk-agent-sync.env"
+AGENT_SYNC_SCRIPT = "/opt/checkmk-tools/script-tools/full/agent_maintenance/checkmk-agent-sync.py"
+
 
 
 # ─── Utilities ────────────────────────────────────────────────────────────────
@@ -606,7 +615,7 @@ def ensure_repo(repo_path: Path, repo_url: str) -> None:
 
 def update_repo(repo_path: Path) -> None:
     repo_str = str(repo_path)
-    result = run_capture(["git", "fetch", "origin", "main"], cwd=repo_str)
+    result = run_capture(["git", "fetch", "origin"], cwd=repo_str)
     if result.returncode != 0:
         print(f"[WARN] git fetch fallito: {(result.stdout or '').strip()}")
         return
@@ -625,7 +634,7 @@ _GIT_SYNC_WRAPPER = """#!/bin/bash
 REPO_DIR="{repo_dir}"
 LOG_FILE="{log}"
 cd "$REPO_DIR" || exit 0
-if ! git fetch origin main >> "$LOG_FILE" 2>&1; then
+if ! git fetch origin >> "$LOG_FILE" 2>&1; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARN: git fetch failed" >> "$LOG_FILE"
     exit 0
 fi
@@ -709,7 +718,7 @@ def install_git_sync_cron(repo_path: Path) -> None:
     """Install git sync via cron (OpenWrt / systems without systemd)."""
     cron_line = (
         f"* * * * * cd {repo_path} && "
-        f"git fetch origin main >> {GIT_SYNC_LOG} 2>&1 && "
+        f"git fetch origin >> {GIT_SYNC_LOG} 2>&1 && "
         f"git fetch --tags origin >> {GIT_SYNC_LOG} 2>&1 && "
         f"git reset --hard origin/main >> {GIT_SYNC_LOG} 2>&1  # {GIT_SYNC_CRON_MARKER}"
     )
@@ -852,6 +861,92 @@ def install_python_sync_cron(repo_path: Path, target: str,
     print(f"[OK] checkmk-python-full-sync installato via cron (ogni 5 min)")
     print(f"     Log:     tail -f {PYTHON_SYNC_LOG}")
 
+
+# ─── STEP 3: Agent Synchronization (verify-only) ──────────────────────────────────
+
+_AGENT_SYNC_SERVICE_TPL = """\
+[Unit]
+Description=CheckMK Agent Synchronization Service
+Documentation=https://github.com/nethesis/checkmk-tools
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/checkmk-agent-sync/checkmk-agent-sync.env
+ExecStart=/usr/bin/python3 -B /opt/checkmk-tools/script-tools/full/agent_maintenance/checkmk-agent-sync.py \
+  --server-url ${CHECKMK_SERVER_URL} \
+  --site ${CHECKMK_SITE} \
+  --target auto \
+  --verbose
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=checkmk-agent-sync
+
+# Non-destructive on failure
+FailureAction=none
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target"""
+
+
+
+
+
+_AGENT_SYNC_TIMER_TPL = """\
+[Unit]
+Description=CheckMK Agent Synchronization Timer
+Documentation=https://github.com/nethesis/checkmk-tools
+Requires=checkmk-agent-sync.service
+
+[Timer]
+# Run daily at 03:00 AM UTC
+OnCalendar=daily
+
+# Randomize by up to 5 minutes to avoid thundering herd
+RandomizedDelaySec=5min
+
+# Ensure the service runs even if the system was off at scheduled time
+Persistent=yes
+
+# Unit to trigger
+Unit=checkmk-agent-sync.service
+
+[Install]
+WantedBy=timers.target"""
+
+
+
+def install_agent_sync_systemd(server_url: str, site: str) -> None:
+    """Install checkmk-agent-sync as systemd service + timer (verify-only by default)."""
+    # Create env directory and env file
+    AGENT_SYNC_ENV_DIR.mkdir(parents=True, exist_ok=True)
+    env_content = (
+        f"# CheckMK Agent Synchronization Configuration\n"
+        f"# Installed by install-checkmk-sync.py v{VERSION}\n"
+        f"CHECKMK_SERVER_URL={server_url}\n"
+        f"CHECKMK_SITE={site}\n"
+        f"CHECKMK_TARGET=auto\n"
+    )
+    write_text(AGENT_SYNC_ENV_FILE, env_content)
+    AGENT_SYNC_ENV_FILE.chmod(0o600)
+
+    svc_path = SYSTEMD_DIR / AGENT_SYNC_SERVICE_NAME
+    timer_path = SYSTEMD_DIR / AGENT_SYNC_TIMER_NAME
+
+    write_text(svc_path, _AGENT_SYNC_SERVICE_TPL)
+    write_text(timer_path, _AGENT_SYNC_TIMER_TPL)
+
+    run(["systemctl", "daemon-reload"])
+    run(["systemctl", "enable", "--now", AGENT_SYNC_TIMER_NAME])
+    print(f"[OK] {AGENT_SYNC_TIMER_NAME} attivo (verifica agente ogni giorno alle 03:00 UTC)")
+    print(f"     Env:    {AGENT_SYNC_ENV_FILE}")
+    print(f"     Status: systemctl status {AGENT_SYNC_TIMER_NAME}")
+
+
+# ─── Add scripts to existing sync ───────────────────────────────────────────────
 
 # ─── Add scripts to existing sync ───────────────────────────────────────────────
 
@@ -1249,8 +1344,14 @@ def parse_args() -> argparse.Namespace:
     # Agent CheckMK
     p.add_argument("--skip-agent", action="store_true",
                    help="Salta l'installazione dell'agente CheckMK (STEP A)")
+    p.add_argument("--skip-agent-sync", action="store_true",
+                   help="Salta l'installazione del timer checkmk-agent-sync (STEP 3)")
     p.add_argument("--checkmk-url", default=CHECKMK_BASE_URL_DEFAULT,
                    help=f"URL base agenti CheckMK (default: {CHECKMK_BASE_URL_DEFAULT})")
+    p.add_argument("--checkmk-server-url", default="https://monitor.nethlab.it",
+                   help="URL server CheckMK per agent-sync (default: https://monitor.nethlab.it)")
+    p.add_argument("--checkmk-site", default="monitoring",
+                   help="Nome sito CheckMK per agent-sync (default: monitoring)")
     p.add_argument("--no-verify-ssl", action="store_true",
                    help="Disabilita verifica certificato SSL (utile per HTTPS con cert self-signed)")
 
@@ -1432,6 +1533,19 @@ def main() -> int:
         install_python_sync_cron(repo_path, args.target, category, all_cat,
                                  scripts=scripts, temp_dir=temp_dir)
 
+    # ── STEP 3: CheckMK Agent Sync (verify-only) ────────────────────────────
+    print()
+    print("── STEP 3: CheckMK Agent Sync (verify-only) ────────")
+    if args.skip_agent_sync:
+        print("[INFO] STEP 3 saltato (--skip-agent-sync)")
+    elif use_systemd:
+        try:
+            install_agent_sync_systemd(args.checkmk_server_url, args.checkmk_site)
+        except Exception as exc:
+            print(f"[WARN] STEP 3 (agent sync) fallito: {exc}", file=sys.stderr)
+            print("[WARN] Il sistema continuera' senza agent-sync timer. Puoi installarlo manualmente.", file=sys.stderr)
+    else:
+        print("[INFO] STEP 3 saltato: sistema non-systemd (agent-sync richiede systemd)")
     # ── Riepilogo finale ──────────────────────────────────────────────────────
     print()
     print("=" * 60)
@@ -1447,6 +1561,7 @@ def main() -> int:
     if use_systemd:
         print(f"   auto-git-sync.timer          (git pull ogni {interval}s)")
         print(f"   checkmk-python-full-sync.timer (deploy ogni 5min)")
+        print(f"   checkmk-agent-sync.timer      (verifica agente ogni giorno alle 03:00 UTC)")
         print()
         print("  Comandi utili:")
         if agent_installed:
@@ -1457,6 +1572,7 @@ def main() -> int:
         print(f"  systemctl status {PYTHON_SYNC_TIMER_NAME}")
         print(f"  journalctl -u auto-git-sync -f")
         print(f"  journalctl -u checkmk-python-full-sync -f")
+        print(f"  journalctl -u checkmk-agent-sync -f")
     else:
         print(f"   git-auto-sync      (ogni minuto)")
         print(f"   python-full-sync   (ogni 5 minuti)")

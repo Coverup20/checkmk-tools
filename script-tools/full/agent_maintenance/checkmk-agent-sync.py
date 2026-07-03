@@ -483,12 +483,6 @@ def parse_args() -> argparse.Namespace:
         help="Install/update the agent if version differs (destructive)",
     )
     p.add_argument(
-        "--verify-only",
-        action="store_true",
-        default=True,
-        help="Verify only, do not install (default mode)",
-    )
-    p.add_argument(
         "--download-only",
         action="store_true",
         help="Download only, do not install",
