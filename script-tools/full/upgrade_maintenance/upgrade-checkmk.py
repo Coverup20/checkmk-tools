@@ -505,6 +505,8 @@ def main() -> int:
     no_update = "Nessun aggiornamento necessario" in report or "No upgrade needed" in report
     if run.returncode == 0 and no_update:
         version = get_current_version(site_name)
+        self_agent_result = update_self_checkmk_agent(site_name, dry_run=False)
+        print(f"SELF_AGENT_UPDATE: {self_agent_result['detail']}")
         subject, body = build_message("NO_UPDATE", site_name, version)
         send_mail(args.email, subject, body)
         print(f"NO_UPDATE: sito {site_name} già alla versione {version}")
