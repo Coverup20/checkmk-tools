@@ -32,3 +32,12 @@ notify-monitor.log
 # Ydea credentials (NEVER commit!)
 Ydea-Toolkit/config/credentials.sh
 Ydea-Toolkit/config/.ydea-cookies
+
+# Claude editor config (local only)
+.claude/
+
+# Backup artifacts
+*.bak
+
+# Private operational docs (do not commit)
+MACHINE_ACCESS_GUIDE.md
