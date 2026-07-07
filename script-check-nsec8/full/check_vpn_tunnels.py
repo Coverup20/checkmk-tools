@@ -1,61 +1,65 @@
 #!/usr/bin/env python3
-"""check_vpn_tunnels.py - CheckMK local check VPN tunnels (pure Python)."""
+"""check_vpn_tunnels.py - CheckMK VPN tunnels check (pyuci beta).
 
-VERSION = "1.1.0"
+OpenVPN: Python-native (reads /var/run/openvpn/*.status directly).
+WireGuard: BLOCKED — no Python-native API to query WireGuard peers
+without invoking the 'wg' command. The 'wg' tool communicates with the
+kernel via netlink, which has no stdlib Python binding.
+Keeping the WireGuard section requires subprocess — prohibited in beta.
+"""
 
-import shutil
-import subprocess
 import sys
 from pathlib import Path
 
+BETA = True
+VERSION = "1.1.0b1"
+SERVICE = "VPN.Tunnels"
 
-def main() -> int:
-    total_tunnels = 0
-    active_tunnels = 0
-    inactive_tunnels = 0
-    details: list[str] = []
+try:
+    from euci import EUci
+except ImportError:
+    EUci = None
 
-    openvpn_dir = Path("/var/run/openvpn")
-    if openvpn_dir.is_dir():
-        for status_file in sorted(openvpn_dir.glob("*.status")):
-            total_tunnels += 1
-            client_count = sum(1 for line in status_file.read_text(encoding="utf-8", errors="ignore").splitlines() if line.startswith("CLIENT_LIST"))
-            if client_count > 0:
-                active_tunnels += 1
-                details.append(f"OpenVPN_{status_file.stem}: {client_count} client")
+
+def main():
+    total = 0
+    active = 0
+    inactive = 0
+    details = []
+
+    # OpenVPN: fully Python-native (file read)
+    ovpn_dir = Path("/var/run/openvpn")
+    if ovpn_dir.is_dir():
+        for sf in sorted(ovpn_dir.glob("*.status")):
+            total += 1
+            cc = sum(1 for line in sf.read_text(encoding="utf-8", errors="ignore").splitlines() if line.startswith("CLIENT_LIST"))
+            if cc > 0:
+                active += 1
+                details.append(f"OpenVPN_{sf.stem}:{cc}")
             else:
-                inactive_tunnels += 1
-                details.append(f"OpenVPN_{status_file.stem}: no clients")
+                inactive += 1
+                details.append(f"OpenVPN_{sf.stem}:no_clients")
 
-    if shutil.which("wg"):
-        interfaces = subprocess.run(["wg", "show", "interfaces"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=False)
-        for iface in (interfaces.stdout or "").split():
-            total_tunnels += 1
-            peers = subprocess.run(["wg", "show", iface, "peers"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=False)
-            peer_count = len([p for p in (peers.stdout or "").splitlines() if p.strip()])
-            if peer_count > 0:
-                active_tunnels += 1
-                details.append(f"WireGuard_{iface}: {peer_count} peers")
-            else:
-                inactive_tunnels += 1
-                details.append(f"WireGuard_{iface}: no active peers")
+    # WireGuard: BLOCKED — requires 'wg' command (netlink kernel interface).
+    # No Python stdlib equivalent exists. Skipped in beta.
+    # See check_vpn_tunnels.py for the original WireGuard implementation.
 
-    if total_tunnels == 0:
-        status, status_text = 0, "No VPN configured"
-    elif active_tunnels == 0:
-        status, status_text = 2, "CRITICAL - All VPN down"
-    elif active_tunnels < total_tunnels:
-        status, status_text = 1, "WARNING - Some VPN down"
+    if total == 0:
+        st, txt = 0, "No VPN configured [beta]"
+    elif active == 0:
+        st, txt = 2, "CRITICAL - All VPN down [beta]"
+    elif active < total:
+        st, txt = 1, "WARNING - Some VPN down [beta]"
     else:
-        status, status_text = 0, "OK - All VPN active"
+        st, txt = 0, "OK - All VPN active [beta]"
 
     print(
-        f"{status} VPN.Tunnels active={active_tunnels};0;0;0;{total_tunnels} "
-        f"Total:{total_tunnels} Active:{active_tunnels} - {status_text} "
-        f"| total={total_tunnels} active={active_tunnels} inactive={inactive_tunnels}"
+        f"{st} {SERVICE} active={active};0;0;0;{total} "
+        f"Total:{total} Active:{active} - {txt}"
+        f" | total={total} active={active} inactive={inactive}"
     )
     if details:
-        print(f"0 VPN.Details - {', '.join(details)}")
+        print(f"0 VPN.Details - {', '.join(details)} [beta]")
     return 0
 
 

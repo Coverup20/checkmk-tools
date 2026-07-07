@@ -1,60 +1,81 @@
 #!/usr/bin/env python3
-"""check_ovpn_host2net.py - CheckMK local check OVPN host-to-net (pure Python)."""
+"""check_ovpn_host2net.py - CheckMK OpenVPN check (pyuci beta).
 
-VERSION = "1.1.0"
+Replaces subprocess ps with /proc scan for OpenVPN processes.
+OpenVPN status files read directly.
+"""
 
-import subprocess
 import sys
 from pathlib import Path
 
+BETA = True
+VERSION = "1.1.0b1"
+SERVICE = "OVPN.HostToNet"
 STATUS_DIR = Path("/var/run/openvpn")
 
+try:
+    from euci import EUci
+except ImportError:
+    EUci = None
 
-def main() -> int:
+
+def count_openvpn_processes():
+    """Count OpenVPN processes by scanning /proc for cmdline containing 'openvpn'."""
+    count = 0
+    try:
+        for proc in Path("/proc").iterdir():
+            if not proc.name.isdigit():
+                continue
+            try:
+                cmdline = (proc / "cmdline").read_bytes()
+                if b"openvpn" in cmdline:
+                    count += 1
+            except (PermissionError, FileNotFoundError, OSError):
+                pass
+    except PermissionError:
+        pass
+    return count
+
+
+def main():
     if not STATUS_DIR.is_dir():
-        print("0 OVPN.HostToNet - OpenVPN not configured or not running")
+        print(f"0 {SERVICE} - OpenVPN not configured or not running [beta]")
         return 0
 
-    status_files = sorted(STATUS_DIR.glob("*.status"))
-    if not status_files:
-        print("0 OVPN.HostToNet - No active host-to-net OpenVPN server")
+    sfiles = sorted(STATUS_DIR.glob("*.status"))
+    if not sfiles:
+        print(f"0 {SERVICE} - No active host-to-net OpenVPN server [beta]")
         return 0
 
-    total_servers = len(status_files)
+    total_servers = len(sfiles)
     total_clients = 0
-    details: list[str] = []
+    details = []
 
-    for status_file in status_files:
-        server_name = status_file.stem
-        client_count = 0
-        for line in status_file.read_text(encoding="utf-8", errors="ignore").splitlines():
+    for sf in sfiles:
+        name = sf.stem
+        cc = 0
+        for line in sf.read_text(encoding="utf-8", errors="ignore").splitlines():
             if line.startswith("CLIENT_LIST,"):
-                client_count += 1
-        total_clients += client_count
-        if client_count == 0:
-            details.append(f"{server_name}:0_clients")
-        else:
-            details.append(f"{server_name}:{client_count}_clients")
+                cc += 1
+        total_clients += cc
+        details.append(f"{name}:{cc}_clients" if cc else f"{name}:0_clients")
 
-    if total_clients >= 50:
-        status, status_text = 1, f"WARNING - Many clients connected: {total_clients}"
+    proc_count = count_openvpn_processes()
+    if proc_count == 0:
+        print(f"2 OVPN.Process - CRITICAL - No OpenVPN process running [beta]")
+        return 0
     else:
-        status, status_text = 0, f"OK - {total_clients} clients connected on {total_servers} servers"
+        print(f"0 OVPN.Process - OK - {proc_count} OpenVPN processes active [beta]")
+
+    st, txt = (1, f"WARNING - Many clients: {total_clients}") if total_clients >= 50 else (0, f"OK - {total_clients} clients on {total_servers} servers")
 
     print(
-        f"{status} OVPN.HostToNet clients={total_clients};50;100;0 servers={total_servers} - {status_text} "
-        f"| total_clients={total_clients} total_servers={total_servers}"
+        f"{st} {SERVICE} clients={total_clients};50;100;0 servers={total_servers} - {txt} [beta]"
+        f" | total_clients={total_clients} total_servers={total_servers}"
     )
-    print(f"0 OVPN.Servers - Active servers: {' '.join([f.stem for f in status_files])}")
+    print(f"0 OVPN.Servers - Active: {' '.join([f.stem for f in sfiles])} [beta]")
     if details:
-        print(f"0 OVPN.ClientDetails - {', '.join(details[:10])}")
-
-    ps = subprocess.run(["ps"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=False)
-    openvpn_processes = sum(1 for line in (ps.stdout or "").splitlines() if "openvpn" in line and "grep" not in line)
-    if openvpn_processes == 0:
-        print("2 OVPN.Process - CRITICAL - No OpenVPN process running")
-    else:
-        print(f"0 OVPN.Process - OK - {openvpn_processes} OpenVPN processes active")
+        print(f"0 OVPN.ClientDetails - {', '.join(details[:10])} [beta]")
     return 0
 
 

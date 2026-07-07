@@ -1,171 +1,115 @@
 #!/usr/bin/env python3
-"""check_wan_throughput.py - CheckMK Local Check for WAN throughput on NethSecurity 8
+"""check_wan_throughput.py - CheckMK WAN throughput check (pyuci beta).
 
-Measures RX/TX throughput on the WAN interface in bytes/s.
-Use ubus dump to detect WAN interface (via default route 0.0.0.0)
-and read the rx_bytes/tx_bytes counters.
+Replaces ubus with:
+  - pyuci (UCI) for WAN interface discovery
+  - /proc/net/dev for byte counters (already partially used in original)
+  - /proc/net/route for default route detection
 
-Performance data emitted with standard CheckMK network metrics names 'if_in_octets'
-and 'if_out_octets' for automatic graph generation in CheckMK web interface.
-Simplified perfdata format (metric=value) for PNP4Nagios compatibility.
-
-Byte reading strategy (in order of priority):
-1. statistics in ubus dump (rx_bytes/tx_bytes)
-2. /proc/net/dev via "device" field in the dump (underlying physical interface)
-
-Persistent state saved in /tmp/wan_throughput_state.json.
-First run: Initialize state and output WARNING "Initializing".
-
-Version: 1.11.0"""
+State persistence via JSON file preserved (/tmp/wan_throughput_state.json).
+No subprocess, no ubus.
+"""
 
 import json
 import os
-import subprocess
 import sys
 import time
-from typing import Optional, Tuple
+from pathlib import Path
 
-SCRIPT_VERSION = "1.11.0"
+BETA = True
+VERSION = "1.11.0b1"
 SERVICE = "WAN.Throughput"
 STATE_FILE = "/tmp/wan_throughput_state.json"
 PROC_NET_DEV = "/proc/net/dev"
 
+try:
+    from euci import EUci
+    EUCI_AVAILABLE = True
+except ImportError:
+    EUci = None
+    EUCI_AVAILABLE = False
 
-def run_command(cmd: list) -> Tuple[int, str, str]:
-    """Esegui comando e ritorna (exit_code, stdout, stderr)."""
+
+def get_wan_device():
+    """Find WAN device via /proc/net/route + pyuci UCI."""
+    wan_iface = None
+
+    # Method 1: /proc/net/route for default route
     try:
-        result = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=10
-        )
-        return result.returncode, result.stdout.strip(), result.stderr.strip()
-    except subprocess.TimeoutExpired:
-        return 1, "", "Command timeout"
-    except FileNotFoundError:
-        return 127, "", f"Command not found: {cmd[0]}"
-    except Exception as e:
-        return 1, "", str(e)
-
-
-def get_proc_net_dev_bytes(device: str) -> Optional[Tuple[int, int]]:
-    """Reads rx_bytes and tx_bytes from /proc/net/dev for the specified physical device.
-    Row format: Interface: rx_bytes rx_packets ... tx_bytes tx_packets ..."""
-    try:
-        with open(PROC_NET_DEV, "r") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith(device + ":"):
-                    # Rimuovi "device:" e splitta
-                    parts = line.split(":", 1)[1].split()
-                    # Colonne: [0]=rx_bytes [1]=rx_packets ... [8]=tx_bytes ...
-                    if len(parts) >= 9:
-                        return int(parts[0]), int(parts[8])
-    except (IOError, ValueError, IndexError):
-        pass
-    return None
-
-
-def get_wan_info() -> Optional[Tuple[str, str, int, int]]:
-    """Use ubus dump to find WAN interface and read RX/TX bytes.
-    Returns (iface_name, device_name, rx_bytes, tx_bytes) or None.
-
-    Bytes strategy:
-    1. statistics.rx_bytes / statistics.tx_bytes from dump
-    2. /proc/net/dev via "device" field (physical interface)"""
-    rc, out, err = run_command(["ubus", "call", "network.interface", "dump"])
-    if rc != 0 or not out:
-        return None
-
-    try:
-        data = json.loads(out)
-        interfaces = data.get("interface", [])
-
-        wan_iface = None
-        wan_data = None
-
-        # First pass: search for interface with default route
-        for iface in interfaces:
-            routes = iface.get("route", [])
-            for route in routes:
-                if route.get("target") == "0.0.0.0":
-                    wan_iface = iface.get("interface", "")
-                    wan_data = iface
-                    break
-            if wan_iface:
+        for line in Path("/proc/net/route").read_text().splitlines()[1:]:
+            parts = line.split()
+            if len(parts) >= 8 and parts[1] == "00000000":
+                wan_iface = parts[0]
                 break
-
-        # Fallback on common prefixes
-        if not wan_iface:
-            for iface in interfaces:
-                name = iface.get("interface", "")
-                if name.lower().startswith(("wan", "wwan", "vwan")):
-                    wan_iface = name
-                    wan_data = iface
-                    break
-
-        if not wan_iface or wan_data is None:
-            return None
-
-        # Leggi device fisico
-        device = wan_data.get("device", "")
-
-        # Strategia 1: statistics nel dump
-        stats = wan_data.get("statistics", {})
-        rx = stats.get("rx_bytes")
-        tx = stats.get("tx_bytes")
-        if rx is not None and tx is not None:
-            return wan_iface, device, int(rx), int(tx)
-
-        # Strategia 2: /proc/net/dev via device fisico
-        if device:
-            result = get_proc_net_dev_bytes(device)
-            if result is not None:
-                return wan_iface, device, result[0], result[1]
-
-    except (json.JSONDecodeError, KeyError, ValueError):
+    except Exception:
         pass
 
+    # Method 2: UCI for WAN interface -> device mapping
+    if not wan_iface and EUCI_AVAILABLE:
+        try:
+            with EUci() as u:
+                net = u.get("network")
+            # Find WAN-type interface
+            for key in net:
+                parts = key.split(".")
+                if len(parts) != 2:
+                    continue
+                name = parts[0]
+                if name.lower().startswith(("wan", "wwan", "vwan")):
+                    device = net.get(f"{name}.device", "")
+                    if not device:
+                        device = net.get(f"{name}.ifname", name)
+                    dev_path = Path(f"/sys/class/net/{device}")
+                    if dev_path.exists():
+                        wan_iface = device
+                        break
+        except Exception:
+            pass
+
+    return wan_iface
+
+
+def get_proc_net_dev_bytes(device):
+    """Read rx_bytes and tx_bytes from /proc/net/dev."""
+    try:
+        for line in Path(PROC_NET_DEV).read_text().splitlines():
+            if line.startswith(device + ":"):
+                parts = line.split(":", 1)[1].split()
+                if len(parts) >= 9:
+                    return int(parts[0]), int(parts[8])
+    except Exception:
+        pass
     return None
 
 
-def load_state() -> Optional[dict]:
-    """Load previous state from JSON file."""
+def get_device_speed(device):
+    """Read interface speed from sysfs."""
+    try:
+        speed = int(Path(f"/sys/class/net/{device}/speed").read_text().strip())
+        return speed if speed > 0 else 1000
+    except Exception:
+        return 1000
+
+
+def load_state():
     try:
         if os.path.exists(STATE_FILE):
-            with open(STATE_FILE, "r") as f:
+            with open(STATE_FILE) as f:
                 return json.load(f)
-    except (json.JSONDecodeError, IOError):
+    except Exception:
         pass
     return None
 
 
-def save_state(iface: str, rx_bytes: int, tx_bytes: int, timestamp: float) -> None:
-    """Save current state to JSON file."""
-    state = {
-        "iface": iface,
-        "rx_bytes": rx_bytes,
-        "tx_bytes": tx_bytes,
-        "timestamp": timestamp
-    }
+def save_state(iface, rx, tx, ts):
     try:
         with open(STATE_FILE, "w") as f:
-            json.dump(state, f)
-    except IOError:
+            json.dump({"iface": iface, "rx_bytes": rx, "tx_bytes": tx, "timestamp": ts}, f)
+    except Exception:
         pass
 
 
-def bytes_to_bps(delta_bytes: int, delta_seconds: float) -> float:
-    """Convert delta bytes to bytes/s."""
-    if delta_seconds <= 0:
-        return 0.0
-    return delta_bytes / delta_seconds
-
-
-def fmt_bps(bps: float) -> str:
-    """Format bytes/s in human-readable format (B/s, KiB/s, MiB/s, GiB/s)."""
+def fmt_bps(bps):
     if bps < 1024:
         return f"{bps:.1f} B/s"
     elif bps < 1024 ** 2:
@@ -176,83 +120,55 @@ def fmt_bps(bps: float) -> str:
         return f"{bps / 1024 ** 3:.2f} GiB/s"
 
 
-def get_device_speed_mbps(device: str) -> int:
-    """Reads interface speed in Mbps from sysfs. Fallback: 1000Mbps."""
-    try:
-        with open(f"/sys/class/net/{device}/speed") as f:
-            speed = int(f.read().strip())
-            return speed if speed > 0 else 1000
-    except Exception:
-        return 1000
-
-
-def main() -> int:
-    # 1. Find WAN interface and read current counters
+def main():
     now = time.time()
-    wan_info = get_wan_info()
-    if wan_info is None:
-        print(f'2 "WAN.Throughput" if_in_octets=0|if_out_octets=0 No WAN interface or bytes not available [v{SCRIPT_VERSION}]')
+    device = get_wan_device()
+    if not device:
+        print(f'2 "{SERVICE}" if_in_octets=0|if_out_octets=0 No WAN device found [beta]')
         return 0
 
-    iface, device, rx_now, tx_now = wan_info
+    result = get_proc_net_dev_bytes(device)
+    if result is None:
+        print(f'2 "{SERVICE}" if_in_octets=0|if_out_octets=0 Cannot read counters for {device} [beta]')
+        return 0
 
-    # 3. Load previous state
+    rx_now, tx_now = result
     state = load_state()
 
-    # First run or interface changed: Initialize
-    if state is None or state.get("iface") != iface:
-        save_state(iface, rx_now, tx_now, now)
-        print(f'0 "WAN.Throughput" if_in_octets=0|if_out_octets=0 [{iface}] Initializing, wait next check [v{SCRIPT_VERSION}]')
+    if state is None or state.get("iface") != device:
+        save_state(device, rx_now, tx_now, now)
+        print(f'1 "{SERVICE}" if_in_octets=0|if_out_octets=0 [{device}] Initializing [beta]')
         return 0
 
-    # 4. Calcola delta
-    delta_seconds = now - state["timestamp"]
-    if delta_seconds < 1:
-        save_state(iface, rx_now, tx_now, now)
-        print(f'0 "WAN.Throughput" if_in_octets=0|if_out_octets=0 [{iface}] Interval too short ({delta_seconds:.1f}s)')
+    delta_sec = now - state["timestamp"]
+    if delta_sec < 1:
+        save_state(device, rx_now, tx_now, now)
+        print(f'0 "{SERVICE}" if_in_octets=0|if_out_octets=0 [{device}] Interval too short ({delta_sec:.1f}s) [beta]')
         return 0
 
-    rx_prev = state["rx_bytes"]
-    tx_prev = state["tx_bytes"]
+    d_rx = rx_now - state["rx_bytes"] if rx_now >= state["rx_bytes"] else rx_now
+    d_tx = tx_now - state["tx_bytes"] if tx_now >= state["tx_bytes"] else tx_now
 
-    # Gestisci counter wrap
-    delta_rx = rx_now - rx_prev if rx_now >= rx_prev else rx_now
-    delta_tx = tx_now - tx_prev if tx_now >= tx_prev else tx_now
+    rx_bps = d_rx / delta_sec
+    tx_bps = d_tx / delta_sec
 
-    rx_bps = bytes_to_bps(delta_rx, delta_seconds)
-    tx_bps = bytes_to_bps(delta_tx, delta_seconds)
+    save_state(device, rx_now, tx_now, now)
 
-    # 5. Save new state
-    save_state(iface, rx_now, tx_now, now)
-
-    # 6. Interface speed and usage percentage
-    speed_mbps = get_device_speed_mbps(device or iface)
-    speed_bps = speed_mbps * 125_000  # Mbps → bytes/s
-    if speed_mbps >= 1000:
-        speed_str = f"{speed_mbps // 1000} GBit/s"
-    else:
-        speed_str = f"{speed_mbps} MBit/s"
-
+    speed_mbps = get_device_speed(device)
+    speed_bps = speed_mbps * 125_000
+    speed_str = f"{speed_mbps // 1000} GBit/s" if speed_mbps >= 1000 else f"{speed_mbps} MBit/s"
     rx_pct = (rx_bps / speed_bps * 100) if speed_bps > 0 else 0.0
     tx_pct = (tx_bps / speed_bps * 100) if speed_bps > 0 else 0.0
 
-    # Thresholds in bytes/s (WARNING 80%, CRITICAL 95% of line speed)
     warn_bps = speed_bps * 0.80
     crit_bps = speed_bps * 0.95
 
-    state_code = 0
-    if rx_bps >= crit_bps or tx_bps >= crit_bps:
-        state_code = 2
-    elif rx_bps >= warn_bps or tx_bps >= warn_bps:
-        state_code = 1
+    st = 2 if (rx_bps >= crit_bps or tx_bps >= crit_bps) else (1 if (rx_bps >= warn_bps or tx_bps >= warn_bps) else 0)
 
-    # CheckMK local check format (OFFICIAL):
-    # STATE "SERVICE_NAME" perfdata status_text
-    # Multiple perfdata: metric1=value|metric2=value (pipe separator WITHIN perfdata field)
-    # Service name: MUST be quoted, perfdata and status_text are space-separated fields
     print(
-        f'{state_code} "WAN.Throughput" if_in_octets={rx_bps:.2f}|if_out_octets={tx_bps:.2f} '
-        f'[{iface}] Speed: {speed_str}, In: {fmt_bps(rx_bps)} ({rx_pct:.2f}%), Out: {fmt_bps(tx_bps)} ({tx_pct:.2f}%)'
+        f'{st} "{SERVICE}" if_in_octets={rx_bps:.2f}|if_out_octets={tx_bps:.2f} '
+        f'[{device}] Speed: {speed_str}, In: {fmt_bps(rx_bps)} ({rx_pct:.2f}%), '
+        f'Out: {fmt_bps(tx_bps)} ({tx_pct:.2f}%) [beta]'
     )
     return 0
 

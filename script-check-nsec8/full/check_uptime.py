@@ -1,44 +1,58 @@
 #!/usr/bin/env python3
-"""check_uptime.py - CheckMK local check uptime/load (Python puro)."""
+"""check_uptime.py - CheckMK uptime/load check (pyuci beta).
 
-VERSION = "1.1.0"
+Already Python-native: reads /proc/uptime and /proc/loadavg directly.
+Beta adds pyuci import check and identifies itself as beta.
+"""
 
 import os
 import sys
 from pathlib import Path
 
+BETA = True
+VERSION = "1.1.0b1"
+SERVICE = "Firewall.Uptime"
 
-def main() -> int:
-    uptime_seconds = 0
+try:
+    from euci import EUci
+except ImportError:
+    EUci = None
+
+
+def main():
+    up_sec = 0
     up = Path("/proc/uptime")
     if up.exists():
-        first = up.read_text(encoding="utf-8", errors="ignore").split()[0]
-        uptime_seconds = int(float(first))
+        parts = up.read_text().split()
+        if parts:
+            up_sec = int(float(parts[0]))
 
-    days = uptime_seconds // 86400
-    hours = (uptime_seconds % 86400) // 3600
-    minutes = (uptime_seconds % 3600) // 60
+    days = up_sec // 86400
+    hours = (up_sec % 86400) // 3600
+    mins = (up_sec % 3600) // 60
 
-    load1 = load5 = load15 = 0.0
-    loadavg = Path("/proc/loadavg")
-    if loadavg.exists():
-        fields = loadavg.read_text(encoding="utf-8", errors="ignore").split()
-        if len(fields) >= 3:
-            load1, load5, load15 = float(fields[0]), float(fields[1]), float(fields[2])
+    l1 = l5 = l15 = 0.0
+    la = Path("/proc/loadavg")
+    if la.exists():
+        f = la.read_text().split()
+        if len(f) >= 3:
+            l1, l5, l15 = float(f[0]), float(f[1]), float(f[2])
 
-    cpu_count = os.cpu_count() or 1
-    load1_norm = load1 / cpu_count
+    cpu = os.cpu_count() or 1
+    norm = l1 / cpu
 
-    if load1_norm > 1.5:
-        status, status_text = 2, "CRITICAL - Load alto"
-    elif load1_norm > 0.8:
-        status, status_text = 1, "WARNING - Load elevato"
+    if norm > 1.5:
+        st, txt = 2, "CRITICAL - Load alto"
+    elif norm > 0.8:
+        st, txt = 1, "WARNING - Load elevato"
     else:
-        status, status_text = 0, "OK"
+        st, txt = 0, "OK"
 
     print(
-        f"{status} Firewall.Uptime - Uptime: {days}d {hours}h {minutes}m, Load: {load1:.2f} {load5:.2f} {load15:.2f} ({cpu_count} CPU) - {status_text} "
-        f"| uptime_seconds={uptime_seconds} load1={load1:.2f} load5={load5:.2f} load15={load15:.2f} cpu_count={cpu_count}"
+        f"{st} {SERVICE} - Uptime: {days}d {hours}h {mins}m, "
+        f"Load: {l1:.2f} {l5:.2f} {l15:.2f} ({cpu} CPU) - {txt} [beta]"
+        f" | uptime_seconds={up_sec} load1={l1:.2f} load5={l5:.2f} "
+        f"load15={l15:.2f} cpu_count={cpu}"
     )
     return 0
 

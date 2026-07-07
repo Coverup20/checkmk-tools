@@ -1,40 +1,47 @@
 #!/usr/bin/env python3
-"""check_firewall_connections.py - CheckMK local check conntrack (Python puro)."""
+"""check_firewall_connections.py - CheckMK conntrack check (pyuci beta).
+
+Already Python-native: reads /proc/sys/net/netfilter/ directly.
+Beta adds pyuci import check and identifies itself as beta.
+"""
 
 import sys
 from pathlib import Path
 
+BETA = True
+VERSION = "1.0.0b1"
 SERVICE = "Firewall.Connections"
 
+try:
+    from euci import EUci
+except ImportError:
+    EUci = None
 
-def read_int(path: str) -> int:
-    return int(Path(path).read_text(encoding="utf-8", errors="ignore").strip())
 
-
-def main() -> int:
-    count_path = Path("/proc/sys/net/netfilter/nf_conntrack_count")
-    max_path = Path("/proc/sys/net/netfilter/nf_conntrack_max")
-    if not count_path.exists() or not max_path.exists():
-        print("1 Firewall.Connections - Conntrack not available")
+def main():
+    cnt = Path("/proc/sys/net/netfilter/nf_conntrack_count")
+    mx = Path("/proc/sys/net/netfilter/nf_conntrack_max")
+    if not cnt.exists() or not mx.exists():
+        print(f"1 {SERVICE} - Conntrack not available")
         return 0
 
-    current = read_int(str(count_path))
-    max_value = read_int(str(max_path))
-    percent = int(current * 100 / max_value) if max_value > 0 else 0
+    current = int(cnt.read_text().strip())
+    maxval = int(mx.read_text().strip())
+    pct = int(current * 100 / maxval) if maxval > 0 else 0
 
-    if percent >= 90:
-        status, status_text = 2, "CRITICAL"
-    elif percent >= 80:
-        status, status_text = 1, "WARNING"
+    if pct >= 90:
+        st, txt = 2, "CRITICAL"
+    elif pct >= 80:
+        st, txt = 1, "WARNING"
     else:
-        status, status_text = 0, "OK"
+        st, txt = 0, "OK"
 
-    warn = int(max_value * 80 / 100)
-    crit = int(max_value * 90 / 100)
+    warn = int(maxval * 80 / 100)
+    crit = int(maxval * 90 / 100)
     print(
-        f"{status} {SERVICE} connections={current};{warn};{crit};0;{max_value} "
-        f"Active connections: {current}/{max_value} ({percent}%) - Status: {status_text} "
-        f"| current={current} max={max_value} percent={percent}"
+        f"{st} {SERVICE} connections={current};{warn};{crit};0;{maxval} "
+        f"Active connections: {current}/{maxval} ({pct}%) - {txt} [beta]"
+        f" | current={current} max={maxval} percent={pct}"
     )
     return 0
 

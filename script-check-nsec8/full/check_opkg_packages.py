@@ -1,71 +1,25 @@
 #!/usr/bin/env python3
-"""check_opkg_packages.py - CheckMK local check OPKG packages (Python puro)."""
+"""check_opkg_packages.py - CheckMK OPKG check (pyuci beta).
 
-import shutil
-import subprocess
+BLOCKED: NethSecurity 8.8 no longer provides 'opkg'.
+This script remains only for name parity with the original.
+The APK variant is check_apk_packages.py (beta).
+"""
+
 import sys
-import time
-from pathlib import Path
 
+BETA = True
+VERSION = "1.0.0b1"
 SERVICE = "OPKG.Packages"
 
+try:
+    from euci import EUci
+except ImportError:
+    EUci = None
 
-def run_lines(cmd: list[str], timeout: int = 15) -> list[str]:
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=timeout, check=False)
-    return (result.stdout or "").splitlines()
 
-
-def main() -> int:
-    if shutil.which("opkg") is None:
-        print("2 OPKG.Packages - opkg not available")
-        return 0
-
-    installed_count = len(run_lines(["opkg", "list-installed"]))
-    updates_available = len(run_lines(["opkg", "list-upgradable"], timeout=10))
-
-    last_update_age = 0
-    lists_dir = Path("/var/opkg-lists")
-    if lists_dir.exists():
-        mtimes = [int(path.stat().st_mtime) for path in lists_dir.glob("*") if path.is_file()]
-        if mtimes:
-            last_update_age = int((time.time() - max(mtimes)) / 86400)
-
-    recent_installs = 0
-    recent_removes = 0
-    log_file = Path("/var/log/messages")
-    if log_file.exists():
-        content = log_file.read_text(encoding="utf-8", errors="ignore")
-        recent_installs = content.count("opkg") if "install" in content else 0
-        recent_removes = content.count("remove") if "opkg" in content else 0
-
-    overlay_used_pct = 0
-    overlay_free = 0
-    try:
-        usage = shutil.disk_usage("/overlay")
-        overlay_free = int(usage.free / 1024)
-        overlay_used_pct = int((usage.used * 100) / usage.total) if usage.total else 0
-    except Exception:
-        pass
-
-    if overlay_used_pct >= 95:
-        status, status_text = 2, f"CRITICAL - /overlay space: {overlay_used_pct}%"
-    elif overlay_used_pct >= 85:
-        status, status_text = 1, f"WARNING - /overlay space: {overlay_used_pct}%"
-    elif updates_available >= 10:
-        status, status_text = 1, f"WARNING - {updates_available} updates available"
-    elif last_update_age >= 30:
-        status, status_text = 1, f"WARNING - Package list outdated ({last_update_age} days)"
-    elif updates_available > 0:
-        status, status_text = 0, f"OK - {updates_available} updates available"
-    else:
-        status, status_text = 0, f"OK - {installed_count} packages installed"
-
-    print(
-        f"{status} {SERVICE} installed={installed_count} updates={updates_available};10;20;0 "
-        f"overlay_used_pct={overlay_used_pct};85;95;0;100 - {status_text} "
-        f"| installed={installed_count} updates_available={updates_available} overlay_free_kb={overlay_free} overlay_used_pct={overlay_used_pct} "
-        f"last_update_age_days={last_update_age} recent_installs={recent_installs} recent_removes={recent_removes}"
-    )
+def main():
+    print(f"2 {SERVICE} - opkg not available on NethSecurity 8.8; use APK.Packages instead [beta]")
     return 0
 
 
