@@ -601,6 +601,11 @@ class ReportEngine:
             return f"{sep}\n  {title}\n{sep}"
         return sep
 
+    def _append_detail_lines(self, lines, prefix, full_value, display_limit):
+        """visual shortening in summary row, non-destructive because the full value available at this rendering point is preserved immediately below"""
+        if len(str(full_value)) > display_limit:
+            lines.append(f"    -> {prefix}: {full_value}")
+
     # --- Section 1: Executive summary ---
 
     def section_executive_summary(self):
@@ -743,7 +748,8 @@ class ReportEngine:
         for e in sorted_execs:
             ts = self._get_ts(e)[:20]
             src = (e.get("script") or "?")[:12]
-            host = (e.get("host") or "?")[:25]
+            full_host = e.get("host") or "?"
+            host = full_host[:25]
             cat = (e.get("category") or "?")[:20]
             old = e.get("old_state") or ""
             new = e.get("new_state") or ""
@@ -753,6 +759,7 @@ class ReportEngine:
             eid = e["execution_id"][:12]
             lines.append(f"  {ts:<20} {src:<12} {host:<25} {cat:<20} "
                          f"{state:<12} {result_str:<20} {eid:<12}")
+            self._append_detail_lines(lines, "Full Host", full_host, 25)
 
         lines.append("")
         return "\n".join(lines)
@@ -786,7 +793,8 @@ class ReportEngine:
         for e in blocked:
             ts = self._get_ts(e)[:20]
             src = (e.get("script") or "?")[:12]
-            host = (e.get("host") or "?")[:25]
+            full_host = e.get("host") or "?"
+            host = full_host[:25]
             cat = (e.get("category") or "?")[:20]
             result = str(e.get("final_result") or "?")[:22]
             cd_sec = e.get("cooldown_seconds")
@@ -796,6 +804,7 @@ class ReportEngine:
             eid = e["execution_id"][:12]
             lines.append(f"  {ts:<20} {src:<12} {host:<25} {cat:<20} "
                          f"{result:<22} {cd_str:<8} {elapsed_str:<8} {eid:<12}")
+            self._append_detail_lines(lines, "Full Host", full_host, 25)
 
         lines.append("")
         return "\n".join(lines)
@@ -828,13 +837,15 @@ class ReportEngine:
         for e in recov:
             ts = self._get_ts(e)[:20]
             src = (e.get("script") or "?")[:12]
-            host = (e.get("host") or "?")[:25]
+            full_host = e.get("host") or "?"
+            host = full_host[:25]
             cat = (e.get("category") or "?")[:20]
             old = (e.get("old_state") or "?")[:8]
             new = (e.get("new_state") or "?")[:8]
             eid = e["execution_id"][:12]
             lines.append(f"  {ts:<20} {src:<12} {host:<25} {cat:<20} "
                          f"{old:<8} {new:<8} {eid:<12}")
+            self._append_detail_lines(lines, "Full Host", full_host, 25)
 
         lines.append("")
         return "\n".join(lines)
@@ -1000,8 +1011,10 @@ class ReportEngine:
             lines.append(f"  {'Host':<30} {'Category':<20} {'Transitions':>11} {'Examples':<45}")
             lines.append(f"  {'-'*30} {'-'*20} {'-'*11} {'-'*45}")
             for cnt, h, cat, examples in flap_results[:10]:
-                ex_str = "; ".join(examples)[:45]
+                full_ex = "; ".join(examples)
+                ex_str = full_ex[:45]
                 lines.append(f"  {h:<30} {cat[:20]:<20} {cnt:>11} {ex_str:<45}")
+                self._append_detail_lines(lines, "Full Examples", full_ex, 45)
         else:
             lines.append("  No recurring transition candidates detected in this period.")
 
@@ -1103,10 +1116,12 @@ class ReportEngine:
             for mb in merged_bursts[:10]:
                 ws = mb["window_start"].strftime("%Y-%m-%d %H:%M")
                 we = mb["window_end"].strftime("%Y-%m-%d %H:%M")
-                ex = ", ".join(mb["host_examples"][:3])[:30]
+                full_ex = ", ".join(mb["host_examples"])
+                ex = full_ex[:30]
                 lines.append(f"  {ws:<20} {we:<20} {mb['hosts']:>6} "
                              f"{mb['dominant_cat'][:20]:<20} {mb['delivered']:>7} "
                              f"{mb['suppressed']:>7} {mb['recovery']:>7} {ex:<30}")
+                self._append_detail_lines(lines, "Full Examples", full_ex, 30)
         else:
             lines.append("  No burst clusters detected in this period.")
 
