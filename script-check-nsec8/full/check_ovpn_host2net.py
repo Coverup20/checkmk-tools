@@ -1,81 +1,75 @@
 #!/usr/bin/env python3
-"""check_ovpn_host2net.py - CheckMK OpenVPN check (pyuci beta).
+"""check_ovpn_host2net.py - CheckMK OpenVPN check.
 
-Replaces subprocess ps with /proc scan for OpenVPN processes.
-OpenVPN status files read directly.
+Scans /proc for OpenVPN processes.
+Reads OpenVPN status files directly.
 """
 
 import sys
 from pathlib import Path
 
-BETA = True
-VERSION = "1.1.0b1"
+VERSION = "1.1.0"
 SERVICE = "OVPN.HostToNet"
-STATUS_DIR = Path("/var/run/openvpn")
-
-try:
-    from euci import EUci
-except ImportError:
-    EUci = None
 
 
-def count_openvpn_processes():
-    """Count OpenVPN processes by scanning /proc for cmdline containing 'openvpn'."""
-    count = 0
+def find_openvpn_processes():
+    openvpn_pids = []
     try:
         for proc in Path("/proc").iterdir():
             if not proc.name.isdigit():
                 continue
             try:
                 cmdline = (proc / "cmdline").read_bytes()
-                if b"openvpn" in cmdline:
-                    count += 1
-            except (PermissionError, FileNotFoundError, OSError):
+                if b"openvpn" in cmdline and b"--config" in cmdline:
+                    openvpn_pids.append(int(proc.name))
+            except (PermissionError, FileNotFoundError):
                 pass
     except PermissionError:
         pass
-    return count
+    return openvpn_pids
+
+
+def find_status_files():
+    status_files = []
+    candidates = [
+        Path("/var/run/openvpn"),
+        Path("/var/run/openvpn-server"),
+        Path("/tmp/openvpn"),
+    ]
+    for d in candidates:
+        if d.is_dir():
+            for f in d.iterdir():
+                if f.name.endswith(".status"):
+                    status_files.append(f)
+    return status_files
+
+
+def read_status_file(path):
+    try:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        clients = 0
+        for line in text.splitlines():
+            if "," in line and "Connected" in line:
+                clients += 1
+        return clients
+    except Exception:
+        return 0
 
 
 def main():
-    if not STATUS_DIR.is_dir():
-        print(f"0 {SERVICE} - OpenVPN not configured or not running [beta]")
+    pids = find_openvpn_processes()
+    status_files = find_status_files()
+    if not pids and not status_files:
+        print(f"0 {SERVICE} - OpenVPN not configured or not running")
         return 0
-
-    sfiles = sorted(STATUS_DIR.glob("*.status"))
-    if not sfiles:
-        print(f"0 {SERVICE} - No active host-to-net OpenVPN server [beta]")
-        return 0
-
-    total_servers = len(sfiles)
     total_clients = 0
-    details = []
-
-    for sf in sfiles:
-        name = sf.stem
-        cc = 0
-        for line in sf.read_text(encoding="utf-8", errors="ignore").splitlines():
-            if line.startswith("CLIENT_LIST,"):
-                cc += 1
-        total_clients += cc
-        details.append(f"{name}:{cc}_clients" if cc else f"{name}:0_clients")
-
-    proc_count = count_openvpn_processes()
-    if proc_count == 0:
-        print(f"2 OVPN.Process - CRITICAL - No OpenVPN process running [beta]")
-        return 0
-    else:
-        print(f"0 OVPN.Process - OK - {proc_count} OpenVPN processes active [beta]")
-
-    st, txt = (1, f"WARNING - Many clients: {total_clients}") if total_clients >= 50 else (0, f"OK - {total_clients} clients on {total_servers} servers")
-
+    for sf in status_files:
+        total_clients += read_status_file(sf)
+    pid_count = len(pids)
     print(
-        f"{st} {SERVICE} clients={total_clients};50;100;0 servers={total_servers} - {txt} [beta]"
-        f" | total_clients={total_clients} total_servers={total_servers}"
+        f"0 {SERVICE} - Active: {pid_count} process(es), {total_clients} client(s)"
+        f" | processes={pid_count} clients={total_clients}"
     )
-    print(f"0 OVPN.Servers - Active: {' '.join([f.stem for f in sfiles])} [beta]")
-    if details:
-        print(f"0 OVPN.ClientDetails - {', '.join(details[:10])} [beta]")
     return 0
 
 

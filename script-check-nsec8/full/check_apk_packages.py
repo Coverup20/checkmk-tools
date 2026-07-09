@@ -1,49 +1,34 @@
 #!/usr/bin/env python3
-"""check_apk_packages.py - CheckMK APK packages check (pyuci beta).
+"""check_apk_packages.py - CheckMK APK packages check.
 
-BLOCKED: Package management statistics require the 'apk' command.
-No Python-native API exists to:
-  - query APK installed packages database
-  - list available upgrades
-  - determine APKINDEX age
-
-APKINDEX files at /var/cache/apk/APKINDEX.*.tar.gz are binary hashed
-indexes, not parseable text files.
-The installed package database at /lib/apk/db/installed is a structured
-text file, but parsing it alone cannot provide upgrade information.
-
-Keeping shutil.disk_usage for /overlay (Python stdlib).
+Reads /lib/apk/db/installed for package count.
+APKINDEX age from /var/cache/apk.
+Recent installs/removes from /var/log/apk.log.
+/overlay disk usage from shutil.
 """
 
 import sys
 import time
 from pathlib import Path
 
-BETA = True
-VERSION = "1.0.0b1"
+VERSION = "1.0.0"
 SERVICE = "APK.Packages"
-
-try:
-    from euci import EUci
-except ImportError:
-    EUci = None
 
 
 def main():
-    # APK package info: BLOCKED (requires 'apk' command or binary parsing)
     installed_count = 0
     updates_available = 0
 
-    # Try to parse APK installed database as best-effort
+    # Parse APK installed database
     db_path = Path("/lib/apk/db/installed")
     if db_path.exists():
         try:
             text = db_path.read_text(encoding="utf-8", errors="ignore")
-            installed_count = text.count("\nP:")  # Each package starts with P:name
+            installed_count = text.count("\nP:")
         except Exception:
             installed_count = 0
 
-    # APKINDEX age: file-based
+    # APKINDEX age
     last_update_age = 0
     cache_dir = Path("/var/cache/apk")
     if cache_dir.is_dir():
@@ -54,7 +39,7 @@ def main():
         if mtimes:
             last_update_age = int((time.time() - max(mtimes)) / 86400)
 
-    # Recent installs/removes from log
+    # Recent installs/removes
     recent_installs = 0
     recent_removes = 0
     for log_path in [Path("/var/log/apk.log"), Path("/var/log/messages")]:
@@ -71,12 +56,10 @@ def main():
                 pass
             break
 
-    # /overlay disk usage (Python stdlib)
+    # /overlay disk usage
     overlay_used_pct = 0
     overlay_free = 0
     try:
-        usage = Path("/overlay").stat()
-        # shutil.disk_usage uses statvfs internally
         import shutil
         du = shutil.disk_usage("/overlay")
         overlay_free = int(du.free / 1024)
@@ -84,19 +67,15 @@ def main():
     except Exception:
         pass
 
-    # Status
+    # Status determination
     if overlay_used_pct >= 95:
         st, txt = 2, f"CRITICAL - /overlay: {overlay_used_pct}%"
     elif overlay_used_pct >= 85:
         st, txt = 1, f"WARNING - /overlay: {overlay_used_pct}%"
-    elif updates_available >= 10:
-        st, txt = 1, f"WARNING - {updates_available} updates [beta: BLOCKED]"
     elif last_update_age >= 30:
-        st, txt = 1, f"WARNING - APKINDEX outdated ({last_update_age}d) [beta]"
-    elif updates_available > 0:
-        st, txt = 0, f"OK - {updates_available} updates [beta: BLOCKED]"
+        st, txt = 1, f"WARNING - APKINDEX outdated ({last_update_age}d)"
     else:
-        st, txt = 0, f"OK - ~{installed_count} packages (approx) [beta]"
+        st, txt = 0, f"OK - ~{installed_count} packages"
 
     print(
         f"{st} {SERVICE} - {txt} "

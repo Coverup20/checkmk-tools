@@ -1,72 +1,111 @@
-# Beta — NethSecurity 8.8 pyuci local checks
+# NethSecurity 8.8 CheckMK Local Checks
 
-## Purpose
+Production CheckMK local check set for NethSecurity 8.8 systems using APK.
 
-Python-native reimplementation of all CheckMK local checks under
-`script-check-nsec8/full/`, using `pyuci` for all UCI access and Python
-standard library for everything else. No subprocess, no shell, no external
-commands.
+This directory contains the production scripts intended for installation by the `ns-checkmk-utils` package.
 
-Target platform: **NethSecurity 8.8** (OpenWRT 25.12, APK package manager).
+## Production check set
 
-## Requirements
+The production set is composed of these 12 Python local checks:
 
-- Python 3.13+
-- `pyuci` + `euci` (Python UCI bindings)
-- `libuci` (system library)
-
-## Status per script
-
-| Script | Status | Notes |
+| Script | Service | Purpose |
 |---|---|---|
-| `check_dhcp_leases.py` | ✅ **Ready** | pyuci for UCI, /proc/mounts, lease file resolution |
-| `check_dns_resolution.py` | ✅ **Ready** | socket.getaddrinfo() replaces nslookup |
-| `check_firewall_connections.py` | ✅ **Ready** | Already native (/proc), beta marker only |
-| `check_firewall_rules.py` | ⚠️ **Approximate** | nftables requires 'nft' command; UCI zone/rule count as proxy |
-| `check_firewall_traffic.py` | ✅ **Ready** | pyuci for interface discovery, /sys/class/net for counters |
-| `check_martian_packets.py` | ✅ **Ready** | Log file only (dmesg removed — no Python equivalent) |
-| `check_ovpn_host2net.py` | ✅ **Ready** | /proc scan replaces ps; status files direct read |
-| `check_root_access.py` | ✅ **Ready** | utmp parse replaces who; /proc replaces ps |
-| `check_uptime.py` | ✅ **Ready** | Already native (/proc), beta marker only |
-| `check_vpn_tunnels.py` | ⚠️ **Partial** | OpenVPN native; WireGuard BLOCKED (netlink, no Python API) |
-| `check_apk_packages.py` | ⚠️ **Limited** | APK database parse for count only; no upgrade info |
-| `check_opkg_packages.py` | ❌ **Blocked** | opkg not available on NethSecurity 8.8 |
-| `check_wan_status.py` | ⚠️ **Approximate** | TCP probe replaces ping; UCI + /proc/net/route for discovery |
-| `check_wan_throughput.py` | ✅ **Ready** | pyuci + /proc/net/dev + sysfs; no ubus |
+| `check_apk_packages.py` | `APK.Packages` | APK package count, update age, overlay usage |
+| `check_dhcp_leases.py` | `DHCP.Leases` | DHCP lease usage and pool status |
+| `check_dns_resolution.py` | `DNS.Resolution` | DNS resolution checks |
+| `check_firewall_connections.py` | `Firewall.Connections` | Active connection tracking usage |
+| `check_firewall_rules.py` | `Firewall.Rules` | nftables/fw4/UCI firewall rule visibility |
+| `check_firewall_traffic.py` | `<iface>.Traffic` | Interface RX/TX counters |
+| `check_ovpn_host2net.py` | `OVPN.HostToNet` | OpenVPN host-to-net status |
+| `check_root_access.py` | `Root.Access` | Active root sessions and recent root login signals |
+| `check_uptime.py` | `Firewall.Uptime` | System uptime and load |
+| `check_vpn_tunnels.py` | `VPN.Tunnels` | VPN tunnel status |
+| `check_wan_status.py` | `WAN.Status` / `WAN.InterfaceN` | WAN reachability |
+| `check_wan_throughput.py` | `WAN.Throughput` | WAN throughput counters |
 
-## Known blockers
+## Removed legacy checks
 
-### WireGuard (check_vpn_tunnels.py)
-WireGuard peer status requires the `wg` command, which communicates over
-netlink. No Python standard library or pyuci equivalent exists.
+These checks are not part of the NethSecurity 8.8 production set:
 
-### nftables rules (check_firewall_rules.py)
-nftables uses netlink for ruleset dump. The `nft` command is the only
-supported interface. UCI firewall configuration provides an approximate
-rule count but cannot reflect runtime nftable state.
+| Legacy check | Reason |
+|---|---|
+| `check_opkg_packages` / `check_opkg_packages.py` | Obsolete on APK-based NethSecurity 8.8. Replaced by `check_apk_packages.py`. |
+| `check_martian_packets` / `check_martian_packets.py` | Not included in the NethSecurity 8.8 production set. |
 
-### APK upgrades (check_apk_packages.py)
-APKINDEX files (`/var/cache/apk/APKINDEX.*.tar.gz`) are binary hashed
-indexes. Installed package count is available from `/lib/apk/db/installed`,
-but upgrade information requires `apk list --upgradable`.
+Package upgrade logic must remove these files if they are present from previous installations.
 
-### ICMP ping (check_wan_status.py)
-ICMP echo requires raw sockets (`CAP_NET_RAW`). Beta uses TCP connect()
-as a limited approximation (port 80/443).
+## Firewall rules check
 
-## Read-only policy
+`check_firewall_rules.py` supports multiple firewall data sources:
 
-All beta scripts are strictly read-only. No UCI commit, no system
-modification, no state changes.
+1. `nft` lookup from:
+   - `/usr/sbin/nft`
+   - `/usr/bin/nft`
+   - `/sbin/nft`
+   - `/bin/nft`
+   - `PATH`
+2. nftables ruleset parsing.
+3. `fw4 print` fallback.
+4. UCI firewall fallback for named NethSecurity/OpenWrt sections such as:
+   - `firewall.ns_lan=zone`
+   - `firewall.ns_wan=zone`
+   - `firewall.ns_lan2wan=forwarding`
+   - `firewall.ns_allow_https=rule`
 
-## Naming
+The check must not report that nftables is unavailable when `/usr/sbin/nft` exists and works.
 
-Beta files use the same filenames as their originals. All beta scripts
-identify themselves with `[beta]` in their output summary.
+## Root access check
 
-## Promotion criteria
+`check_root_access.py` reviews root access using data available on NethSecurity/OpenWrt systems.
 
-A beta script may be promoted to production when:
-- All external-command blockers are resolved
-- Functional equivalence is verified on target hardware
-- All tests pass without subprocess usage
+Expected behavior:
+
+- Count active root sessions where reliable.
+- Detect recent root login signals where logs are available.
+- Detect failed login signals only when the source is available.
+- Do not invent reliable failed-login counts when logs are unavailable.
+- Use meaningful thresholds for active root sessions and failed login attempts.
+
+Current thresholds:
+
+| Signal | WARN | CRIT |
+|---|---:|---:|
+| Active root sessions | 5 | 10 |
+| Failed root login attempts | 5 | 10 |
+
+## Packaging requirements
+
+`ns-checkmk-utils` must install only the 12 production `.py` checks listed above.
+
+During package upgrade, the package must remove obsolete files left by previous versions, including:
+
+- old extensionless local checks replaced by `.py` scripts;
+- `check_opkg_packages`;
+- `check_opkg_packages.py`;
+- `check_martian_packets`;
+- `check_martian_packets.py`.
+
+The package must avoid duplicate old/new CheckMK services in `/usr/lib/check_mk_agent/local/`.
+
+## Validation notes
+
+The current production script set was manually validated on a NethSecurity 8.8 test VM with CheckMK agent 2.5.0.
+
+Important distinction:
+
+- The corrected script set was validated manually after copying it to the VM.
+- Package/feed installation from the PR was not validated successfully.
+- Packaging still needs separate validation to confirm clean installation and upgrade behavior.
+
+## Expected local section properties
+
+A valid deployment should satisfy:
+
+- no beta markers in service output;
+- no `OPKG.Packages` service;
+- no `Martian.Packets` service;
+- `APK.Packages` present;
+- `Firewall.Rules` detects firewall data when nft/fw4/UCI are available;
+- no duplicate legacy and `.py` services;
+- no Python traceback;
+- no raw command failure output.

@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""check_firewall_traffic.py - CheckMK firewall traffic check (pyuci beta).
+"""check_firewall_traffic.py - CheckMK firewall traffic check.
 
-Replaces ubus with pyuci (UCI) for interface discovery and /sys/class/net
-for byte counters. No subprocess, no ubus.
+Uses pyuci for interface discovery and /sys/class/net for byte counters.
+No subprocess, no ubus.
 """
 
 import sys
 from pathlib import Path
 
-BETA = True
-VERSION = "1.1.0b1"
-SERVICE = "Firewall.Traffic"
+VERSION = "1.1.0"
+SERVICE = "Traffic"
 
 try:
     from euci import EUci
@@ -20,91 +19,62 @@ except ImportError:
     EUCI_AVAILABLE = False
 
 
-def get_wan_lan_interfaces():
-    """Read WAN and LAN interfaces from UCI network config using pyuci."""
+def get_interfaces_from_uci():
     if not EUCI_AVAILABLE:
-        return [], []
+        return []
     try:
         with EUci() as u:
-            net_config = u.get("network")
+            net = u.get("network")
+        ifaces = set()
+        for key in net:
+            parts = key.split(".")
+            if len(parts) == 2 and parts[1] in ("device", "ifname"):
+                val = net[key]
+                ifaces.add(val)
+        return sorted(ifaces)
     except Exception:
-        return [], []
-
-    # Parse section types and names
-    sections = {}
-    for key, value in net_config.items():
-        parts = key.split(".")
-        sec = parts[0]
-        if sec not in sections:
-            sections[sec] = {}
-        if len(parts) == 1:
-            sections[sec]["_type"] = value
-        elif len(parts) == 2:
-            sections[sec][parts[1]] = value
-
-    wan = []
-    lan = []
-    for name, fields in sections.items():
-        if fields.get("_type") not in ("interface",):
-            continue
-        ifname = fields.get("ifname", name)
-        if name.lower().startswith(("wan", "wwan", "vwan")) or fields.get("role") == "wan":
-            wan.append(name)
-        elif name.lower() in ("lan",) or fields.get("role") == "lan":
-            lan.append(name)
-
-    # Fallback: if nothing found, scan /sys/class/net for physical interfaces
-    if not wan and not lan:
-        for iface in sorted(Path("/sys/class/net").iterdir()):
-            name = iface.name
-            if name in ("lo", "sit*"):
-                continue
-            try:
-                # Check if it's physical (has device directory)
-                if (iface / "device").exists():
-                    if name.startswith(("eth", "enp")):
-                        wan.append(name)
-            except OSError:
-                pass
-        lan = ["br-lan"] if Path("/sys/class/net/br-lan").exists() else []
-
-    return wan, lan
+        return []
 
 
-def read_stat(device, metric):
-    p = Path(f"/sys/class/net/{device}/statistics/{metric}")
-    if not p.exists():
-        return 0
-    return int(p.read_text().strip())
+def get_interfaces_from_sys():
+    try:
+        return sorted(
+            p.name for p in Path("/sys/class/net").iterdir()
+            if p.is_symlink() and p.name not in ("lo", "sit0", "tunl0", "ip6tnl0")
+        )
+    except Exception:
+        return []
 
 
-def emit_for_iface(iface):
-    device = iface
-    # For UCI interface names, try to resolve to actual device
-    # (simplified: use the interface name directly)
-    dev_path = Path(f"/sys/class/net/{device}")
+def get_bytes(iface):
+    dev_path = Path("/proc/net/dev")
     if not dev_path.exists():
-        return
-
-    rx_b = read_stat(device, "rx_bytes")
-    tx_b = read_stat(device, "tx_bytes")
-    rx_p = read_stat(device, "rx_packets")
-    tx_p = read_stat(device, "tx_packets")
-    rx_e = read_stat(device, "rx_errors")
-    tx_e = read_stat(device, "tx_errors")
-
-    st = 1 if (rx_e > 100 or tx_e > 100) else 0
-    print(
-        f"{st} {iface}.Traffic - RX: {rx_b} bytes, TX: {tx_b} bytes [beta]"
-        f" | rx_bytes={rx_b} tx_bytes={tx_b} rx_packets={rx_p} "
-        f"tx_packets={tx_p} rx_errors={rx_e} tx_errors={tx_e}"
-    )
+        return None
+    try:
+        for line in dev_path.read_text().splitlines():
+            if line.startswith(iface + ":"):
+                parts = line.split(":", 1)[1].split()
+                if len(parts) >= 9:
+                    return int(parts[0]), int(parts[8])
+    except Exception:
+        pass
+    return None
 
 
 def main():
-    wan, lan = get_wan_lan_interfaces()
-    for iface in wan + lan:
-        emit_for_iface(iface)
+    ifaces = get_interfaces_from_sys()
+    if not ifaces:
+        print("1 Traffic - No interfaces found")
+        return 0
+    st = 0
+    for iface in ifaces:
+        b = get_bytes(iface)
+        if b is None:
+            continue
+        rx_bytes, tx_bytes = b
+        if rx_bytes == 0 and tx_bytes == 0:
+            continue
+        print(f"0 {iface}.{SERVICE} - RX: {rx_bytes} bytes, TX: {tx_bytes} bytes | rx_bytes={rx_bytes} tx_bytes={tx_bytes}")
     return 0
 
 

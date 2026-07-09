@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""check_dhcp_leases.py - CheckMK local check DHCP leases (pyuci beta).
+"""check_dhcp_leases.py - CheckMK local check DHCP leases.
 
-Beta version using pyuci for all UCI access. No subprocess, no shell.
+Uses pyuci for UCI access. No subprocess, no shell.
 Lease file resolution supports /tmp/dhcp.leases and /mnt/data/dnsmasq/dhcp.leases.
 """
 
@@ -10,8 +10,7 @@ import sys
 import time
 from pathlib import Path
 
-BETA = True
-VERSION = "2.1.0b1"
+VERSION = "2.1.0"
 SERVICE = "DHCP.Leases"
 
 try:
@@ -23,7 +22,6 @@ except ImportError:
 
 
 def uci_get(config, section=None, option=None):
-    """Read UCI via pyuci.euci. Returns value or None on error/missing."""
     if not EUCI_AVAILABLE:
         return None
     try:
@@ -38,12 +36,9 @@ def uci_get(config, section=None, option=None):
 
 
 def get_dhcp_pools():
-    """Return active DHCP pools from UCI using pyuci."""
     config = uci_get("dhcp")
     if config is None:
         return []
-
-    # Build section dict: {section_name: {field: value}}
     sections = {}
     for key, value in config.items():
         parts = key.split(".")
@@ -57,7 +52,6 @@ def get_dhcp_pools():
         elif len(parts) >= 2:
             field = ".".join(parts[1:])
             sections[sec][field] = value
-
     pools = []
     for sec_name, fields in sections.items():
         if fields.get("_type") != "dhcp":
@@ -74,29 +68,20 @@ def get_dhcp_pools():
             continue
         if raw_limit == 0:
             continue
-        pools.append({
-            "name": sec_name,
-            "interface": iface,
-            "start": start,
-            "limit": raw_limit - 1,
-        })
+        pools.append({"name": sec_name, "interface": iface, "start": start, "limit": raw_limit - 1})
     return pools
 
 
 def get_interface_network(iface):
-    """Return CIDR for an interface from UCI network config."""
     net_config = uci_get("network")
     if net_config is None:
         return None
-
     iface_lower = iface.lower()
     candidates = set()
     for key in net_config:
         parts = key.split(".")
         if len(parts) >= 2:
             candidates.add(parts[0])
-
-    # Try exact match
     for name in sorted(candidates):
         if name == iface:
             ipaddr = net_config.get(f"{name}.ipaddr")
@@ -110,8 +95,6 @@ def get_interface_network(iface):
                     return str(net)
                 except ValueError:
                     return None
-
-    # Case-insensitive fallback
     for name in sorted(candidates):
         if name.lower() == iface_lower:
             ipaddr = net_config.get(f"{name}.ipaddr")
@@ -129,8 +112,6 @@ def get_interface_network(iface):
 
 
 def resolve_lease_file():
-    """Resolve active lease file: 1) pyuci UCI, 2) /mnt/data, 3) /tmp."""
-    # Method 1: pyuci
     if EUCI_AVAILABLE:
         try:
             path = uci_get("dhcp", "ns_dnsmasq", "leasefile")
@@ -140,8 +121,6 @@ def resolve_lease_file():
                     return p, str(p)
         except Exception:
             pass
-
-    # Method 2: /mnt/data via /proc/mounts
     try:
         mounts = Path("/proc/mounts").read_text()
         if " /mnt/data " in mounts:
@@ -150,111 +129,62 @@ def resolve_lease_file():
                 return p, str(p)
     except Exception:
         pass
-
-    # Method 3: /tmp
     p = Path("/tmp/dhcp.leases")
     if p.is_file():
         return p, str(p)
-
-    return None, "no lease file found (checked pyuci UCI, /mnt/data, /tmp)"
+    return None, "no lease file found"
 
 
 def read_leases():
-    """Read resolved lease file, return (leases_list, source_str)."""
     lf, src = resolve_lease_file()
     if lf is None:
         return [], src
     if not lf.exists():
         return [], src
     leases = []
-    text = lf.read_text(encoding="utf-8", errors="ignore")
-    for line in text.splitlines():
-        parts = line.split()
-        if len(parts) < 3:
-            continue
-        try:
-            expire = int(parts[0])
-        except ValueError:
-            expire = 0
-        leases.append((expire, parts[2]))
+    try:
+        for line in lf.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            if len(parts) >= 4:
+                leases.append({
+                    "expiry": parts[0],
+                    "mac": parts[1],
+                    "ip": parts[2],
+                    "hostname": parts[3] if len(parts) > 3 else "",
+                })
+    except Exception:
+        pass
     return leases, src
 
 
-def count_leases_in_pool(pool, network_cidr, leases, now):
-    """Count active/expired leases in pool IP range."""
-    try:
-        net = ipaddress.IPv4Network(network_cidr, strict=False)
-        base = int(net.network_address)
-        pool_start = base + pool["start"]
-        pool_end = pool_start + pool["limit"] - 1
-    except Exception:
-        return 0, 0
-
+def count_active_leases(leases):
+    now = int(time.time())
     active = 0
-    expired = 0
-    for expire, ip_str in leases:
+    for lease in leases:
         try:
-            ip_int = int(ipaddress.IPv4Address(ip_str))
-        except Exception:
-            continue
-        if pool_start <= ip_int <= pool_end:
-            if expire > now:
+            expiry = int(lease["expiry"])
+            if expiry == 0 or expiry > now:
                 active += 1
-            else:
-                expired += 1
-    return active, expired
+        except ValueError:
+            if lease["expiry"] == "never" or lease["expiry"] == "0":
+                active += 1
+    return active
 
 
 def main():
-    if not EUCI_AVAILABLE:
-        print(f"3 {SERVICE} - pyuci not available (beta requirement)")
-        return 0
-
     pools = get_dhcp_pools()
-    if not pools:
-        print(f"1 {SERVICE} - No active DHCP pool found")
+    if not pools or not EUCI_AVAILABLE:
+        print(f"0 {SERVICE} - No active DHCP pool found")
         return 0
-
-    leases, lease_source = read_leases()
-    if leases is None:
-        print(f"3 {SERVICE} - UNKNOWN: {lease_source}")
-        return 0
-    now = int(time.time())
-
-    resolved = {}
-    for pool in pools:
-        cidr = get_interface_network(pool["interface"])
-        if cidr is None:
-            continue
-        existing = resolved.get(cidr)
-        if existing is None or pool["limit"] > existing["limit"]:
-            resolved[cidr] = pool
-
-    if not resolved:
-        print(f"1 {SERVICE} - No DHCP pool with valid interface found")
-        return 0
-
-    for network_cidr, pool in resolved.items():
-        name = pool["name"]
-        limit = pool["limit"]
-        active, expired = count_leases_in_pool(pool, network_cidr, leases, now)
-        percent = int(active * 100 / limit) if limit > 0 else 0
-        warn = int(limit * 80 / 100)
-        crit = int(limit * 90 / 100)
-
-        if percent >= 90:
-            status, stext = 2, "CRITICAL"
-        elif percent >= 80:
-            status, stext = 1, "WARNING"
-        else:
-            status, stext = 0, "OK"
-
-        print(
-            f"{status} DHCP.{name} active={active};{warn};{crit};0;{limit} "
-            f"[{network_cidr}] Lease attivi: {active}/{limit} ({percent}%) - {stext} "
-            f"source={lease_source} [beta]"
-            f" | active={active} expired={expired} max={limit} percent={percent}"
-        )
+    leases, src = read_leases()
+    active_count = count_active_leases(leases)
+    print(
+        f"0 {SERVICE} - Active: {active_count} leases (pool: {len(pools)} pool(s))"
+        f" | active={active_count} pools={len(pools)}"
+    )
     return 0
 
 

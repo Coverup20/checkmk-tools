@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""check_root_access.py - CheckMK root access check (pyuci beta).
+"""check_root_access.py - CheckMK root access check.
 
-Replaces subprocess who with /var/run/utmp parsing (standard Unix format).
-Replaces subprocess ps with /proc scan for dropbear/sshd processes.
-Log file parsing preserved (Python-native).
+Detects active root SSH sessions via:
+  - /var/run/utmp (USER_PROCESS entries)
+  - /proc scan for dropbear/sshd children (excluding main daemons)
+Parses /var/log/messages for successful/failed login attempts.
 """
 
 import re
@@ -11,20 +12,20 @@ import struct
 import sys
 from pathlib import Path
 
-BETA = True
-VERSION = "1.3.0b1"
+VERSION = "1.4.0"
 SERVICE = "Root.Access"
 LOG_FILE = Path("/var/log/messages")
 
-try:
-    from euci import EUci
-except ImportError:
-    EUci = None
+# Warning thresholds
+SESSIONS_WARN = 5
+SESSIONS_CRIT = 10
+FAILED_WARN = 5
+FAILED_CRIT = 10
 
 
 def get_active_root_sessions():
-    """Count active root SSH sessions from utmp file + /proc scan."""
-    count = 0
+    """Count active root SSH sessions from utmp + /proc scan."""
+    sessions = set()
 
     # Method 1: parse /var/run/utmp for USER_PROCESS entries with root
     utmp = Path("/var/run/utmp")
@@ -40,69 +41,121 @@ def get_active_root_sessions():
                 entry = struct.unpack(fmt, rec)
                 ut_type = entry[0]
                 ut_user = entry[2].split(b'\x00', 1)[0].decode("utf-8", errors="replace")
+                ut_host = entry[4].split(b'\x00', 1)[0].decode("utf-8", errors="replace")
+                ut_line = entry[3].split(b'\x00', 1)[0].decode("utf-8", errors="replace")
                 # USER_PROCESS = 7
                 if ut_type == 7 and ut_user == "root":
-                    count += 1
+                    # Identify by host or line for uniqueness
+                    session_id = ut_host or ut_line or str(i)
+                    sessions.add(session_id)
         except Exception:
             pass
 
-    # Method 2: fallback — scan /proc for sshd/dropbear processes
-    if count == 0:
-        try:
-            for proc in Path("/proc").iterdir():
-                if not proc.name.isdigit():
+    # Method 2: /proc scan for dropbear/sshd children
+    # Count only session processes (pts/ssh), skip main daemons
+    try:
+        for proc in Path("/proc").iterdir():
+            if not proc.name.isdigit():
+                continue
+            try:
+                cmdline = (proc / "cmdline").read_bytes()
+                is_ssh = b"dropbear" in cmdline or b"sshd" in cmdline
+                if not is_ssh:
                     continue
+                # Check for child process (has a parent that is also dropbear/sshd)
+                # or has an associated pts
                 try:
-                    cmdline = (proc / "cmdline").read_bytes()
-                    if b"dropbear" in cmdline or b"sshd" in cmdline:
-                        # Exclude the main daemon (PID 1 parent or no pts)
-                        count += 1
-                except (PermissionError, FileNotFoundError, OSError):
-                    pass
-        except PermissionError:
-            pass
+                    status = (proc / "status").read_text()
+                    for line in status.splitlines():
+                        if line.startswith("Name:"):
+                            name = line.split(":", 1)[1].strip()
+                            break
+                    # Only count if it's a session child (not the main daemon)
+                    # Main daemon typically has no pts and PPID=1
+                    is_main = False
+                    for line in status.splitlines():
+                        if line.startswith("PPID:"):
+                            ppid = line.split(":", 1)[1].strip()
+                            if ppid == "1":
+                                try:
+                                    parent_cmd = (Path("/proc") / ppid / "cmdline").read_bytes()
+                                    if b"dropbear" in parent_cmd or b"sshd" in parent_cmd:
+                                        is_main = True
+                                except Exception:
+                                    pass
+                            break
+                    if not is_main:
+                        sessions.add(f"proc:{proc.name}")
+                except Exception:
+                    sessions.add(f"proc:{proc.name}")
+            except (PermissionError, FileNotFoundError, OSError):
+                pass
+    except PermissionError:
+        pass
 
-    return count
+    return len(sessions), sessions
 
 
-def main():
-    active = get_active_root_sessions()
-
+def parse_auth_log():
+    """Parse /var/log/messages for SSH auth events."""
     successful = 0
     failed = 0
     recent_ips = []
-    if LOG_FILE.exists():
-        for line in LOG_FILE.read_text(encoding="utf-8", errors="ignore").splitlines()[-500:]:
-            lower = line.lower()
-            if ("accepted password" in lower or "accepted publickey" in lower) and " for root" in lower:
-                successful += 1
-                m = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})", line)
-                if m:
-                    recent_ips.append(m.group(1))
-            if ("failed password" in lower or "authentication failure" in lower) and " for root" in lower:
-                failed += 1
+    if not LOG_FILE.exists():
+        return None, None, []  # Signal that log is unavailable
+    try:
+        lines = LOG_FILE.read_text(encoding="utf-8", errors="ignore").splitlines()
+    except Exception:
+        return None, None, []
+    for line in lines[-500:]:
+        lower = line.lower()
+        if ("accepted password" in lower or "accepted publickey" in lower) and " for root " in lower:
+            successful += 1
+            m = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})", line)
+            if m:
+                recent_ips.append(m.group(1))
+        if ("failed password" in lower or "authentication failure" in lower) and " for root " in lower:
+            failed += 1
+    return successful, failed, recent_ips
 
-    unique_ips = len(set(recent_ips))
 
-    if failed >= 10:
-        st, txt = 2, f"CRITICAL - Too many failed attempts ({failed})"
-    elif failed >= 5:
+def main():
+    active_count, sessions = get_active_root_sessions()
+    successful, failed, recent_ips = parse_auth_log()
+
+    # Build status
+    if failed is not None and failed >= FAILED_CRIT:
+        st, txt = 2, f"CRITICAL - Failed attempts: {failed}"
+    elif failed is not None and failed >= FAILED_WARN:
         st, txt = 1, f"WARNING - Failed attempts: {failed}"
-    elif active > 2:
-        st, txt = 1, f"WARNING - Too many root sessions: {active}"
-    elif successful > 0 or active > 0:
-        st, txt = 0, f"OK - Logins: {successful}, Sessions: {active}"
+    elif active_count >= SESSIONS_CRIT:
+        st, txt = 2, f"CRITICAL - Too many root sessions: {active_count}"
+    elif active_count >= SESSIONS_WARN:
+        st, txt = 1, f"WARNING - Active root sessions: {active_count}"
+    elif successful is not None and successful > 0:
+        st, txt = 0, f"OK - Logins: {successful}, Sessions: {active_count}"
+    elif active_count > 0:
+        st, txt = 0, f"OK - Sessions: {active_count}"
     else:
         st, txt = 0, "OK - No recent access"
 
+    # Log availability
+    log_note = ""
+    if successful is None:
+        log_note = " (auth log unavailable)"
+
+    failed_display = failed if failed is not None else 0
+    successful_display = successful if successful is not None else 0
+    unique_ips = len(set(recent_ips)) if recent_ips else 0
+
     print(
-        f"{st} {SERVICE} sessions={active};2;3;0 logins={successful} "
-        f"failed={failed};5;10;0 - {txt} [beta]"
-        f" | active_sessions={active} successful_logins={successful} "
-        f"failed_logins={failed} unique_ips={unique_ips}"
+        f"{st} {SERVICE} sessions={active_count};{SESSIONS_WARN};{SESSIONS_CRIT};0 "
+        f"logins={successful_display} "
+        f"failed={failed_display};{FAILED_WARN};{FAILED_CRIT};0"
+        f" - {txt}{log_note}"
+        f" | active_sessions={active_count} successful_logins={successful_display} "
+        f"failed_logins={failed_display} unique_ips={unique_ips}"
     )
-    if recent_ips:
-        print(f"0 Root.AccessIPs - Recent: {' '.join(sorted(set(recent_ips))[:5])} [beta]")
     return 0
 
 

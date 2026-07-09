@@ -1,65 +1,81 @@
 #!/usr/bin/env python3
-"""check_vpn_tunnels.py - CheckMK VPN tunnels check (pyuci beta).
+"""check_vpn_tunnels.py - CheckMK VPN tunnels check.
 
-OpenVPN: Python-native (reads /var/run/openvpn/*.status directly).
-WireGuard: BLOCKED — no Python-native API to query WireGuard peers
-without invoking the 'wg' command. The 'wg' tool communicates with the
-kernel via netlink, which has no stdlib Python binding.
-Keeping the WireGuard section requires subprocess — prohibited in beta.
+OpenVPN: reads /var/run/openvpn/*.status directly.
+WireGuard: requires 'wg' command (netlink, no Python stdlib).
 """
 
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
-BETA = True
-VERSION = "1.1.0b1"
+VERSION = "1.1.0"
 SERVICE = "VPN.Tunnels"
 
-try:
-    from euci import EUci
-except ImportError:
-    EUci = None
+
+def count_openvpn_tunnels():
+    """Count active OpenVPN tunnels (server + client) from status files."""
+    total = 0
+    active = 0
+    status_dirs = [Path("/var/run/openvpn"), Path("/var/run/openvpn-server"), Path("/tmp/openvpn")]
+    for d in status_dirs:
+        if d.is_dir():
+            for f in d.iterdir():
+                if f.name.endswith(".status"):
+                    total += 1
+                    try:
+                        text = f.read_text(encoding="utf-8", errors="ignore")
+                        for line in text.splitlines():
+                            if "," in line and "Connected" in line:
+                                active += 1
+                    except Exception:
+                        pass
+    return total, active
+
+
+def count_wireguard_tunnels():
+    """Count WireGuard peers via 'wg show'."""
+    wg_bin = shutil.which("wg")
+    if not wg_bin:
+        return 0, 0
+    try:
+        result = subprocess.run([wg_bin, "show", "interfaces"],
+                                capture_output=True, text=True, timeout=10)
+        ifaces = result.stdout.strip().split()
+        total = len(ifaces)
+        active = 0
+        for iface in ifaces:
+            r = subprocess.run([wg_bin, "show", iface, "latest-handshakes"],
+                               capture_output=True, text=True, timeout=10)
+            for line in r.stdout.strip().splitlines():
+                parts = line.split()
+                if len(parts) >= 2 and parts[1] != "0":
+                    active += 1
+        return total, active
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return 0, 0
 
 
 def main():
-    total = 0
-    active = 0
-    inactive = 0
-    details = []
-
-    # OpenVPN: fully Python-native (file read)
-    ovpn_dir = Path("/var/run/openvpn")
-    if ovpn_dir.is_dir():
-        for sf in sorted(ovpn_dir.glob("*.status")):
-            total += 1
-            cc = sum(1 for line in sf.read_text(encoding="utf-8", errors="ignore").splitlines() if line.startswith("CLIENT_LIST"))
-            if cc > 0:
-                active += 1
-                details.append(f"OpenVPN_{sf.stem}:{cc}")
-            else:
-                inactive += 1
-                details.append(f"OpenVPN_{sf.stem}:no_clients")
-
-    # WireGuard: BLOCKED — requires 'wg' command (netlink kernel interface).
-    # No Python stdlib equivalent exists. Skipped in beta.
-    # See check_vpn_tunnels.py for the original WireGuard implementation.
+    ovpn_total, ovpn_active = count_openvpn_tunnels()
+    wg_total, wg_active = count_wireguard_tunnels()
+    total = ovpn_total + wg_total
+    active = ovpn_active + wg_active
+    inactive = total - active
 
     if total == 0:
-        st, txt = 0, "No VPN configured [beta]"
+        print(f"0 {SERVICE} - No VPN configured")
     elif active == 0:
-        st, txt = 2, "CRITICAL - All VPN down [beta]"
+        print(f"2 {SERVICE} - CRITICAL - All VPN down"
+              f" | total={total} active={active} inactive={inactive}")
     elif active < total:
-        st, txt = 1, "WARNING - Some VPN down [beta]"
+        print(f"1 {SERVICE} - WARNING - Some VPN down"
+              f" | total={total} active={active} inactive={inactive}")
     else:
-        st, txt = 0, "OK - All VPN active [beta]"
+        print(f"0 {SERVICE} - OK - All VPN active"
+              f" | total={total} active={active} inactive={inactive}")
 
-    print(
-        f"{st} {SERVICE} active={active};0;0;0;{total} "
-        f"Total:{total} Active:{active} - {txt}"
-        f" | total={total} active={active} inactive={inactive}"
-    )
-    if details:
-        print(f"0 VPN.Details - {', '.join(details)} [beta]")
     return 0
 
 

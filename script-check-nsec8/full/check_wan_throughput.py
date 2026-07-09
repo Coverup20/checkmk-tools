@@ -1,23 +1,16 @@
 #!/usr/bin/env python3
-"""check_wan_throughput.py - CheckMK WAN throughput check (pyuci beta).
+"""check_wan_throughput.py - CheckMK WAN throughput check.
 
-Replaces ubus with:
-  - pyuci (UCI) for WAN interface discovery
-  - /proc/net/dev for byte counters (already partially used in original)
-  - /proc/net/route for default route detection
-
-State persistence via JSON file preserved (/tmp/wan_throughput_state.json).
-No subprocess, no ubus.
+Uses /proc/net/route for default route, /proc/net/dev for byte counters.
+State persistence via JSON file (/tmp/wan_throughput_state.json).
 """
 
 import json
-import os
 import sys
 import time
 from pathlib import Path
 
-BETA = True
-VERSION = "1.11.0b1"
+VERSION = "1.11.0"
 SERVICE = "WAN.Throughput"
 STATE_FILE = "/tmp/wan_throughput_state.json"
 PROC_NET_DEV = "/proc/net/dev"
@@ -31,10 +24,7 @@ except ImportError:
 
 
 def get_wan_device():
-    """Find WAN device via /proc/net/route + pyuci UCI."""
     wan_iface = None
-
-    # Method 1: /proc/net/route for default route
     try:
         for line in Path("/proc/net/route").read_text().splitlines()[1:]:
             parts = line.split()
@@ -43,13 +33,10 @@ def get_wan_device():
                 break
     except Exception:
         pass
-
-    # Method 2: UCI for WAN interface -> device mapping
     if not wan_iface and EUCI_AVAILABLE:
         try:
             with EUci() as u:
                 net = u.get("network")
-            # Find WAN-type interface
             for key in net:
                 parts = key.split(".")
                 if len(parts) != 2:
@@ -59,18 +46,15 @@ def get_wan_device():
                     device = net.get(f"{name}.device", "")
                     if not device:
                         device = net.get(f"{name}.ifname", name)
-                    dev_path = Path(f"/sys/class/net/{device}")
-                    if dev_path.exists():
+                    if Path(f"/sys/class/net/{device}").exists():
                         wan_iface = device
                         break
         except Exception:
             pass
-
     return wan_iface
 
 
 def get_proc_net_dev_bytes(device):
-    """Read rx_bytes and tx_bytes from /proc/net/dev."""
     try:
         for line in Path(PROC_NET_DEV).read_text().splitlines():
             if line.startswith(device + ":"):
@@ -83,7 +67,6 @@ def get_proc_net_dev_bytes(device):
 
 
 def get_device_speed(device):
-    """Read interface speed from sysfs."""
     try:
         speed = int(Path(f"/sys/class/net/{device}/speed").read_text().strip())
         return speed if speed > 0 else 1000
@@ -93,7 +76,7 @@ def get_device_speed(device):
 
 def load_state():
     try:
-        if os.path.exists(STATE_FILE):
+        if Path(STATE_FILE).exists():
             with open(STATE_FILE) as f:
                 return json.load(f)
     except Exception:
@@ -124,51 +107,40 @@ def main():
     now = time.time()
     device = get_wan_device()
     if not device:
-        print(f'2 "{SERVICE}" if_in_octets=0|if_out_octets=0 No WAN device found [beta]')
+        print(f'2 "{SERVICE}" if_in_octets=0|if_out_octets=0 No WAN device found')
         return 0
-
     result = get_proc_net_dev_bytes(device)
     if result is None:
-        print(f'2 "{SERVICE}" if_in_octets=0|if_out_octets=0 Cannot read counters for {device} [beta]')
+        print(f'2 "{SERVICE}" if_in_octets=0|if_out_octets=0 Cannot read counters for {device}')
         return 0
-
     rx_now, tx_now = result
     state = load_state()
-
     if state is None or state.get("iface") != device:
         save_state(device, rx_now, tx_now, now)
-        print(f'1 "{SERVICE}" if_in_octets=0|if_out_octets=0 [{device}] Initializing [beta]')
+        print(f'1 "{SERVICE}" if_in_octets=0|if_out_octets=0 [{device}] Initializing')
         return 0
-
     delta_sec = now - state["timestamp"]
     if delta_sec < 1:
         save_state(device, rx_now, tx_now, now)
-        print(f'0 "{SERVICE}" if_in_octets=0|if_out_octets=0 [{device}] Interval too short ({delta_sec:.1f}s) [beta]')
+        print(f'0 "{SERVICE}" if_in_octets=0|if_out_octets=0 [{device}] Interval too short ({delta_sec:.1f}s)')
         return 0
-
     d_rx = rx_now - state["rx_bytes"] if rx_now >= state["rx_bytes"] else rx_now
     d_tx = tx_now - state["tx_bytes"] if tx_now >= state["tx_bytes"] else tx_now
-
     rx_bps = d_rx / delta_sec
     tx_bps = d_tx / delta_sec
-
     save_state(device, rx_now, tx_now, now)
-
     speed_mbps = get_device_speed(device)
     speed_bps = speed_mbps * 125_000
     speed_str = f"{speed_mbps // 1000} GBit/s" if speed_mbps >= 1000 else f"{speed_mbps} MBit/s"
     rx_pct = (rx_bps / speed_bps * 100) if speed_bps > 0 else 0.0
     tx_pct = (tx_bps / speed_bps * 100) if speed_bps > 0 else 0.0
-
     warn_bps = speed_bps * 0.80
     crit_bps = speed_bps * 0.95
-
     st = 2 if (rx_bps >= crit_bps or tx_bps >= crit_bps) else (1 if (rx_bps >= warn_bps or tx_bps >= warn_bps) else 0)
-
     print(
         f'{st} "{SERVICE}" if_in_octets={rx_bps:.2f}|if_out_octets={tx_bps:.2f} '
         f'[{device}] Speed: {speed_str}, In: {fmt_bps(rx_bps)} ({rx_pct:.2f}%), '
-        f'Out: {fmt_bps(tx_bps)} ({tx_pct:.2f}%) [beta]'
+        f'Out: {fmt_bps(tx_bps)} ({tx_pct:.2f}%)'
     )
     return 0
 
