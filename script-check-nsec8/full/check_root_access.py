@@ -127,15 +127,33 @@ def parse_auth_log():
 
     if not lines:
         return None, None, []
-        
+
+    successful = 0
+    failed = 0
+    recent_ips = []
+
+    root_markers = (" for root ", "for 'root'", 'for "root"', "user=root")
+    success_markers = (
+        "accepted password",
+        "accepted publickey",
+        "password auth succeeded",
+        "pubkey auth succeeded",
+    )
+    failed_markers = (
+        "failed password",
+        "bad password attempt",
+        "authentication failure",
+    )
+
     for line in lines[-500:]:
         lower = line.lower()
-        if ("accepted password" in lower or "accepted publickey" in lower) and " for root " in lower:
+        is_root = any(marker in lower for marker in root_markers)
+        if any(marker in lower for marker in success_markers) and is_root:
             successful += 1
             m = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})", line)
             if m:
                 recent_ips.append(m.group(1))
-        if ("failed password" in lower or "authentication failure" in lower) and " for root " in lower:
+        if any(marker in lower for marker in failed_markers) and is_root:
             failed += 1
             
     return successful, failed, recent_ips
