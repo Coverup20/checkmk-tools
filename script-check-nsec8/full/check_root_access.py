@@ -97,16 +97,37 @@ def get_active_root_sessions():
 
 
 def parse_auth_log():
-    """Parse /var/log/messages for SSH auth events."""
-    successful = 0
-    failed = 0
-    recent_ips = []
-    if not LOG_FILE.exists():
-        return None, None, []  # Signal that log is unavailable
+    """Parse auth log via logread (OpenWrt/NethSecurity) or /var/log/messages (Linux).
+
+    Returns:
+        Tuple (successful, failed, recent_ips) or (None, None, []) if unavailable
+    """
+    lines = []
+
+    # Try logread first (OpenWrt/NethSecurity default)
     try:
-        lines = LOG_FILE.read_text(encoding="utf-8", errors="ignore").splitlines()
-    except Exception:
+        import subprocess
+        result = subprocess.run(
+            ["logread"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            lines = result.stdout.splitlines()
+    except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+        pass
+
+    # Fallback to /var/log/messages (standard Linux)
+    if not lines and LOG_FILE.exists():
+        try:
+            lines = LOG_FILE.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except Exception:
+            pass
+
+    if not lines:
         return None, None, []
+        
     for line in lines[-500:]:
         lower = line.lower()
         if ("accepted password" in lower or "accepted publickey" in lower) and " for root " in lower:
@@ -116,6 +137,7 @@ def parse_auth_log():
                 recent_ips.append(m.group(1))
         if ("failed password" in lower or "authentication failure" in lower) and " for root " in lower:
             failed += 1
+            
     return successful, failed, recent_ips
 
 
@@ -124,20 +146,26 @@ def main():
     successful, failed, recent_ips = parse_auth_log()
 
     # Build status
-    if failed is not None and failed >= FAILED_CRIT:
-        st, txt = 2, f"CRITICAL - Failed attempts: {failed}"
-    elif failed is not None and failed >= FAILED_WARN:
-        st, txt = 1, f"WARNING - Failed attempts: {failed}"
-    elif active_count >= SESSIONS_CRIT:
-        st, txt = 2, f"CRITICAL - Too many root sessions: {active_count}"
-    elif active_count >= SESSIONS_WARN:
-        st, txt = 1, f"WARNING - Active root sessions: {active_count}"
+    login_state = "none"
+    if failed is not None and failed > 0:
+        login_state = "failed"
     elif successful is not None and successful > 0:
-        st, txt = 0, f"OK - Logins: {successful}, Sessions: {active_count}"
+        login_state = "passed"
+
+    if failed is not None and failed >= FAILED_CRIT:
+        st, txt = 2, f"CRITICAL - login_state={login_state}, Failed attempts: {failed}"
+    elif failed is not None and failed >= FAILED_WARN:
+        st, txt = 1, f"WARNING - login_state={login_state}, Failed attempts: {failed}"
+    elif active_count >= SESSIONS_CRIT:
+        st, txt = 2, f"CRITICAL - login_state={login_state}, Too many root sessions: {active_count}"
+    elif active_count >= SESSIONS_WARN:
+        st, txt = 1, f"WARNING - login_state={login_state}, Active root sessions: {active_count}"
+    elif successful is not None and successful > 0:
+        st, txt = 0, f"OK - login_state={login_state}, Logins: {successful}, Sessions: {active_count}"
     elif active_count > 0:
-        st, txt = 0, f"OK - Sessions: {active_count}"
+        st, txt = 0, f"OK - login_state={login_state}, Sessions: {active_count}"
     else:
-        st, txt = 0, "OK - No recent access"
+        st, txt = 0, f"OK - login_state={login_state}, No recent access"
 
     # Log availability
     log_note = ""
@@ -151,8 +179,9 @@ def main():
     print(
         f"{st} {SERVICE} sessions={active_count};{SESSIONS_WARN};{SESSIONS_CRIT};0 "
         f"logins={successful_display} "
-        f"failed={failed_display};{FAILED_WARN};{FAILED_CRIT};0"
-        f" - {txt}{log_note}"
+        f"failed={failed_display};{FAILED_WARN};{FAILED_CRIT};0 "
+        f"login_state={login_state} "
+        f"- {txt}{log_note}"
         f" | active_sessions={active_count} successful_logins={successful_display} "
         f"failed_logins={failed_display} unique_ips={unique_ips}"
     )

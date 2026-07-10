@@ -22,31 +22,40 @@ except ImportError:
 
 
 def find_wan_interfaces():
+    """Find WAN (red-role) interfaces using nethsec library.
+
+    Primary: nethsec.inventory.get_networks() with role == "red"
+    Fallback: /proc/net/route for backward compatibility (library unavailable)
+    """
     wan = []
+
+    # Method 1: Use nethsec library (primary, robust)
+    if EUCI_AVAILABLE:
+        try:
+            from nethsec.inventory import get_networks
+            with EUci() as u:
+                networks = get_networks(u)
+                for dev, net in networks.items():
+                    if net.get("props", {}).get("role") == "red":
+                        wan.append(dev)
+                if wan:
+                    return wan  # Success - don't fall through
+        except (ImportError, Exception):
+            pass
+
+    # Method 2: Fallback to /proc/net/route only if library unavailable
     try:
         for line in Path("/proc/net/route").read_text().splitlines()[1:]:
             parts = line.split()
-            if len(parts) >= 8 and parts[1] == "00000000":
-                iface = parts[0]
-                if iface not in wan:
+            if len(parts) >= 2 and parts[1] == "00000000":
+                iface = parts[0].strip()
+                if iface and iface not in wan:
                     wan.append(iface)
+        return wan
     except Exception:
         pass
-    if not wan and EUCI_AVAILABLE:
-        try:
-            with EUci() as u:
-                net = u.get("network")
-            for key in net:
-                parts = key.split(".")
-                if len(parts) == 1:
-                    continue
-                name = parts[0]
-                if name.lower().startswith(("wan", "wwan", "vwan")):
-                    if name not in wan:
-                        wan.append(name)
-        except Exception:
-            pass
-    return wan
+
+    return wan  # Return whatever we found (even if empty)
 
 
 def iface_is_up(iface):

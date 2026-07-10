@@ -24,34 +24,40 @@ except ImportError:
 
 
 def get_wan_device():
+    """Get primary WAN device using nethsec library.
+
+    Primary: nethsec.inventory.get_networks() with role == "red"
+    Fallback: /proc/net/route for backward compatibility
+    """
     wan_iface = None
+
+    # Method 1: Use nethsec library (primary, robust)
+    if EUCI_AVAILABLE:
+        try:
+            from nethsec.inventory import get_networks
+            with EUci() as u:
+                networks = get_networks(u)
+                for dev, net in networks.items():
+                    if net.get("props", {}).get("role") == "red":
+                        wan_iface = dev
+                        break
+                if wan_iface:
+                    return wan_iface  # Success - don't fall through
+        except (ImportError, Exception):
+            pass
+
+    # Method 2: Fallback to /proc/net/route only if library unavailable
     try:
         for line in Path("/proc/net/route").read_text().splitlines()[1:]:
             parts = line.split()
-            if len(parts) >= 8 and parts[1] == "00000000":
-                wan_iface = parts[0]
-                break
+            if len(parts) >= 2 and parts[1] == "00000000":
+                wan_iface = parts[0].strip()
+                if wan_iface:
+                    return wan_iface
     except Exception:
         pass
-    if not wan_iface and EUCI_AVAILABLE:
-        try:
-            with EUci() as u:
-                net = u.get("network")
-            for key in net:
-                parts = key.split(".")
-                if len(parts) != 2:
-                    continue
-                name = parts[0]
-                if name.lower().startswith(("wan", "wwan", "vwan")):
-                    device = net.get(f"{name}.device", "")
-                    if not device:
-                        device = net.get(f"{name}.ifname", name)
-                    if Path(f"/sys/class/net/{device}").exists():
-                        wan_iface = device
-                        break
-        except Exception:
-            pass
-    return wan_iface
+
+    return wan_iface  # Return None if nothing found
 
 
 def get_proc_net_dev_bytes(device):
