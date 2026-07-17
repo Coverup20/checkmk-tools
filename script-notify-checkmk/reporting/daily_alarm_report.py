@@ -7,7 +7,7 @@ from analyze_notification_recurrence import parse_notifications, analyze_recurre
 SITE = 'monitoring'
 FROM_EMAIL = 'srv-monitoring-us@nethesis.it'
 TO_EMAIL = 'marzio@nethesis.it'
-W = 68  # larghezza box titolo
+W = 78  # larghezza box titolo
 
 def send_email(subject, body):
     msg = f"From: {FROM_EMAIL}\nTo: {TO_EMAIL}\nSubject: {subject}\nContent-Type: text/plain; charset=UTF-8\n\n{body}"
