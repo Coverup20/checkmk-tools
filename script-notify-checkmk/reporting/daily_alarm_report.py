@@ -27,10 +27,13 @@ def main():
     now = __import__('datetime').datetime.now().strftime('%d/%m/%Y alle %H:%M')
 
     lines = []
-    lines.append("=" * 56)
-    lines.append("  REPORT ALLARMI RICORRENTI")
-    lines.append(f"  {now}")
-    lines.append("=" * 56)
+    lines.append("")
+    lines.append("=" * W)
+    lines.append(f"  {'REPORT ALLARMI RICORRENTI':^64s}  ".center(68))
+    lines.append(f"{'':^64s}")
+    lines.append(f"{now:^64s}")
+    lines.append("=" * W)
+    lines.append("")
     lines.append("")
     lines.append("Buongiorno, di seguito il report giornaliero degli allarmi ricorrenti.")
     lines.append("")
