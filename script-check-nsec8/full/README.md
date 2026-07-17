@@ -18,7 +18,7 @@ The production set is composed of these 10 Python local checks:
 | `check_ovpn_host2net.py` | `OVPN.HostToNet` | OpenVPN host-to-net status |
 | `check_root_access.py` | `Root.Access` | Active root sessions and recent root login signals |
 | `check_vpn_tunnels.py` | `VPN.Tunnels` | VPN tunnel status |
-| `check_wan_status.py` | `WAN.Status` / `WAN.InterfaceN` | WAN reachability |
+| `check_wan_status.py` | `WAN.Interface.<label>` / `WAN.Status.<label>` / `WAN.Metrics` | WAN reachability |
 | `check_wan_throughput.py` | `WAN.Throughput` | WAN throughput counters |
 
 ## Excluded / legacy checks

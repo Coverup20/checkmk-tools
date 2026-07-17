@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-2.0-only
+#
+
 """check_root_access.py - CheckMK root access check.
 
 Detects active root SSH sessions via a /proc scan for dropbear/sshd
@@ -18,7 +23,7 @@ import re
 import sys
 from pathlib import Path
 
-VERSION = "1.5.0"
+VERSION = "1.7.0"
 SERVICE = "Root.Access"
 LOG_FILE = Path("/var/log/messages")
 
@@ -48,10 +53,6 @@ def get_active_root_sessions():
                 # or has an associated pts
                 try:
                     status = (proc / "status").read_text()
-                    for line in status.splitlines():
-                        if line.startswith("Name:"):
-                            name = line.split(":", 1)[1].strip()
-                            break
                     # Only count if it's a session child (not the main daemon).
                     # The main daemon is spawned directly by the init/process
                     # supervisor (PPid=1 - procd on OpenWrt/NethSecurity,
@@ -117,15 +118,50 @@ def parse_auth_log():
 
     if not lines:
         return None, None, []
-        
-    for line in lines[-500:]:
+
+    successful = 0
+    failed = 0
+    recent_ips = []
+
+    # Covers 3 distinct root-login sources actually seen on NethSecurity 8.8:
+    # - dropbear/sshd (SSH): "password auth succeeded for 'root' from <ip>"
+    # - busybox login (local/serial console): "root login on 'ttyS0'"
+    # - nethsecurity-api (web UI): "authentication success for user root
+    #   from <ip>" / "authentication failed for user root from <ip>: ..."
+    #   (verified against packages/ns-api-server/files/src/middleware/middleware.go
+    #   - NOT "authorization success/failed", which is logged on every
+    #   authenticated API call, not just login)
+    root_markers = (" for root ", "for 'root'", 'for "root"', "user=root", "for user root", "root login on '")
+    success_markers = (
+        "accepted password",
+        "accepted publickey",
+        "password auth succeeded",
+        "pubkey auth succeeded",
+        "authentication success",
+        "login on '",
+    )
+    failed_markers = (
+        "failed password",
+        "bad password attempt",
+        "authentication failure",
+        "authentication failed",
+    )
+
+    # Scan everything available, not just a fixed tail: /var/log/messages is
+    # only weekly-rotated and this device logs an nethsecurity-api heartbeat
+    # line roughly every 60s, so a 500-line cap (the previous behavior) gets
+    # flushed out by that noise within a few hours - verified live: a real
+    # root login (both console and web UI) fell outside the last 500 lines
+    # and was silently missed, leaving login_state stuck at "none".
+    for line in lines:
         lower = line.lower()
-        if ("accepted password" in lower or "accepted publickey" in lower) and " for root " in lower:
+        is_root = any(marker in lower for marker in root_markers)
+        if any(marker in lower for marker in success_markers) and is_root:
             successful += 1
             m = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})", line)
             if m:
                 recent_ips.append(m.group(1))
-        if ("failed password" in lower or "authentication failure" in lower) and " for root " in lower:
+        if any(marker in lower for marker in failed_markers) and is_root:
             failed += 1
 
     return successful, failed, recent_ips
@@ -166,15 +202,20 @@ def main():
     successful_display = successful if successful is not None else 0
     unique_ips = len(set(recent_ips)) if recent_ips else 0
 
-    print(
-        f"{st} {SERVICE} sessions={active_count};{SESSIONS_WARN};{SESSIONS_CRIT};0 "
-        f"logins={successful_display} "
-        f"failed={failed_display};{FAILED_WARN};{FAILED_CRIT};0 "
-        f"login_state={login_state} "
-        f"- {txt}{log_note}"
-        f" | active_sessions={active_count} successful_logins={successful_display} "
-        f"failed_logins={failed_display} unique_ips={unique_ips}"
+    # Perfdata must be the single whitespace-free 3rd field (CheckMK's local
+    # check parser never re-scans the free-text field for a later "|") - it
+    # was previously split across 3 separate space-separated tokens plus a
+    # trailing "| ..." block, so only "sessions" was ever actually graphed
+    # (and active_sessions/successful_logins/failed_logins/unique_ips were
+    # dead decorative text, duplicating sessions/logins/failed under
+    # different names for nothing).
+    perfdata = (
+        f"sessions={active_count};{SESSIONS_WARN};{SESSIONS_CRIT};0"
+        f"|logins={successful_display}"
+        f"|failed={failed_display};{FAILED_WARN};{FAILED_CRIT};0"
+        f"|unique_ips={unique_ips}"
     )
+    print(f"{st} {SERVICE} {perfdata} login_state={login_state} - {txt}{log_note}")
     return 0
 
 

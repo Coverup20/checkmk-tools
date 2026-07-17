@@ -10,6 +10,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.ruff_cache/
 
 # Personal preferences (not for public repo)
 .copilot-preferences.md

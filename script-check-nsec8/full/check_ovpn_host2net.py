@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-2.0-only
+#
+
 """check_ovpn_host2net.py - CheckMK OpenVPN check.
 
 Enumerates enabled OpenVPN instances via UCI/nethsec, and their connected
@@ -8,7 +13,7 @@ clients via nethsec.ovpn.list_connected_clients() (openvpn-status socket).
 import sys
 from pathlib import Path
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 SERVICE = "OVPN.HostToNet"
 
 try:
@@ -20,7 +25,7 @@ except ImportError:
 
 
 def find_running_instances():
-    """Enumerate enabled OpenVPN instances and whether each is actually running.
+    """Enumerate enabled host-to-net (road warrior) OpenVPN instances that are running.
 
     The previous implementation grepped /proc for a process whose cmdline
     contains both "openvpn" and "--config" - this misses any instance
@@ -34,6 +39,14 @@ def find_running_instances():
     the same runtime artifact nethsec.ovpn.list_connected_clients() itself
     reads from - if the socket exists, the instance's management interface
     is up.
+
+    Only instances tagged as road warrior (ns_tag contains "automated") are
+    considered: this is the same marker NethSecurity's own ns.ovpnrw rpcd
+    backend uses in its list_instances() to tell host-to-net instances apart
+    from net2net tunnels (ns.ovpntunnel, which uses ns_name/ns_client instead
+    and never sets ns_tag) or any other manually-defined "openvpn" UCI
+    section. Without this filter, an enabled net2net tunnel or custom config
+    would be miscounted as a "host2net" instance.
     """
     if not EUCI_AVAILABLE:
         return []
@@ -43,10 +56,14 @@ def find_running_instances():
             instances = get_all_by_type(u, "openvpn", "openvpn")
     except Exception:
         return []
+    if not instances:
+        return []
 
     running = []
     for section, fields in instances.items():
         if fields.get("enabled") != "1":
+            continue
+        if "automated" not in (fields.get("ns_tag") or ""):
             continue
         socket_path = Path(f"/var/run/openvpn_{section}.socket")
         if socket_path.exists():
@@ -70,10 +87,11 @@ def main():
         return 0
     total_clients = sum(count_connected_clients(i) for i in running)
     instance_count = len(running)
-    print(
-        f"0 {SERVICE} - Active: {instance_count} instance(s), {total_clients} client(s)"
-        f" | instances={instance_count} clients={total_clients}"
-    )
+    # Perfdata must be the single whitespace-free 3rd field (CheckMK's local
+    # check parser never re-scans the free-text field for a later "|") -
+    # putting it after the label as before produced zero graphed metrics.
+    perfdata = f"instances={instance_count}|clients={total_clients}"
+    print(f"0 {SERVICE} {perfdata} Active: {instance_count} instance(s), {total_clients} client(s)")
     return 0
 
 

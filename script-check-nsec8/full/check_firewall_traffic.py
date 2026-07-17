@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-2.0-only
+#
+
 """check_firewall_traffic.py - CheckMK firewall traffic check.
 
 Uses nethsec (WAN/LAN zone-based device discovery) and /proc/net/dev for
@@ -8,7 +13,7 @@ byte/packet/error counters. No subprocess, no ubus.
 import sys
 from pathlib import Path
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 SERVICE = "Traffic"
 
 # Alarm threshold for RX/TX error counters, per doc/check_firewall_traffic.md
@@ -79,11 +84,15 @@ def main():
         rx_bytes, rx_packets, rx_errors, tx_bytes, tx_packets, tx_errors = counters
         st = 1 if (rx_errors > ERROR_WARN or tx_errors > ERROR_WARN) else 0
         label = "WARNING" if st else "OK"
-        print(
-            f"{st} {iface}.{SERVICE} - RX: {rx_bytes} bytes, TX: {tx_bytes} bytes - {label}"
-            f" | rx_bytes={rx_bytes} tx_bytes={tx_bytes} rx_packets={rx_packets} "
-            f"tx_packets={tx_packets} rx_errors={rx_errors} tx_errors={tx_errors}"
+        # Perfdata MUST be a single whitespace-free token (CheckMK's local check
+        # parser takes the 3rd space-separated field as perfdata verbatim and
+        # never re-scans the free-text field for a later "|" - putting it
+        # after "- {label}" as before silently produced zero graphed metrics.
+        perfdata = (
+            f"rx_bytes={rx_bytes}|tx_bytes={tx_bytes}|rx_packets={rx_packets}"
+            f"|tx_packets={tx_packets}|rx_errors={rx_errors}|tx_errors={tx_errors}"
         )
+        print(f"{st} {iface}.{SERVICE} {perfdata} RX: {rx_bytes} bytes, TX: {tx_bytes} bytes - {label}")
     return 0
 
 
