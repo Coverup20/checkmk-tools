@@ -64,9 +64,9 @@ def main():
             lines.append(f"  \u23f1 {r[3]:22s} spento {r[5]} -> acceso {r[6]}  ({dur_h:.0f} ore)")
         lines.append("")
 
-    lines.append("-" * 56)
+    lines.append("-" * W)
     lines.append(f"  Totale: {len(rows)} pattern | Prossimo report: domani alle 18:00")
-    lines.append("=" * 56)
+    lines.append("=" * W)
 
     body = "\n".join(lines)
     print(body)
