@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
 """check_root_access.py - CheckMK root access check.
 
-Detects active root SSH sessions via:
-  - /var/run/utmp (USER_PROCESS entries)
-  - /proc scan for dropbear/sshd children (excluding main daemons)
-Parses /var/log/messages for successful/failed login attempts.
+Detects active root SSH sessions via a /proc scan for dropbear/sshd
+processes (excluding main daemons).
+Parses auth logs (logread or /var/log/messages) for successful/failed
+login attempts.
+
+Note: an earlier revision also tried to parse /var/run/utmp directly with a
+hardcoded glibc struct layout. That file does not exist at all on
+NethSecurity 8.8 (verified live: no getty/utmp accounting on this minimal
+BusyBox userland) and the struct layout was never verified against musl -
+removed rather than carry an unverified binary parser for a file that isn't
+even present on the target platform.
 """
 
 import re
-import struct
 import sys
 from pathlib import Path
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 SERVICE = "Root.Access"
 LOG_FILE = Path("/var/log/messages")
 
@@ -24,35 +30,11 @@ FAILED_CRIT = 10
 
 
 def get_active_root_sessions():
-    """Count active root SSH sessions from utmp + /proc scan."""
+    """Count active root SSH sessions via a /proc scan."""
     sessions = set()
 
-    # Method 1: parse /var/run/utmp for USER_PROCESS entries with root
-    utmp = Path("/var/run/utmp")
-    if utmp.exists():
-        fmt = "hi32s4s32s256siiiiii4i"
-        size = struct.calcsize(fmt)
-        try:
-            data = utmp.read_bytes()
-            for i in range(0, len(data), size):
-                rec = data[i:i + size]
-                if len(rec) < size:
-                    break
-                entry = struct.unpack(fmt, rec)
-                ut_type = entry[0]
-                ut_user = entry[2].split(b'\x00', 1)[0].decode("utf-8", errors="replace")
-                ut_host = entry[4].split(b'\x00', 1)[0].decode("utf-8", errors="replace")
-                ut_line = entry[3].split(b'\x00', 1)[0].decode("utf-8", errors="replace")
-                # USER_PROCESS = 7
-                if ut_type == 7 and ut_user == "root":
-                    # Identify by host or line for uniqueness
-                    session_id = ut_host or ut_line or str(i)
-                    sessions.add(session_id)
-        except Exception:
-            pass
-
-    # Method 2: /proc scan for dropbear/sshd children
-    # Count only session processes (pts/ssh), skip main daemons
+    # /proc scan for dropbear/sshd children.
+    # Count only session processes (pts/ssh), skip main daemons.
     try:
         for proc in Path("/proc").iterdir():
             if not proc.name.isdigit():
@@ -70,19 +52,27 @@ def get_active_root_sessions():
                         if line.startswith("Name:"):
                             name = line.split(":", 1)[1].strip()
                             break
-                    # Only count if it's a session child (not the main daemon)
-                    # Main daemon typically has no pts and PPID=1
+                    # Only count if it's a session child (not the main daemon).
+                    # The main daemon is spawned directly by the init/process
+                    # supervisor (PPid=1 - procd on OpenWrt/NethSecurity,
+                    # systemd/init elsewhere) - PID 1 itself is ALWAYS the
+                    # supervisor, never dropbear/sshd, so no extra check
+                    # against PID 1's own cmdline makes sense there.
+                    #
+                    # NOTE (two compounding bugs fixed here):
+                    # 1. /proc/<pid>/status uses "PPid:" (mixed case), not
+                    #    "PPID:" - the previous all-caps check never matched
+                    #    any line, so is_main was always False.
+                    # 2. Even with the case fixed, the old code additionally
+                    #    required PID 1's own cmdline to contain
+                    #    dropbear/sshd before treating PPid==1 as "main
+                    #    daemon" - impossible on any real system, since PID 1
+                    #    is always the init/supervisor, not the daemon.
                     is_main = False
                     for line in status.splitlines():
-                        if line.startswith("PPID:"):
+                        if line.startswith("PPid:"):
                             ppid = line.split(":", 1)[1].strip()
-                            if ppid == "1":
-                                try:
-                                    parent_cmd = (Path("/proc") / ppid / "cmdline").read_bytes()
-                                    if b"dropbear" in parent_cmd or b"sshd" in parent_cmd:
-                                        is_main = True
-                                except Exception:
-                                    pass
+                            is_main = ppid == "1"
                             break
                     if not is_main:
                         sessions.add(f"proc:{proc.name}")
@@ -155,7 +145,7 @@ def parse_auth_log():
                 recent_ips.append(m.group(1))
         if any(marker in lower for marker in failed_markers) and is_root:
             failed += 1
-            
+
     return successful, failed, recent_ips
 
 

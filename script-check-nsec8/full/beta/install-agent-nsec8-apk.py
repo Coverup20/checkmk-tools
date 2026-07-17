@@ -27,7 +27,7 @@ Usage:
   python3 install-agent-nsec8-apk.py --uninstall         # Remove agent and checks
   python3 install-agent-nsec8-apk.py --help              # Show this help
 
-Version: 1.0.0b1 (BETA)"""
+Version: 1.0.1b1 (BETA)"""
 
 import os
 import shutil
@@ -35,7 +35,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.0.0b1"
+VERSION = "1.0.1b1"
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -186,16 +186,30 @@ def phase_verify_agent() -> None:
         warn(f"Local checks directory {LOCAL_DIR} does not exist")
 
 
+def get_scripts_dir() -> Path:
+    repo_root = Path(__file__).resolve().parent.parent.parent.parent  # up 4: beta -> full -> nsec8 -> checkmk-tools
+    return repo_root / "script-check-nsec8" / "full"
+
+
+def get_deployed_check_names() -> list:
+    """Names this installer deploys to LOCAL_DIR (source .py stems).
+
+    Shared by phase_deploy_checks() and phase_uninstall() so uninstall can
+    never remove more than install ever deployed.
+    """
+    scripts_dir = get_scripts_dir()
+    if not scripts_dir.is_dir():
+        return []
+    return [src.stem for src in sorted(scripts_dir.glob("*.py"))]
+
+
 def phase_deploy_checks() -> None:
     """Phase 4: Deploy check scripts from repository to agent local dir.
 
     Scripts are copied WITHOUT the .py extension, matching the convention
     documented in the NSec8 APK Migration Guide §3.
     """
-    # Determine source directory: use full/ by default
-    repo_root = Path(__file__).resolve().parent.parent.parent.parent  # up 4: beta -> full -> nsec8 -> checkmk-tools
-    scripts_dir = repo_root / "script-check-nsec8" / "full"
-
+    scripts_dir = get_scripts_dir()
     if not scripts_dir.is_dir():
         die(f"Source scripts directory not found: {scripts_dir}")
 
@@ -278,14 +292,24 @@ def phase_uninstall() -> None:
 
     # Remove deployed check scripts
     if LOCAL_DIR.is_dir():
-        # Only remove files that look like our deployed checks (no .py extension)
+        # Only remove files this installer itself deploys (explicit
+        # allow-list from get_deployed_check_names()). The previous
+        # implementation deleted EVERY extensionless file in LOCAL_DIR -
+        # since extensionless is the standard CheckMK local-check
+        # convention, any unrelated check dropped there by another package
+        # would have been silently wiped on --uninstall.
+        allowed = set(get_deployed_check_names())
         removed = 0
-        for f in LOCAL_DIR.iterdir():
-            if f.is_file() and not f.name.endswith(".py") and f.name != ".gitignore":
+        for name in allowed:
+            f = LOCAL_DIR / name
+            if f.is_file():
                 f.unlink()
                 removed += 1
         if removed:
             log(f"Removed {removed} deployed check scripts from {LOCAL_DIR}")
+        skipped = [f.name for f in LOCAL_DIR.iterdir() if f.is_file() and f.name not in allowed and f.name != ".gitignore"]
+        if skipped:
+            log(f"Left {len(skipped)} unrelated file(s) in {LOCAL_DIR} untouched: {', '.join(skipped)}")
 
     ok("Uninstall complete")
 

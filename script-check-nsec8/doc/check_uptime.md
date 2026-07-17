@@ -1,14 +1,14 @@
-# check_uptime.sh
+# check_uptime.py
 
 ## Description
-Monitor system uptime and load average on NSecFirewall8, normalizing load by number of CPUs.
+Monitor system uptime and load average on NethSecurity 8.8, normalizing load by number of CPUs.
 
 ## Features
 - Read uptime from `/proc/uptime` and convert to days/hours/minutes
 - Read load average (1min, 5min, 15min) from `/proc/loadavg`
-- Count available CPUs with `nproc`
+- Count available CPUs with `os.cpu_count()`
 - Normalize load per CPU (load / cpu_count)
-- Threshold: WARNING if load/cpu > 0.8, CRITICAL if > 1.5
+- Threshold: WARNING if load/cpu >= 0.8, CRITICAL if >= 1.5
 
 ## States
 - **OK (0)**: Normalized load < 0.8 per CPU
@@ -29,17 +29,17 @@ Monitor system uptime and load average on NSecFirewall8, normalizing load by num
 
 ## Requirements
 - `/proc/uptime` and `/proc/loadavg` files
-- `nproc` command to count CPU
+- Python 3 (`os.cpu_count()` to count CPUs)
 
 ## Installation
 ```bash
-cp check_uptime.sh /usr/lib/check_mk_agent/local/rcheck_uptime.sh
-chmod +x /usr/lib/check_mk_agent/local/rcheck_uptime.sh
+cp check_uptime.py /usr/lib/check_mk_agent/local/check_uptime
+chmod +x /usr/lib/check_mk_agent/local/check_uptime
 ```
 
 ## Manual testing
 ```bash
-bash /opt/checkmk-tools/script-check-nsec8/full/check_uptime.sh
+python3 /opt/checkmk-tools/script-check-nsec8/full/check_uptime.py
 ```
 
 ## Load Average Interpretation

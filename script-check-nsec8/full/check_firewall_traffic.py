@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """check_firewall_traffic.py - CheckMK firewall traffic check.
 
-Uses pyuci for interface discovery and /sys/class/net for byte counters.
-No subprocess, no ubus.
+Uses nethsec (WAN/LAN zone-based device discovery) and /proc/net/dev for
+byte/packet/error counters. No subprocess, no ubus.
 """
 
 import sys
 from pathlib import Path
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 SERVICE = "Traffic"
+
+# Alarm threshold for RX/TX error counters, per doc/check_firewall_traffic.md
+ERROR_WARN = 100
 
 try:
     from euci import EUci
@@ -19,34 +22,29 @@ except ImportError:
     EUCI_AVAILABLE = False
 
 
-def get_interfaces_from_uci():
+def get_wan_lan_interfaces():
+    """Restrict monitoring to real WAN/LAN devices via firewall zone membership.
+
+    The previous implementation enumerated every device in /sys/class/net
+    (minus a 4-name blocklist) - i.e. every interface on the box, not just
+    WAN/LAN as documented. It also carried a second, dead UCI-based
+    discovery function that was never called from main() and additionally
+    had the same broken nested-dict euci usage seen in other checks
+    (u.get("network") returns {section: {options}}, not flat dotted keys).
+    """
     if not EUCI_AVAILABLE:
         return []
     try:
+        from nethsec.utils import get_all_wan_devices, get_all_lan_devices
         with EUci() as u:
-            net = u.get("network")
-        ifaces = set()
-        for key in net:
-            parts = key.split(".")
-            if len(parts) == 2 and parts[1] in ("device", "ifname"):
-                val = net[key]
-                ifaces.add(val)
+            ifaces = set(get_all_wan_devices(u)) | set(get_all_lan_devices(u))
         return sorted(ifaces)
     except Exception:
         return []
 
 
-def get_interfaces_from_sys():
-    try:
-        return sorted(
-            p.name for p in Path("/sys/class/net").iterdir()
-            if p.is_symlink() and p.name not in ("lo", "sit0", "tunl0", "ip6tnl0")
-        )
-    except Exception:
-        return []
-
-
-def get_bytes(iface):
+def get_counters(iface):
+    """Return (rx_bytes, rx_packets, rx_errors, tx_bytes, tx_packets, tx_errors) or None."""
     dev_path = Path("/proc/net/dev")
     if not dev_path.exists():
         return None
@@ -54,27 +52,33 @@ def get_bytes(iface):
         for line in dev_path.read_text().splitlines():
             if line.startswith(iface + ":"):
                 parts = line.split(":", 1)[1].split()
-                if len(parts) >= 9:
-                    return int(parts[0]), int(parts[8])
+                if len(parts) >= 11:
+                    return (
+                        int(parts[0]), int(parts[1]), int(parts[2]),
+                        int(parts[8]), int(parts[9]), int(parts[10]),
+                    )
     except Exception:
         pass
     return None
 
 
 def main():
-    ifaces = get_interfaces_from_sys()
+    ifaces = get_wan_lan_interfaces()
     if not ifaces:
-        print("1 Traffic - No interfaces found")
+        print("1 Traffic - No WAN/LAN interfaces found")
         return 0
-    st = 0
     for iface in ifaces:
-        b = get_bytes(iface)
-        if b is None:
+        counters = get_counters(iface)
+        if counters is None:
             continue
-        rx_bytes, tx_bytes = b
-        if rx_bytes == 0 and tx_bytes == 0:
-            continue
-        print(f"0 {iface}.{SERVICE} - RX: {rx_bytes} bytes, TX: {tx_bytes} bytes | rx_bytes={rx_bytes} tx_bytes={tx_bytes}")
+        rx_bytes, rx_packets, rx_errors, tx_bytes, tx_packets, tx_errors = counters
+        st = 1 if (rx_errors > ERROR_WARN or tx_errors > ERROR_WARN) else 0
+        label = "WARNING" if st else "OK"
+        print(
+            f"{st} {iface}.{SERVICE} - RX: {rx_bytes} bytes, TX: {tx_bytes} bytes - {label}"
+            f" | rx_bytes={rx_bytes} tx_bytes={tx_bytes} rx_packets={rx_packets} "
+            f"tx_packets={tx_packets} rx_errors={rx_errors} tx_errors={tx_errors}"
+        )
     return 0
 
 

@@ -21,13 +21,19 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.0.2"
 TOOL_NAME = "review_compare_outputs"
 
 # Paths
+# This file lives at <repo>/script-check-nsec8/beta/review_compare_outputs.py,
+# so .parent.parent.parent is <repo>, not <repo>/script-check-nsec8 - the
+# previous defaults pointed at <repo>/full (nonexistent) instead of
+# <repo>/script-check-nsec8/full, making --list/--all fail out of the box
+# with the default arguments (confirmed: "ERROR: original directory not
+# found: <repo>/full").
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-ORIGINAL_DIR_DEFAULT = REPO_ROOT / "full"
-BETA_DIR_DEFAULT = REPO_ROOT / "full" / "beta"
+ORIGINAL_DIR_DEFAULT = REPO_ROOT / "script-check-nsec8" / "full"
+BETA_DIR_DEFAULT = REPO_ROOT / "script-check-nsec8" / "full" / "beta"
 OUTPUT_DIR_DEFAULT = Path("/tmp/nethsecurity-checkmk-beta-review")
 
 # Files to exclude from pairing
@@ -468,14 +474,16 @@ def main():
                   if r.get("classification") in ("DIFFERENT", "UNEXPECTED_DIFFERENCE")]
     timed_out = [r for r in comparison if r.get("classification") == "TIMEOUT"]
     blocked = [r for r in comparison if r.get("classification") == "BLOCKED"]
+    both_failed = [r for r in comparison if r.get("classification") == "BOTH_FAILED"]
 
     has_unexpected = bool(unexpected) and args.fail_on_difference
     has_timeout = bool(timed_out)
     has_blocked = bool(blocked)
+    has_both_failed = bool(both_failed)
 
     if has_unexpected:
         return 1
-    if has_timeout or has_blocked:
+    if has_timeout or has_blocked or has_both_failed:
         return 3
     return 0
 

@@ -1,13 +1,13 @@
-# check_dns_resolution.sh
+# check_dns_resolution.py
 
 ## Description
-Test local server DNS resolution (127.0.0.1) on NSecFirewall8, checking speed and reliability.
+Test local server DNS resolution (127.0.0.1) on NethSecurity 8.8, checking speed and reliability.
 
 ## Features
 - Test resolution of public domains (google.com, cloudflare.com, dns.google)
-- Use `nslookup` towards 127.0.0.1 (local dnsmasq)
+- Sends a raw UDP DNS query directly to 127.0.0.1:53 (local dnsmasq) - not the system resolver, which may be configured with a different server entirely
 - Measure average response time in milliseconds
-- Threshold: WARNING if > 500ms, CRITICAL if no response
+- Threshold: WARNING if > 500ms, CRITICAL if > 1000ms or no response
 
 ## States
 - **OK (0)**: All tests OK and time < 500ms
@@ -27,19 +27,19 @@ Test local server DNS resolution (127.0.0.1) on NSecFirewall8, checking speed an
 - `avg_time_ms`: Average time in milliseconds
 
 ## Requirements
-- `nslookup` command available
+- Python 3 (raw DNS query via stdlib `socket`/`struct`, no external DNS library needed)
 - dnsmasq or other DNS resolver listening on 127.0.0.1:53
 - Internet access to resolve public domains
 
 ## Installation
 ```bash
-cp check_dns_resolution.sh /usr/lib/check_mk_agent/local/rcheck_dns_resolution.sh
-chmod +x /usr/lib/check_mk_agent/local/rcheck_dns_resolution.sh
+cp check_dns_resolution.py /usr/lib/check_mk_agent/local/check_dns_resolution
+chmod +x /usr/lib/check_mk_agent/local/check_dns_resolution
 ```
 
 ## Manual testing
 ```bash
-bash /opt/checkmk-tools/script-check-nsec8/full/check_dns_resolution.sh
+python3 /opt/checkmk-tools/script-check-nsec8/full/check_dns_resolution.py
 ```
 
 ## Notes

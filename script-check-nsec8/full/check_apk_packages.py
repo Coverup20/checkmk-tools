@@ -1,32 +1,71 @@
 #!/usr/bin/env python3
 """check_apk_packages.py - CheckMK APK packages check.
 
-Reads /lib/apk/db/installed for package count.
+Installed package count via `apk info` (stable CLI interface).
+Pending updates via nethsec.inventory.info_package_updates_available().
 APKINDEX age from /var/cache/apk.
 Recent installs/removes from /var/log/apk.log.
 /overlay disk usage from shutil.
 """
 
+import subprocess
 import sys
 import time
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 SERVICE = "APK.Packages"
+
+try:
+    from euci import EUci
+    EUCI_AVAILABLE = True
+except ImportError:
+    EUci = None
+    EUCI_AVAILABLE = False
+
+
+def get_installed_count():
+    """Count installed packages via `apk info` (stable CLI interface).
+
+    The previous implementation counted "\\nP:" occurrences in the raw
+    /lib/apk/db/installed index file - an internal on-disk format, not a
+    stable interface, unlike the documented migration-guide intent of using
+    the apk CLI directly.
+    """
+    try:
+        result = subprocess.run(
+            ["apk", "info"], capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            return len([l for l in result.stdout.splitlines() if l.strip()])
+    except Exception:
+        pass
+    return 0
+
+
+def get_updates_available():
+    """Whether package updates are available, via nethsec.inventory.
+
+    The previous implementation had `updates_available = 0` as a dead
+    constant, never reassigned anywhere in the file, yet reported
+    unconditionally as perfdata - the check always claimed zero pending
+    updates regardless of reality. Note: the library function returns a
+    boolean (any update available or not), not a count - perfdata below
+    reflects that (0/1 flag), not a package count.
+    """
+    if not EUCI_AVAILABLE:
+        return False
+    try:
+        from nethsec.inventory import info_package_updates_available
+        with EUci() as u:
+            return bool(info_package_updates_available(u))
+    except Exception:
+        return False
 
 
 def main():
-    installed_count = 0
-    updates_available = 0
-
-    # Parse APK installed database
-    db_path = Path("/lib/apk/db/installed")
-    if db_path.exists():
-        try:
-            text = db_path.read_text(encoding="utf-8", errors="ignore")
-            installed_count = text.count("\nP:")
-        except Exception:
-            installed_count = 0
+    installed_count = get_installed_count()
+    updates_available = 1 if get_updates_available() else 0
 
     # APKINDEX age
     last_update_age = 0
