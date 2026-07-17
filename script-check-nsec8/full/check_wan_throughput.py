@@ -12,7 +12,7 @@ import sys
 import time
 from pathlib import Path
 
-VERSION = "1.12.0"
+VERSION = "1.14.0"
 SERVICE = "WAN.Throughput"
 STATE_FILE = "/tmp/wan_throughput_state.json"
 PROC_NET_DEV = "/proc/net/dev"
@@ -49,14 +49,22 @@ def _resolve_runtime_device(uci, section, configured_device):
     return configured_device
 
 
-def get_wan_device():
-    """Get primary WAN device using nethsec library.
+def get_wan_devices():
+    """Get all WAN devices using nethsec library.
+
+    Returns a list of dicts: {"label": <logical name>, "device": <runtime device>}.
+    "label" is the UCI interface section name (e.g. "tim_fibra",
+    "vodafone_adsl") - the name an admin actually gave the WAN, commonly the
+    ISP/operator name, not literally "wan" - since that's what should be
+    shown in CheckMK, not the raw device name. Falls back to the device name
+    if no matching UCI section is found.
 
     Primary: nethsec.inventory.get_networks() with role == "red", resolved to
-    its runtime device via ubus (handles PPPoE/dynamic protocols correctly).
-    Fallback: /proc/net/route for backward compatibility
+    the runtime device via ubus (handles PPPoE/dynamic protocols correctly).
+    Fallback: /proc/net/route for backward compatibility (single device,
+    library unavailable - no per-WAN label possible there).
     """
-    wan_iface = None
+    wans = []
 
     # Method 1: Use nethsec library (primary, robust)
     if EUCI_AVAILABLE:
@@ -73,10 +81,12 @@ def get_wan_device():
                         if u.get("network", s, "device", default=None) == dev:
                             section = s
                             break
-                    wan_iface = _resolve_runtime_device(u, section, dev) if section else dev
-                    break
-                if wan_iface:
-                    return wan_iface  # Success - don't fall through
+                    runtime_dev = _resolve_runtime_device(u, section, dev) if section else dev
+                    label = section or runtime_dev
+                    if not any(w["device"] == runtime_dev for w in wans):
+                        wans.append({"label": label, "device": runtime_dev})
+                if wans:
+                    return wans  # Success - don't fall through
         except (ImportError, Exception):
             pass
 
@@ -85,13 +95,13 @@ def get_wan_device():
         for line in Path("/proc/net/route").read_text().splitlines()[1:]:
             parts = line.split()
             if len(parts) >= 2 and parts[1] == "00000000":
-                wan_iface = parts[0].strip()
-                if wan_iface:
-                    return wan_iface
+                iface = parts[0].strip()
+                if iface and not any(w["device"] == iface for w in wans):
+                    wans.append({"label": iface, "device": iface})
     except Exception:
         pass
 
-    return wan_iface  # Return None if nothing found
+    return wans  # Return whatever we found (even empty)
 
 
 def get_proc_net_dev_bytes(device):
@@ -133,19 +143,28 @@ def get_device_speed(device):
 
 
 def load_state():
+    """Returns {device: {rx_bytes, tx_bytes, timestamp}}, keyed per WAN device
+    so multiple WANs each keep their own counter baseline."""
     try:
         if Path(STATE_FILE).exists():
             with open(STATE_FILE) as f:
-                return json.load(f)
+                data = json.load(f)
+            # Back-compat: a previous single-WAN state file had a flat
+            # {"iface": ..., "rx_bytes": ..., ...} shape instead of being
+            # keyed by device - treat it as empty rather than misreading it.
+            if "iface" in data:
+                return {}
+            return data
     except Exception:
         pass
-    return None
+    return {}
 
 
-def save_state(iface, rx, tx, ts):
+def save_device_state(all_state, device, rx, tx, ts):
+    all_state[device] = {"rx_bytes": rx, "tx_bytes": tx, "timestamp": ts}
     try:
         with open(STATE_FILE, "w") as f:
-            json.dump({"iface": iface, "rx_bytes": rx, "tx_bytes": tx, "timestamp": ts}, f)
+            json.dump(all_state, f)
     except Exception:
         pass
 
@@ -163,59 +182,65 @@ def fmt_bps(bps):
 
 def main():
     now = time.time()
-    device = get_wan_device()
-    if not device:
+    wans = get_wan_devices()
+    if not wans:
         print(f'2 {SERVICE} if_in_octets=0|if_out_octets=0 No WAN device found')
         return 0
-    result = get_proc_net_dev_bytes(device)
-    if result is None:
-        print(f'2 {SERVICE} if_in_octets=0|if_out_octets=0 Cannot read counters for {device}')
-        return 0
-    rx_now, tx_now = result
-    state = load_state()
-    if state is None or state.get("iface") != device:
-        save_state(device, rx_now, tx_now, now)
-        print(f'1 {SERVICE} if_in_octets=0|if_out_octets=0 [{device}] Initializing')
-        return 0
-    delta_sec = now - state["timestamp"]
-    if delta_sec < 1:
-        save_state(device, rx_now, tx_now, now)
-        print(f'0 {SERVICE} if_in_octets=0|if_out_octets=0 [{device}] Interval too short ({delta_sec:.1f}s)')
-        return 0
-    if rx_now < state["rx_bytes"] or tx_now < state["tx_bytes"]:
-        # Counter reset (driver reload/hotplug): the new counter value is NOT
-        # a valid delta for this interval - computing "delta = new - 0" would
-        # fabricate a bogus multi-gigabyte spike. Re-baseline instead.
-        save_state(device, rx_now, tx_now, now)
-        print(f'0 {SERVICE} if_in_octets=0|if_out_octets=0 [{device}] Counters reset, re-baselining')
-        return 0
-    d_rx = rx_now - state["rx_bytes"]
-    d_tx = tx_now - state["tx_bytes"]
-    rx_bps = d_rx / delta_sec
-    tx_bps = d_tx / delta_sec
-    save_state(device, rx_now, tx_now, now)
-    speed_mbps = get_device_speed(device)
-    if speed_mbps is None:
-        # Unknown link speed: report raw throughput without a %-of-speed
-        # threshold rather than assuming a default that could either mask
-        # real saturation or make thresholds unreachable.
+
+    all_state = load_state()
+    for w in wans:
+        label, device = w["label"], w["device"]
+        service = f"{SERVICE}.{label}"
+        result = get_proc_net_dev_bytes(device)
+        if result is None:
+            print(f'2 {service} if_in_octets=0|if_out_octets=0 Cannot read counters for {device}')
+            continue
+        rx_now, tx_now = result
+        state = all_state.get(device)
+        if state is None:
+            save_device_state(all_state, device, rx_now, tx_now, now)
+            print(f'1 {service} if_in_octets=0|if_out_octets=0 [{device}] Initializing')
+            continue
+        delta_sec = now - state["timestamp"]
+        if delta_sec < 1:
+            save_device_state(all_state, device, rx_now, tx_now, now)
+            print(f'0 {service} if_in_octets=0|if_out_octets=0 [{device}] Interval too short ({delta_sec:.1f}s)')
+            continue
+        if rx_now < state["rx_bytes"] or tx_now < state["tx_bytes"]:
+            # Counter reset (driver reload/hotplug): the new counter value is
+            # NOT a valid delta for this interval - computing
+            # "delta = new - 0" would fabricate a bogus multi-gigabyte spike.
+            # Re-baseline instead.
+            save_device_state(all_state, device, rx_now, tx_now, now)
+            print(f'0 {service} if_in_octets=0|if_out_octets=0 [{device}] Counters reset, re-baselining')
+            continue
+        d_rx = rx_now - state["rx_bytes"]
+        d_tx = tx_now - state["tx_bytes"]
+        rx_bps = d_rx / delta_sec
+        tx_bps = d_tx / delta_sec
+        save_device_state(all_state, device, rx_now, tx_now, now)
+        speed_mbps = get_device_speed(device)
+        if speed_mbps is None:
+            # Unknown link speed: report raw throughput without a %-of-speed
+            # threshold rather than assuming a default that could either
+            # mask real saturation or make thresholds unreachable.
+            print(
+                f'0 {service} if_in_octets={rx_bps:.2f}|if_out_octets={tx_bps:.2f} '
+                f'[{device}] Speed: unknown, In: {fmt_bps(rx_bps)}, Out: {fmt_bps(tx_bps)}'
+            )
+            continue
+        speed_bps = speed_mbps * 125_000
+        speed_str = f"{speed_mbps // 1000} GBit/s" if speed_mbps >= 1000 else f"{speed_mbps} MBit/s"
+        rx_pct = (rx_bps / speed_bps * 100) if speed_bps > 0 else 0.0
+        tx_pct = (tx_bps / speed_bps * 100) if speed_bps > 0 else 0.0
+        warn_bps = speed_bps * 0.80
+        crit_bps = speed_bps * 0.95
+        st = 2 if (rx_bps >= crit_bps or tx_bps >= crit_bps) else (1 if (rx_bps >= warn_bps or tx_bps >= warn_bps) else 0)
         print(
-            f'0 {SERVICE} if_in_octets={rx_bps:.2f}|if_out_octets={tx_bps:.2f} '
-            f'[{device}] Speed: unknown, In: {fmt_bps(rx_bps)}, Out: {fmt_bps(tx_bps)}'
+            f'{st} {service} if_in_octets={rx_bps:.2f}|if_out_octets={tx_bps:.2f} '
+            f'[{device}] Speed: {speed_str}, In: {fmt_bps(rx_bps)} ({rx_pct:.2f}%), '
+            f'Out: {fmt_bps(tx_bps)} ({tx_pct:.2f}%)'
         )
-        return 0
-    speed_bps = speed_mbps * 125_000
-    speed_str = f"{speed_mbps // 1000} GBit/s" if speed_mbps >= 1000 else f"{speed_mbps} MBit/s"
-    rx_pct = (rx_bps / speed_bps * 100) if speed_bps > 0 else 0.0
-    tx_pct = (tx_bps / speed_bps * 100) if speed_bps > 0 else 0.0
-    warn_bps = speed_bps * 0.80
-    crit_bps = speed_bps * 0.95
-    st = 2 if (rx_bps >= crit_bps or tx_bps >= crit_bps) else (1 if (rx_bps >= warn_bps or tx_bps >= warn_bps) else 0)
-    print(
-        f'{st} {SERVICE} if_in_octets={rx_bps:.2f}|if_out_octets={tx_bps:.2f} '
-        f'[{device}] Speed: {speed_str}, In: {fmt_bps(rx_bps)} ({rx_pct:.2f}%), '
-        f'Out: {fmt_bps(tx_bps)} ({tx_pct:.2f}%)'
-    )
     return 0
 
 

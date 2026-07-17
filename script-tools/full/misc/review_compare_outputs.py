@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
-"""review_compare_outputs.py - Compare original vs beta CheckMK scripts.
+"""review_compare_outputs.py - Compare two variants of CheckMK local checks.
 
-Runs original and beta versions of NethSecurity 8.8 local checks,
-captures stdout/stderr/exit code/duration, and produces comparison reports.
+Runs an "original" and a "beta"/candidate version of each same-named
+NethSecurity 8.8 local check, captures stdout/stderr/exit code/duration, and
+produces comparison reports.
+
+There is no permanent "beta" directory in this repo (script-check-nsec8/
+only has full/ and doc/, matching every other script-check-* directory) -
+--beta-dir must point at wherever you've staged the candidate version for
+this one-off comparison (e.g. a temp directory with modified copies).
 
 Exit codes:
   0 = all pairs identical, equivalent, or expected differences
@@ -25,15 +31,14 @@ VERSION = "1.0.2"
 TOOL_NAME = "review_compare_outputs"
 
 # Paths
-# This file lives at <repo>/script-check-nsec8/beta/review_compare_outputs.py,
-# so .parent.parent.parent is <repo>, not <repo>/script-check-nsec8 - the
-# previous defaults pointed at <repo>/full (nonexistent) instead of
-# <repo>/script-check-nsec8/full, making --list/--all fail out of the box
-# with the default arguments (confirmed: "ERROR: original directory not
-# found: <repo>/full").
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+# This file lives at <repo>/script-tools/full/misc/review_compare_outputs.py -
+# a generic QA/diffing tool, not a NethSecurity-specific check itself, so it
+# doesn't live alongside the scripts it compares. Default --original-dir
+# still targets script-check-nsec8/full since that's the primary use case
+# this tool was built for; pass --original-dir explicitly to compare a
+# different script set.
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 ORIGINAL_DIR_DEFAULT = REPO_ROOT / "script-check-nsec8" / "full"
-BETA_DIR_DEFAULT = REPO_ROOT / "script-check-nsec8" / "full" / "beta"
 OUTPUT_DIR_DEFAULT = Path("/tmp/nethsecurity-checkmk-beta-review")
 
 # Files to exclude from pairing
@@ -410,8 +415,10 @@ def main():
     p.add_argument("--all", action="store_true", help="Run comparison for all paired scripts")
     p.add_argument("--original-dir", default=str(ORIGINAL_DIR_DEFAULT),
                    help=f"Original scripts directory (default: {ORIGINAL_DIR_DEFAULT})")
-    p.add_argument("--beta-dir", default=str(BETA_DIR_DEFAULT),
-                   help=f"Beta scripts directory (default: {BETA_DIR_DEFAULT})")
+    p.add_argument("--beta-dir", default=None,
+                   help="Beta/candidate scripts directory (required - no permanent "
+                        "beta/ directory exists in this repo, point this at wherever "
+                        "you've staged the candidate version for this comparison)")
     p.add_argument("--output-dir", default=str(OUTPUT_DIR_DEFAULT),
                    help=f"Output directory (default: {OUTPUT_DIR_DEFAULT})")
     p.add_argument("--timeout", type=int, default=30, help="Per-script timeout in seconds")
@@ -423,8 +430,13 @@ def main():
     args = p.parse_args()
 
     orig_dir = Path(args.original_dir)
-    beta_dir = Path(args.beta_dir)
     output_dir = Path(args.output_dir)
+
+    if args.beta_dir is None:
+        print("ERROR: --beta-dir is required (no permanent beta/ directory exists "
+              "in this repo)", file=sys.stderr)
+        return 2
+    beta_dir = Path(args.beta_dir)
 
     if not orig_dir.is_dir():
         print(f"ERROR: original directory not found: {orig_dir}", file=sys.stderr)

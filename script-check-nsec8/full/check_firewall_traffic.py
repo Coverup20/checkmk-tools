@@ -8,7 +8,7 @@ byte/packet/error counters. No subprocess, no ubus.
 import sys
 from pathlib import Path
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 SERVICE = "Traffic"
 
 # Alarm threshold for RX/TX error counters, per doc/check_firewall_traffic.md
@@ -50,8 +50,13 @@ def get_counters(iface):
         return None
     try:
         for line in dev_path.read_text().splitlines():
-            if line.startswith(iface + ":"):
-                parts = line.split(":", 1)[1].split()
+            # /proc/net/dev right-pads short interface names with leading
+            # spaces (e.g. "  eth0:") to align columns - without stripping,
+            # startswith() only matched names long enough to fill the
+            # column (e.g. "br-lan:"), silently missing eth0/eth1/eth2/etc.
+            stripped = line.strip()
+            if stripped.startswith(iface + ":"):
+                parts = stripped.split(":", 1)[1].split()
                 if len(parts) >= 11:
                     return (
                         int(parts[0]), int(parts[1]), int(parts[2]),
