@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-2.0-only
+#
+
 """check_wan_throughput.py - CheckMK WAN throughput check.
 
 Uses /proc/net/route for default route, /proc/net/dev for byte counters.
@@ -12,7 +17,7 @@ import sys
 import time
 from pathlib import Path
 
-VERSION = "1.14.0"
+VERSION = "1.14.1"
 SERVICE = "WAN.Throughput"
 STATE_FILE = "/tmp/wan_throughput_state.json"
 PROC_NET_DEV = "/proc/net/dev"

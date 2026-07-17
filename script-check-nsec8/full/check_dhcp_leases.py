@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-2.0-only
+#
+
 """check_dhcp_leases.py - CheckMK local check DHCP leases.
 
 Uses pyuci for UCI access. No subprocess, no shell.
@@ -10,7 +15,7 @@ import sys
 import time
 from pathlib import Path
 
-VERSION = "2.2.0"
+VERSION = "2.3.0"
 SERVICE = "DHCP.Leases"
 
 # Warning thresholds (percentage of pool capacity in active use)
@@ -60,6 +65,12 @@ def get_dhcp_pools():
             sections = get_all_by_type(u, "dhcp", "dhcp")
     except Exception:
         return []
+    # get_all_by_type() returns None (not {}) if uci.get(config) itself errors
+    # (confirmed live: same call against a bogus config name returns None, not
+    # an empty dict) - guard against that or sections.items() below crashes
+    # uncaught, outside this try/except.
+    if not sections:
+        return []
 
     pools = []
     for sec_name, fields in sections.items():
@@ -75,7 +86,12 @@ def get_dhcp_pools():
             continue
         if raw_limit == 0:
             continue
-        pools.append({"name": sec_name, "interface": iface, "start": start, "limit": raw_limit - 1})
+        # Pool capacity is `limit` addresses, not limit-1: OpenWrt's dnsmasq init
+        # script (/etc/init.d/dnsmasq) computes end=start+limit-1 (inclusive), so
+        # the range [start, start+limit-1] holds exactly `limit` addresses.
+        # Confirmed live: `ipcalc <ip>/24 100 150` -> START=.100 END=.249 (150
+        # addresses), i.e. count = limit, not limit - 1.
+        pools.append({"name": sec_name, "interface": iface, "start": start, "limit": raw_limit})
     return pools
 
 
@@ -201,13 +217,23 @@ def main():
         st = 0
     labels = {0: "OK", 1: "WARNING", 2: "CRITICAL"}
 
+    # Perfdata must be the single whitespace-free 3rd field (CheckMK's local
+    # check parser never re-scans the free-text field for a later "|") - it
+    # was previously split by a space before "Leases active:..." plus a
+    # trailing "| ..." block, so only "active" was ever actually graphed
+    # ("max" also dropped here since it duplicated active's own ;0;{capacity}
+    # boundary under a different name).
+    perfdata = (
+        f"active={active_count};{int(capacity * PCT_WARN / 100)};"
+        f"{int(capacity * PCT_CRIT / 100)};0;{capacity}"
+        f"|expired={expired_count}|total={total_leases}"
+        f"|percent={percent:.0f};{PCT_WARN};{PCT_CRIT};0;100"
+        f"|pools={len(pools)}"
+    )
     print(
-        f"{st} {SERVICE} active={active_count};{int(capacity * PCT_WARN / 100)};"
-        f"{int(capacity * PCT_CRIT / 100)};0;{capacity} "
+        f"{st} {SERVICE} {perfdata} "
         f"Leases active: {active_count}/{capacity} ({percent:.0f}%) - {labels[st]} "
         f"({len(pools)} pool(s))"
-        f" | active={active_count} expired={expired_count} total={total_leases} "
-        f"max={capacity} percent={percent:.0f} pools={len(pools)}"
     )
     return 0
 

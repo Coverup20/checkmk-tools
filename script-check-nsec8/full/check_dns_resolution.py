@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-2.0-only
+#
+
 """check_dns_resolution.py - CheckMK DNS check.
 
 Sends a raw DNS query directly to 127.0.0.1:53 to test the LOCAL resolver
@@ -11,7 +16,7 @@ import struct
 import sys
 import time
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 SERVICE = "DNS.Resolution"
 TEST_DOMAINS = ["google.com", "cloudflare.com", "dns.google"]
 LOCAL_RESOLVER = "127.0.0.1"
@@ -85,11 +90,14 @@ def main():
         st, txt = 1, "WARNING - DNS slow response"
     else:
         st, txt = 0, "OK"
-    print(
-        f"{st} {SERVICE} response_time={avg}ms;500;1000 "
-        f"Test: {successful}/{total} OK, avg time: {avg}ms - {txt}"
-        f" | successful={successful} failed={failed} total={total} avg_time_ms={avg}"
-    )
+    # Perfdata must be the single whitespace-free 3rd field (CheckMK's local
+    # check parser never re-scans the free-text field for a later "|") -
+    # "successful"/"failed"/"total"/"avg_time_ms" were previously placed
+    # after the free text, so only "response_time" was ever actually
+    # graphed. "avg_time_ms" is dropped here as a duplicate of
+    # "response_time" (same value under a different name).
+    perfdata = f"response_time={avg}ms;500;1000|successful={successful}|failed={failed}|total={total}"
+    print(f"{st} {SERVICE} {perfdata} Test: {successful}/{total} OK, avg time: {avg}ms - {txt}")
     return 0
 
 

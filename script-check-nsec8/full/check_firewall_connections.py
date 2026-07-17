@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-2.0-only
+#
+
 """check_firewall_connections.py - CheckMK conntrack check.
 
 Reads /proc/sys/net/netfilter/ for connection tracking stats.
@@ -7,7 +12,7 @@ Reads /proc/sys/net/netfilter/ for connection tracking stats.
 import sys
 from pathlib import Path
 
-VERSION = "1.1.0"
+VERSION = "1.1.2"
 SERVICE = "Firewall.Connections"
 
 
@@ -35,10 +40,19 @@ def main():
         st, txt = 0, "OK"
     warn = int(maxval * 80 / 100)
     crit = int(maxval * 90 / 100)
+    # CheckMK's local-check parser only treats the 3rd whitespace-delimited
+    # field as performance data (metrics separated by "|"); everything from
+    # the 4th field onward is plain status text, even if it contains "|".
+    # (Verified against cmk/plugins/checkmk/agent_based/local.py: text after
+    # the pipe in field 4 is never parsed into Metric objects.) Previously,
+    # "current"/"max"/"percent" were appended after a "|" inside the status
+    # text, so they looked like perfdata but were never actually graphed.
+    # "percent" is now a real field-3 metric so it is actually graphable;
+    # "current"/"max" are dropped as separate metrics since they duplicate
+    # the value/max already carried by the "connections" metric.
     print(
-        f"{st} {SERVICE} connections={current};{warn};{crit};0;{maxval} "
+        f"{st} {SERVICE} connections={current};{warn};{crit};0;{maxval}|percent={pct};80;90;0;100 "
         f"Active connections: {current}/{maxval} ({pct}%) - {txt}"
-        f" | current={current} max={maxval} percent={pct}"
     )
     return 0
 

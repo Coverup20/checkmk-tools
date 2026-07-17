@@ -16,7 +16,7 @@ Test local server DNS resolution (127.0.0.1) on NethSecurity 8.8, checking speed
 
 ## Output CheckMK
 ```
-0 DNS_Resolution response_time=45ms;500;1000 Test: 3/3 OK, average time: 45ms - OK | successful=3 failed=0 total=3 avg_time_ms=45
+0 DNS.Resolution response_time=45ms;500;1000|successful=3|failed=0|total=3 Test: 3/3 OK, avg time: 45ms - OK
 ```
 
 ## Performance Data
@@ -24,7 +24,6 @@ Test local server DNS resolution (127.0.0.1) on NethSecurity 8.8, checking speed
 - `successful`: Number of successful tests
 - `failed`: Number of failed tests
 - `total`: Total number of tests
-- `avg_time_ms`: Average time in milliseconds
 
 ## Requirements
 - Python 3 (raw DNS query via stdlib `socket`/`struct`, no external DNS library needed)

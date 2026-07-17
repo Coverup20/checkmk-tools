@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-2.0-only
+#
+
 """check_firewall_rules.py - CheckMK firewall rules check.
 
 Counts nftables rules, zones, and forwardings using:
@@ -13,7 +18,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 SERVICE = "Firewall.Rules"
 
 
@@ -87,10 +92,13 @@ def main():
         nft_result, nft_err = count_nft_rulesets(nft_bin)
         if nft_result:
             r = nft_result
+            # Perfdata must be the single whitespace-free 3rd field (see
+            # check_firewall_traffic.py for why) - it was previously placed
+            # after the free text, so CheckMK graphed zero metrics here.
+            perfdata = f"tables={r['tables']}|chains={r['chains']}|rules={r['rules']}"
             print(
-                f"0 {SERVICE} - OK - {r['tables']} tables, {r['chains']} chains, "
+                f"0 {SERVICE} {perfdata} OK - {r['tables']} tables, {r['chains']} chains, "
                 f"{r['rules']} rules (nft)"
-                f" | tables={r['tables']} chains={r['chains']} rules={r['rules']}"
             )
             return 0
 
@@ -98,10 +106,10 @@ def main():
     uci_result, uci_err = count_uci_firewall()
     if uci_result:
         r = uci_result
+        perfdata = f"zones={r['zones']}|forwardings={r['forwardings']}|rules={r['rules']}"
         print(
-            f"0 {SERVICE} - OK - {r['zones']} zones, {r['forwardings']} forwarding, "
+            f"0 {SERVICE} {perfdata} OK - {r['zones']} zones, {r['forwardings']} forwarding, "
             f"{r['rules']} rules (UCI)"
-            f" | zones={r['zones']} forwardings={r['forwardings']} rules={r['rules']}"
         )
         return 0
 
