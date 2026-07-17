@@ -1,13 +1,12 @@
-# check_firewall_traffic.sh
+# check_firewall_traffic.py
 
 ## Description
-Monitor network traffic (RX/TX) on the WAN and LAN interfaces of the NSecFirewall8 firewall.
+Monitor network traffic (RX/TX bytes, packets, errors) on the WAN and LAN interfaces of a NethSecurity 8.8 firewall.
 
 ## Features
-- Automatically detects WAN (wan, wwan) and LAN (lan, br-lan) interfaces
-- Read statistics from `/sys/class/net/<device>/statistics/`
-- Count bytes, packets and errors for RX and TX
-- Generate alarm if errors > 100
+- Detects WAN/LAN devices via firewall zone membership (`nethsec.utils.get_all_wan_devices`/`get_all_lan_devices`), not by interface name pattern - correctly follows whatever devices are actually assigned to those zones and excludes unrelated interfaces (bridge member NICs already reflected in their bridge's counters, DPI/redirect virtual devices, etc.)
+- Reads bytes, packets and errors for RX and TX from `/proc/net/dev`
+- Generates a WARNING alarm if RX or TX errors exceed 100
 
 ## States
 - **OK (0)**: RX/TX errors <= 100
@@ -15,8 +14,8 @@ Monitor network traffic (RX/TX) on the WAN and LAN interfaces of the NSecFirewal
 
 ## Output CheckMK
 ```
-0 wan_traffic - RX: 123456789 bytes, TX: 987654321 bytes | rx_bytes=123456789 tx_bytes=987654321 rx_packets=12345 tx_packets=98765 rx_errors=0 tx_errors=0
-0 lan_traffic - RX: 987654321 bytes, TX: 123456789 bytes | rx_bytes=987654321 tx_bytes=123456789 rx_packets=98765 tx_packets=12345 rx_errors=0 tx_errors=0
+0 eth1.Traffic - RX: 123456789 bytes, TX: 987654321 bytes - OK | rx_bytes=123456789 tx_bytes=987654321 rx_packets=12345 tx_packets=98765 rx_errors=0 tx_errors=0
+0 br-lan.Traffic - RX: 987654321 bytes, TX: 123456789 bytes - OK | rx_bytes=987654321 tx_bytes=123456789 rx_packets=98765 tx_packets=12345 rx_errors=0 tx_errors=0
 ```
 
 ## Performance Data
@@ -28,18 +27,18 @@ Monitor network traffic (RX/TX) on the WAN and LAN interfaces of the NSecFirewal
 - `tx_errors`: Transmission errors
 
 ## Requirements
-- OpenWrt with `ubus` to map logical interfaces to physical devices
-- Directory `/sys/class/net/` accessible
+- Python 3 with `euci`/`nethsec` (`python3-nethsec`) for WAN/LAN device discovery
+- `/proc/net/dev` accessible
 
 ## Installation
 ```bash
-cp check_firewall_traffic.sh /usr/lib/check_mk_agent/local/rcheck_firewall_traffic.sh
-chmod +x /usr/lib/check_mk_agent/local/rcheck_firewall_traffic.sh
+cp check_firewall_traffic.py /usr/lib/check_mk_agent/local/check_firewall_traffic
+chmod +x /usr/lib/check_mk_agent/local/check_firewall_traffic
 ```
 
 ## Manual testing
 ```bash
-bash /opt/checkmk-tools/script-check-nsec8/full/check_firewall_traffic.sh
+python3 /opt/checkmk-tools/script-check-nsec8/full/check_firewall_traffic.py
 ```
 
 ## Notes
@@ -50,3 +49,4 @@ bash /opt/checkmk-tools/script-check-nsec8/full/check_firewall_traffic.sh
   - Hardware problems (cable, network card)
   - Collisions on half-duplex
   - MTU mismatch
+- A device with no zone assignment (or entirely absent, e.g. an unplugged WAN NIC) is silently skipped, not reported as an error - only assigned WAN/LAN devices that actually exist are checked

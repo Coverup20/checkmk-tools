@@ -7,7 +7,7 @@ Reads /proc/sys/net/netfilter/ for connection tracking stats.
 import sys
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 SERVICE = "Firewall.Connections"
 
 
@@ -17,8 +17,15 @@ def main():
     if not cnt.exists() or not mx.exists():
         print(f"1 {SERVICE} - Conntrack not available")
         return 0
-    current = int(cnt.read_text().strip())
-    maxval = int(mx.read_text().strip())
+    # Previously unguarded: an unreadable or unexpectedly-formatted sysctl
+    # file crashed with a raw Python traceback, violating this project's own
+    # "no Python traceback" rule (full/README.md).
+    try:
+        current = int(cnt.read_text().strip())
+        maxval = int(mx.read_text().strip())
+    except (OSError, ValueError) as e:
+        print(f"3 {SERVICE} - UNKNOWN - Cannot read conntrack counters ({e})")
+        return 0
     pct = int(current * 100 / maxval) if maxval > 0 else 0
     if pct >= 90:
         st, txt = 2, "CRITICAL"

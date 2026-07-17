@@ -10,8 +10,12 @@ import sys
 import time
 from pathlib import Path
 
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 SERVICE = "DHCP.Leases"
+
+# Warning thresholds (percentage of pool capacity in active use)
+PCT_WARN = 80
+PCT_CRIT = 90
 
 try:
     from euci import EUci
@@ -36,26 +40,29 @@ def uci_get(config, section=None, option=None):
 
 
 def get_dhcp_pools():
-    config = uci_get("dhcp")
-    if config is None:
+    """Enumerate configured DHCP pools via nethsec.utils.get_all_by_type().
+
+    The previous implementation called `u.get("dhcp")` and manually split
+    dotted-looking keys to reconstruct sections - but euci's single-argument
+    get() already returns a NESTED dict ({section: {option: value}}), not a
+    flat dotted-key one. Every bare section name (e.g. "ns_dnsmasq") has
+    len(parts)==1, so the old code stored the section's entire options dict
+    as "_type" and then compared that dict against the string "dhcp" - never
+    equal, so every real pool was silently skipped (confirmed live: real
+    NethSecurity 8.8 devices with configured DHCP pools reported "No active
+    DHCP pool found" from this bug alone).
+    """
+    if not EUCI_AVAILABLE:
         return []
-    sections = {}
-    for key, value in config.items():
-        parts = key.split(".")
-        sec = parts[0]
-        if sec not in sections:
-            sections[sec] = {}
-        if len(parts) == 1:
-            sections[sec]["_type"] = value
-        elif len(parts) == 2:
-            sections[sec][parts[1]] = value
-        elif len(parts) >= 2:
-            field = ".".join(parts[1:])
-            sections[sec][field] = value
+    try:
+        from nethsec.utils import get_all_by_type
+        with EUci() as u:
+            sections = get_all_by_type(u, "dhcp", "dhcp")
+    except Exception:
+        return []
+
     pools = []
     for sec_name, fields in sections.items():
-        if fields.get("_type") != "dhcp":
-            continue
         if fields.get("ignore") == "1":
             continue
         if fields.get("dhcpv4") == "disabled":
@@ -181,9 +188,26 @@ def main():
         return 0
     leases, src = read_leases()
     active_count = count_active_leases(leases)
+    total_leases = len(leases)
+    expired_count = total_leases - active_count
+    capacity = sum(p["limit"] for p in pools)
+
+    percent = (active_count / capacity * 100) if capacity > 0 else 0.0
+    if percent >= PCT_CRIT:
+        st = 2
+    elif percent >= PCT_WARN:
+        st = 1
+    else:
+        st = 0
+    labels = {0: "OK", 1: "WARNING", 2: "CRITICAL"}
+
     print(
-        f"0 {SERVICE} - Active: {active_count} leases (pool: {len(pools)} pool(s))"
-        f" | active={active_count} pools={len(pools)}"
+        f"{st} {SERVICE} active={active_count};{int(capacity * PCT_WARN / 100)};"
+        f"{int(capacity * PCT_CRIT / 100)};0;{capacity} "
+        f"Leases active: {active_count}/{capacity} ({percent:.0f}%) - {labels[st]} "
+        f"({len(pools)} pool(s))"
+        f" | active={active_count} expired={expired_count} total={total_leases} "
+        f"max={capacity} percent={percent:.0f} pools={len(pools)}"
     )
     return 0
 

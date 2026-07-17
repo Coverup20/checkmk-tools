@@ -36,7 +36,7 @@ Package upgrade logic must remove these files if they are present from previous 
 
 ## Firewall rules check
 
-`check_firewall_rules.py` supports multiple firewall data sources:
+`check_firewall_rules.py` supports two firewall data sources:
 
 1. `nft` lookup from:
    - `/usr/sbin/nft`
@@ -44,9 +44,8 @@ Package upgrade logic must remove these files if they are present from previous 
    - `/sbin/nft`
    - `/bin/nft`
    - `PATH`
-2. nftables ruleset parsing.
-3. `fw4 print` fallback.
-4. UCI firewall fallback for named NethSecurity/OpenWrt sections such as:
+2. `nft -j list ruleset` (structured JSON) for a precise table/chain/rule count. No separate `fw4 print` fallback exists or is needed - `nft` alone already reflects the NethSecurity-managed ruleset.
+3. UCI firewall fallback (via `nethsec.utils.get_all_by_type`) for named NethSecurity/OpenWrt sections such as:
    - `firewall.ns_lan=zone`
    - `firewall.ns_wan=zone`
    - `firewall.ns_lan2wan=forwarding`
