@@ -39,20 +39,16 @@ def main():
         lines.append(f"  🔴 ALLARMI FREQUENTI (>3 volte/giorno)")
         lines.append("  Potrebbe esserci un problema tecnico da verificare.")
         lines.append("")
-        for r in flaps[:10]:
+        for r in flaps:
             lines.append(f"  \u26a0 {r[3]:22s} {r[4]:12s} {r[1]:.0f} volte/giorno  (dura {format_dur(r[2])})")
-        if len(flaps) > 10:
-            lines.append(f"     ... e altri {len(flaps)-10} host")
         lines.append("")
 
     if rics:
         lines.append(f"  \U0001f7e1 ALLARMI SALTUARI (1-3 volte/giorno)")
         lines.append("  Potrebbero essere causati da cali di rete momentanei.")
         lines.append("")
-        for r in rics[:10]:
+        for r in rics:
             lines.append(f"  \u26a1 {r[3]:22s} {r[4]:12s} {r[1]:.0f} volte/giorno  (dura {format_dur(r[2])})")
-        if len(rics) > 10:
-            lines.append(f"     ... e altri {len(rics)-10} host")
         lines.append("")
 
     if certas:
