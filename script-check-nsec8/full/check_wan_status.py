@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 SERVICE = "WAN.Status"
 
 try:
@@ -57,6 +57,15 @@ def _resolve_runtime_device(uci, section, configured_device):
 def find_wan_interfaces():
     """Find WAN (red-role) interfaces using nethsec library.
 
+    Returns a list of dicts: {"label": <logical name>, "device": <runtime device>}.
+
+    "label" is the UCI interface section name (e.g. "tim_fibra",
+    "vodafone_adsl" - whatever the admin actually named the WAN, which is
+    commonly the ISP/operator name, not literally "wan") - this is what gets
+    shown in CheckMK, since "eth1: UP" tells an operator nothing about which
+    line is up, while "tim_fibra: UP" does. Falls back to the device name
+    only if no matching UCI section is found (should not normally happen).
+
     Primary: nethsec.inventory.get_networks() with role == "red", resolved to
     their runtime device via ubus (handles PPPoE/dynamic protocols correctly).
     Fallback: /proc/net/route for backward compatibility (library unavailable)
@@ -79,21 +88,23 @@ def find_wan_interfaces():
                             section = s
                             break
                     runtime_dev = _resolve_runtime_device(u, section, dev) if section else dev
-                    if runtime_dev not in wan:
-                        wan.append(runtime_dev)
+                    label = section or runtime_dev
+                    if not any(w["device"] == runtime_dev for w in wan):
+                        wan.append({"label": label, "device": runtime_dev})
                 if wan:
                     return wan  # Success - don't fall through
         except (ImportError, Exception):
             pass
 
     # Method 2: Fallback to /proc/net/route only if library unavailable
+    # (no UCI section lookup possible here, so label == device)
     try:
         for line in Path("/proc/net/route").read_text().splitlines()[1:]:
             parts = line.split()
             if len(parts) >= 2 and parts[1] == "00000000":
                 iface = parts[0].strip()
-                if iface and iface not in wan:
-                    wan.append(iface)
+                if iface and not any(w["device"] == iface for w in wan):
+                    wan.append({"label": iface, "device": iface})
         return wan
     except Exception:
         pass
@@ -138,7 +149,8 @@ def main():
     overall = 0
     details = []
     degraded = 0
-    for iface in wan:
+    for w in wan:
+        label, iface = w["label"], w["device"]
         up = iface_is_up(iface)
         if up:
             gw = get_gateway(iface)
@@ -148,16 +160,16 @@ def main():
             # is expected on a perfectly healthy link. Only fall back to
             # WARNING if real internet connectivity also can't be confirmed.
             if gw and tcp_probe(gw):
-                details.append((0, f"{iface}: UP (gateway {gw} reachable via TCP)"))
+                details.append((0, f"{label}: UP (gateway {gw} reachable via TCP)"))
             elif tcp_probe("1.1.1.1", 443) or tcp_probe("8.8.8.8", 53):
                 suffix = f" (gateway {gw} TCP probe on :80 inconclusive)" if gw else ""
-                details.append((0, f"{iface}: UP (internet reachable){suffix}"))
+                details.append((0, f"{label}: UP (internet reachable){suffix}"))
             else:
-                details.append((1, f"{iface}: UP but no connectivity" + (f" (gateway {gw})" if gw else "")))
+                details.append((1, f"{label}: UP but no connectivity" + (f" (gateway {gw})" if gw else "")))
                 overall = max(overall, 1)
                 degraded += 1
         else:
-            details.append((2, f"{iface}: DOWN"))
+            details.append((2, f"{label}: DOWN"))
             overall = max(overall, 2)
     labels = {0: "OK", 1: "WARNING", 2: "CRITICAL"}
     detail_texts = [d[1] for d in details]

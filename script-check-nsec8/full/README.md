@@ -2,37 +2,36 @@
 
 Production CheckMK local check set for NethSecurity 8.8 systems using APK.
 
-This directory contains the production scripts intended for installation by the `ns-checkmk-utils` package.
+This directory contains the production scripts intended for installation by the `ns-checkmk-utils` package. It also contains a few excluded/legacy scripts (see below) that are kept here as source for reference but are NOT part of the packaged set.
 
 ## Production check set
 
-The production set is composed of these 12 Python local checks:
+The production set is composed of these 10 Python local checks:
 
 | Script | Service | Purpose |
 |---|---|---|
-| `check_apk_packages.py` | `APK.Packages` | APK package count, update age, overlay usage |
 | `check_dhcp_leases.py` | `DHCP.Leases` | DHCP lease usage and pool status |
 | `check_dns_resolution.py` | `DNS.Resolution` | DNS resolution checks |
 | `check_firewall_connections.py` | `Firewall.Connections` | Active connection tracking usage |
-| `check_firewall_rules.py` | `Firewall.Rules` | nftables/fw4/UCI firewall rule visibility |
+| `check_firewall_rules.py` | `Firewall.Rules` | nftables/UCI firewall rule visibility |
 | `check_firewall_traffic.py` | `<iface>.Traffic` | Interface RX/TX counters |
 | `check_ovpn_host2net.py` | `OVPN.HostToNet` | OpenVPN host-to-net status |
 | `check_root_access.py` | `Root.Access` | Active root sessions and recent root login signals |
-| `check_uptime.py` | `Firewall.Uptime` | System uptime and load |
 | `check_vpn_tunnels.py` | `VPN.Tunnels` | VPN tunnel status |
 | `check_wan_status.py` | `WAN.Status` / `WAN.InterfaceN` | WAN reachability |
 | `check_wan_throughput.py` | `WAN.Throughput` | WAN throughput counters |
 
-## Removed legacy checks
+## Excluded / legacy checks
 
-These checks are not part of the NethSecurity 8.8 production set:
+These scripts exist as source in this directory but are NOT part of the NethSecurity 8.8 packaged production set - `ns-checkmk-utils` must not install them:
 
-| Legacy check | Reason |
+| Script | Reason |
 |---|---|
-| `check_opkg_packages` / `check_opkg_packages.py` | Obsolete on APK-based NethSecurity 8.8. Replaced by `check_apk_packages.py`. |
-| `check_martian_packets` / `check_martian_packets.py` | Not included in the NethSecurity 8.8 production set. |
+| `check_apk_packages.py` | Excluded from the package by request - not a useful CheckMK signal for this platform. |
+| `check_opkg_packages.py` | Obsolete on APK-based NethSecurity 8.8. |
+| `check_martian_packets.py` | Not included in the NethSecurity 8.8 production set. |
 
-Package upgrade logic must remove these files if they are present from previous installations.
+Package upgrade logic must remove the corresponding deployed files (both extensionless legacy names and any `.py`-suffixed leftovers) if present from previous installations.
 
 ## Firewall rules check
 
@@ -74,15 +73,15 @@ Current thresholds:
 
 ## Packaging requirements
 
-`ns-checkmk-utils` must install only the 12 production `.py` checks listed above.
+`ns-checkmk-utils` must install only the 10 production `.py` checks listed above - it must NOT install `check_apk_packages.py`, `check_opkg_packages.py`, or `check_martian_packets.py`.
 
 During package upgrade, the package must remove obsolete files left by previous versions, including:
 
 - old extensionless local checks replaced by `.py` scripts;
-- `check_opkg_packages`;
-- `check_opkg_packages.py`;
-- `check_martian_packets`;
-- `check_martian_packets.py`.
+- `check_apk_packages` / `check_apk_packages.py`;
+- `check_uptime` / `check_uptime.py` (removed - no longer part of the check set);
+- `check_opkg_packages` / `check_opkg_packages.py`;
+- `check_martian_packets` / `check_martian_packets.py`.
 
 The package must avoid duplicate old/new CheckMK services in `/usr/lib/check_mk_agent/local/`.
 
@@ -100,11 +99,11 @@ Important distinction:
 
 A valid deployment should satisfy:
 
-- no beta markers in service output;
+- no `APK.Packages` service;
+- no `Firewall.Uptime` service;
 - no `OPKG.Packages` service;
 - no `Martian.Packets` service;
-- `APK.Packages` present;
-- `Firewall.Rules` detects firewall data when nft/fw4/UCI are available;
+- `Firewall.Rules` detects firewall data when nft/UCI are available;
 - no duplicate legacy and `.py` services;
 - no Python traceback;
 - no raw command failure output.
