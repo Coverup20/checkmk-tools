@@ -53,10 +53,12 @@ ALL_HOSTS = [
     ("checkmk-vps-01",      "CheckMK Production VPS (monitor.nethlab.it) — needs ControlMaster"),
     # LAN hosts — require Twingate OFF
     ("nsec8-stable",        "NethSecurity 8 stable lab (10.155.100.100)"),
+    ("nsec8-test",          "NethSecurity 8.8.0-dev lab (192.168.10.167) — Twingate OFF required"),
     ("rl94ns8",             "NethServer 8 lab (10.155.100.40)"),
     ("rl94ns81",            "NethServer 8 lab webtop (10.155.100.41)"),
     ("checkmk-z1-00",       "CheckMK local (192.168.10.128) — Twingate OFF required"),
     ("checkmk-z1-01",       "CheckMK local (192.168.10.126) — Twingate OFF required"),
+    ("redteam-shell",       "Redteam shell (redteam.security.nethesis.it) — via sos ProxyJump"),
 ]
 
 # Full operational context for Sonnet High (complete, authoritative)
