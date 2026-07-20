@@ -2,7 +2,7 @@
 
 Production CheckMK local check set for NethSecurity 8.8 systems using APK.
 
-This directory contains the production scripts intended for installation by the `ns-checkmk-utils` package. It also contains a few excluded/legacy scripts (see below) that are kept here as source for reference but are NOT part of the packaged set.
+This directory contains the production scripts intended for installation by the `ns-checkmk-utils` package.
 
 ## Production check set
 
@@ -20,18 +20,6 @@ The production set is composed of these 10 Python local checks:
 | `check_vpn_tunnels.py` | `VPN.Tunnels` | VPN tunnel status |
 | `check_wan_status.py` | `WAN.Interface.<label>` / `WAN.Status.<label>` / `WAN.Metrics` | WAN reachability |
 | `check_wan_throughput.py` | `WAN.Throughput` | WAN throughput counters |
-
-## Excluded / legacy checks
-
-These scripts exist as source in this directory but are NOT part of the NethSecurity 8.8 packaged production set - `ns-checkmk-utils` must not install them:
-
-| Script | Reason |
-|---|---|
-| `check_apk_packages.py` | Excluded from the package by request - not a useful CheckMK signal for this platform. |
-| `check_opkg_packages.py` | Obsolete on APK-based NethSecurity 8.8. |
-| `check_martian_packets.py` | Not included in the NethSecurity 8.8 production set. |
-
-Package upgrade logic must remove the corresponding deployed files (both extensionless legacy names and any `.py`-suffixed leftovers) if present from previous installations.
 
 ## Firewall rules check
 
@@ -73,9 +61,9 @@ Current thresholds:
 
 ## Packaging requirements
 
-`ns-checkmk-utils` must install only the 10 production `.py` checks listed above - it must NOT install `check_apk_packages.py`, `check_opkg_packages.py`, or `check_martian_packets.py`.
+`ns-checkmk-utils` must install only the 10 production `.py` checks listed above.
 
-During package upgrade, the package must remove obsolete files left by previous versions, including:
+During package upgrade, the package must remove obsolete files left by previous versions (from before these scripts were removed from this directory entirely), including:
 
 - old extensionless local checks replaced by `.py` scripts;
 - `check_apk_packages` / `check_apk_packages.py`;
