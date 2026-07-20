@@ -112,7 +112,7 @@ def get_wan_devices():
 def get_proc_net_dev_bytes(device):
     try:
         for line in Path(PROC_NET_DEV).read_text().splitlines():
-            if line.startswith(device + ":"):
+            if line.strip().startswith(device + ":"):
                 parts = line.split(":", 1)[1].split()
                 if len(parts) >= 9:
                     return int(parts[0]), int(parts[8])
