@@ -43,3 +43,6 @@ Ydea-Toolkit/config/.ydea-cookies
 
 # Private operational docs (do not commit)
 MACHINE_ACCESS_GUIDE.md
+
+# MCP config (local only)
+.mcp.json
