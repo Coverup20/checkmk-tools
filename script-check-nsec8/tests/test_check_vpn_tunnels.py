@@ -8,13 +8,13 @@
 
 Covers: the OpenVPN p2p-vs-subnet type-mismatch regression (client/outbound
 instances were always queried with type="subnet", permanently reporting 0
-active clients for real, healthy p2p tunnels), the WireGuard
-handshake-freshness regression (previously "nonzero ever" = permanent
-false-OK), the perfdata-placement regression, and the road-warrior-exclusion
-fix (not yet promoted to full/ - see check_vpn_tunnels_wip.py in this same
-directory; this test file intentionally imports that staged copy instead of
-the production script in full/, whose hash must stay unchanged until the
-fix is promoted).
+active clients for real, healthy p2p tunnels), the road-warrior-exclusion
+fix, and the per-tunnel IPsec (strongSwan) check added alongside it - none
+yet promoted to full/ (see check_vpn_tunnels_wip.py in this same directory;
+this test file intentionally imports that staged copy instead of the
+production script in full/, whose hash must stay unchanged until the fix is
+promoted). WireGuard support has been removed entirely - out of scope for
+what this check needs to monitor.
 """
 
 import importlib.machinery
@@ -30,7 +30,7 @@ _spec = importlib.util.spec_from_loader(_loader.name, _loader)
 vt = importlib.util.module_from_spec(_spec)
 _loader.exec_module(vt)
 
-from checkmk_format import graphed_metric_names, parse_perfdata, split_check_result
+from checkmk_format import split_check_result
 
 
 # --- count_openvpn_tunnels() -------------------------------------------------
@@ -198,6 +198,200 @@ def test_count_openvpn_tunnels_derived_from_list(fake_nethsec, fake_euci):
     assert (total, active) == (2, 1)
 
 
+# --- _parse_swanctl_sas() ----------------------------------------------------
+
+# Captured verbatim from `swanctl --list-sas --pretty` on nsec8-test against
+# an unreachable peer: IKE_SA still negotiating, no child SA yet.
+_SWANCTL_CONNECTING = """list-sa event {
+  ns_b4100974 {
+    uniqueid = 1
+    version = 2
+    state = CONNECTING
+    local-host = 192.168.10.180
+    local-port = 500
+    local-id = %any
+    remote-host = 2.43.5.33
+    remote-port = 500
+    remote-id = %any
+    initiator = yes
+    initiator-spi = ef5dfa14fb0f771b
+    responder-spi = 0000000000000000
+    tasks-active = [
+      IKE_VENDOR
+      IKE_INIT
+      IKE_NATD
+      IKE_CERT_PRE
+      IKE_AUTH
+      IKE_CERT_POST
+      IKE_CONFIG
+      IKE_AUTH_LIFETIME
+      IKE_MOBIKE
+      IKE_ESTABLISH
+      CHILD_CREATE
+    ]
+    child-sas {
+    }
+  }
+}
+list-sas reply {
+}
+"""
+
+# Synthetic: IKE_SA established with one child SA (the data tunnel) installed.
+_SWANCTL_ESTABLISHED = """list-sa event {
+  ns_b4100974 {
+    uniqueid = 1
+    version = 2
+    state = ESTABLISHED
+    local-host = 192.168.10.180
+    remote-host = 2.43.5.33
+    child-sas {
+      ns_b4100974_tunnel_1 {
+        reqid = 1
+        state = INSTALLED
+        mode = TUNNEL
+        protocol = ESP
+      }
+    }
+  }
+}
+list-sas reply {
+}
+"""
+
+# Synthetic: IKE_SA established but its child SA has not (yet) come up -
+# must NOT count as up, unlike a naive "IKE state == ESTABLISHED" check.
+_SWANCTL_ESTABLISHED_NO_CHILD = """list-sa event {
+  ns_b4100974 {
+    uniqueid = 1
+    version = 2
+    state = ESTABLISHED
+    local-host = 192.168.10.180
+    remote-host = 2.43.5.33
+    child-sas {
+    }
+  }
+}
+list-sas reply {
+}
+"""
+
+
+def test_parse_swanctl_connecting_has_no_installed_child():
+    conns = vt._parse_swanctl_sas(_SWANCTL_CONNECTING)
+
+    assert conns["ns_b4100974"]["state"] == "CONNECTING"
+    assert conns["ns_b4100974"]["children"] == []
+
+
+def test_parse_swanctl_established_with_installed_child():
+    conns = vt._parse_swanctl_sas(_SWANCTL_ESTABLISHED)
+
+    assert conns["ns_b4100974"]["state"] == "ESTABLISHED"
+    assert conns["ns_b4100974"]["children"] == ["INSTALLED"]
+
+
+def test_parse_swanctl_ignores_nested_child_state_for_ike_state():
+    # Regression risk: a naive "last 'state = X' wins" parser would let the
+    # child SA's INSTALLED state overwrite the IKE_SA's own ESTABLISHED.
+    conns = vt._parse_swanctl_sas(_SWANCTL_ESTABLISHED)
+
+    assert conns["ns_b4100974"]["state"] == "ESTABLISHED"
+
+
+# --- list_ipsec_tunnels() -----------------------------------------------------
+
+def _install_ipsec_remote(fake_nethsec, remotes):
+    utils = SimpleNamespace(get_all_by_type=lambda u, config, kind: remotes)
+    fake_nethsec.install(utils=utils)
+
+
+def test_ipsec_up_requires_established_and_installed_child(fake_nethsec, fake_euci, monkeypatch):
+    _install_ipsec_remote(fake_nethsec, {
+        "ns_b4100974": {"ns_name": "Checkmk", "enabled": "1"},
+    })
+    fake_euci(vt, uci_obj=MagicMock())
+    monkeypatch.setattr(vt.shutil, "which", lambda name: "/usr/sbin/swanctl")
+    monkeypatch.setattr(subprocess, "run",
+                         lambda cmd, **kw: MagicMock(stdout=_SWANCTL_ESTABLISHED))
+
+    tunnels = vt.list_ipsec_tunnels()
+
+    assert tunnels == [{"name": "ns_b4100974", "label": "Checkmk", "up": True}]
+
+
+def test_ipsec_established_without_installed_child_is_down(fake_nethsec, fake_euci, monkeypatch):
+    _install_ipsec_remote(fake_nethsec, {
+        "ns_b4100974": {"ns_name": "Checkmk", "enabled": "1"},
+    })
+    fake_euci(vt, uci_obj=MagicMock())
+    monkeypatch.setattr(vt.shutil, "which", lambda name: "/usr/sbin/swanctl")
+    monkeypatch.setattr(subprocess, "run",
+                         lambda cmd, **kw: MagicMock(stdout=_SWANCTL_ESTABLISHED_NO_CHILD))
+
+    tunnels = vt.list_ipsec_tunnels()
+
+    assert tunnels[0]["up"] is False
+
+
+def test_ipsec_connecting_is_down(fake_nethsec, fake_euci, monkeypatch):
+    _install_ipsec_remote(fake_nethsec, {
+        "ns_b4100974": {"ns_name": "Checkmk", "enabled": "1"},
+    })
+    fake_euci(vt, uci_obj=MagicMock())
+    monkeypatch.setattr(vt.shutil, "which", lambda name: "/usr/sbin/swanctl")
+    monkeypatch.setattr(subprocess, "run",
+                         lambda cmd, **kw: MagicMock(stdout=_SWANCTL_CONNECTING))
+
+    tunnels = vt.list_ipsec_tunnels()
+
+    assert tunnels[0]["up"] is False
+
+
+def test_ipsec_disabled_not_counted(fake_nethsec, fake_euci, monkeypatch):
+    _install_ipsec_remote(fake_nethsec, {
+        "ns_b4100974": {"ns_name": "Checkmk", "enabled": "0"},
+    })
+    fake_euci(vt, uci_obj=MagicMock())
+    monkeypatch.setattr(vt.shutil, "which", lambda name: "/usr/sbin/swanctl")
+    monkeypatch.setattr(subprocess, "run",
+                         lambda cmd, **kw: MagicMock(stdout=_SWANCTL_ESTABLISHED))
+
+    assert vt.list_ipsec_tunnels() == []
+
+
+def test_ipsec_label_falls_back_to_section_name(fake_nethsec, fake_euci, monkeypatch):
+    _install_ipsec_remote(fake_nethsec, {
+        "ns_b4100974": {"enabled": "1"},  # no ns_name
+    })
+    fake_euci(vt, uci_obj=MagicMock())
+    monkeypatch.setattr(vt.shutil, "which", lambda name: "/usr/sbin/swanctl")
+    monkeypatch.setattr(subprocess, "run",
+                         lambda cmd, **kw: MagicMock(stdout=_SWANCTL_ESTABLISHED))
+
+    tunnels = vt.list_ipsec_tunnels()
+
+    assert tunnels[0]["label"] == "ns_b4100974"
+
+
+def test_ipsec_down_when_swanctl_binary_unavailable(fake_nethsec, fake_euci, monkeypatch):
+    _install_ipsec_remote(fake_nethsec, {
+        "ns_b4100974": {"ns_name": "Checkmk", "enabled": "1"},
+    })
+    fake_euci(vt, uci_obj=MagicMock())
+    monkeypatch.setattr(vt.shutil, "which", lambda name: None)
+
+    tunnels = vt.list_ipsec_tunnels()
+
+    assert tunnels[0]["up"] is False
+
+
+def test_ipsec_empty_without_library(monkeypatch):
+    monkeypatch.setattr(vt, "EUCI_AVAILABLE", False)
+
+    assert vt.list_ipsec_tunnels() == []
+
+
 # --- main(): per-tunnel service lines ----------------------------------------
 
 def test_main_prints_one_service_line_per_tunnel(monkeypatch, capsys):
@@ -205,118 +399,38 @@ def test_main_prints_one_service_line_per_tunnel(monkeypatch, capsys):
         {"name": "ns_site_a", "up": True, "label": "ns_site_a", "clients": 1},
         {"name": "ns_site_b", "up": False, "label": "ns_site_b", "clients": 0},
     ])
-    monkeypatch.setattr(vt, "count_wireguard_tunnels", lambda: (0, 0))
+    monkeypatch.setattr(vt, "list_ipsec_tunnels", lambda: [])
 
     vt.main()
     lines = capsys.readouterr().out.strip().splitlines()
 
-    assert split_check_result(lines[0])[:2] == ("0", "VPN.Tunnel.ns_site_a")
-    assert split_check_result(lines[1])[:2] == ("2", "VPN.Tunnel.ns_site_b")
-    # WireGuard aggregate line still present (unaffected by OpenVPN state -
-    # no WireGuard peers configured here).
-    assert split_check_result(lines[2])[:2] == ("0", "VPN.Tunnel")
+    assert split_check_result(lines[0])[:2] == ("0", "VPN.Tunnel.OVPN.ns_site_a")
+    assert split_check_result(lines[1])[:2] == ("2", "VPN.Tunnel.OVPN.ns_site_b")
+    assert len(lines) == 2
 
 
-# --- count_wireguard_tunnels() ----------------------------------------------
+def test_main_prints_one_service_line_per_ipsec_tunnel(monkeypatch, capsys):
+    monkeypatch.setattr(vt, "list_openvpn_tunnels", lambda: [])
+    monkeypatch.setattr(vt, "list_ipsec_tunnels", lambda: [
+        {"name": "ns_b4100974", "label": "Checkmk", "up": False},
+    ])
 
-def test_wireguard_active_requires_fresh_handshake(fake_nethsec, fake_euci, monkeypatch):
-    # Regression: the old logic counted a peer active if its handshake
-    # timestamp was ever nonzero - a peer that handshaked once and went
-    # silent stayed "active" forever. Now it must be within the 180s window.
-    wg_facts = {"servers": {"wg0": {"peers": 2}}}
-    inventory = SimpleNamespace(fact_wireguard=lambda u: wg_facts)
-    fake_nethsec.install(inventory=inventory)
-    fake_euci(vt, uci_obj=MagicMock())
-    monkeypatch.setattr(vt.time, "time", lambda: 1_000_000)
-    monkeypatch.setattr(vt.shutil, "which", lambda name: "/usr/bin/wg")
+    vt.main()
+    lines = capsys.readouterr().out.strip().splitlines()
 
-    now = 1_000_000
-    fresh_ts = now - 60          # within window -> active
-    stale_ts = now - 99999999    # ancient handshake, once nonzero -> must NOT count
+    assert len(lines) == 1
+    # Prefixed distinctly from OpenVPN's "VPN.Tunnel.OVPN.<label>" so the two
+    # label namespaces (both operator-chosen ns_name values) can't collide.
+    assert split_check_result(lines[0])[:2] == ("2", "VPN.Tunnel.IPsec.Checkmk")
 
-    def fake_run(cmd, **kwargs):
-        if cmd[1:3] == ["show", "interfaces"]:
-            return MagicMock(stdout="wg0\n")
-        if cmd[1:3] == ["show", "wg0"]:
-            return MagicMock(stdout=f"peerA\t{fresh_ts}\npeerB\t{stale_ts}\n")
-        raise AssertionError(f"unexpected command {cmd}")
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
-
-    total, active = vt.count_wireguard_tunnels()
-
-    assert (total, active) == (2, 1)
-
-
-def test_wireguard_total_and_active_are_both_peer_level(fake_nethsec, fake_euci, monkeypatch):
-    # Regression: the old code derived "total" from interface count and
-    # "active" from a per-peer check across interfaces, so active > total
-    # was possible whenever one interface had multiple peers.
-    wg_facts = {"servers": {"wg0": {"peers": 3}}}
-    fake_nethsec.install(inventory=SimpleNamespace(fact_wireguard=lambda u: wg_facts))
-    fake_euci(vt, uci_obj=MagicMock())
-    monkeypatch.setattr(vt.shutil, "which", lambda name: None)  # wg binary unavailable
-
-    total, active = vt.count_wireguard_tunnels()
-
-    assert total == 3
-    assert active <= total
-
-
-def test_wireguard_zero_peers_configured(fake_nethsec, fake_euci):
-    fake_nethsec.install(inventory=SimpleNamespace(fact_wireguard=lambda u: {"servers": {}}))
-    fake_euci(vt, uci_obj=MagicMock())
-
-    assert vt.count_wireguard_tunnels() == (0, 0)
-
-
-# --- main(): perfdata + state thresholds ------------------------------------
 
 def test_main_no_vpn_configured(monkeypatch, capsys):
     monkeypatch.setattr(vt, "list_openvpn_tunnels", lambda: [])
-    monkeypatch.setattr(vt, "count_wireguard_tunnels", lambda: (0, 0))
+    monkeypatch.setattr(vt, "list_ipsec_tunnels", lambda: [])
 
     vt.main()
-    line = capsys.readouterr().out.strip()
+    out = capsys.readouterr().out.strip()
 
-    state, service, perf, text = split_check_result(line)
-    assert state == "0"
-    assert service == "VPN.Tunnel"
-    assert "No WireGuard peers configured" in text
-    # Regression: perfdata was previously placed after the label text, so
-    # field3 was just "-" and nothing was graphed.
-    assert graphed_metric_names(line) == {"total", "active", "inactive"}
-
-
-def test_main_wireguard_all_active_is_ok(monkeypatch, capsys):
-    # The aggregate service is WireGuard-only now (OpenVPN tunnels get their
-    # own per-tunnel VPN.Tunnel.<label> service instead - see
-    # test_main_prints_one_service_line_per_tunnel).
-    monkeypatch.setattr(vt, "list_openvpn_tunnels", lambda: [])
-    monkeypatch.setattr(vt, "count_wireguard_tunnels", lambda: (2, 2))
-
-    vt.main()
-    line = capsys.readouterr().out.strip().splitlines()[-1]
-
-    assert split_check_result(line)[0] == "0"
-    assert dict(parse_perfdata(split_check_result(line)[2])) == {"total": 2.0, "active": 2.0, "inactive": 0.0}
-
-
-def test_main_wireguard_some_down_is_warning(monkeypatch, capsys):
-    monkeypatch.setattr(vt, "list_openvpn_tunnels", lambda: [])
-    monkeypatch.setattr(vt, "count_wireguard_tunnels", lambda: (2, 1))
-
-    vt.main()
-    line = capsys.readouterr().out.strip().splitlines()[-1]
-
-    assert split_check_result(line)[0] == "1"
-
-
-def test_main_wireguard_all_down_is_critical(monkeypatch, capsys):
-    monkeypatch.setattr(vt, "list_openvpn_tunnels", lambda: [])
-    monkeypatch.setattr(vt, "count_wireguard_tunnels", lambda: (2, 0))
-
-    vt.main()
-    line = capsys.readouterr().out.strip().splitlines()[-1]
-
-    assert split_check_result(line)[0] == "2"
+    # Nothing configured at all - no OpenVPN tunnels, no IPsec tunnels -
+    # means no service lines at all, not a permanent uninformative OK.
+    assert out == ""
