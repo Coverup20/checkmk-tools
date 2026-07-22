@@ -17,8 +17,8 @@ import subprocess
 import sys
 import time
 
-VERSION = "1.4.0"
-SERVICE = "VPN.Tunnels"
+VERSION = "1.6.0"
+WIREGUARD_SERVICE = "VPN.Tunnel"
 
 # A WireGuard peer is considered active if it handshaked within this window,
 # per doc/check_vpn_tunnels.md. The previous implementation only checked
@@ -34,8 +34,32 @@ except ImportError:
     EUCI_AVAILABLE = False
 
 
-def count_openvpn_tunnels():
-    """Count enabled OpenVPN instances and their connected clients.
+def list_openvpn_tunnels():
+    """Per-tunnel detail for every enabled, non-road-warrior OpenVPN instance.
+
+    Returns a list of {"name": section, "label": str, "up": bool, "clients":
+    int} - "up" is a single yes/no fact for that one named tunnel (unlike the
+    aggregate total/active counts in count_openvpn_tunnels(), which lump
+    every tunnel together and can't tell an operator *which* tunnel, out of
+    several, is the one that's down). "clients" is the connected-session
+    count for subnet/routed servers (0 or 1 for p2p/client instances, since a
+    p2p tunnel has exactly one remote peer by definition). "label" is the
+    human-facing name - the "ns_name" field NethSecurity's own UI sets (e.g.
+    "Checkmk" for UCI section "ns_Checkmk") when present, falling back to the
+    raw UCI section name otherwise (e.g. instances predating that field, or
+    ones configured outside the ns-openvpn API) - used for the CheckMK
+    service name instead of "name" so it doesn't leak the "ns_" UCI-section
+    prefix into what an operator sees.
+
+    Road-warrior (host-to-net) servers are excluded entirely, same as
+    /usr/libexec/rpcd/ns.ovpntunnel::list_tunnels() ("skip road warrior
+    servers" via `if 'ns_auth_mode' in vpn: continue` - the field ns.ovpnrw
+    sets on every road-warrior instance it creates). They're already covered
+    by check_ovpn_host2net.py, which treats 0 connected clients as normal
+    (road warriors connect ad-hoc); counting them here too meant the same
+    instance got conflicting verdicts across the two checks - a road warrior
+    with no client currently connected made this check report CRITICAL "All
+    VPN down" even when every real site-to-site tunnel was healthy.
 
     Replaces the previous file-based "," + "Connected" substring heuristic,
     which miscounted the openvpn-status CSV header line as a connected
@@ -58,35 +82,23 @@ def count_openvpn_tunnels():
     in both directions (bytes_received > 0 and bytes_sent > 0); everything
     else is queried with its own "topology" (default "subnet" - matches the
     UCI default set by ns.ovpnrw for road-warrior servers).
-
-    Road-warrior (host-to-net) servers are excluded entirely, same as
-    /usr/libexec/rpcd/ns.ovpntunnel::list_tunnels() ("skip road warrior
-    servers" via `if 'ns_auth_mode' in vpn: continue` - the field ns.ovpnrw
-    sets on every road-warrior instance it creates). They're already covered
-    by check_ovpn_host2net.py, which treats 0 connected clients as normal
-    (road warriors connect ad-hoc); counting them here too meant the same
-    instance got conflicting verdicts across the two checks - a road warrior
-    with no client currently connected made this check report CRITICAL "All
-    VPN down" even when every real site-to-site tunnel was healthy.
     """
     if not EUCI_AVAILABLE:
-        return 0, 0
+        return []
     try:
         from nethsec.utils import get_all_by_type
         from nethsec.ovpn import list_connected_clients
         with EUci() as u:
             instances = get_all_by_type(u, "openvpn", "openvpn")
     except Exception:
-        return 0, 0
+        return []
 
-    total = 0
-    active = 0
+    details = []
     for section, fields in instances.items():
         if fields.get("enabled") != "1":
             continue
         if "ns_auth_mode" in fields:
             continue  # road warrior server - covered by check_ovpn_host2net
-        total += 1
         is_client = fields.get("client") == "1" or fields.get("ns_client") == "1"
         if is_client:
             vpn_type = "p2p"
@@ -97,15 +109,26 @@ def count_openvpn_tunnels():
         try:
             clients = list_connected_clients(section, type=vpn_type)
         except Exception:
-            continue
-        if not clients:
-            continue
+            clients = None
+
         if is_client:
-            stats = clients.get("stats", {})
-            if stats.get("bytes_received", 0) > 0 and stats.get("bytes_sent", 0) > 0:
-                active += 1
+            stats = (clients or {}).get("stats", {})
+            up = stats.get("bytes_received", 0) > 0 and stats.get("bytes_sent", 0) > 0
+            count = 1 if up else 0
         else:
-            active += len(clients)
+            count = len(clients) if clients else 0
+            up = count > 0
+        label = fields.get("ns_name") or section
+        details.append({"name": section, "label": label, "up": up, "clients": count})
+    return details
+
+
+def count_openvpn_tunnels():
+    """Aggregate total/active OpenVPN tunnel counts - see list_openvpn_tunnels()
+    for the per-tunnel breakdown this is derived from."""
+    details = list_openvpn_tunnels()
+    total = len(details)
+    active = sum(d["clients"] for d in details)
     return total, active
 
 
@@ -160,24 +183,32 @@ def count_wireguard_tunnels():
 
 
 def main():
-    ovpn_total, ovpn_active = count_openvpn_tunnels()
+    # One service per OpenVPN tunnel, named after it - with more than one
+    # net-to-net/p2p tunnel, a single aggregate service could only ever say
+    # "1 of 2 down", never which one. WireGuard peers don't get the same
+    # treatment: 'wg show' only exposes peers by public key, no human-facing
+    # name to hang a service on, so they still go through the aggregate
+    # WIREGUARD_SERVICE below instead.
+    for tunnel in list_openvpn_tunnels():
+        state = 0 if tunnel["up"] else 2
+        text = "UP" if tunnel["up"] else "DOWN"
+        print(f"{state} VPN.Tunnel.{tunnel['label']} - {tunnel['label']}: {text}")
+
     wg_total, wg_active = count_wireguard_tunnels()
-    total = ovpn_total + wg_total
-    active = ovpn_active + wg_active
-    inactive = total - active
+    wg_inactive = wg_total - wg_active
 
     # Perfdata must be the single whitespace-free 3rd field (CheckMK's local
     # check parser never re-scans the free-text field for a later "|") -
     # putting it after the label as before produced zero graphed metrics.
-    perfdata = f"total={total}|active={active}|inactive={inactive}"
-    if total == 0:
-        print(f"0 {SERVICE} {perfdata} No VPN configured")
-    elif active == 0:
-        print(f"2 {SERVICE} {perfdata} CRITICAL - All VPN down")
-    elif active < total:
-        print(f"1 {SERVICE} {perfdata} WARNING - Some VPN down")
+    perfdata = f"total={wg_total}|active={wg_active}|inactive={wg_inactive}"
+    if wg_total == 0:
+        print(f"0 {WIREGUARD_SERVICE} {perfdata} No WireGuard peers configured")
+    elif wg_active == 0:
+        print(f"2 {WIREGUARD_SERVICE} {perfdata} CRITICAL - All WireGuard peers down")
+    elif wg_active < wg_total:
+        print(f"1 {WIREGUARD_SERVICE} {perfdata} WARNING - Some WireGuard peers down")
     else:
-        print(f"0 {SERVICE} {perfdata} OK - All VPN active")
+        print(f"0 {WIREGUARD_SERVICE} {perfdata} OK - All WireGuard peers active")
 
     return 0
 
