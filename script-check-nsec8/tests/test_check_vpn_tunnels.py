@@ -128,6 +128,95 @@ def test_openvpn_empty_without_library(monkeypatch):
     assert vt.count_openvpn_tunnels() == (0, 0)
 
 
+# --- list_openvpn_tunnels() (per-tunnel identification) ---------------------
+
+def test_list_tunnels_names_which_one_is_down_when_several_configured(fake_nethsec, fake_euci):
+    # The whole point of this function: with 2+ net-to-net tunnels, the
+    # aggregate count_openvpn_tunnels() can only say "1 of 2 down" - it
+    # can't say which. list_openvpn_tunnels() must name it.
+    instances = {
+        "ns_site_a": {"enabled": "1"},   # connected
+        "ns_site_b": {"enabled": "1"},   # not connected
+    }
+    utils = SimpleNamespace(get_all_by_type=lambda u, config, kind: instances)
+
+    def fake_list_connected_clients(section, type):
+        return {"peer1": {}} if section == "ns_site_a" else {}
+
+    ovpn = SimpleNamespace(list_connected_clients=fake_list_connected_clients)
+    fake_nethsec.install(utils=utils, ovpn=ovpn)
+    fake_euci(vt, uci_obj=MagicMock())
+
+    details = {d["name"]: d for d in vt.list_openvpn_tunnels()}
+
+    assert details["ns_site_a"]["up"] is True
+    assert details["ns_site_a"]["clients"] == 1
+    assert details["ns_site_b"]["up"] is False
+    assert details["ns_site_b"]["clients"] == 0
+
+
+def test_list_tunnels_excludes_road_warrior(fake_nethsec, fake_euci):
+    instances = {"ns_roadwarrior1": {"enabled": "1", "ns_auth_mode": "certificate"}}
+    utils = SimpleNamespace(get_all_by_type=lambda u, config, kind: instances)
+    ovpn = SimpleNamespace(list_connected_clients=lambda section, type: {"peer1": {}})
+    fake_nethsec.install(utils=utils, ovpn=ovpn)
+    fake_euci(vt, uci_obj=MagicMock())
+
+    assert vt.list_openvpn_tunnels() == []
+
+
+def test_list_tunnels_p2p_client_up_requires_traffic_both_directions(fake_nethsec, fake_euci):
+    instances = {"ns_client_a": {"enabled": "1", "client": "1"}}
+    utils = SimpleNamespace(get_all_by_type=lambda u, config, kind: instances)
+    ovpn = SimpleNamespace(list_connected_clients=lambda section, type: {"stats": {"bytes_received": 10, "bytes_sent": 0}})
+    fake_nethsec.install(utils=utils, ovpn=ovpn)
+    fake_euci(vt, uci_obj=MagicMock())
+
+    details = vt.list_openvpn_tunnels()
+
+    assert details == [{"name": "ns_client_a", "up": False, "label": "ns_client_a", "clients": 0}]
+
+
+def test_count_openvpn_tunnels_derived_from_list(fake_nethsec, fake_euci):
+    # count_openvpn_tunnels() must agree with list_openvpn_tunnels() - it's
+    # meant to be a pure aggregation of the same data, not a second query.
+    instances = {
+        "ns_site_a": {"enabled": "1"},
+        "ns_site_b": {"enabled": "1"},
+    }
+    utils = SimpleNamespace(get_all_by_type=lambda u, config, kind: instances)
+
+    def fake_list_connected_clients(section, type):
+        return {"peer1": {}} if section == "ns_site_a" else {}
+
+    ovpn = SimpleNamespace(list_connected_clients=fake_list_connected_clients)
+    fake_nethsec.install(utils=utils, ovpn=ovpn)
+    fake_euci(vt, uci_obj=MagicMock())
+
+    total, active = vt.count_openvpn_tunnels()
+
+    assert (total, active) == (2, 1)
+
+
+# --- main(): per-tunnel service lines ----------------------------------------
+
+def test_main_prints_one_service_line_per_tunnel(monkeypatch, capsys):
+    monkeypatch.setattr(vt, "list_openvpn_tunnels", lambda: [
+        {"name": "ns_site_a", "up": True, "label": "ns_site_a", "clients": 1},
+        {"name": "ns_site_b", "up": False, "label": "ns_site_b", "clients": 0},
+    ])
+    monkeypatch.setattr(vt, "count_wireguard_tunnels", lambda: (0, 0))
+
+    vt.main()
+    lines = capsys.readouterr().out.strip().splitlines()
+
+    assert split_check_result(lines[0])[:2] == ("0", "VPN.Tunnel.ns_site_a")
+    assert split_check_result(lines[1])[:2] == ("2", "VPN.Tunnel.ns_site_b")
+    # WireGuard aggregate line still present (unaffected by OpenVPN state -
+    # no WireGuard peers configured here).
+    assert split_check_result(lines[2])[:2] == ("0", "VPN.Tunnel")
+
+
 # --- count_wireguard_tunnels() ----------------------------------------------
 
 def test_wireguard_active_requires_fresh_handshake(fake_nethsec, fake_euci, monkeypatch):
@@ -184,7 +273,7 @@ def test_wireguard_zero_peers_configured(fake_nethsec, fake_euci):
 # --- main(): perfdata + state thresholds ------------------------------------
 
 def test_main_no_vpn_configured(monkeypatch, capsys):
-    monkeypatch.setattr(vt, "count_openvpn_tunnels", lambda: (0, 0))
+    monkeypatch.setattr(vt, "list_openvpn_tunnels", lambda: [])
     monkeypatch.setattr(vt, "count_wireguard_tunnels", lambda: (0, 0))
 
     vt.main()
@@ -192,38 +281,42 @@ def test_main_no_vpn_configured(monkeypatch, capsys):
 
     state, service, perf, text = split_check_result(line)
     assert state == "0"
-    assert "No VPN configured" in text
+    assert service == "VPN.Tunnel"
+    assert "No WireGuard peers configured" in text
     # Regression: perfdata was previously placed after the label text, so
     # field3 was just "-" and nothing was graphed.
     assert graphed_metric_names(line) == {"total", "active", "inactive"}
 
 
-def test_main_all_active_is_ok(monkeypatch, capsys):
-    monkeypatch.setattr(vt, "count_openvpn_tunnels", lambda: (2, 2))
-    monkeypatch.setattr(vt, "count_wireguard_tunnels", lambda: (0, 0))
+def test_main_wireguard_all_active_is_ok(monkeypatch, capsys):
+    # The aggregate service is WireGuard-only now (OpenVPN tunnels get their
+    # own per-tunnel VPN.Tunnel.<label> service instead - see
+    # test_main_prints_one_service_line_per_tunnel).
+    monkeypatch.setattr(vt, "list_openvpn_tunnels", lambda: [])
+    monkeypatch.setattr(vt, "count_wireguard_tunnels", lambda: (2, 2))
 
     vt.main()
-    line = capsys.readouterr().out.strip()
+    line = capsys.readouterr().out.strip().splitlines()[-1]
 
     assert split_check_result(line)[0] == "0"
     assert dict(parse_perfdata(split_check_result(line)[2])) == {"total": 2.0, "active": 2.0, "inactive": 0.0}
 
 
-def test_main_some_down_is_warning(monkeypatch, capsys):
-    monkeypatch.setattr(vt, "count_openvpn_tunnels", lambda: (2, 1))
-    monkeypatch.setattr(vt, "count_wireguard_tunnels", lambda: (0, 0))
+def test_main_wireguard_some_down_is_warning(monkeypatch, capsys):
+    monkeypatch.setattr(vt, "list_openvpn_tunnels", lambda: [])
+    monkeypatch.setattr(vt, "count_wireguard_tunnels", lambda: (2, 1))
 
     vt.main()
-    line = capsys.readouterr().out.strip()
+    line = capsys.readouterr().out.strip().splitlines()[-1]
 
     assert split_check_result(line)[0] == "1"
 
 
-def test_main_all_down_is_critical(monkeypatch, capsys):
-    monkeypatch.setattr(vt, "count_openvpn_tunnels", lambda: (2, 0))
-    monkeypatch.setattr(vt, "count_wireguard_tunnels", lambda: (0, 0))
+def test_main_wireguard_all_down_is_critical(monkeypatch, capsys):
+    monkeypatch.setattr(vt, "list_openvpn_tunnels", lambda: [])
+    monkeypatch.setattr(vt, "count_wireguard_tunnels", lambda: (2, 0))
 
     vt.main()
-    line = capsys.readouterr().out.strip()
+    line = capsys.readouterr().out.strip().splitlines()[-1]
 
     assert split_check_result(line)[0] == "2"
