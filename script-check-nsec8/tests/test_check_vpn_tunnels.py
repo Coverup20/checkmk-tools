@@ -10,14 +10,26 @@ Covers: the OpenVPN p2p-vs-subnet type-mismatch regression (client/outbound
 instances were always queried with type="subnet", permanently reporting 0
 active clients for real, healthy p2p tunnels), the WireGuard
 handshake-freshness regression (previously "nonzero ever" = permanent
-false-OK), and the perfdata-placement regression.
+false-OK), the perfdata-placement regression, and the road-warrior-exclusion
+fix (not yet promoted to full/ - see check_vpn_tunnels_wip.py in this same
+directory; this test file intentionally imports that staged copy instead of
+the production script in full/, whose hash must stay unchanged until the
+fix is promoted).
 """
 
+import importlib.machinery
+import importlib.util
 import subprocess
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import check_vpn_tunnels as vt
+_WIP_PATH = Path(__file__).resolve().parent / "check_vpn_tunnels_wip.py"
+_loader = importlib.machinery.SourceFileLoader("check_vpn_tunnels_wip", str(_WIP_PATH))
+_spec = importlib.util.spec_from_loader(_loader.name, _loader)
+vt = importlib.util.module_from_spec(_spec)
+_loader.exec_module(vt)
+
 from checkmk_format import graphed_metric_names, parse_perfdata, split_check_result
 
 
@@ -60,8 +72,30 @@ def test_openvpn_p2p_requires_traffic_in_both_directions(fake_nethsec, fake_euci
     assert (total, active) == (1, 0)
 
 
-def test_openvpn_road_warrior_server_queried_as_subnet(fake_nethsec, fake_euci):
-    instances = {"ns_roadwarrior1": {"enabled": "1"}}  # no client/ns_client flag
+def test_openvpn_road_warrior_excluded_from_tunnel_count(fake_nethsec, fake_euci):
+    # Regression: road warrior (host-to-net) servers were counted here too,
+    # same as genuine site-to-site tunnels. They're identified by
+    # 'ns_auth_mode' - the same field /usr/libexec/rpcd/ns.ovpntunnel's own
+    # list_tunnels() checks to skip them ("skip road warrior servers").
+    # check_ovpn_host2net.py already covers them, and treats 0 connected
+    # clients as normal - counting them here too made a road warrior with no
+    # client currently connected drag this check down to CRITICAL "All VPN
+    # down" even when every real tunnel was healthy.
+    instances = {"ns_roadwarrior1": {"enabled": "1", "ns_auth_mode": "certificate"}}
+    utils = SimpleNamespace(get_all_by_type=lambda u, config, kind: instances)
+    ovpn = SimpleNamespace(list_connected_clients=lambda section, type: {"peer1": {}, "peer2": {}})
+    fake_nethsec.install(utils=utils, ovpn=ovpn)
+    fake_euci(vt, uci_obj=MagicMock())
+
+    total, active = vt.count_openvpn_tunnels()
+
+    assert (total, active) == (0, 0)
+
+
+def test_openvpn_net_to_net_subnet_server_queried_as_subnet(fake_nethsec, fake_euci):
+    # A genuine site-to-site (net-to-net) server: no client/ns_client flag
+    # and no ns_auth_mode - unlike a road warrior, this must be counted.
+    instances = {"ns_site_b": {"enabled": "1"}}
     utils = SimpleNamespace(get_all_by_type=lambda u, config, kind: instances)
     seen_types = []
 
