@@ -8,23 +8,18 @@
 
 OpenVPN: enumerates configured instances via UCI/nethsec, connected clients
 via nethsec.ovpn.list_connected_clients() (openvpn-status socket).
-WireGuard: peer count via nethsec.inventory.fact_wireguard() (config-level,
-authoritative), liveness/freshness via 'wg show' (not exposed by the library).
+IPsec: enumerates configured "remote" connections via UCI/nethsec, liveness
+via 'swanctl --list-sas --pretty' (nethsec.ipsec exposes no status query).
 """
 
+import re
 import shutil
 import subprocess
 import sys
-import time
 
 VERSION = "1.6.0"
-WIREGUARD_SERVICE = "VPN.Tunnel"
-
-# A WireGuard peer is considered active if it handshaked within this window,
-# per doc/check_vpn_tunnels.md. The previous implementation only checked
-# "handshake timestamp is nonzero, ever" - a peer that handshaked once and
-# then went silent stayed "active" forever (permanent false-OK).
-WG_HANDSHAKE_FRESH_SECONDS = 180
+OPENVPN_SERVICE_PREFIX = "VPN.Tunnel.OVPN"
+IPSEC_SERVICE_PREFIX = "VPN.Tunnel.IPsec"
 
 try:
     from euci import EUci
@@ -132,83 +127,128 @@ def count_openvpn_tunnels():
     return total, active
 
 
-def count_wireguard_tunnels():
-    """Count WireGuard peers: total from nethsec (config, authoritative),
-    active from 'wg show' handshake freshness (not covered by the library).
+def _parse_swanctl_sas(text):
+    """Parse `swanctl --list-sas --pretty` output into
+    {conn_name: {"state": str | None, "children": [child_state, ...]}}.
 
-    The previous implementation derived "total" from the number of
-    interfaces and "active" from a per-peer handshake check across all
-    interfaces - mixing interface count and peer count made active > total
-    possible whenever an interface had more than one peer. Now both are
-    peer-level counts, comparable in the same unit.
+    swanctl has no JSON output - --pretty is the indented vici event dump
+    (2 spaces per nesting level, braces always closed at their opening
+    line's indent), e.g.:
+
+        list-sa event {
+          ns_b4100974 {
+            state = ESTABLISHED
+            ...
+            child-sas {
+              ns_b4100974_tunnel_1 {
+                state = INSTALLED
+                ...
+              }
+            }
+          }
+        }
+
+    Parsed by indent level rather than a general brace parser: a top-level
+    connection block is a "  <name> {" line and its matching "  }" (same
+    2-space indent); within it, only "    state = X" (the IKE_SA's own,
+    4-space indent) is taken as the connection state - not any nested
+    child-SA "state = X" at deeper indent, which would silently overwrite
+    it and misreport the IKE_SA's own liveness.
+    """
+    lines = text.splitlines()
+    n = len(lines)
+    conns = {}
+    i = 0
+    while i < n:
+        m = re.match(r'^  (\S+) \{$', lines[i])
+        if not m:
+            i += 1
+            continue
+        name = m.group(1)
+        state = None
+        children = []
+        j = i + 1
+        while j < n and lines[j] != '  }':
+            sm = re.match(r'^    state = (\w+)$', lines[j])
+            if sm:
+                state = sm.group(1)
+            cm = re.match(r'^      (\S+) \{$', lines[j])
+            if cm:
+                k = j + 1
+                while k < n and lines[k] != '      }':
+                    csm = re.match(r'^        state = (\w+)$', lines[k])
+                    if csm:
+                        children.append(csm.group(1))
+                    k += 1
+                j = k
+            j += 1
+        conns[name] = {"state": state, "children": children}
+        i = j + 1
+    return conns
+
+
+def list_ipsec_tunnels():
+    """Per-tunnel detail for every enabled IPsec (strongSwan) remote
+    connection, same shape as list_openvpn_tunnels(): a list of {"name":
+    section, "label": str, "up": bool}.
+
+    "up" requires both the IKE_SA to be ESTABLISHED and at least one of its
+    child SAs (the actual data tunnel) to be INSTALLED - an IKE_SA can
+    finish negotiating (ESTABLISHED) while its child SA is still pending or
+    was torn down (e.g. startaction=start racing the peer, or a rekey in
+    flight), which would otherwise report a tunnel passing no traffic as up.
+
+    "label" mirrors OpenVPN's: NethSecurity's own "ns_name" field when
+    present, falling back to the raw UCI section name - so operators see
+    the same human-facing name the UI shows them, not the internal
+    "ns_<hash>" section id.
     """
     if not EUCI_AVAILABLE:
-        return 0, 0
+        return []
     try:
-        from nethsec.inventory import fact_wireguard
+        from nethsec.utils import get_all_by_type
         with EUci() as u:
-            wg_facts = fact_wireguard(u)
+            remotes = get_all_by_type(u, "ipsec", "remote")
     except Exception:
-        wg_facts = {}
+        return []
 
-    servers = wg_facts.get("servers", {}) if wg_facts else {}
-    total = sum(v.get("peers", 0) for v in servers.values())
-    if total == 0:
-        return 0, 0
+    swanctl_bin = shutil.which("swanctl")
+    sa_states = {}
+    if swanctl_bin:
+        try:
+            result = subprocess.run([swanctl_bin, "--list-sas", "--pretty"],
+                                     capture_output=True, text=True, timeout=10)
+            sa_states = _parse_swanctl_sas(result.stdout)
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+            sa_states = {}
 
-    wg_bin = shutil.which("wg")
-    if not wg_bin:
-        return total, 0
-    active = 0
-    now = int(time.time())
-    try:
-        result = subprocess.run([wg_bin, "show", "interfaces"],
-                                capture_output=True, text=True, timeout=10)
-        ifaces = result.stdout.strip().split()
-        for iface in ifaces:
-            r = subprocess.run([wg_bin, "show", iface, "latest-handshakes"],
-                               capture_output=True, text=True, timeout=10)
-            for line in r.stdout.strip().splitlines():
-                parts = line.split()
-                if len(parts) >= 2:
-                    try:
-                        handshake_ts = int(parts[1])
-                    except ValueError:
-                        continue
-                    if handshake_ts != 0 and (now - handshake_ts) <= WG_HANDSHAKE_FRESH_SECONDS:
-                        active += 1
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        pass
-    return total, active
+    details = []
+    for section, fields in remotes.items():
+        if fields.get("enabled") != "1":
+            continue
+        sa = sa_states.get(section, {})
+        up = sa.get("state") == "ESTABLISHED" and "INSTALLED" in sa.get("children", [])
+        label = fields.get("ns_name") or section
+        details.append({"name": section, "label": label, "up": up})
+    return details
 
 
 def main():
-    # One service per OpenVPN tunnel, named after it - with more than one
+    # One service per tunnel, named after it - with more than one
     # net-to-net/p2p tunnel, a single aggregate service could only ever say
-    # "1 of 2 down", never which one. WireGuard peers don't get the same
-    # treatment: 'wg show' only exposes peers by public key, no human-facing
-    # name to hang a service on, so they still go through the aggregate
-    # WIREGUARD_SERVICE below instead.
+    # "1 of 2 down", never which one. OpenVPN and IPsec are prefixed
+    # separately ("VPN.Tunnel.OVPN.<label>" / "VPN.Tunnel.IPsec.<label>") so
+    # the two label namespaces - both operator-chosen ns_name values - can't
+    # collide.
     for tunnel in list_openvpn_tunnels():
         state = 0 if tunnel["up"] else 2
         text = "UP" if tunnel["up"] else "DOWN"
-        print(f"{state} VPN.Tunnel.{tunnel['label']} - {tunnel['label']}: {text}")
+        print(f"{state} {OPENVPN_SERVICE_PREFIX}.{tunnel['label']} - {tunnel['label']}: {text}")
 
-    wg_total, wg_active = count_wireguard_tunnels()
-    wg_inactive = wg_total - wg_active
-
-    # Perfdata must be the single whitespace-free 3rd field (CheckMK's local
-    # check parser never re-scans the free-text field for a later "|") -
-    # putting it after the label as before produced zero graphed metrics.
-    perfdata = f"total={wg_total}|active={wg_active}|inactive={wg_inactive}"
-    if wg_total == 0:
-        print(f"0 {WIREGUARD_SERVICE} {perfdata} No WireGuard peers configured")
-    elif wg_active == 0:
-        print(f"2 {WIREGUARD_SERVICE} {perfdata} CRITICAL - All WireGuard peers down")
-    elif wg_active < wg_total:
-        print(f"1 {WIREGUARD_SERVICE} {perfdata} WARNING - Some WireGuard peers down")
-    else:
-        print(f"0 {WIREGUARD_SERVICE} {perfdata} OK - All WireGuard peers active")
+    for tunnel in list_ipsec_tunnels():
+        state = 0 if tunnel["up"] else 2
+        text = "UP" if tunnel["up"] else "DOWN"
+        print(f"{state} {IPSEC_SERVICE_PREFIX}.{tunnel['label']} - {tunnel['label']}: {text}")
 
     return 0
 
