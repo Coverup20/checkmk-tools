@@ -64,9 +64,14 @@ ExecStart=-/usr/bin/check_mk_agent
 StandardInput=socket
 """
 
+# NethServer 7's EL7 stunnel package is 4.56 (2015) - it predates
+# sslVersionMin (added in stunnel 5.x) and rejects it outright ("Specified
+# option name is not valid here"). sslVersion pins a single version rather
+# than a minimum, but TLSv1.2 is also the highest this build supports, so
+# the effect is the same.
 _STUNNEL_CONF_TEMPLATE = f"""pid = /var/run/stunnel-checkmk.pid
 cert = {CERT_FILE}
-sslVersionMin = TLSv1.2
+sslVersion = TLSv1.2
 
 [checkmk-agent]
 accept = {TLS_PUBLIC_PORT}
@@ -118,8 +123,34 @@ def stunnel_service_name() -> str:
     return CUSTOM_STUNNEL_SERVICE.replace(".service", "")
 
 
+VAULT_REPO_FILE = Path("/etc/yum.repos.d/centos7-vault-stunnel-fallback.repo")
+VAULT_REPO_ID = "centos7-vault-stunnel-fallback"
+_VAULT_REPO_CONTENT = f"""[{VAULT_REPO_ID}]
+name=CentOS-7 vault base (fallback source for stunnel only)
+baseurl=http://vault.centos.org/centos/7/os/x86_64/
+enabled=0
+gpgcheck=0
+"""
+
+
 def install_stunnel() -> bool:
     code, _, _ = run_command(["yum", "install", "-y", "stunnel"], timeout=120)
+
+    if code != 0:
+        # NethServer 7's own package mirrors (sb-base/sb-epel/... on
+        # nethserver.com) can go down or reject requests (403 seen live on
+        # ns-lab00) independently of this host's actual subscription state.
+        # CentOS 7 is EOL, so the vault is the only other place stunnel is
+        # still fetchable from - used only as a fallback, and only for this
+        # one package (--disablerepo='*' so nothing else is ever pulled
+        # from it), never enabled outside of this single install attempt.
+        VAULT_REPO_FILE.write_text(_VAULT_REPO_CONTENT)
+        code, _, _ = run_command(
+            ["yum", "--disablerepo=*", f"--enablerepo={VAULT_REPO_ID}",
+             "install", "-y", "stunnel"],
+            timeout=120,
+        )
+
     # The distro package registers its own native stunnel.service - stop
     # and disable it so it can never race our dedicated unit over the same
     # config file/port.

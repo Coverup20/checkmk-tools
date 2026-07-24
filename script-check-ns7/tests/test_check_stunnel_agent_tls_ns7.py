@@ -210,6 +210,52 @@ def test_install_stunnel_disables_native_unit(monkeypatch):
     assert ["systemctl", "disable", "stunnel"] in calls
 
 
+def test_install_stunnel_succeeds_without_vault_fallback_when_yum_works(monkeypatch, tmp_path):
+    monkeypatch.setattr(mod, "VAULT_REPO_FILE", tmp_path / "vault.repo")
+    calls = []
+    monkeypatch.setattr(mod, "run_command", lambda cmd, timeout=15: (calls.append(cmd), (0, "", ""))[1])
+
+    ok = mod.install_stunnel()
+
+    assert ok is True
+    assert not mod.VAULT_REPO_FILE.exists()
+    assert not any(mod.VAULT_REPO_ID in cmd for cmd in calls)
+
+
+def test_install_stunnel_falls_back_to_centos_vault_when_yum_repos_fail(monkeypatch, tmp_path):
+    # Regression: found live on ns-lab00 - NethServer 7's own mirrors
+    # (sb-base/sb-epel/...) returned 403 Forbidden, blocking every yum
+    # install regardless of package. CentOS 7 is EOL, so the vault is used
+    # as a fallback source for stunnel specifically (never enabled beyond
+    # this one install attempt).
+    monkeypatch.setattr(mod, "VAULT_REPO_FILE", tmp_path / "vault.repo")
+    calls = []
+
+    def fake_run(cmd, timeout=15):
+        calls.append(cmd)
+        if cmd == ["yum", "install", "-y", "stunnel"]:
+            return 1, "", "403 Forbidden"
+        return 0, "", ""
+
+    monkeypatch.setattr(mod, "run_command", fake_run)
+
+    ok = mod.install_stunnel()
+
+    assert ok is True
+    assert mod.VAULT_REPO_FILE.is_file()
+    assert "vault.centos.org" in mod.VAULT_REPO_FILE.read_text()
+    assert ["yum", "--disablerepo=*", f"--enablerepo={mod.VAULT_REPO_ID}", "install", "-y", "stunnel"] in calls
+
+
+def test_install_stunnel_reports_failure_if_vault_fallback_also_fails(monkeypatch, tmp_path):
+    monkeypatch.setattr(mod, "VAULT_REPO_FILE", tmp_path / "vault.repo")
+    monkeypatch.setattr(mod, "run_command", lambda cmd, timeout=15: (1, "", "still failing"))
+
+    ok = mod.install_stunnel()
+
+    assert ok is False
+
+
 # --- remediate() orchestration ------------------------------------------------
 
 def test_remediate_returns_error_when_yum_missing(monkeypatch):
