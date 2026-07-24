@@ -1,16 +1,17 @@
-"""Tests for check_stunnel_agent_tls.py.
+"""Tests for check_stunnel_agent_tls_proxmox.py (Proxmox VE variant).
 
 Covers: compliance detection (each missing piece reported distinctly),
 the idempotent fast-path (compliant hosts must never call remediate()),
-and the remediation path (success, remediation failure, and
-"still not compliant after remediation" cases) - all via monkeypatched
-filesystem paths and mocked subprocess calls, no dependency on a real
-system.
+the remediation path (success, remediation failure, and "still not
+compliant after remediation" cases), and two real regressions found while
+rolling this out live: a systemd socket-rebind bug (real-socket test, not
+mocked) and the RHEL-family stunnel.service incompatibility that this
+per-OS split exists to avoid.
 """
 
 import socket
 
-import check_stunnel_agent_tls as mod
+import check_stunnel_agent_tls_proxmox as mod
 
 
 # --- fixtures --------------------------------------------------------------
@@ -36,7 +37,7 @@ def _make_compliant(monkeypatch, tmp_path):
     mod.CONF_FILE.write_text(mod._STUNNEL_CONF_TEMPLATE)
 
     monkeypatch.setattr(mod, "is_port_listening", lambda port, host="127.0.0.1", timeout=1.5: True)
-    monkeypatch.setattr(mod, "detect_stunnel_service_name", lambda: "stunnel4")
+    monkeypatch.setattr(mod, "is_stunnel_installed", lambda: True)
 
 
 # --- is_compliant() ---------------------------------------------------------
@@ -50,7 +51,6 @@ def test_is_compliant_true_when_everything_configured(monkeypatch, tmp_path):
 
 def test_is_compliant_false_when_socket_not_rebound(monkeypatch, tmp_path):
     _wire_paths(monkeypatch, tmp_path)
-    # AGENT_SOCKET_UNIT does not exist at all
     compliant, reason = mod.is_compliant()
     assert compliant is False
     assert "socket" in reason
@@ -82,7 +82,7 @@ def test_is_compliant_false_when_stunnel_conf_wrong(monkeypatch, tmp_path):
 
 def test_is_compliant_false_when_stunnel_not_installed(monkeypatch, tmp_path):
     _make_compliant(monkeypatch, tmp_path)
-    monkeypatch.setattr(mod, "detect_stunnel_service_name", lambda: None)
+    monkeypatch.setattr(mod, "is_stunnel_installed", lambda: False)
     compliant, reason = mod.is_compliant()
     assert compliant is False
     assert "not installed" in reason
@@ -117,7 +117,6 @@ def test_main_fast_path_ok_never_calls_remediate(monkeypatch, tmp_path, capsys):
 
 def test_main_remediates_and_reports_ok(monkeypatch, tmp_path, capsys):
     _wire_paths(monkeypatch, tmp_path)
-    # First call: not compliant. After "remediate" flips state, compliant.
     calls = {"n": 0}
 
     def fake_is_compliant():
@@ -140,14 +139,14 @@ def test_main_remediates_and_reports_ok(monkeypatch, tmp_path, capsys):
 def test_main_reports_critical_when_remediation_raises_error(monkeypatch, tmp_path, capsys):
     _wire_paths(monkeypatch, tmp_path)
     monkeypatch.setattr(mod, "is_compliant", lambda: (False, "agent socket not rebound to 127.0.0.1"))
-    monkeypatch.setattr(mod, "remediate", lambda: "stunnel package installation failed")
+    monkeypatch.setattr(mod, "remediate", lambda: "stunnel4 package installation failed")
 
     rc = mod.main()
 
     assert rc == 0
     out = capsys.readouterr().out
     assert out.startswith("2 Agent.TLS.Stunnel - CRITICAL")
-    assert "stunnel package installation failed" in out
+    assert "stunnel4 package installation failed" in out
 
 
 def test_main_reports_critical_when_still_not_compliant_after_remediation(monkeypatch, tmp_path, capsys):
@@ -161,35 +160,6 @@ def test_main_reports_critical_when_still_not_compliant_after_remediation(monkey
     out = capsys.readouterr().out
     assert out.startswith("2 Agent.TLS.Stunnel - CRITICAL")
     assert "still not compliant" in out
-
-
-# --- detect_stunnel_service_name() / detect_package_manager() ---------------
-
-def test_detect_stunnel_service_name_none_when_stunnel_not_found(monkeypatch):
-    monkeypatch.setattr(mod.shutil, "which", lambda name: None)
-    assert mod.detect_stunnel_service_name() is None
-
-
-def test_detect_stunnel_service_name_prefers_distro_unit(monkeypatch):
-    monkeypatch.setattr(mod.shutil, "which", lambda name: "/usr/bin/stunnel" if name == "stunnel" else None)
-
-    def fake_run(cmd, timeout=15):
-        if cmd[:2] == ["systemctl", "list-unit-files"] and "stunnel4.service" in cmd:
-            return 0, "stunnel4.service enabled", ""
-        return 1, "", ""
-
-    monkeypatch.setattr(mod, "run_command", fake_run)
-    assert mod.detect_stunnel_service_name() == "stunnel4"
-
-
-def test_detect_package_manager_returns_first_available(monkeypatch):
-    monkeypatch.setattr(mod.shutil, "which", lambda name: "/usr/bin/dnf" if name == "dnf" else None)
-    assert mod.detect_package_manager() == "dnf"
-
-
-def test_detect_package_manager_none_when_nothing_available(monkeypatch):
-    monkeypatch.setattr(mod.shutil, "which", lambda name: None)
-    assert mod.detect_package_manager() is None
 
 
 # --- is_port_listening() ------------------------------------------------------
@@ -213,39 +183,61 @@ def test_is_port_listening_false_for_a_closed_port():
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.bind(("127.0.0.1", 0))
     port = srv.getsockname()[1]
-    srv.close()  # port is now closed again
+    srv.close()
     assert mod.is_port_listening(port, timeout=0.3) is False
+
+
+# --- stunnel_service_name() / install_stunnel() -----------------------------
+
+def test_stunnel_service_name_is_always_the_dedicated_unit():
+    # Regression: must NEVER be "stunnel4" - relying on Debian's native
+    # unit (which reads *.conf via /etc/default/stunnel4's FILES glob) is
+    # one more distro assumption to track; a dedicated unit that names our
+    # config explicitly keeps this identical to the RHEL-family variants.
+    assert mod.stunnel_service_name() == "stunnel-checkmk"
+
+
+def test_install_stunnel_disables_native_unit(monkeypatch):
+    calls = []
+    monkeypatch.setattr(mod, "run_command", lambda cmd, timeout=15: (calls.append(cmd), (0, "", ""))[1])
+
+    ok = mod.install_stunnel()
+
+    assert ok is True
+    assert ["apt-get", "install", "-y", "stunnel4"] in calls
+    assert ["systemctl", "stop", "stunnel4"] in calls
+    assert ["systemctl", "disable", "stunnel4"] in calls
 
 
 # --- remediate() orchestration ------------------------------------------------
 
-def test_remediate_returns_error_when_no_package_manager(monkeypatch):
-    monkeypatch.setattr(mod, "detect_stunnel_service_name", lambda: None)
-    monkeypatch.setattr(mod, "detect_package_manager", lambda: None)
+def test_remediate_returns_error_when_apt_get_missing(monkeypatch):
+    monkeypatch.setattr(mod, "is_stunnel_installed", lambda: False)
+    monkeypatch.setattr(mod.shutil, "which", lambda name: None)
 
     error = mod.remediate()
 
-    assert error == "no supported package manager (apt-get/dnf/yum) found"
+    assert error == "apt-get not found (not a Debian-based Proxmox VE system?)"
 
 
 def test_remediate_returns_error_when_install_fails(monkeypatch):
-    monkeypatch.setattr(mod, "detect_stunnel_service_name", lambda: None)
-    monkeypatch.setattr(mod, "detect_package_manager", lambda: "apt-get")
-    monkeypatch.setattr(mod, "install_stunnel", lambda pkg_mgr: False)
+    monkeypatch.setattr(mod, "is_stunnel_installed", lambda: False)
+    monkeypatch.setattr(mod.shutil, "which", lambda name: "/usr/bin/apt-get" if name == "apt-get" else None)
+    monkeypatch.setattr(mod, "install_stunnel", lambda: False)
 
     error = mod.remediate()
 
-    assert error == "stunnel package installation failed"
+    assert error == "stunnel4 package installation failed"
 
 
 def test_remediate_happy_path_calls_all_steps(monkeypatch):
-    monkeypatch.setattr(mod, "detect_stunnel_service_name", lambda: "stunnel4")
+    monkeypatch.setattr(mod, "is_stunnel_installed", lambda: True)
     calls = []
     monkeypatch.setattr(mod, "configure_agent_socket", lambda: calls.append("socket"))
     monkeypatch.setattr(mod, "generate_certificate", lambda: calls.append("cert"))
-    monkeypatch.setattr(mod, "configure_stunnel", lambda svc: calls.append(f"stunnel:{svc}"))
+    monkeypatch.setattr(mod, "configure_stunnel", lambda: calls.append("stunnel"))
 
     error = mod.remediate()
 
     assert error is None
-    assert calls == ["socket", "cert", "stunnel:stunnel4"]
+    assert calls == ["socket", "cert", "stunnel"]
