@@ -44,6 +44,8 @@ Documentation=https://docs.checkmk.com/
 [Socket]
 ListenStream={LOCAL_AGENT_PORT}
 Accept=yes
+MaxConnections=5
+MaxConnectionsPerSource=3
 
 [Install]
 WantedBy=sockets.target
