@@ -11,7 +11,6 @@ ExecStart=/usr/bin/python3 -B /opt/checkmk-tools/script-tools/full/agent_mainten
     --server-url ${CHECKMK_SERVER_URL} \
     --site ${CHECKMK_SITE} \
     --target auto \
-    --verify-only \
     --verbose
 
 StandardOutput=journal
