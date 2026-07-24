@@ -27,6 +27,17 @@ Usage:
 Version: 1.0.0
 """
 
+# Python 3.6 compatibility: 'text' alias for 'universal_newlines'
+import sys as _sys
+if _sys.version_info < (3, 7):
+    import subprocess as _subprocess
+    _orig_check_output = _subprocess.check_output
+    def _compat_check_output(*args, **kwargs):
+        if 'text' in kwargs:
+            kwargs['universal_newlines'] = kwargs.pop('text')
+        return _orig_check_output(*args, **kwargs)
+    _subprocess.check_output = _compat_check_output
+
 import argparse
 import json
 import os
