@@ -32,10 +32,10 @@ Each sync cycle:
 
 ```bash
 # Install with systemd timer (default interval 30 seconds)
-python3 ../installation/install-checkmk-sync.py --enable-auto-git-sync --auto-git-sync-interval 30
+python3 ../installation/install-checkmk-sync.py --git-interval 30
 
 # Or with custom interval (5 minutes)
-python3 ../installation/install-checkmk-sync.py --enable-auto-git-sync --auto-git-sync-interval 300
+python3 ../installation/install-checkmk-sync.py --git-interval 300
 ```
 
 ### Status and Logging

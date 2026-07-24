@@ -19,6 +19,7 @@ Complete collection of scripts for monitoring and managing infrastructures with 
   - [Proxmox](#proxmox)
   - [tmate Server](#tmate-server)
   - [Windows](#windows)
+  - [CheckMK Server-Side Checks](#checkmk-server-side-checks)
 - [Notification Scripts](#notification-scripts)
 - [Deployment Tools](#deployment-tools)
 - [Ydea Toolkit](#ydea-toolkit)
@@ -82,7 +83,8 @@ checkmk-tools/
 │   ├── full/                   # Python check scripts
 │   └── doc/
 ├── script-check-nsec8/         # NethSecurity 8 check scripts
-│   ├── full/                   # Python check scripts
+│   ├── full/                   # Production Python check scripts
+│   ├── tests/                  # pytest suite + staged/WIP checks
 │   └── doc/
 ├── script-check-ubuntu/        # Ubuntu/Linux check scripts
 │   ├── full/                   # Python check scripts
@@ -95,25 +97,39 @@ checkmk-tools/
 ├── script-check-windows/       # Windows check scripts (PowerShell)
 │   ├── full/
 │   └── doc/
+├── script-checkmk/             # CheckMK server-side check scripts
+│   └── full/                   # Host connectivity, VPN tunnel checks
 ├── script-notify-checkmk/      # CheckMK notification scripts
-│   ├── full/                   # Email, Telegram, Ydea
+│   ├── full/                   # Email, Telegram, Ydea, ticket watchers
+│   ├── beta/                   # M@il-20 / Telegram-20 rate-limited notifiers
+│   ├── reporting/              # Alarm/notification reporting & recurrence analysis
 │   └── doc/
-├── script-tools/               # Deployment and management tools
+├── script-tools/                    # Deployment and management tools
 │   ├── full/
-│   │   └── installation/       # Agent and service installers
+│   │   ├── agent_maintenance/       # CheckMK agent sync (multi-OS)
+│   │   ├── audit_ns8/               # NS8 audit reports
+│   │   ├── backup_restore/          # Backup, restore, rclone cloud sync
+│   │   ├── clients/                 # Client-side setup scripts (SMTP, etc.)
+│   │   ├── deploy/                  # Agent and check-script deployment
+│   │   ├── installation/            # Agent/FRPC/tmate installers
+│   │   ├── monitoring_diagnostics/  # Tuning, diagnostics, flapping analysis
+│   │   ├── network_scan/            # nmap-based network scanning
+│   │   ├── sync_update/             # Auto-git-sync, script/crontab updates
+│   │   ├── systemd/                 # Systemd unit templates (backup jobs)
+│   │   ├── upgrade_maintenance/     # CheckMK/agent upgrade automation
+│   │   └── wrappers_templates/      # Wrapper/template examples
 │   └── doc/
-├── script-checkmk/             # CheckMK server-side scripts
-│   ├── full/
+├── Ydea-Toolkit/                # Ydea ticketing integration & API toolkit
+│   ├── full/                    # Integration + exploration/test scripts
+│   ├── config/                  # Configuration files
 │   └── doc/
-├── ydea-Toolkit/               # Ydea ticketing integration
-│   ├── full/
-│   ├── config/
-│   └── doc/
-├── nethesis-brand/             # CheckMK Nethesis branding assets
+├── nethesis-brand/              # CheckMK Nethesis branding assets
 │   ├── theme.css
 │   └── *.svg
-├── script-ps-tools/            # PowerShell maintenance tools (Windows)
-└── deploy-nethesis-brand.sh    # Deploy branding on CheckMK servers
+├── script-ps-tools/             # PowerShell backup/maintenance tools (Windows)
+├── copilot/                     # Internal AI-agent automation scripts (ops use)
+├── docs/                        # Release notes (PENDING_RELEASE.md)
+└── deploy-nethesis-brand.sh     # Deploy branding on CheckMK servers
 ```
 
 ---
@@ -203,10 +219,7 @@ Monitoring for NethSecurity 8 (OpenWrt-based firewall).
 | `check_firewall_traffic.py` | Firewall traffic statistics |
 | `check_dhcp_leases.py` | DHCP lease usage |
 | `check_dns_resolution.py` | DNS resolution check |
-| `check_martian_packets.py` | Martian packet detection |
 | `check_root_access.py` | Root access attempts |
-| `check_uptime.py` | System uptime |
-| `check_opkg_packages.py` | OpenWrt package status |
 
 ---
 
@@ -226,6 +239,8 @@ Generic check scripts for Ubuntu/Debian distributions.
 | `check_arp_watch.py` | ARP watch / MAC address changes |
 | `check_tmate_session.py` | tmate session status |
 | `check_efivars.py` | EFI variables check |
+| `check_notification_by_script.py` | Notification activity grouped by script (Ydea, mail, Telegram, etc.) |
+| `check_notification_limiter_status.py` | M@il-20 / Telegram-20 delivery and rate-limiter status |
 
 ---
 
@@ -290,6 +305,21 @@ Copy-Item check_ransomware_activity.ps1, ransomware_config.json `
 
 ---
 
+### CheckMK Server-Side Checks
+
+**Directory**: `script-checkmk/full/`
+
+Checks that run on the CheckMK server itself rather than on the monitored host.
+
+| Script | Description |
+| -------- | ----------- |
+| `check_host_connectivity.py` | ARP (same-subnet) + ICMP fallback (cross-VLAN) host reachability, replaces `check_icmp` behind active firewalls |
+| `check_host_connectivity_nmap.py` | Host connectivity via nmap only (auto ARP/ICMP selection) |
+| `check_host_connectivity_us.py` | Host connectivity variant for multi-VLAN setups where the monitoring server can't reach hosts directly |
+| `check_vpn_tunnels.py` | OpenVPN net-to-net tunnel status via remote-subnet gateway ping |
+
+---
+
 ## Notification Scripts
 
 **Directory**: `script-notify-checkmk/full/`
@@ -310,6 +340,7 @@ if 'NOTIFY_HOSTLABEL_real_ip' in os.environ:
 | Script | Description |
 | -------- | ----------- |
 | `mail_realip` | Email with real IP extraction (FRP-aware) |
+| `mail-checkmk` | Standard CheckMK email notification wrapper |
 
 ### Telegram
 
@@ -321,6 +352,7 @@ if 'NOTIFY_HOSTLABEL_real_ip' in os.environ:
 | `telegram_c01_selfmon` | Telegram C01 self-monitoring |
 | `telegram_cl00` | Telegram CL00 notifications |
 | `telegram_tmate.py` | Telegram tmate session notifications |
+| `telegram_get_chatid.py` | Utility to retrieve a Telegram chat ID |
 
 ### Ydea Integration
 
@@ -328,8 +360,32 @@ if 'NOTIFY_HOSTLABEL_real_ip' in os.environ:
 | -------- | ----------- |
 | `ydea_la` | Ydea LA ticketing notification |
 | `ydea_ag` | Ydea AG ticketing notification |
+| `ydea_ag_testing` / `ydea_la_testing` | Testing variants of the Ydea notifications |
 | `ydea_cache_validator.py` | Ticket cache validator |
 | `notify_ticket_watcher.py` | Monitor open notification tickets |
+| `notify_ticket_watcher_sp.py` | Ticket watcher variant (SP site) |
+| `notify_copilot_autofix.py` | Trigger AI-agent autofix workflow from a notification event |
+
+### Rate-Limited Notifiers (beta)
+
+**Directory**: `script-notify-checkmk/beta/`
+
+| Script | Description |
+| -------- | ----------- |
+| `M@il-20` | Email notifier with adaptive cooldown / rate limiting |
+| `Telegram-20` | Telegram notifier with adaptive cooldown / rate limiting |
+
+Monitored on the target host via `check_notification_limiter_status.py` (see [Ubuntu/Linux](#ubuntulinux)).
+
+### Reporting
+
+**Directory**: `script-notify-checkmk/reporting/`
+
+| Script | Description |
+| -------- | ----------- |
+| `daily_alarm_report.py` | Daily summary report of CheckMK alarms |
+| `notification-limiter-report.py` | Read-only recurrence/time-of-day insights for rate-limited notifications |
+| `analyze_notification_recurrence.py` | Recurring alert pattern analysis module |
 
 ### Deployment
 
@@ -350,16 +406,19 @@ chmod +x /omd/sites/SITENAME/local/share/check_mk/notifications/mail_realip
 
 **Directory**: `script-tools/full/`
 
-Python tools for CheckMK agent deployment, infrastructure management, backup, and tuning.
+Python tools for CheckMK agent deployment, infrastructure management, backup, and tuning, organized by function into subfolders (no loose scripts in the folder root — see `script-tools/full/README.md`).
 
-### Agent Installation
+### Agent Installation & Sync
 
 | Script | Description |
 | -------- | ----------- |
-| `installation/install-checkmk-agent-persistent-nsec8.*` | ROCKSOLID installer for NethSecurity 8 |
+| `installation/install-agent-nsec8.py` | ROCKSOLID CheckMK+FRP agent installer for NethSecurity 8 |
+| `installation/setup-persistent-nsec8.py` | Upgrade-resistant persistence setup for NethSecurity 8 |
 | `installation/install_frpc.py` | FRP client installation |
-| `deploy-plain-agent.py` | Deploy agent to a single host |
-| `deploy-plain-agent-multi.py` | Multi-host deployment from list |
+| `agent_maintenance/checkmk-agent-sync.py` | Multi-OS agent sync (Debian/RHEL/NethSecurity/NS8), verify-only by default, structured status reporting |
+| `agent_maintenance/checkmk-agent-sync.service` / `.timer` | Optional systemd units for scheduled agent sync (daily, randomized delay) |
+| `deploy/deploy-plain-agent.py` | Deploy agent to a single host |
+| `deploy/deploy-plain-agent-multi.py` | Multi-host deployment from list |
 
 #### NethSecurity 8 - Official Installation Procedure
 
@@ -388,25 +447,48 @@ opkg install ns-checkmk-utils_0.0.2-r1_all.ipk
 | `backup_restore/checkmk_rclone_space_dyn.py` | Cloud backup with rclone (S3/Spaces) |
 | `backup_restore/checkmk_backup.py` | Local CheckMK backup |
 | `backup_restore/checkmk_restore.py` | CheckMK restore |
-| `backup_restore/checkmk_disaster_recovery.py` | Disaster recovery workflow |
-| `cleanup-checkmk-retention.py` | Backup retention cleanup |
+| `backup_restore/checkmk_restore_dr.py` | Disaster recovery restore workflow |
+| `backup_restore/checkmk_manage_job00_daily.py` / `checkmk_manage_job01_weekly.py` | Scheduled backup job managers |
+| `backup_restore/cleanup-checkmk-retention.py` | Backup retention cleanup |
+| `systemd/checkmk-backup-job00.service` / `checkmk-backup-job01.service` | Systemd units for scheduled backup jobs |
 
-### CheckMK Tuning and Upgrade
+### CheckMK Tuning, Upgrade & Diagnostics
 
 | Script | Description |
 | -------- | ----------- |
-| `checkmk-tuning-interactive-v5.py` | Interactive CheckMK tuning wizard |
-| `checkmk_optimize.py` | Automated CheckMK optimization |
-| `upgrade-checkmk.py` | Automated CheckMK upgrade |
-| `setup-auto-upgrade-checkmk.py` | Setup auto-upgrade via crontab |
+| `monitoring_diagnostics/checkmk-tuning-interactive-v5.py` | Interactive CheckMK tuning wizard |
+| `upgrade_maintenance/checkmk_optimize.py` | Automated CheckMK optimization |
+| `upgrade_maintenance/upgrade-checkmk.py` | Automated CheckMK upgrade |
+| `upgrade_maintenance/setup-auto-upgrade-checkmk.py` | Setup auto-upgrade via crontab |
+| `upgrade_maintenance/pre-upgrade-nsec8.py` | Pre-upgrade checks for NethSecurity 8 |
+| `monitoring_diagnostics/flapping_analyzer.py` | Detect flapping services/hosts |
+| `monitoring_diagnostics/fix_stale_checkmk.py` | Recover stale/hung CheckMK checks |
+| `monitoring_diagnostics/check_hostgroup_service_status.py` | Service status summary by host group |
+| `monitoring_diagnostics/distributed-monitoring-setup.py` | Distributed monitoring site setup |
+
+### NS8 Audit Reports
+
+| Script | Description |
+| -------- | ----------- |
+| `audit_ns8/ns8-audit-report-unified.py` | Unified NS8 audit report |
+| `audit_ns8/ns8-biweekly-audit-report.py` | Biweekly NS8 audit report |
+
+### Network Scan
+
+| Script | Description |
+| -------- | ----------- |
+| `network_scan/scan_nmap.py` | nmap-based network scan |
+| `network_scan/network_scan_to_folder.py` | Scan and export results to folder |
+| `network_scan/scan-nmap-interattivo-verbose-multi-options.py` | Interactive multi-option nmap scan |
 
 ### Monitoring Script Deployment
 
 | Script | Description |
 | -------- | ----------- |
-| `deploy-monitoring-scripts.py` | OS-aware interactive script deployment |
-| `smart-deploy-hybrid.py` | Multi-host deployment with cache |
-| `deploy_monitoring.py` | Batch monitoring deployment |
+| `deploy/deploy-monitoring-scripts.py` | OS-aware interactive script deployment |
+| `deploy/smart-deploy-hybrid.py` | Multi-host deployment with cache |
+| `deploy/deploy_monitoring.py` | Batch monitoring deployment |
+| `deploy/auto-deploy-checks.py` | Automated check-script deployment |
 
 ### Repository Sync
 
@@ -414,11 +496,11 @@ The repository is automatically synchronized on CheckMK servers using a Python-m
 
 ```bash
 # Install auto-sync (systemd timer-based, with fallback to cron on systems without systemd)
-python3 install-checkmk-sync.py --enable-auto-git-sync --auto-git-sync-interval 30
+python3 installation/install-checkmk-sync.py --git-interval 30
 ```
 
 **Active Model:**
-- **Architecture:** Python orchestration with minimal Bash runtime wrapper
+- **Architecture:** Python orchestration (`sync_update/auto_git_sync.py`) with minimal Bash runtime wrapper
 - **Systemd Mode:** Timer (`auto-git-sync.timer`) + oneshot service (`auto-git-sync.service`)
 - **Sync Logic:** `git fetch origin main` → `git reset --hard origin/main` → `git clean -fd`
 - **Cron Fallback:** On systems without systemd (OpenWrt, NethSecurity 8), sync runs every minute via cron
@@ -430,15 +512,15 @@ python3 install-checkmk-sync.py --enable-auto-git-sync --auto-git-sync-interval 
 
 ## Ydea Toolkit
 
-**Directory**: `ydea-Toolkit/`
+**Directory**: `Ydea-Toolkit/`
 
-Complete integration between CheckMK and the Ydea helpdesk system for automatic ticket creation from monitoring events.
+Integration between CheckMK and the Ydea helpdesk system for automatic ticket creation from monitoring events, plus a broad set of Ydea REST API exploration/test scripts (each with both a `.py` implementation and a `.sh` wrapper) used to reverse-engineer SLA, contract, and ticket endpoints.
 
 **Structure**:
 
-- `full/` — Integration scripts
-- `config/` — Configuration files
-- `doc/` — Documentation
+- `full/` — Integration scripts + API exploration/test scripts
+- `config/` — Configuration files (`credentials.sh.template`, `premium-mon-config.json`)
+- `doc/` — Documentation (including `README-CHECKMK-INTEGRATION.md`)
 
 ### Features
 
@@ -446,6 +528,7 @@ Complete integration between CheckMK and the Ydea helpdesk system for automatic 
 - SLA discovery from customer contracts
 - Ticket deduplication and state tracking
 - Health monitor for integration status
+- Correlator to link CheckMK notifications back to existing Ydea tickets
 
 ### Key Scripts
 
@@ -456,7 +539,12 @@ Complete integration between CheckMK and the Ydea helpdesk system for automatic 
 | `ydea_health_monitor.py` | Integration health monitoring |
 | `ydea_ticket_monitor.py` | Open ticket monitor |
 | `ydea_discover_sla_ids.py` | Automatic SLA discovery from contracts |
+| `ydea_notify_correlator.py` | Correlate CheckMK notifications with existing tickets |
+| `ydea_common.py` | Shared API client/helpers |
+| `ydea_templates.py` | Ticket message templates |
 | `ydea-toolkit.py` | Ydea API master toolkit |
+
+The remaining `explore_*`, `search_*`, `get_*`, `test_*`, and `analyze_*` scripts (with matching `.sh` wrappers) are ad-hoc tools for exploring the Ydea API surface (anagrafica, SLA, tickets, contracts) — see `Ydea-Toolkit/doc/` for details.
 
 ### Configuration
 
@@ -471,7 +559,7 @@ YDEA_CONTRATTO_ID="your_contract_id"
 
 ```bash
 # 1. Installation
-cd ydea-Toolkit/full
+cd Ydea-Toolkit/full
 python3 install_ydea_checkmk_integration.py
 
 # 2. Configure credentials
@@ -485,7 +573,7 @@ python3 ydea_discover_sla_ids.py
 python3 ydea_health_monitor.py
 ```
 
-**Documentation**: [ydea-Toolkit/README.md](ydea-Toolkit/README.md)
+**Documentation**: [Ydea-Toolkit/doc/README.md](Ydea-Toolkit/doc/README.md)
 
 ---
 
@@ -529,7 +617,7 @@ CSS and SVG assets to apply Nethesis visual identity to the CheckMK web interfac
 
 ```bash
 # Clone the repository
-git clone https://github.com/nethesis/checkmk-tools.git /opt/checkmk-tools
+git clone https://github.com/Coverup20/checkmk-tools.git /opt/checkmk-tools
 
 # Copy the desired script to the local checks directory (no extension)
 cp /opt/checkmk-tools/script-check-ns7/full/check_dovecot_status.py \
@@ -547,14 +635,14 @@ Scripts are deployed **without the `.py` extension** so CheckMK executes them di
 To keep scripts automatically updated on a server:
 
 ```bash
-python3 /opt/checkmk-tools/script-tools/full/install-auto-git-sync.py
+python3 /opt/checkmk-tools/script-tools/full/installation/install-checkmk-sync.py --git-interval 60
 ```
 
 ### Notification Script Installation
 
 ```bash
 # On CheckMK server (as root)
-git clone https://github.com/nethesis/checkmk-tools.git /tmp/checkmk-tools
+git clone https://github.com/Coverup20/checkmk-tools.git /tmp/checkmk-tools
 cp /tmp/checkmk-tools/script-notify-checkmk/full/mail_realip \
    /omd/sites/SITENAME/local/share/check_mk/notifications/
 chmod +x /omd/sites/SITENAME/local/share/check_mk/notifications/mail_realip
@@ -687,7 +775,7 @@ Complete script for automated CheckMK backup to cloud storage via rclone.
 **Quick Start**:
 
 ```bash
-cd /opt/checkmk-tools/script-tools/full
+cd /opt/checkmk-tools/script-tools/full/backup_restore
 python3 checkmk_rclone_space_dyn.py setup
 ```
 
@@ -714,8 +802,9 @@ GPL-2.0-only — see [LICENSE](LICENSE) for details.
 | ---------- | -------------- | ----------- |
 | NethServer 7 | 20 | CentOS 7 based server |
 | NethServer 8 | 14 | Container/Podman based server |
-| NethSecurity 8 | 13 | OpenWrt-based firewall |
-| Ubuntu/Linux | 8 | Generic Debian/Ubuntu |
+| NethSecurity 8 | 10 | OpenWrt-based firewall |
+| Ubuntu/Linux | 10 | Generic Debian/Ubuntu |
 | Proxmox VE | 10 | Virtualization platform |
 | tmate Server | 1 | SSH session sharing |
+| CheckMK Server-Side | 4 | Host connectivity, VPN tunnels (run on the CheckMK server) |
 | Windows | - | PowerShell scripts |
