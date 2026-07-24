@@ -117,20 +117,25 @@ function Stop-And-Remove-Task {
 
 function Add-DefenderExclusion {
   Write-Log "Configurazione esclusioni Windows Defender..." "INFO"
-  
+
   try {
+    # Add exclusion for temp extraction dir (Defender can quarantine frpc.exe
+    # here during Expand-Archive, before it's even copied to $InstallPath)
+    Add-MpPreference -ExclusionPath $TempDir -ErrorAction Stop
+    Write-Log "Esclusione temp aggiunta: $TempDir" "OK"
+
     # Add exclusion for directory
     Add-MpPreference -ExclusionPath $InstallPath -ErrorAction Stop
     Write-Log "Esclusione path aggiunta: $InstallPath" "OK"
-    
+
     # Add exclusion for executable
     Add-MpPreference -ExclusionPath $FrpcExePath -ErrorAction Stop
     Write-Log "Esclusione exe aggiunta: $FrpcExePath" "OK"
-    
+
     # Add exclusion for process
     Add-MpPreference -ExclusionProcess "frpc.exe" -ErrorAction Stop
     Write-Log "Esclusione processo aggiunta: frpc.exe" "OK"
-    
+
     # CRITICAL: frpc-specific ThreatID Whitelist (Trojan:Win32/Kepavll!rfn)
     try {
       Add-MpPreference -ThreatIDDefaultAction_Ids 2147939874 -ThreatIDDefaultAction_Actions Allow -Force -ErrorAction Stop
@@ -138,11 +143,15 @@ function Add-DefenderExclusion {
     } catch {
       Write-Log "Impossibile whitelist ThreatID: $($_.Exception.Message)" "WARN"
     }
-    
+
     return $true
   } catch {
     Write-Log "Impossibile configurare esclusioni Defender: $($_.Exception.Message)" "WARN"
-    Write-Log "Aggiungi manualmente con: Add-MpPreference -ExclusionPath '$InstallPath'" "WARN"
+    Write-Log "Se l'errore e' 0x800106ba, Tamper Protection e' probabilmente ATTIVA:" "WARN"
+    Write-Log "  Impostazioni > Privacy e sicurezza > Sicurezza di Windows >" "INFO"
+    Write-Log "  Protezione da virus e minacce > Gestisci impostazioni >" "INFO"
+    Write-Log "  disattiva 'Protezione da manomissione', poi rilancia lo script." "INFO"
+    Write-Log "In alternativa aggiungi manualmente: Add-MpPreference -ExclusionPath '$InstallPath'" "WARN"
     return $false
   }
 }
@@ -213,7 +222,17 @@ function Install-Frpc {
     New-Item -Path $InstallPath -ItemType Directory -Force | Out-Null
   }
 
-  Copy-Item -Path $frpc.FullName -Destination $FrpcExePath -Force
+  try {
+    Copy-Item -Path $frpc.FullName -Destination $FrpcExePath -Force -ErrorAction Stop
+  } catch {
+    Write-Log "" "ERROR"
+    Write-Log "Copia di frpc.exe negata: Defender ha probabilmente messo in quarantena" "ERROR"
+    Write-Log "il file appena estratto (falso positivo Trojan:Win32/Kepavll!rfn)." "ERROR"
+    Write-Log "Verifica: Sicurezza di Windows > Protezione da virus e minacce >" "WARN"
+    Write-Log "Cronologia protezione. Se presente, clicca 'Consenti/Ripristina'," "INFO"
+    Write-Log "poi rilancia questo script." "INFO"
+    throw "Accesso negato a frpc.exe (probabile quarantena Defender): $($_.Exception.Message)"
+  }
   Write-Log "frpc.exe copiato, attendo verifica Defender..." "INFO"
   
   # Wait for Defender to analyze the file
