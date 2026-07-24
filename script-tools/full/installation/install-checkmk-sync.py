@@ -919,8 +919,11 @@ WantedBy=timers.target"""
 
 
 
-def install_agent_sync_systemd(server_url: str, site: str) -> None:
-    """Install checkmk-agent-sync as systemd service + timer (verify-only by default)."""
+def install_agent_sync_systemd(server_url: str, site: str, enable_install: bool = False) -> None:
+    """Install checkmk-agent-sync as systemd service + timer (verify-only by default).
+
+    enable_install=True adds --install to the ExecStart line, so the timer
+    actually upgrades the agent instead of only reporting drift."""
     # Create env directory and env file
     AGENT_SYNC_ENV_DIR.mkdir(parents=True, exist_ok=True)
     env_content = (
@@ -936,12 +939,20 @@ def install_agent_sync_systemd(server_url: str, site: str) -> None:
     svc_path = SYSTEMD_DIR / AGENT_SYNC_SERVICE_NAME
     timer_path = SYSTEMD_DIR / AGENT_SYNC_TIMER_NAME
 
-    write_text(svc_path, _AGENT_SYNC_SERVICE_TPL)
+    service_content = _AGENT_SYNC_SERVICE_TPL
+    if enable_install:
+        service_content = service_content.replace(
+            "--target auto   --verbose",
+            "--target auto   --install   --verbose",
+        )
+
+    write_text(svc_path, service_content)
     write_text(timer_path, _AGENT_SYNC_TIMER_TPL)
 
     run(["systemctl", "daemon-reload"])
     run(["systemctl", "enable", "--now", AGENT_SYNC_TIMER_NAME])
-    print(f"[OK] {AGENT_SYNC_TIMER_NAME} attivo (verifica agente ogni giorno alle 03:00 UTC)")
+    mode = "INSTALL (aggiornamento reale)" if enable_install else "VERIFY_ONLY (solo verifica)"
+    print(f"[OK] {AGENT_SYNC_TIMER_NAME} attivo (verifica agente ogni giorno alle 03:00 UTC, modalita': {mode})")
     print(f"     Env:    {AGENT_SYNC_ENV_FILE}")
     print(f"     Status: systemctl status {AGENT_SYNC_TIMER_NAME}")
 
@@ -1352,6 +1363,9 @@ def parse_args() -> argparse.Namespace:
                    help="URL server CheckMK per agent-sync (default: https://monitor.nethlab.it)")
     p.add_argument("--checkmk-site", default="monitoring",
                    help="Nome sito CheckMK per agent-sync (default: monitoring)")
+    p.add_argument("--agent-sync-install", action="store_true",
+                   help="Abilita l'aggiornamento reale dell'agente nel timer checkmk-agent-sync "
+                        "(aggiunge --install all'ExecStart, invece del default verify-only)")
     p.add_argument("--no-verify-ssl", action="store_true",
                    help="Disabilita verifica certificato SSL (utile per HTTPS con cert self-signed)")
 
@@ -1540,7 +1554,7 @@ def main() -> int:
         print("[INFO] STEP 3 saltato (--skip-agent-sync)")
     elif use_systemd:
         try:
-            install_agent_sync_systemd(args.checkmk_server_url, args.checkmk_site)
+            install_agent_sync_systemd(args.checkmk_server_url, args.checkmk_site, args.agent_sync_install)
         except Exception as exc:
             print(f"[WARN] STEP 3 (agent sync) fallito: {exc}", file=sys.stderr)
             print("[WARN] Il sistema continuera' senza agent-sync timer. Puoi installarlo manualmente.", file=sys.stderr)
