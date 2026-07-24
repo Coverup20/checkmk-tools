@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""check_stunnel_agent_tls.py - CheckMK Local Check + self-remediation for
-Agent TLS wrapping via Stunnel.
+"""check_stunnel_agent_tls_proxmox.py - CheckMK Local Check + self-remediation
+for Agent TLS wrapping via Stunnel, on Proxmox VE (Debian-based, apt).
 
 Verifies that the classic CheckMK plain-TCP agent (port 6556) is not
 reachable in clear text: the real agent socket must be rebound to
 127.0.0.1:6555 and a local Stunnel instance must terminate TLS on
 0.0.0.0:6556 in front of it. If the host is not yet compliant, configures
-it (install stunnel, rebind the socket, generate a cert if needed, start
-the tunnel) and re-verifies. Idempotent and safe to run every check cycle:
-already-compliant hosts do nothing beyond a handful of read-only checks.
+it (apt-get install stunnel4, rebind the socket, generate a cert if
+needed, start the tunnel) and re-verifies. Idempotent and safe to run
+every check cycle: already-compliant hosts do nothing beyond a handful of
+read-only checks.
 
 Compatible with CheckMK local check format (always exits 0, encodes the
 result as "<status> <SERVICE> - message").
@@ -99,39 +100,28 @@ def run_command(cmd: list, timeout: int = 15) -> Tuple[int, str, str]:
         return 1, "", str(exc)
 
 
-def detect_stunnel_service_name() -> Optional[str]:
-    """Return the systemd unit name that should run stunnel, or None if
-    stunnel is not installed."""
-    if not shutil.which("stunnel") and not shutil.which("stunnel3"):
-        return None
-
-    for candidate in ("stunnel4", "stunnel"):
-        code, out, _ = run_command(["systemctl", "list-unit-files", f"{candidate}.service"])
-        if code == 0 and candidate in out:
-            return candidate
-
-    if AGENT_SOCKET_UNIT.exists():
-        # A custom unit may already have been deployed by a previous run.
-        code, _, _ = run_command(["systemctl", "list-unit-files", CUSTOM_STUNNEL_SERVICE])
-        if code == 0:
-            return CUSTOM_STUNNEL_SERVICE.replace(".service", "")
-
-    return None
+def is_stunnel_installed() -> bool:
+    return bool(shutil.which("stunnel") or shutil.which("stunnel3"))
 
 
-def detect_package_manager() -> Optional[str]:
-    for mgr in ("apt-get", "dnf", "yum"):
-        if shutil.which(mgr):
-            return mgr
-    return None
+def stunnel_service_name() -> str:
+    """We always run our own dedicated unit rather than Debian's native
+    stunnel4 service: stunnel4 reads every *.conf under /etc/stunnel/ via
+    /etc/default/stunnel4's FILES glob, which would also pick up our file,
+    but relying on that distro-specific default is one more thing that can
+    silently change - a dedicated unit that explicitly names our config is
+    simpler to reason about and keeps this script's behavior identical to
+    its RHEL-family siblings (check_stunnel_agent_tls_ns7/ns8.py)."""
+    return CUSTOM_STUNNEL_SERVICE.replace(".service", "")
 
 
-def install_stunnel(pkg_mgr: str) -> bool:
-    if pkg_mgr == "apt-get":
-        run_command(["apt-get", "update", "-y"], timeout=60)
-        code, _, _ = run_command(["apt-get", "install", "-y", "stunnel4"], timeout=120)
-    else:
-        code, _, _ = run_command([pkg_mgr, "install", "-y", "stunnel"], timeout=120)
+def install_stunnel() -> bool:
+    run_command(["apt-get", "update", "-y"], timeout=60)
+    code, _, _ = run_command(["apt-get", "install", "-y", "stunnel4"], timeout=120)
+    # The stunnel4 package registers its own systemd unit - stop/disable it
+    # so it can never race our dedicated unit over the same config/port.
+    run_command(["systemctl", "stop", "stunnel4"])
+    run_command(["systemctl", "disable", "stunnel4"])
     return code == 0
 
 
@@ -160,11 +150,6 @@ def is_stunnel_conf_correct() -> bool:
     )
 
 
-def is_unit_active(unit: str) -> bool:
-    code, out, _ = run_command(["systemctl", "is-active", unit])
-    return code == 0 and out.strip() == "active"
-
-
 def is_port_listening(port: int, host: str = "127.0.0.1", timeout: float = 1.5) -> bool:
     """Real TCP connectivity probe. systemd can report a socket unit as
     "active (listening)" even after it has silently lost its listening file
@@ -190,12 +175,10 @@ def is_compliant() -> Tuple[bool, str]:
         return False, "stunnel certificate missing"
     if not is_stunnel_conf_correct():
         return False, "stunnel.conf missing or misconfigured"
-
-    stunnel_service = detect_stunnel_service_name()
-    if not stunnel_service:
+    if not is_stunnel_installed():
         return False, "stunnel not installed"
     if not is_port_listening(6556):
-        return False, f"{stunnel_service} not actually listening on {TLS_PUBLIC_PORT}"
+        return False, f"{stunnel_service_name()} not actually listening on {TLS_PUBLIC_PORT}"
 
     return True, "compliant"
 
@@ -235,54 +218,34 @@ def generate_certificate() -> None:
         pass
 
 
-def configure_stunnel(service_name: str) -> str:
+def configure_stunnel() -> None:
     STUNNEL_CONF_DIR.mkdir(parents=True, exist_ok=True)
     CONF_FILE.write_text(_STUNNEL_CONF_TEMPLATE)
 
-    code, out, _ = run_command(["systemctl", "list-unit-files", f"{service_name}.service"])
-    has_unit = code == 0 and service_name in out
-
-    if not has_unit:
-        SYSTEMD_DIR.joinpath(CUSTOM_STUNNEL_SERVICE).write_text(_CUSTOM_STUNNEL_SERVICE_CONTENT)
-        service_name = CUSTOM_STUNNEL_SERVICE.replace(".service", "")
-        run_command(["systemctl", "daemon-reload"])
-    elif service_name == "stunnel4":
-        default_file = Path("/etc/default/stunnel4")
-        if default_file.is_file():
-            try:
-                content = default_file.read_text()
-                if "ENABLED=0" in content:
-                    default_file.write_text(content.replace("ENABLED=0", "ENABLED=1"))
-            except OSError:
-                pass
-
+    service = stunnel_service_name()
+    SYSTEMD_DIR.joinpath(CUSTOM_STUNNEL_SERVICE).write_text(_CUSTOM_STUNNEL_SERVICE_CONTENT)
     run_command(["systemctl", "daemon-reload"])
-    run_command(["systemctl", "reset-failed", service_name])
-    run_command(["systemctl", "enable", service_name])
+    run_command(["systemctl", "reset-failed", service])
+    run_command(["systemctl", "enable", service])
     # restart (not "enable --now"): stunnel.conf may have changed while the
     # service was already running, and it will not pick up the new config
     # without an explicit restart.
-    run_command(["systemctl", "restart", service_name])
-    return service_name
+    run_command(["systemctl", "restart", service])
 
 
 def remediate() -> Optional[str]:
     """Attempt to bring the host into compliance. Returns an error message
     if remediation could not even be attempted, None otherwise (the caller
     re-checks compliance afterwards regardless of this return value)."""
-    pkg_mgr = detect_package_manager()
-    stunnel_service = detect_stunnel_service_name()
-
-    if not stunnel_service:
-        if not pkg_mgr:
-            return "no supported package manager (apt-get/dnf/yum) found"
-        if not install_stunnel(pkg_mgr):
-            return "stunnel package installation failed"
-        stunnel_service = "stunnel4" if pkg_mgr == "apt-get" else "stunnel"
+    if not is_stunnel_installed():
+        if not shutil.which("apt-get"):
+            return "apt-get not found (not a Debian-based Proxmox VE system?)"
+        if not install_stunnel():
+            return "stunnel4 package installation failed"
 
     configure_agent_socket()
     generate_certificate()
-    configure_stunnel(stunnel_service)
+    configure_stunnel()
     return None
 
 
