@@ -4,8 +4,10 @@ Documentation=https://github.com/nethesis/checkmk-tools
 Requires=checkmk-agent-sync.service
 
 [Timer]
-# Run daily at 03:00 AM UTC
-OnCalendar=*-*-* 03:00:00 UTC
+# Run daily at 03:00 AM local time (no explicit timezone: the "UTC" calendar
+# suffix requires systemd >= 233 and fails to parse on systemd 219, e.g.
+# CentOS 7 / NethServer 7 hosts, leaving the timer unit unloaded entirely)
+OnCalendar=*-*-* 03:00:00
 
 # Randomize by up to 5 minutes to avoid thundering herd
 RandomizedDelaySec=5min
