@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 """sync-python-full-checks.py - Synchronize and deploy Python local checks
 
-Copy Python checks from script-check-*/full/*.py
-to /usr/lib/check_mk_agent/local/ (without .py extension).
+Copy Python checks from category_dir/full/*.py to /usr/lib/check_mk_agent/local/
+(without .py extension). Category directories are an explicit allowlist
+(KNOWN_CATEGORIES below), not a glob pattern - a directory not in that list
+(e.g. script-notify-checkmk, manually-deployed notification scripts) is never
+touched by this tool, regardless of its name.
 
 Used by install-checkmk-sync.py as STEP 2.
 
 Topics:
   --repo Path local repository (default: /opt/checkmk-tools)
   --target Local checks target directory (default: /usr/lib/check_mk_agent/local)
-  --category Specify script-check-* category, or a comma-separated list of
-                   categories declaring the COMPLETE set for this host
-                   (enables orphan cleanup, same as auto-detect) (default: auto-detect)
-  --all-categories Sync all categories script-check-*
+  --category Specify one category from KNOWN_CATEGORIES, or a comma-separated
+                   list declaring the COMPLETE set for this host (enables
+                   orphan cleanup, same as auto-detect) (default: auto-detect)
+  --all-categories Sync every category in KNOWN_CATEGORIES
   --scripts Specific script names to deploy, separated by commas
                    Ex: check_fail2ban_status,check_disk_space
   --temp-dir Deploy to temp directory instead of --target
@@ -20,7 +23,7 @@ Topics:
   --exclude-file File with script names to exclude (one per line)
                    Default: /etc/checkmk-python-full-sync.exclude
 
-Version: 1.4.0"""
+Version: 1.5.0"""
 
 import argparse
 import os
@@ -30,12 +33,29 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Set, Tuple
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 TEMP_DIR_DEFAULT = "/tmp/checkmk-sync-preview"
 
 REPO_DEFAULT = Path("/opt/checkmk-tools")
 TARGET_DEFAULT = "/usr/lib/check_mk_agent/local"
 EXCLUDE_FILE_DEFAULT = "/etc/checkmk-python-full-sync.exclude"
+
+# Explicit allowlist of category directories this tool will ever touch - no
+# glob pattern anywhere. A directory not in this list (e.g. script-notify-checkmk,
+# which holds manually-deployed notification scripts, never auto-synced) is
+# invisible to auto-detect, --all-categories, and orphan cleanup, regardless
+# of its name or whether it happens to match "script-check-*".
+KNOWN_CATEGORIES = [
+    "script-check-ns7",
+    "script-check-ns8",
+    "script-check-nsec8",
+    "script-check-proxmox",
+    "script-check-tmate-server",
+    "script-check-ubuntu",
+    "script-check-windows",
+    "script-checkmk",
+    "script-checkmk-us",
+]
 
 
 # ─── Utilities ────────────────────────────────────────────────────────────────
@@ -77,7 +97,7 @@ def load_exclude_list(exclude_file: Path) -> Set[str]:
 
 
 def detect_host_categories() -> List[str]:
-    """Detect which script-check-* categories actually apply to this host.
+    """Detect which KNOWN_CATEGORIES actually apply to this host.
 
     Unlike a plain OS/distro guess, this picks exactly one base category
     (the host is never simultaneously NethServer 7 and Ubuntu) plus zero or
@@ -113,10 +133,9 @@ def detect_host_categories() -> List[str]:
 
 
 def get_categories(repo: Path, category: str, all_categories: bool) -> List[Path]:
-    """Returns list of script-check-* directories to process."""
+    """Returns list of category directories to process."""
     if all_categories:
-        cats = sorted(repo.glob("script-check-*/"))
-        return [c for c in cats if c.is_dir()]
+        return [repo / name for name in KNOWN_CATEGORIES if (repo / name).is_dir()]
 
     if category and category != "auto":
         # Comma-separated list: caller is declaring the COMPLETE set of
@@ -125,6 +144,9 @@ def get_categories(repo: Path, category: str, all_categories: bool) -> List[Path
         names = [c.strip() for c in category.split(",") if c.strip()]
         cat_paths = []
         for name in names:
+            if name not in KNOWN_CATEGORIES:
+                print(f"[ERROR] Categoria non ammessa (non in KNOWN_CATEGORIES): {name}", file=sys.stderr)
+                sys.exit(1)
             cat_path = repo / name
             if not cat_path.is_dir():
                 print(f"[ERROR] Categoria non trovata: {cat_path}", file=sys.stderr)
@@ -167,24 +189,10 @@ def find_launchers(category_dir: Path,
     return launchers
 
 
-# Categories that don't match the "script-check-*" glob (no hyphen after
-# "check") but are still legitimate, explicitly-deployed categories - without
-# these, list_all_launchers() can't recognize their files as "known", so
-# remove_orphans() silently leaves behind stale files from them forever
-# (e.g. check_vpn_tunnels lingering after being moved out of script-checkmk).
-EXTRA_CATEGORY_NAMES = ["script-checkmk", "script-checkmk-us"]
-
-
 def all_category_dirs(repo: Path) -> List[Path]:
-    """Every known category directory in the repo: script-check-* plus the
-    non-matching EXTRA_CATEGORY_NAMES."""
-    cats = sorted(repo.glob("script-check-*/"))
-    cats = [c for c in cats if c.is_dir()]
-    for name in EXTRA_CATEGORY_NAMES:
-        extra = repo / name
-        if extra.is_dir():
-            cats.append(extra)
-    return cats
+    """Every category directory this tool recognizes - strictly the
+    KNOWN_CATEGORIES allowlist, nothing discovered via pattern matching."""
+    return [repo / name for name in KNOWN_CATEGORIES if (repo / name).is_dir()]
 
 
 def list_all_launchers(repo: Path) -> List[Path]:
@@ -211,7 +219,7 @@ def sync_category(category_dir: Path, target_dir: Path,
     """Sync launchers in a category.
 
     Args:
-        category_dir: Directory script-check-*
+        category_dir: One of the KNOWN_CATEGORIES directories
         target_dir: Deployment target (real or temp)
         scripts_filter: If specified, deploy only scripts in the set
         exclude_set: If specified, skip scripts whose stem is in this set
@@ -285,7 +293,7 @@ def remove_orphans(repo: Path, target_dir: Path, deployed_stems: Set[str],
     sync (e.g. the auto-detect bug that used to deploy every category).
 
     Only removes a file if its name matches a KNOWN check stem from ANY
-    script-check-* category in the repo - files unrelated to this sync tool
+    KNOWN_CATEGORIES category - files unrelated to this sync tool
     are never touched. Anything in exclude_set is also left alone.
     """
     known_stems = {deploy_name(l) for l in list_all_launchers(repo)}
@@ -416,7 +424,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--target", default=TARGET_DEFAULT,
                    help=f"Directory destinazione (default: {TARGET_DEFAULT})")
     p.add_argument("--category", default="auto",
-                   help="Categoria script-check-*, 'auto', oppure una lista separata da "
+                   help="Categoria da KNOWN_CATEGORIES, 'auto', oppure una lista separata da "
                         "virgole che dichiara l'insieme completo di categorie per l'host "
                         "(abilita la pulizia orfani, come auto-detect)")
     p.add_argument("--all-categories", action="store_true",
