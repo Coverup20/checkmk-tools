@@ -250,6 +250,33 @@ def sync_category(category_dir: Path, target_dir: Path,
     return deployed, updated, skipped, excluded
 
 
+def remove_orphans(repo: Path, target_dir: Path, deployed_stems: Set[str],
+                    exclude_set: Set[str]) -> int:
+    """Remove stale local checks left behind by a previous, wrongly-broad
+    sync (e.g. the auto-detect bug that used to deploy every category).
+
+    Only removes a file if its name matches a KNOWN check stem from ANY
+    script-check-* category in the repo - files unrelated to this sync tool
+    are never touched. Anything in exclude_set is also left alone.
+    """
+    known_stems = {deploy_name(l) for l in list_all_launchers(repo)}
+    removed = 0
+    for entry in sorted(target_dir.iterdir()):
+        if not entry.is_file():
+            continue
+        if entry.name in deployed_stems or entry.name in exclude_set:
+            continue
+        if entry.name not in known_stems:
+            continue
+        try:
+            entry.unlink()
+            print(f"  [REMOVED] {entry.name} (categoria non pertinente a questo host)")
+            removed += 1
+        except OSError as e:
+            print(f"  [WARN] Impossibile rimuovere {entry.name}: {e}")
+    return removed
+
+
 def run(repo: Path, target_dir: Path, category: str, all_categories: bool,
         scripts_filter: Optional[Set[str]] = None,
         temp_dir: Optional[Path] = None,
@@ -305,9 +332,11 @@ def run(repo: Path, target_dir: Path, category: str, all_categories: bool,
     total_updated = 0
     total_skipped = 0
     total_excluded = 0
+    current_stems: Set[str] = set()
 
     for cat_dir in categories:
         cat_name = cat_dir.name
+        current_stems.update(deploy_name(l) for l in find_launchers(cat_dir, scripts_filter))
         d, u, s, e = sync_category(cat_dir, effective_target, scripts_filter, exclude_set)
         total_deployed += d
         total_updated += u
@@ -316,11 +345,18 @@ def run(repo: Path, target_dir: Path, category: str, all_categories: bool,
         if d > 0 or u > 0:
             print()  # separatore visivo tra categorie con output
 
+    # Cleanup: only for a real (non-preview) auto-detect run - explicit
+    # --category/--all-categories/--scripts selections are left as-is, since
+    # those are deliberately partial/additive by the caller.
+    total_removed = 0
+    if not is_temp and not scripts_filter and not all_categories and category == "auto":
+        total_removed = remove_orphans(repo, effective_target, current_stems, exclude_set)
+
     print("─" * 40)
     if is_temp:
         print(f"[OK] Anteprima in: {effective_target}")
         print(f"     Per deployare davvero: cp {effective_target}/* {target_dir}/")
-    print(f"[OK] Riepilogo: {total_deployed} deployati, {total_updated} aggiornati, {total_skipped} invariati, {total_excluded} esclusi")
+    print(f"[OK] Riepilogo: {total_deployed} deployati, {total_updated} aggiornati, {total_skipped} invariati, {total_excluded} esclusi, {total_removed} rimossi")
     return 0
 
 
