@@ -2,9 +2,9 @@
 """install-checkmk-sync.py - CheckMK unified installer
 
 Execute in sequence:
-  STEP A  → CheckMK Agent install (download from CMK server, TCP 6556)
-              + cmk-agent-ctl native plain pull (allow_legacy_pull + ip_allowlist,
-                no TLS/stunnel - IP autorizzato chiesto interattivamente)
+  STEP A  → CheckMK Agent install (download from CMK server) + classic plain
+              TCP socket bound to 127.0.0.1:6556 only (no cmk-agent-ctl, no
+              TLS, no IP allowlist - reachable only via the local frpc tunnel)
               + optional FRPC (tunnel to FRP server)
   STEP 1  → auto-git-sync (automatic git pull every N seconds)
   STEP 2  → checkmk-python-full-sync (deploy check Python every 5 minutes)
@@ -36,7 +36,7 @@ import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "2.3.0"
+VERSION = "2.4.0"
 
 # Global SSL verify flag (set to False via --no-verify-ssl)
 SSL_VERIFY = True
@@ -50,19 +50,14 @@ LOCAL_TARGET_DEFAULT = "/usr/lib/check_mk_agent/local"
 
 # CheckMK Agent
 CHECKMK_BASE_URL_DEFAULT = os.environ.get("CMK_AGENTS_URL", "https://monitor.nethlab.it/monitoring/check_mk/agents")
-
-# cmk-agent-ctl native plain pull (allow_legacy_pull + ip_allowlist, no TLS/stunnel)
-CMK_AGENT_DIR = Path("/var/lib/cmk-agent")
-CMK_AGENT_CTL_TOML = CMK_AGENT_DIR / "cmk-agent-ctl.toml"
-CMK_AGENT_ALLOW_LEGACY_PULL = CMK_AGENT_DIR / "allow-legacy-pull"
-CMK_AGENT_SOCKET_NAME = "check-mk-agent.socket"
-CMK_AGENT_CTL_DAEMON_NAME = "cmk-agent-ctl-daemon.service"
-DEFAULT_ALLOWED_IP = "127.0.0.1"
-# Legacy units possibly left over from older stunnel-based setups - always cleaned up
+AGENT_PLAIN_SOCKET_NAME = "check-mk-agent-plain.socket"
+AGENT_PLAIN_SERVICE_NAME = "check-mk-agent-plain@.service"
+# Legacy/cmk-agent-ctl units possibly left over from a previous install - always cleaned up
 LEGACY_UNITS_TO_DISABLE = (
     "stunnel-checkmk", "stunnel4",
-    "check-mk-agent-plain.socket", "check-mk-agent-plain@.service",
+    "check-mk-agent.socket", "cmk-agent-ctl-daemon.service",
 )
+CMK_AGENT_DIR = Path("/var/lib/cmk-agent")
 
 # FRPC
 FRP_VERSION_DEFAULT = "0.64.0"
@@ -384,6 +379,26 @@ def install_agent(base_url: str, os_info: Dict[str, str]) -> None:
 
 # agent – socket configuration ─────────────────────── ───────────────────────
 
+_AGENT_SOCKET_UNIT = """\
+[Unit]
+Description=Checkmk Agent (TCP 6556 plain)
+Documentation=https://docs.checkmk.com/
+
+[Socket]
+ListenStream=127.0.0.1:6556
+Accept=yes
+
+[Install]
+WantedBy=sockets.target"""
+
+_AGENT_SERVICE_UNIT = """\
+[Unit]
+Description=Checkmk Agent (TCP 6556 plain) connection
+
+[Service]
+ExecStart=-/usr/bin/check_mk_agent
+StandardInput=socket"""
+
 _AGENT_OPENWRT_INITD = """\
 #!/bin/sh /etc/rc.common
 START=98
@@ -394,7 +409,7 @@ PROG=/usr/bin/check_mk_agent
 
 start_service() {
     procd_open_instance
-    procd_set_param command socat TCP-LISTEN:6556,reuseaddr,fork,keepalive EXEC:$PROG
+    procd_set_param command socat TCP-LISTEN:6556,bind=127.0.0.1,reuseaddr,fork,keepalive EXEC:$PROG
     procd_set_param respawn
     procd_set_param stdout 1
     procd_set_param stderr 1
@@ -406,51 +421,43 @@ stop_service() {
 }"""
 
 
-def configure_agent_plain_pull(allowed_ip: str) -> None:
-    """Configure the agent's own cmk-agent-ctl for native plain-text pull,
-    restricted to allowed_ip via ip_allowlist - no TLS, no stunnel, no custom
-    socket unit. This is the fleet-wide standard as of 2026-07-27: port 6556
-    stays open to plain connections only from allowed_ip (typically 127.0.0.1
-    when reached through an frpc tunnel)."""
-    run_capture(["cmk-agent-ctl", "delete-all"])
-
-    CMK_AGENT_DIR.mkdir(parents=True, exist_ok=True)
-    CMK_AGENT_ALLOW_LEGACY_PULL.touch(exist_ok=True)
-    run_capture(["chown", "cmk-agent:cmk-agent", str(CMK_AGENT_ALLOW_LEGACY_PULL)])
-
-    write_text(CMK_AGENT_CTL_TOML, f'allowed_ip = ["{allowed_ip}"]\n')
-    run_capture(["chown", "cmk-agent:cmk-agent", str(CMK_AGENT_CTL_TOML)])
-    CMK_AGENT_CTL_TOML.chmod(0o640)
-
-    # Clean up any leftover stunnel/custom-socket setup from older installs
+def configure_agent_systemd() -> None:
+    """Configure the classic agent on a plain TCP socket, bound to 127.0.0.1
+    only (not 0.0.0.0) - reachable exclusively via the local frpc tunnel, not
+    directly from the host's LAN. No cmk-agent-ctl, no TLS, no IP allowlist:
+    the classic check_mk_agent binary piped through a systemd socket, exactly
+    as before the 2026-07 cmk-agent-ctl experiment, with the loopback bind now
+    doing the job the ip_allowlist used to do."""
     for unit in LEGACY_UNITS_TO_DISABLE:
         run_capture(["systemctl", "stop", unit])
         run_capture(["systemctl", "disable", unit])
+    if CMK_AGENT_DIR.is_dir():
+        shutil.rmtree(str(CMK_AGENT_DIR), ignore_errors=True)
 
-    run(["systemctl", "enable", "--now", CMK_AGENT_SOCKET_NAME])
-    run(["systemctl", "enable", "--now", CMK_AGENT_CTL_DAEMON_NAME])
-    # Restart explicitly: enable --now is a no-op if the units were already
-    # active under a stale/conflicting config (e.g. port still held by stunnel).
-    run_capture(["systemctl", "restart", CMK_AGENT_SOCKET_NAME])
-    run_capture(["systemctl", "restart", CMK_AGENT_CTL_DAEMON_NAME])
-    print(f"[OK] cmk-agent-ctl in modalita' plain pull nativa (porta 6556, allowed_ip=\"{allowed_ip}\")")
+    write_text(SYSTEMD_DIR / AGENT_PLAIN_SOCKET_NAME, _AGENT_SOCKET_UNIT)
+    write_text(SYSTEMD_DIR / AGENT_PLAIN_SERVICE_NAME, _AGENT_SERVICE_UNIT)
+
+    run(["systemctl", "daemon-reload"])
+    run(["systemctl", "enable", "--now", AGENT_PLAIN_SOCKET_NAME])
+    run_capture(["systemctl", "restart", AGENT_PLAIN_SOCKET_NAME])
+    print("[OK] Socket check-mk-agent-plain.socket attivo (127.0.0.1:6556)")
 
 
 def configure_agent_openwrt() -> None:
-    """Configure agent via procd + socat on OpenWrt."""
+    """Configure agent via procd + socat on OpenWrt, bound to 127.0.0.1."""
     initd = Path("/etc/init.d/check_mk_agent")
     write_text(initd, _AGENT_OPENWRT_INITD)
     initd.chmod(0o755)
     run_capture([str(initd), "enable"])
     run_capture([str(initd), "restart"])
-    print("[OK] Agente avviato via procd + socat (porta 6556)")
+    print("[OK] Agente avviato via procd + socat (127.0.0.1:6556)")
 
 
-def configure_agent(os_info: Dict[str, str], allowed_ip: str) -> None:
+def configure_agent(os_info: Dict[str, str]) -> None:
     if os_info["pkg_type"] == "openwrt":
         configure_agent_openwrt()
     else:
-        configure_agent_plain_pull(allowed_ip)
+        configure_agent_systemd()
 
 
 # agente – uninstall ──────────────────────────────────────────────────────────
@@ -466,12 +473,12 @@ def uninstall_agent(os_info: Dict[str, str]) -> None:
         unlink_safe(Path("/usr/bin/check_mk_agent"))
         shutil.rmtree("/etc/check_mk", ignore_errors=True)
     else:
-        run_capture(["systemctl", "stop", CMK_AGENT_CTL_DAEMON_NAME])
-        run_capture(["systemctl", "stop", CMK_AGENT_SOCKET_NAME])
-        run_capture(["systemctl", "disable", CMK_AGENT_CTL_DAEMON_NAME])
-        run_capture(["systemctl", "disable", CMK_AGENT_SOCKET_NAME])
-        run_capture(["cmk-agent-ctl", "delete-all"])
-        shutil.rmtree(str(CMK_AGENT_DIR), ignore_errors=True)
+        run_capture(["systemctl", "stop", AGENT_PLAIN_SOCKET_NAME])
+        run_capture(["systemctl", "disable", AGENT_PLAIN_SOCKET_NAME])
+        unlink_safe((SYSTEMD_DIR / AGENT_PLAIN_SOCKET_NAME))
+        unlink_safe((SYSTEMD_DIR / AGENT_PLAIN_SERVICE_NAME))
+        if CMK_AGENT_DIR.is_dir():
+            shutil.rmtree(str(CMK_AGENT_DIR), ignore_errors=True)
         for unit in LEGACY_UNITS_TO_DISABLE:
             run_capture(["systemctl", "stop", unit])
             run_capture(["systemctl", "disable", unit])
@@ -1118,19 +1125,8 @@ def ask_agent_install() -> bool:
     print()
     print("  STEP A – Installazione CheckMK Agent + FRPC")
     print("  ─────────────────────────────────────────────")
-    ans = _ask("  Installare CheckMK Agent (TCP 6556, plain pull + IP allowlist)? [S/n]: ").strip().lower().replace("\r", "") or "s"
+    ans = _ask("  Installare CheckMK Agent (TCP 6556 plain, 127.0.0.1 only)? [S/n]: ").strip().lower().replace("\r", "") or "s"
     return ans in ("s", "y", "")
-
-
-def ask_allowed_ip() -> str:
-    """Chiede quale IP autorizzare nell'allowlist di cmk-agent-ctl (plain pull)."""
-    print()
-    print("  Configurazione IP allowlist (cmk-agent-ctl, plain pull nativo):")
-    print("  L'agente accettera' connessioni in chiaro sulla 6556 SOLO da questo IP.")
-    print(f"  Usare {DEFAULT_ALLOWED_IP} se il traffico arriva tramite tunnel FRP locale (caso comune),")
-    print("  altrimenti l'IP reale da cui si connette il server CheckMK.")
-    ip = _ask(f"  IP autorizzato [{DEFAULT_ALLOWED_IP}]: ").strip().replace("\r", "") or DEFAULT_ALLOWED_IP
-    return ip
 
 
 def ask_frpc_install() -> bool:
@@ -1393,9 +1389,6 @@ def parse_args() -> argparse.Namespace:
                    help="Salta l'installazione del timer checkmk-agent-sync (STEP 3)")
     p.add_argument("--checkmk-url", default=CHECKMK_BASE_URL_DEFAULT,
                    help=f"URL base agenti CheckMK (default: {CHECKMK_BASE_URL_DEFAULT})")
-    p.add_argument("--allowed-ip", default="",
-                   help=f"IP autorizzato nell'allowlist cmk-agent-ctl per il plain pull "
-                        f"(default: chiesto interattivamente, fallback {DEFAULT_ALLOWED_IP} in --quick)")
     p.add_argument("--checkmk-server-url", default="https://monitor.nethlab.it",
                    help="URL server CheckMK per agent-sync (default: https://monitor.nethlab.it)")
     p.add_argument("--checkmk-site", default="monitoring",
@@ -1497,20 +1490,11 @@ def main() -> int:
 
     if not skip_agent:
         os_info = detect_os_info()
-        if args.allowed_ip:
-            allowed_ip = args.allowed_ip
-        elif args.quick:
-            allowed_ip = DEFAULT_ALLOWED_IP
-        else:
-            allowed_ip = ask_allowed_ip()
         try:
             install_agent(args.checkmk_url, os_info)
-            configure_agent(os_info, allowed_ip)
+            configure_agent(os_info)
             agent_installed = True
-            if os_info["pkg_type"] == "openwrt":
-                print("[OK] CheckMK Agent installato (porta 6556)")
-            else:
-                print(f"[OK] CheckMK Agent installato (porta 6556, plain pull, allowed_ip=\"{allowed_ip}\")")
+            print("[OK] CheckMK Agent installato (127.0.0.1:6556 plain)")
         except Exception as exc:
             print(f"[ERR] Installazione agente fallita: {exc}", file=sys.stderr)
             print("[WARN] Continuando con STEP 1 e STEP 2...", file=sys.stderr)
@@ -1614,7 +1598,7 @@ def main() -> int:
     print()
 
     if agent_installed:
-        print(f"   CheckMK Agent         (porta 6556, plain pull nativo, IP allowlist)")
+        print(f"   CheckMK Agent         (127.0.0.1:6556 plain, agente classico)")
     if frpc_installed:
         print(f"   FRPC                  (tunnel verso server FRP)")
 
@@ -1625,8 +1609,7 @@ def main() -> int:
         print()
         print("  Comandi utili:")
         if agent_installed:
-            print(f"  cmk-agent-ctl status")
-            print(f"  systemctl status {CMK_AGENT_CTL_DAEMON_NAME}")
+            print(f"  systemctl status {AGENT_PLAIN_SOCKET_NAME}")
         if frpc_installed:
             print("  systemctl status frpc")
         print(f"  systemctl status {GIT_SYNC_TIMER_NAME}")
