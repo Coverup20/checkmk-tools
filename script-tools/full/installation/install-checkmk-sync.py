@@ -99,6 +99,15 @@ def run_capture(cmd: List[str], cwd: str = "") -> subprocess.CompletedProcess:
     )
 
 
+def unlink_safe(path: Path) -> None:
+    """Path.unlink(missing_ok=True) equivalent - missing_ok needs Python 3.8+,
+    NethServer 7 hosts still run 3.6."""
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+
+
 def require_root() -> None:
     if os.geteuid() != 0:
         print("[ERROR] Eseguire come root", file=sys.stderr)
@@ -154,7 +163,7 @@ def cron_update(lines_to_keep_filter: str, new_line: str, openwrt: bool = False)
             f.write("\n".join(current) + "\n")
             tmp = f.name
         run(["crontab", tmp])
-        Path(tmp).unlink(missing_ok=True)
+        unlink_safe(Path(tmp))
 
 
 # ─── STEP A: CheckMK Agent + FRPC ─────────────────────────────────────────────
@@ -302,7 +311,7 @@ def install_agent_linux(base_url: str, pkg_type: str, pkg_mgr: str) -> None:
         if not shutil.which("rpm"):
             raise RuntimeError("rpm non trovato")
         run(["rpm", "-Uvh", "--replacepkgs", tmp])
-    Path(tmp).unlink(missing_ok=True)
+    unlink_safe(Path(tmp))
 
 
 def install_agent_openwrt(base_url: str) -> None:
@@ -444,20 +453,20 @@ def uninstall_agent(os_info: Dict[str, str]) -> None:
         initd = Path("/etc/init.d/check_mk_agent")
         run_capture([str(initd), "stop"])
         run_capture([str(initd), "disable"])
-        initd.unlink(missing_ok=True)
-        Path("/usr/bin/check_mk_agent").unlink(missing_ok=True)
+        unlink_safe(initd)
+        unlink_safe(Path("/usr/bin/check_mk_agent"))
         shutil.rmtree("/etc/check_mk", ignore_errors=True)
     else:
         run_capture(["systemctl", "stop", AGENT_PLAIN_SOCKET_NAME])
         run_capture(["systemctl", "disable", AGENT_PLAIN_SOCKET_NAME])
-        (SYSTEMD_DIR / AGENT_PLAIN_SOCKET_NAME).unlink(missing_ok=True)
-        (SYSTEMD_DIR / AGENT_PLAIN_SERVICE_NAME).unlink(missing_ok=True)
+        unlink_safe((SYSTEMD_DIR / AGENT_PLAIN_SOCKET_NAME))
+        unlink_safe((SYSTEMD_DIR / AGENT_PLAIN_SERVICE_NAME))
         run_capture(["systemctl", "daemon-reload"])
         if os_info["pkg_type"] == "deb":
             run_capture(["dpkg", "-r", "check-mk-agent"])
         elif os_info["pkg_type"] == "rpm":
             run_capture(["rpm", "-e", "check-mk-agent"])
-        Path("/usr/bin/check_mk_agent").unlink(missing_ok=True)
+        unlink_safe(Path("/usr/bin/check_mk_agent"))
         shutil.rmtree("/etc/check_mk", ignore_errors=True)
     print("[OK] Agente rimosso")
 
@@ -576,13 +585,13 @@ def uninstall_frpc(os_info: Dict[str, str]) -> None:
         initd = Path("/etc/init.d/frpc")
         run_capture([str(initd), "stop"])
         run_capture([str(initd), "disable"])
-        initd.unlink(missing_ok=True)
+        unlink_safe(initd)
     else:
         run_capture(["systemctl", "stop", "frpc"])
         run_capture(["systemctl", "disable", "frpc"])
-        (SYSTEMD_DIR / "frpc.service").unlink(missing_ok=True)
+        unlink_safe((SYSTEMD_DIR / "frpc.service"))
         run_capture(["systemctl", "daemon-reload"])
-    Path(FRPC_BIN).unlink(missing_ok=True)
+    unlink_safe(Path(FRPC_BIN))
     shutil.rmtree(str(FRPC_CONF_DIR), ignore_errors=True)
     print("[OK] FRPC rimosso")
 
@@ -1064,7 +1073,7 @@ def add_scripts_to_sync(new_scripts_arg: str, use_systemd: bool) -> int:
                 f.write("\n".join(cron_lines) + "\n")
                 tmp = f.name
             run(["crontab", tmp])
-            Path(tmp).unlink(missing_ok=True)
+            unlink_safe(Path(tmp))
         print("[OK] --add-scripts completato. Cron aggiornato.")
 
     return 0

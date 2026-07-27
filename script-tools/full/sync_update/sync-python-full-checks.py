@@ -74,6 +74,42 @@ def load_exclude_list(exclude_file: Path) -> Set[str]:
     return excluded
 
 
+def detect_host_categories() -> List[str]:
+    """Detect which script-check-* categories actually apply to this host.
+
+    Unlike a plain OS/distro guess, this picks exactly one base category
+    (the host is never simultaneously NethServer 7 and Ubuntu) plus zero or
+    more role add-ons (e.g. tmate-server) that can coexist with any base.
+    """
+    categories: List[str] = []
+
+    # Base OS/platform - checked in order of specificity so that e.g. a
+    # Debian-based Proxmox host is not mistaken for plain Ubuntu.
+    if shutil.which("pveversion") or Path("/etc/pve").is_dir():
+        categories.append("script-check-proxmox")
+    elif Path("/etc/openwrt_release").is_file():
+        categories.append("script-check-nsec8")
+    elif Path("/etc/nethserver-release").is_file():
+        # NethServer 7: classic single-file marker, no NS8 module env files.
+        categories.append("script-check-ns7")
+    elif Path("/etc/nethserver/api-server.env").is_file() or Path("/etc/nethserver/core.env").is_file():
+        # NethServer 8: /etc/nethserver exists as a directory of per-module
+        # env files instead of the NS7 single release file.
+        categories.append("script-check-ns8")
+    elif os.name == "nt" or Path("C:/Windows").exists():
+        categories.append("script-check-windows")
+    elif shutil.which("dpkg") or shutil.which("apt-get"):
+        categories.append("script-check-ubuntu")
+    # else: unrecognized base - no category guessed, avoid deploying checks
+    # for a platform we can't confirm.
+
+    # Role add-ons - independent of the base OS above.
+    if shutil.which("tmate-ssh-server"):
+        categories.append("script-check-tmate-server")
+
+    return categories
+
+
 def get_categories(repo: Path, category: str, all_categories: bool) -> List[Path]:
     """Returns list of script-check-* directories to process."""
     if all_categories:
@@ -87,9 +123,23 @@ def get_categories(repo: Path, category: str, all_categories: bool) -> List[Path
             sys.exit(1)
         return [cat_path]
 
-    # Auto-detect: all categories with at least one file in full/
-    cats = sorted(repo.glob("script-check-*/"))
-    return [c for c in cats if c.is_dir() and (c / "full").is_dir()]
+    # Auto-detect: only the categories that actually match this host (base
+    # OS/platform plus any applicable role add-ons), not every category that
+    # happens to exist in the repo.
+    detected = detect_host_categories()
+    if not detected:
+        print("[ERROR] Auto-detect: impossibile determinare la categoria di questo host.", file=sys.stderr)
+        sys.exit(1)
+
+    cats = []
+    for name in detected:
+        cat_path = repo / name
+        if cat_path.is_dir() and (cat_path / "full").is_dir():
+            print(f"[INFO] Auto-detect: categoria {name}")
+            cats.append(cat_path)
+        else:
+            print(f"[WARN] Auto-detect: categoria {name} rilevata ma non trovata nel repo", file=sys.stderr)
+    return cats
 
 
 def find_launchers(category_dir: Path,
