@@ -9,7 +9,9 @@ Used by install-checkmk-sync.py as STEP 2.
 Topics:
   --repo Path local repository (default: /opt/checkmk-tools)
   --target Local checks target directory (default: /usr/lib/check_mk_agent/local)
-  --category Specify script-check-* category (default: auto-detect)
+  --category Specify script-check-* category, or a comma-separated list of
+                   categories declaring the COMPLETE set for this host
+                   (enables orphan cleanup, same as auto-detect) (default: auto-detect)
   --all-categories Sync all categories script-check-*
   --scripts Specific script names to deploy, separated by commas
                    Ex: check_fail2ban_status,check_disk_space
@@ -18,7 +20,7 @@ Topics:
   --exclude-file File with script names to exclude (one per line)
                    Default: /etc/checkmk-python-full-sync.exclude
 
-Version: 1.3.0"""
+Version: 1.4.0"""
 
 import argparse
 import os
@@ -28,7 +30,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Set, Tuple
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 TEMP_DIR_DEFAULT = "/tmp/checkmk-sync-preview"
 
 REPO_DEFAULT = Path("/opt/checkmk-tools")
@@ -117,11 +119,18 @@ def get_categories(repo: Path, category: str, all_categories: bool) -> List[Path
         return [c for c in cats if c.is_dir()]
 
     if category and category != "auto":
-        cat_path = repo / category
-        if not cat_path.is_dir():
-            print(f"[ERROR] Categoria non trovata: {cat_path}", file=sys.stderr)
-            sys.exit(1)
-        return [cat_path]
+        # Comma-separated list: caller is declaring the COMPLETE set of
+        # categories for this host in one invocation (see run()'s cleanup
+        # gate), not just a partial/ad-hoc selection.
+        names = [c.strip() for c in category.split(",") if c.strip()]
+        cat_paths = []
+        for name in names:
+            cat_path = repo / name
+            if not cat_path.is_dir():
+                print(f"[ERROR] Categoria non trovata: {cat_path}", file=sys.stderr)
+                sys.exit(1)
+            cat_paths.append(cat_path)
+        return cat_paths
 
     # Auto-detect: only the categories that actually match this host (base
     # OS/platform plus any applicable role add-ons), not every category that
@@ -158,10 +167,30 @@ def find_launchers(category_dir: Path,
     return launchers
 
 
+# Categories that don't match the "script-check-*" glob (no hyphen after
+# "check") but are still legitimate, explicitly-deployed categories - without
+# these, list_all_launchers() can't recognize their files as "known", so
+# remove_orphans() silently leaves behind stale files from them forever
+# (e.g. check_vpn_tunnels lingering after being moved out of script-checkmk).
+EXTRA_CATEGORY_NAMES = ["script-checkmk", "script-checkmk-us"]
+
+
+def all_category_dirs(repo: Path) -> List[Path]:
+    """Every known category directory in the repo: script-check-* plus the
+    non-matching EXTRA_CATEGORY_NAMES."""
+    cats = sorted(repo.glob("script-check-*/"))
+    cats = [c for c in cats if c.is_dir()]
+    for name in EXTRA_CATEGORY_NAMES:
+        extra = repo / name
+        if extra.is_dir():
+            cats.append(extra)
+    return cats
+
+
 def list_all_launchers(repo: Path) -> List[Path]:
     """Returns all checks available in the repo (all categories)."""
     result = []
-    for cat in sorted(repo.glob("script-check-*/")):
+    for cat in all_category_dirs(repo):
         full_dir = cat / "full"
         if full_dir.is_dir():
             result.extend(sorted(full_dir.glob("*.py")))
@@ -345,11 +374,14 @@ def run(repo: Path, target_dir: Path, category: str, all_categories: bool,
         if d > 0 or u > 0:
             print()  # separatore visivo tra categorie con output
 
-    # Cleanup: only for a real (non-preview) auto-detect run - explicit
-    # --category/--all-categories/--scripts selections are left as-is, since
-    # those are deliberately partial/additive by the caller.
+    # Cleanup: for a real (non-preview) auto-detect run, or an explicit
+    # comma-separated --category list (the caller is declaring the COMPLETE
+    # category set for this host in one invocation, same trust level as
+    # auto-detect). A single bare --category stays additive-only, since that
+    # is commonly used for partial/ad-hoc/testing deploys.
     total_removed = 0
-    if not is_temp and not scripts_filter and not all_categories and category == "auto":
+    is_full_explicit_set = category not in ("auto", "") and "," in category
+    if not is_temp and not scripts_filter and not all_categories and (category == "auto" or is_full_explicit_set):
         total_removed = remove_orphans(repo, effective_target, current_stems, exclude_set)
 
     print("─" * 40)
@@ -384,7 +416,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--target", default=TARGET_DEFAULT,
                    help=f"Directory destinazione (default: {TARGET_DEFAULT})")
     p.add_argument("--category", default="auto",
-                   help="Categoria script-check-* o 'auto'")
+                   help="Categoria script-check-*, 'auto', oppure una lista separata da "
+                        "virgole che dichiara l'insieme completo di categorie per l'host "
+                        "(abilita la pulizia orfani, come auto-detect)")
     p.add_argument("--all-categories", action="store_true",
                    help="Sincronizza tutte le categorie")
     p.add_argument("--scripts",
