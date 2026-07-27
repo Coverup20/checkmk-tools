@@ -3,12 +3,14 @@
 
 Version: 1.0.0"""
 
+import json
 import subprocess
 import sys
 from typing import List, Tuple
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 SERVICE = "NS8.Container.Inventory"
+NODE_AGENT_ENV = "/var/lib/nethserver/node/state/agent.env"
 
 
 def run_command(cmd: List[str], timeout: int = 30) -> Tuple[int, str, str]:
@@ -29,17 +31,41 @@ def run_command(cmd: List[str], timeout: int = 30) -> Tuple[int, str, str]:
         return 1, "", str(exc)
 
 
+def get_local_node_id() -> str:
+    """Reads this node's own ID from NODE_AGENT_ENV (AGENT_ID=node/<id>)."""
+    try:
+        with open(NODE_AGENT_ENV, encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("AGENT_ID=node/"):
+                    return line.strip().split("/", 1)[1]
+    except OSError:
+        pass
+    return ""
+
+
 def get_instances() -> List[str]:
-    code, out, _ = run_command(["runagent", "-l"])
+    """Enumerates module instances actually installed on this node.
+
+    runagent -l only ever lists the cluster/node meta-agents, never real
+    module IDs (e.g. traefik1, samba1) - it is not a module inventory
+    command. api-cli run list-installed-modules is the correct source,
+    filtered to this node's own ID so remote-node instances of the same
+    module (e.g. traefik2 on node 2) are not double-counted here."""
+    code, out, _ = run_command(["api-cli", "run", "list-installed-modules"])
     if code != 0 or not out:
         return []
 
+    try:
+        data = json.loads(out)
+    except json.JSONDecodeError:
+        return []
+
+    node_id = get_local_node_id()
     instances = []
-    for line in out.splitlines():
-        name = line.strip()
-        if not name or name in ("cluster", "node"):
-            continue
-        instances.append(name)
+    for modules in data.values():
+        for module in modules:
+            if not node_id or str(module.get("node")) == node_id:
+                instances.append(module["id"])
     return instances
 
 
