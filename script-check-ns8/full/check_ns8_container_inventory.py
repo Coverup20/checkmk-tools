@@ -3,12 +3,11 @@
 
 Version: 1.0.0"""
 
-import json
 import subprocess
 import sys
 from typing import List, Tuple
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 SERVICE = "NS8.Container.Inventory"
 NODE_AGENT_ENV = "/var/lib/nethserver/node/state/agent.env"
 
