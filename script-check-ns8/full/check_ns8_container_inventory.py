@@ -47,24 +47,22 @@ def get_instances() -> List[str]:
 
     runagent -l only ever lists the cluster/node meta-agents, never real
     module IDs (e.g. traefik1, samba1) - it is not a module inventory
-    command. api-cli run list-installed-modules is the correct source,
-    filtered to this node's own ID so remote-node instances of the same
-    module (e.g. traefik2 on node 2) are not double-counted here."""
-    code, out, _ = run_command(["api-cli", "run", "list-installed-modules"])
+    command. api-cli run list-installed-modules would be the natural
+    replacement, but cluster-scoped api-cli actions only work from the
+    cluster leader node and fail with an AuthenticationError on workers -
+    redis-cli reading cluster/module_node directly works identically on
+    every node, leader or worker, with no login required."""
+    code, out, _ = run_command(["redis-cli", "--raw", "HGETALL", "cluster/module_node"])
     if code != 0 or not out:
         return []
 
-    try:
-        data = json.loads(out)
-    except json.JSONDecodeError:
-        return []
-
+    lines = out.splitlines()
     node_id = get_local_node_id()
     instances = []
-    for modules in data.values():
-        for module in modules:
-            if not node_id or str(module.get("node")) == node_id:
-                instances.append(module["id"])
+    for i in range(0, len(lines) - 1, 2):
+        module_id, module_node = lines[i], lines[i + 1]
+        if not node_id or module_node == node_id:
+            instances.append(module_id)
     return instances
 
 
