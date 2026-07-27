@@ -9,13 +9,12 @@ Special controls for Dovecot:
 
 Version: 1.0.0"""
 
-import json
 import subprocess
 import sys
 import re
 from typing import Tuple, List, Optional, Dict
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 LOG_LINES = 500  # Numero righe log da analizzare
 NODE_AGENT_ENV = "/var/lib/nethserver/node/state/agent.env"
 
@@ -60,34 +59,32 @@ def get_local_node_id() -> str:
 
 
 def get_mail_instances() -> List[str]:
-    """Get list of mail instances on this node via api-cli.
+    """Get list of mail instances on this node.
 
     runagent -l only ever lists the cluster/node meta-agents, never real
     module IDs (e.g. mail2) - it never matched the 'mail' prefix filter here,
     so this check silently found zero instances. api-cli run
-    list-installed-modules is the correct source, filtered to this node's
-    own ID so a mail instance on another node isn't checked from here.
+    list-installed-modules would be the natural replacement, but
+    cluster-scoped api-cli actions only work from the cluster leader node
+    and fail with an AuthenticationError on workers - redis-cli reading
+    cluster/module_node directly works identically on every node, leader or
+    worker, with no login required.
 
     Returns:
         List of mail instance names (e.g., ['mail1', 'mail2'])"""
-    exit_code, stdout, _ = run_command(['api-cli', 'run', 'list-installed-modules'])
+    exit_code, stdout, _ = run_command(['redis-cli', '--raw', 'HGETALL', 'cluster/module_node'])
     if exit_code != 0 or not stdout:
         return []
 
-    try:
-        data = json.loads(stdout)
-    except json.JSONDecodeError:
-        return []
-
+    lines = stdout.splitlines()
     node_id = get_local_node_id()
     instances = []
-    for modules in data.values():
-        for module in modules:
-            module_id = module.get("id", "")
-            if not module_id.startswith("mail"):
-                continue
-            if not node_id or str(module.get("node")) == node_id:
-                instances.append(module_id)
+    for i in range(0, len(lines) - 1, 2):
+        module_id, module_node = lines[i], lines[i + 1]
+        if not module_id.startswith("mail"):
+            continue
+        if not node_id or module_node == node_id:
+            instances.append(module_id)
     return instances
 
 
