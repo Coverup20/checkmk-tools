@@ -224,7 +224,7 @@ def collect_log_files(log_path: str) -> List[str]:
 
 def print_service(script: str, data: dict) -> None:
     """Print a single Checkmk local check service for a notification script."""
-    service_name = f"Notification {script}"
+    service_name = f"Notification_{script}"
     total = data["total"]
     last_ts = data["last_ts"]
     host_count = len(data["hosts"])
@@ -252,10 +252,10 @@ def print_service(script: str, data: dict) -> None:
     
     # Add recent details
     if details:
-        details_str = " | ".join(details)
+        details_str = "; ".join(details)
         parts.append(f"e.g. {details_str}")
 
-    detail_str = " | ".join(parts)
+    detail_str = "; ".join(parts)
     perfdata = f"total={total} hosts={host_count}"
 
     # Status logic: WARN if there were critical/down notifications
