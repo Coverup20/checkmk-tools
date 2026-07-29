@@ -9,7 +9,7 @@ The auto-git-sync system keeps `/opt/checkmk-tools/` synchronized with the upstr
 ### Architecture
 
 **Python-First Design:**
-- Installer and orchestration logic is implemented in `../installation/install-checkmk-sync.py`
+- Installer and orchestration logic is implemented in `../installation/install-checkmk-agent-linux.py`
 - Configuration and scheduling are managed by Python code
 - Minimal Bash wrapper is generated at installation time for systemd integration
 
@@ -32,10 +32,10 @@ Each sync cycle:
 
 ```bash
 # Install with systemd timer (default interval 30 seconds)
-python3 ../installation/install-checkmk-sync.py --git-interval 30
+python3 ../installation/install-checkmk-agent-linux.py --git-interval 30
 
 # Or with custom interval (5 minutes)
-python3 ../installation/install-checkmk-sync.py --git-interval 300
+python3 ../installation/install-checkmk-agent-linux.py --git-interval 300
 ```
 
 ### Status and Logging

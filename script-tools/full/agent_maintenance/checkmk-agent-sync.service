@@ -7,7 +7,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 EnvironmentFile=-/etc/checkmk-agent-sync/checkmk-agent-sync.env
-ExecStart=/usr/bin/python3 -B /opt/checkmk-tools/script-tools/full/agent_maintenance/checkmk-agent-sync.py \
+ExecStart=/usr/bin/python3 -B /opt/checkmk-tools/script-tools/full/agent_maintenance/checkmk-agent-autoupdate-linux.py \
     --server-url ${CHECKMK_SERVER_URL} \
     --site ${CHECKMK_SITE} \
     --target auto \

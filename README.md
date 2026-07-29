@@ -415,7 +415,7 @@ Python tools for CheckMK agent deployment, infrastructure management, backup, an
 | `installation/install-agent-nsec8.py` | ROCKSOLID CheckMK+FRP agent installer for NethSecurity 8 |
 | `installation/setup-persistent-nsec8.py` | Upgrade-resistant persistence setup for NethSecurity 8 |
 | `installation/install_frpc.py` | FRP client installation |
-| `agent_maintenance/checkmk-agent-sync.py` | Multi-OS agent sync (Debian/RHEL/NethSecurity/NS8), verify-only by default, structured status reporting |
+| `agent_maintenance/checkmk-agent-autoupdate-linux.py` | Multi-OS agent sync (Debian/RHEL/NethSecurity/NS8), verify-only by default, structured status reporting |
 | `agent_maintenance/checkmk-agent-sync.service` / `.timer` | Optional systemd units for scheduled agent sync (daily, randomized delay) |
 | `deploy/deploy-plain-agent.py` | Deploy agent to a single host |
 | `deploy/deploy-plain-agent-multi.py` | Multi-host deployment from list |
@@ -496,7 +496,7 @@ The repository is automatically synchronized on CheckMK servers using a Python-m
 
 ```bash
 # Install auto-sync (systemd timer-based, with fallback to cron on systems without systemd)
-python3 installation/install-checkmk-sync.py --git-interval 30
+python3 installation/install-checkmk-agent-linux.py --git-interval 30
 ```
 
 **Active Model:**
@@ -635,7 +635,7 @@ Scripts are deployed **without the `.py` extension** so CheckMK executes them di
 To keep scripts automatically updated on a server:
 
 ```bash
-python3 /opt/checkmk-tools/script-tools/full/installation/install-checkmk-sync.py --git-interval 60
+python3 /opt/checkmk-tools/script-tools/full/installation/install-checkmk-agent-linux.py --git-interval 60
 ```
 
 ### Notification Script Installation

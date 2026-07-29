@@ -7,7 +7,7 @@ Copy Python checks from category_dir/full/*.py to /usr/lib/check_mk_agent/local/
 (e.g. script-notify-checkmk, manually-deployed notification scripts) is never
 touched by this tool, regardless of its name.
 
-Used by install-checkmk-sync.py as STEP 2.
+Used by install-checkmk-agent-linux.py as STEP 2.
 
 Topics:
   --repo Path local repository (default: /opt/checkmk-tools)
