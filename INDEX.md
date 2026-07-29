@@ -396,7 +396,7 @@ Utility scripts for agent installation, deployment, backup, sync, and upgrades. 
 - `[ydea_toolkit.py](file:///root/checkmk-tools/script-tools/full/installation/checkmk/steps/ydea_toolkit.py)` - No description available
 - `[install-agent-nsec8.py](file:///root/checkmk-tools/script-tools/full/installation/install-agent-nsec8.py)` - install-agent-nsec8.py — CheckMK Agent Installer — PERSISTENT Edition Install and configure CheckMK Agent on NethSecu...
 - `[install-checkmk-log-optimizer.py](file:///root/checkmk-tools/script-tools/full/installation/install-checkmk-log-optimizer.py)` - install-checkmk-log-optimizer.py Python entrypoint that delegates to install-checkmk-log-optimizer.sh. Version: 1.0.0
-- `[install-checkmk-sync.py](file:///root/checkmk-tools/script-tools/full/installation/install-checkmk-sync.py)` - CheckMK unified installer Execute in sequence:   STEP A → CheckMK Agent install (download from CMK server, plain TCP ...
+- `[install-checkmk-agent-linux.py](file:///root/checkmk-tools/script-tools/full/installation/install-checkmk-agent-linux.py)` - CheckMK unified installer Execute in sequence:   STEP A → CheckMK Agent install (download from CMK server, TCP 6556)...
 - `[install-frpc-pc.ps1](file:///root/checkmk-tools/script-tools/full/installation/install-frpc-pc.ps1)` - >
 - `[install-tmate-client.py](file:///root/checkmk-tools/script-tools/full/installation/install-tmate-client.py)` - Install and configure tmate client to connect to a self-hosted tmate server  After installation the SSH token is avai...
 - `[install-tmate-server.py](file:///root/checkmk-tools/script-tools/full/installation/install-tmate-server.py)` - Install and configure tmate-ssh-server + token receiver infrastructure on a VPS  What it does: 1. Install tmate + tma...
@@ -483,14 +483,14 @@ Utility scripts for agent installation, deployment, backup, sync, and upgrades. 
 
 ```bash
 # Download and run agent installer directly
-curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/installation/install-checkmk-sync.py | python3
+curl -fsSL https://raw.githubusercontent.com/nethesis/checkmk-tools/main/script-tools/full/installation/install-checkmk-agent-linux.py | python3
 ```
 
 ### Method 2: From Local Repository (Preferred)
 
 ```bash
 # Direct execution from local repo
-python3 /opt/checkmk-tools/script-tools/full/installation/install-checkmk-sync.py
+python3 /opt/checkmk-tools/script-tools/full/installation/install-checkmk-agent-linux.py
 
 # Git pull first (auto-pull runs periodically)
 cd /opt/checkmk-tools && git pull

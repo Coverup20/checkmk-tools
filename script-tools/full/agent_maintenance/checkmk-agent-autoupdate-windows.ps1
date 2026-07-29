@@ -5,7 +5,7 @@ CheckMK Agent Synchronization Tool for Windows.
 .DESCRIPTION
 Synchronizes the locally installed Checkmk Windows agent (check_mk_agent.msi)
 with the version served by the configured Checkmk site, mirroring the
-behavior of the Linux counterpart checkmk-agent-sync.py:
+behavior of the Linux counterpart checkmk-agent-autoupdate-linux.py:
   - Default mode is verify-only (report status, do not touch the system)
   - -Install actually downloads and runs msiexec to upgrade the agent
   - -DryRun shows what would happen without downloading/installing
@@ -34,10 +34,10 @@ Re-install even if the local and remote versions already match.
 Show what would happen without downloading or installing anything.
 
 .EXAMPLE
-powershell -File checkmk-agent-sync.ps1 -ServerUrl https://monitor.nethlab.it -Site monitoring
+powershell -File checkmk-agent-autoupdate-windows.ps1 -ServerUrl https://monitor.nethlab.it -Site monitoring
 
 .EXAMPLE
-powershell -File checkmk-agent-sync.ps1 -Install -Verbose
+powershell -File checkmk-agent-autoupdate-windows.ps1 -Install -Verbose
 #>
 
 [CmdletBinding()]

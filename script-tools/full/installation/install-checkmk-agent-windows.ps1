@@ -1,24 +1,29 @@
 <#
 .SYNOPSIS
-  Installazione dell'agente CheckMK su Windows, in modalita' plain (nessuna
-  restrizione IP, nessun TLS) - equivalente Windows dell'agente classico.
+  Installazione dell'agente CheckMK su Windows, con cmk-agent-ctl in plain
+  pull nativo e IP allowlist (supporta piu' di un IP autorizzato).
 
 .DESCRIPTION
   - Download dell'MSI agente CheckMK dal server configurato
   - Installazione/aggiornamento silenzioso (msiexec /quiet)
-  - Abilita connessioni non protette su cmk-agent-ctl.exe
-    (delete-all --enable-insecure-connections), senza IP allowlist:
-    l'agente Windows moderno include sempre cmk-agent-ctl.exe (non esiste
-    piu' un agente Windows "puro" senza di esso), ma qui viene lasciato
-    completamente aperto, equivalente in termini di sicurezza al vecchio
-    agente classico plain usato su Linux prima della conversione a
-    ip_allowlist - nessuna restrizione, nessun TLS.
+  - Abilita il plain pull nativo di cmk-agent-ctl.exe
+    (delete-all --enable-insecure-connections), niente TLS/certificati custom
+  - Chiede interattivamente quali IP autorizzare (uno o piu', separati da
+    virgola) e li scrive in cmk-agent-ctl.toml (allowed_ip)
 
 .PARAMETER ServerUrl
   Base Checkmk server URL (default: https://monitor.nethlab.it)
 
 .PARAMETER Site
   Checkmk site name (default: monitoring)
+
+.PARAMETER AllowedIp
+  IP da autorizzare nell'allowlist di cmk-agent-ctl, separati da virgola per
+  piu' di un IP. Se fornito, salta il prompt interattivo.
+
+.PARAMETER Quick
+  Modalita' non interattiva: usa 127.0.0.1 come unico IP autorizzato senza
+  chiedere nulla (equivalente a -AllowedIp 127.0.0.1).
 
 .PARAMETER Uninstall
   Disinstalla l'agente CheckMK e rimuove la configurazione cmk-agent-ctl.
@@ -28,6 +33,9 @@
 
 .USAGE
   powershell -ExecutionPolicy Bypass -File .\install-checkmk-agent-windows.ps1
+  powershell -ExecutionPolicy Bypass -File .\install-checkmk-agent-windows.ps1 -AllowedIp 127.0.0.1
+  powershell -ExecutionPolicy Bypass -File .\install-checkmk-agent-windows.ps1 -AllowedIp "127.0.0.1,10.0.0.5"
+  powershell -ExecutionPolicy Bypass -File .\install-checkmk-agent-windows.ps1 -Quick
   powershell -ExecutionPolicy Bypass -File .\install-checkmk-agent-windows.ps1 -Uninstall
 #>
 
@@ -35,15 +43,19 @@
 param(
     [string]$ServerUrl = "https://monitor.nethlab.it",
     [string]$Site = "monitoring",
+    [string]$AllowedIp = "",
+    [switch]$Quick,
     [switch]$Uninstall
 )
 
-$ScriptVersion = "2.0.0"
+$ScriptVersion = "2.1.0"
 $ErrorActionPreference = "Stop"
 $ProgressPreference    = "SilentlyContinue"
 
 $CmkAgentDir        = "C:\ProgramData\checkmk\agent"
+$CmkAgentCtlToml    = Join-Path $CmkAgentDir "cmk-agent-ctl.toml"
 $CmkAgentCtlExe     = "C:\Program Files (x86)\checkmk\service\cmk-agent-ctl.exe"
+$DefaultAllowedIp   = "127.0.0.1"
 
 # ===============================
 # Utility
@@ -67,6 +79,43 @@ function Test-Administrator {
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
     $p  = New-Object Security.Principal.WindowsPrincipal($id)
     return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function ConvertTo-IpList {
+    # Splits a comma/space-separated string into a de-duplicated array of IPs.
+    # Throws on the first malformed entry.
+    param([string]$Raw)
+    $ips = @()
+    foreach ($token in ($Raw -split '[,\s]+')) {
+        if (-not $token) { continue }
+        if ($token -notmatch '^\d{1,3}(\.\d{1,3}){3}$') {
+            throw "IP non valido: '$token' (formato atteso: x.x.x.x)"
+        }
+        if ($ips -notcontains $token) { $ips += $token }
+    }
+    return $ips
+}
+
+function Read-AllowedIps {
+    # Chiede quali IP autorizzare nell'allowlist di cmk-agent-ctl (plain pull).
+    # Supporta piu' IP separati da virgola o spazio.
+    Write-Host ""
+    Write-Host "  Configurazione IP allowlist (cmk-agent-ctl, plain pull nativo):"
+    Write-Host "  L'agente accettera' connessioni in chiaro sulla 6556 SOLO da questi IP."
+    Write-Host "  Usare $DefaultAllowedIp se il traffico arriva tramite tunnel FRP locale (caso comune),"
+    Write-Host "  altrimenti l'IP reale (o piu' IP separati da virgola/spazio) da cui si connette il server CheckMK."
+    while ($true) {
+        $raw = Read-Host "  IP autorizzati [$DefaultAllowedIp]"
+        if (-not $raw) { return @($DefaultAllowedIp) }
+        try {
+            $ips = ConvertTo-IpList -Raw $raw
+        } catch {
+            Write-Log $_.Exception.Message "WARN"
+            continue
+        }
+        if ($ips.Count -gt 0) { return $ips }
+        Write-Log "Nessun IP valido inserito, riprova." "WARN"
+    }
 }
 
 function Get-LocalAgentVersion {
@@ -128,7 +177,7 @@ function Uninstall-CheckmkAgent {
 }
 
 # ===============================
-# Plain, no restrictions (equivalente Windows dell'agente classico)
+# cmk-agent-ctl plain pull (+ IP allowlist, uno o piu' IP)
 # ===============================
 function Find-CheckmkAgentService {
     $svc = Get-Service | Where-Object {
@@ -139,13 +188,22 @@ function Find-CheckmkAgentService {
     return $svc
 }
 
-function Set-PlainConfig {
+function Set-PlainPullConfig {
+    param([string[]]$AllowedIps)
+
     if (-not (Test-Path $CmkAgentCtlExe)) {
         throw "cmk-agent-ctl.exe non trovato in: $CmkAgentCtlExe (l'agente e' installato correttamente?)"
     }
 
-    Write-Log "Rimozione registrazione TLS esistente e abilitazione connessioni non protette (nessuna restrizione IP)..." "INFO"
+    Write-Log "Rimozione registrazione TLS esistente e abilitazione plain pull..." "INFO"
     & $CmkAgentCtlExe delete-all --enable-insecure-connections 2>&1 | ForEach-Object { Write-Log $_ "INFO" }
+
+    if (-not (Test-Path $CmkAgentDir)) {
+        New-Item -Path $CmkAgentDir -ItemType Directory -Force | Out-Null
+    }
+    $ipArray = ($AllowedIps | ForEach-Object { "`"$_`"" }) -join ", "
+    Set-Content -Path $CmkAgentCtlToml -Value "allowed_ip = [$ipArray]`n" -Encoding UTF8
+    Write-Log "Scritto $CmkAgentCtlToml (allowed_ip=$($AllowedIps -join ', '))" "OK"
 
     $svc = Find-CheckmkAgentService
     if ($svc) {
@@ -172,15 +230,27 @@ try {
         exit 0
     }
 
+    if ($AllowedIp) {
+        $resolvedIps = ConvertTo-IpList -Raw $AllowedIp
+        if ($resolvedIps.Count -eq 0) { throw "-AllowedIp non contiene nessun IP valido" }
+    } elseif ($Quick) {
+        $resolvedIps = @($DefaultAllowedIp)
+    } else {
+        $resolvedIps = Read-AllowedIps
+    }
+
     Install-CheckmkAgent
-    Set-PlainConfig
+    Set-PlainPullConfig -AllowedIps $resolvedIps
 
     Write-Log "" "INFO"
     Write-Log "=== INSTALLAZIONE COMPLETATA ===" "OK"
-    Write-Log "  Agente CheckMK   : porta 6556, plain, nessuna restrizione IP" "INFO"
+    Write-Log "  Agente CheckMK   : porta 6556, plain pull, allowed_ip=$($resolvedIps -join ', ')" "INFO"
     Write-Log "" "INFO"
     Write-Log "Verifica:" "INFO"
     Write-Log "  & '$CmkAgentCtlExe' status" "INFO"
+    Write-Log "" "INFO"
+    Write-Log "Se questo host deve essere raggiunto tramite tunnel FRP, installare" "INFO"
+    Write-Log "separatamente: install-frpc-pc.ps1 (stessa cartella)" "INFO"
 
     exit 0
 }

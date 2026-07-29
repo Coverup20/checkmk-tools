@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-Installs checkmk-agent-sync.ps1 as a daily Windows Scheduled Task.
+Installs checkmk-agent-autoupdate-windows.ps1 as a daily Windows Scheduled Task.
 
 .DESCRIPTION
 Registers a Scheduled Task ("CheckmkAgentSync") that runs
-checkmk-agent-sync.ps1 daily as SYSTEM, mirroring the systemd
+checkmk-agent-autoupdate-windows.ps1 daily as SYSTEM, mirroring the systemd
 checkmk-agent-sync.timer used on Linux clients. Verify-only by default -
 pass -Install to also enable real upgrades (adds -Install to the task's
 arguments), matching the Linux deployment convention where verify-only
@@ -40,7 +40,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $TaskName = "CheckmkAgentSync"
-$ScriptPath = Join-Path $PSScriptRoot "checkmk-agent-sync.ps1"
+$ScriptPath = Join-Path $PSScriptRoot "checkmk-agent-autoupdate-windows.ps1"
 $LogPath = "C:\ProgramData\checkmk-agent-sync\checkmk-agent-sync.log"
 
 $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -49,7 +49,7 @@ if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Adm
 }
 
 if (-not (Test-Path $ScriptPath)) {
-    throw "checkmk-agent-sync.ps1 not found next to this installer: $ScriptPath"
+    throw "checkmk-agent-autoupdate-windows.ps1 not found next to this installer: $ScriptPath"
 }
 
 New-Item -ItemType Directory -Path (Split-Path $LogPath) -Force | Out-Null

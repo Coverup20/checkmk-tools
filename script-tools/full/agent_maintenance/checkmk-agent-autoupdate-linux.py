@@ -13,16 +13,16 @@ Supported targets:
 
 Usage:
   # Verify current status only (default, non-destructive)
-  python3 checkmk-agent-sync.py --server-url https://monitoring.nethlab.it --site monitoring
+  python3 checkmk-agent-autoupdate-linux.py --server-url https://monitoring.nethlab.it --site monitoring
 
   # Dry-run: show what would happen
-  python3 checkmk-agent-sync.py --dry-run --server-url https://monitoring.nethlab.it --site monitoring
+  python3 checkmk-agent-autoupdate-linux.py --dry-run --server-url https://monitoring.nethlab.it --site monitoring
 
   # Download only
-  python3 checkmk-agent-sync.py --download-only --server-url https://monitoring.nethlab.it --site monitoring
+  python3 checkmk-agent-autoupdate-linux.py --download-only --server-url https://monitoring.nethlab.it --site monitoring
 
   # Install if newer (destructive, requires confirmation)
-  python3 checkmk-agent-sync.py --install --server-url https://monitoring.nethlab.it --site monitoring
+  python3 checkmk-agent-autoupdate-linux.py --install --server-url https://monitoring.nethlab.it --site monitoring
 
 Version: 1.0.0
 """
@@ -454,16 +454,16 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
   # Verify only (default, non-destructive)
-  python3 checkmk-agent-sync.py --server-url https://monitoring.nethlab.it --site monitoring
+  python3 checkmk-agent-autoupdate-linux.py --server-url https://monitoring.nethlab.it --site monitoring
 
   # Dry-run
-  python3 checkmk-agent-sync.py --dry-run --server-url https://monitoring.nethlab.it --site monitoring
+  python3 checkmk-agent-autoupdate-linux.py --dry-run --server-url https://monitoring.nethlab.it --site monitoring
 
   # Download only
-  python3 checkmk-agent-sync.py --download-only --server-url https://monitoring.nethlab.it --site monitoring --package-cache-dir /tmp
+  python3 checkmk-agent-autoupdate-linux.py --download-only --server-url https://monitoring.nethlab.it --site monitoring --package-cache-dir /tmp
 
   # Install (destructive)
-  python3 checkmk-agent-sync.py --install --server-url https://monitoring.nethlab.it --site monitoring""",
+  python3 checkmk-agent-autoupdate-linux.py --install --server-url https://monitoring.nethlab.it --site monitoring""",
     )
     p.add_argument(
         "--server-url",
