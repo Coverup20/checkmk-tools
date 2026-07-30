@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-VERSION = "1.0.30"
+VERSION = "1.0.31"
 
 
 class Colors:
@@ -86,6 +86,18 @@ def run_capture(cmd: list[str], *, check: bool = True) -> str:
     if check and res.returncode != 0:
         raise subprocess.CalledProcessError(res.returncode, cmd, output=res.stdout, stderr=res.stderr)
     return res.stdout.strip()
+
+
+def run_stdin(cmd: list[str], input_text: str, *, check: bool = True) -> RunResult:
+    """Like run(), but feeds `input_text` via stdin instead of embedding secrets in argv/shell strings.
+
+    Use this whenever a command needs a password/secret: passing it as a CLI argument
+    would leak it both to `ps`/`/proc/<pid>/cmdline` and to the "Running: ..." log line."""
+    log_info(f"Running: {shlex.join(cmd)} (stdin hidden)")
+    res = subprocess.run(cmd, input=input_text, text=True, env=_child_env())
+    if check and res.returncode != 0:
+        raise subprocess.CalledProcessError(res.returncode, cmd)
+    return RunResult(returncode=res.returncode)
 
 
 _BACKUP_DIR = Path("/var/backups/checkmk-installer")
