@@ -45,13 +45,21 @@ def run_step(cfg: InstallerConfig) -> None:
     # Rotated via copytruncate: OMD daemons keep their log file handles open, and there is no
     # single reload signal that covers all of them, so copy-then-truncate is the safe generic
     # choice instead of per-daemon postrotate scripts.
+    #
+    # nagios.log targets var/nagios/nagios.log, not the var/log/nagios.log symlink that points
+    # to it - logrotate refuses to rotate symlinks for security reasons and would silently skip
+    # it forever otherwise (confirmed live: "Rotation of symbolic links is not allowed").
     stanzas = [
-        _logrotate_stanza(f"{site_dir}/var/log/nagios.log"),
+        _logrotate_stanza(f"{site_dir}/var/nagios/nagios.log"),
         _logrotate_stanza(f"{site_dir}/var/log/web.log"),
         _logrotate_stanza(f"{site_dir}/var/log/mkeventd.log"),
         _logrotate_stanza(f"{site_dir}/var/log/notify.log"),
         _logrotate_stanza(f"{site_dir}/var/log/rrdcached.log"),
         _logrotate_stanza(f"{site_dir}/var/log/liveproxyd.log"),
+        _logrotate_stanza(f"{site_dir}/var/log/security.log"),
+        _logrotate_stanza(f"{site_dir}/var/log/licensing.log"),
+        _logrotate_stanza(f"{site_dir}/var/log/product_usage_analytics.log"),
+        _logrotate_stanza(f"{site_dir}/var/log/redis-server.log"),
         _logrotate_stanza(f"{site_dir}/var/log/apache/access_log {site_dir}/var/log/apache/error_log"),
     ]
 
@@ -64,12 +72,14 @@ def run_step(cfg: InstallerConfig) -> None:
     # other package sharing /etc/logrotate.d.
     run_cmd(["logrotate", "-d", str(_LOGROTATE_FILE)], check=False)
 
-    # Crash reports (var/check_mk/crashes/<type>/<id>/) and Event Console history
-    # (var/mkeventd/history/*.log) are directories of discrete files, not one growing log -
-    # logrotate can't prune those by age, so that goes in the site's own cron instead.
+    # Crash reports (var/check_mk/crashes/<type>/<id>/) are a directory of discrete files, not
+    # one growing log - logrotate can't prune those by age, so that goes in the site's own cron
+    # instead. Event Console history (var/mkeventd/history/history.sqlite) is a single SQLite
+    # database CheckMK manages internally (confirmed live) - not a set of per-day log files, so
+    # it must not be pruned externally by age/deleted piecemeal.
     cron_dir = site_dir / "etc" / "cron.d"
     if not cron_dir.exists():
-        log_warn(f"OMD cron directory not found: {cron_dir}. Skip crash/Event Console cleanup cron.")
+        log_warn(f"OMD cron directory not found: {cron_dir}. Skip crash cleanup cron.")
         log_success("Log optimization pack installed (logrotate only)")
         return
 
@@ -80,17 +90,15 @@ def run_step(cfg: InstallerConfig) -> None:
     cron_file.write_text(
         "\n".join(
             [
-                f"# Prune CheckMK crash reports and Event Console history older than {_PRUNE_MAX_AGE_DAYS} days",
+                f"# Prune CheckMK crash reports older than {_PRUNE_MAX_AGE_DAYS} days",
                 f"15 3 * * * find {site_dir}/var/check_mk/crashes -mindepth 2 -maxdepth 2 -type d "
                 f"-mtime +{_PRUNE_MAX_AGE_DAYS} -exec rm -rf {{}} + > /dev/null 2>&1",
-                f"20 3 * * * find {site_dir}/var/mkeventd/history -type f -name '*.log' "
-                f"-mtime +{_PRUNE_MAX_AGE_DAYS} -delete > /dev/null 2>&1",
                 "",
             ]
         ),
         encoding="utf-8",
     )
-    log_info(f"Wrote crash/Event Console cleanup cron: {cron_file}")
+    log_info(f"Wrote crash cleanup cron: {cron_file}")
 
     run_cmd(["su", "-", cfg.site_name, "-c", "omd reload crontab"], check=False)
 

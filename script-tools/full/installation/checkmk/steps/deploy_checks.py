@@ -6,6 +6,8 @@ from pathlib import Path
 from lib.common import log_header, log_info, log_success, log_warn, run as run_cmd
 from lib.config import InstallerConfig
 
+from . import auto_git_sync
+
 _WAIT_POLL_SEC = 5       # intervallo polling
 _WAIT_TIMEOUT_SEC = 180  # massimo 3 minuti
 
@@ -28,6 +30,23 @@ def _find_local_agent_deb() -> Path | None:
     if not candidates:
         return None
     return sorted(candidates)[-1]
+
+
+def _reconcile_auto_git_sync(cfg: InstallerConfig) -> None:
+    """install-checkmk-agent-linux.py's own STEP 1 writes its own auto-git-sync.service
+    (Type=oneshot, triggered by an auto-git-sync.timer it also creates) under the same unit
+    name this installer's own auto_git_sync step manages (Type=simple, always running via
+    Restart=always). Confirmed live: this leaves systemd in an inconsistent state ("Current
+    command vanished from the unit file") because the running process was started under the
+    old definition while the unit file underneath it was swapped to a different Type. Disable
+    the stray timer and restore the installer's own canonical service definition."""
+    stray_timer = Path("/etc/systemd/system/auto-git-sync.timer")
+    if stray_timer.exists():
+        run_cmd(["systemctl", "disable", "--now", "auto-git-sync.timer"], check=False)
+        stray_timer.unlink(missing_ok=True)
+        run_cmd(["systemctl", "daemon-reload"], check=False)
+    if cfg.enable_auto_git_sync:
+        auto_git_sync.run(cfg)
 
 
 def _try_install_agent_via_interactive_script(cfg: InstallerConfig, repo_root: Path | None) -> bool:
@@ -70,6 +89,7 @@ def _try_install_agent_via_interactive_script(cfg: InstallerConfig, repo_root: P
         run_cmd(cmd, check=False)
 
         if Path("/usr/lib/check_mk_agent/local").exists():
+            _reconcile_auto_git_sync(cfg)
             return True
 
     return False
