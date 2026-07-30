@@ -17,8 +17,22 @@ def _parse_version_tuple(version: str) -> tuple[int, int, int, int]:
     return int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))
 
 
-def _detect_latest_raw_version(timeout_sec: int = 20) -> str:
-    url = "https://download.checkmk.com/checkmk/"
+def _pkg_prefix_for_version(version: str) -> str:
+    """CheckMK renamed the Raw Edition package starting with 2.5.0:
+    2.4.x and earlier -> check-mk-raw-X.Y.ZpN
+    2.5.0 and later   -> check-mk-community-X.Y.ZpN
+    Mirrors the same rule already used by upgrade_maintenance/upgrade_checkmk.py."""
+    major, minor, _patch, _p = _parse_version_tuple(version)
+    return "check-mk-community" if (major, minor) >= (2, 5) else "check-mk-raw"
+
+
+def _detect_latest_version(timeout_sec: int = 20) -> tuple[str, str]:
+    """Return (version, pkg_prefix) of the latest stable CheckMK release, detected from the
+    public marketing page (same source and parsing strategy as upgrade_checkmk.py):
+      - Raw Edition (<=2.4.x): filename 'check-mk-raw-X.Y.ZpN' appears directly in page HTML
+      - Community Edition (>=2.5.0): data-edition="community" data-version="X.Y.ZpN" attributes
+    """
+    url = "https://checkmk.com/download"
     req = urllib.request.Request(
         url,
         headers={
@@ -29,12 +43,23 @@ def _detect_latest_raw_version(timeout_sec: int = 20) -> str:
     with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
         html = resp.read().decode("utf-8", errors="replace")
 
-    # Capture versions like 2.4.0p20, 2.5.0p1, etc.
-    versions = set(re.findall(r"\b\d+\.\d+\.\d+p\d+\b", html))
-    if not versions:
-        raise RuntimeError("Could not detect any versions from download listing")
+    raw_versions = set(re.findall(r"check-mk-raw-(\d+\.\d+\.\d+p\d+)", html))
+    community_versions = set(
+        re.findall(r'data-edition=["\']community["\'][^>]*?data-version=["\'](\d+\.\d+\.\d+p\d+)["\']', html)
+    )
 
-    return max(versions, key=_parse_version_tuple)
+    best_version: str | None = None
+    best_prefix: str | None = None
+    for v in raw_versions:
+        if best_version is None or _parse_version_tuple(v) > _parse_version_tuple(best_version):
+            best_version, best_prefix = v, "check-mk-raw"
+    for v in community_versions:
+        if best_version is None or _parse_version_tuple(v) > _parse_version_tuple(best_version):
+            best_version, best_prefix = v, "check-mk-community"
+
+    if not best_version or not best_prefix:
+        raise RuntimeError("Could not detect any versions from download page")
+    return best_version, best_prefix
 
 
 def _probe_url_ok(url: str, timeout_sec: int = 20) -> bool:
@@ -58,7 +83,12 @@ def _probe_url_ok(url: str, timeout_sec: int = 20) -> bool:
 
 
 def _derive_latest_from_seed_url(seed_url: str, *, codename: str, arch: str, timeout_sec: int = 20) -> str:
-    """Given a known-good deb URL, probe newer patch versions and return the latest reachable URL."""
+    """Given a known-good deb URL, probe newer patch versions and return the latest reachable URL.
+
+    Handles both package name prefixes (check-mk-raw- for <=2.4.x, check-mk-community- for
+    >=2.5.0): whichever prefix appears in the seed URL is the one reused for every probed URL,
+    so a 2.5.x+ seed keeps probing check-mk-community- patches instead of a nonexistent
+    check-mk-raw- filename."""
 
     # Extract base '/checkmk' prefix
     if "/checkmk/" not in seed_url:
@@ -67,12 +97,13 @@ def _derive_latest_from_seed_url(seed_url: str, *, codename: str, arch: str, tim
     prefix, tail = seed_url.split("/checkmk/", 1)
     base = prefix.rstrip("/") + "/checkmk"
 
-    m = re.search(r"check-mk-raw-(\d+\.\d+\.\d+)p(\d+)_0\.[a-z0-9]+_[^/]+\.deb", seed_url)
+    m = re.search(r"(check-mk-raw|check-mk-community)-(\d+\.\d+\.\d+)p(\d+)_0\.[a-z0-9]+_[^/]+\.deb", seed_url)
     if not m:
         return seed_url
 
-    series = m.group(1)
-    seed_patch = int(m.group(2))
+    pkg_prefix = m.group(1)
+    series = m.group(2)
+    seed_patch = int(m.group(3))
 
     last_ok = seed_patch
     consecutive_fail = 0
@@ -80,7 +111,7 @@ def _derive_latest_from_seed_url(seed_url: str, *, codename: str, arch: str, tim
     # Probe forward from the seed patch; stop after a few consecutive misses.
     for patch in range(seed_patch, seed_patch + 50):
         ver = f"{series}p{patch}"
-        url = f"{base}/{ver}/check-mk-raw-{ver}_0.{codename}_{arch}.deb"
+        url = f"{base}/{ver}/{pkg_prefix}-{ver}_0.{codename}_{arch}.deb"
         if _probe_url_ok(url, timeout_sec=timeout_sec):
             last_ok = patch
             consecutive_fail = 0
@@ -90,7 +121,7 @@ def _derive_latest_from_seed_url(seed_url: str, *, codename: str, arch: str, tim
                 break
 
     ver = f"{series}p{last_ok}"
-    return f"{base}/{ver}/check-mk-raw-{ver}_0.{codename}_{arch}.deb"
+    return f"{base}/{ver}/{pkg_prefix}-{ver}_0.{codename}_{arch}.deb"
 
 
 def run_step(cfg: InstallerConfig) -> None:
@@ -125,15 +156,16 @@ def run_step(cfg: InstallerConfig) -> None:
             url = derived
 
         if not url:
-            # Legacy listing-based detection (may fail if upstream requires auth)
             cmk_version = (cfg.cmk_version or "").strip()
+            pkg_prefix = "check-mk-raw"
             if cmk_version.lower() in {"latest", ""}:
-                log_info("CMK_VERSION=latest: detecting latest available raw version...")
+                log_info("CMK_VERSION=latest: detecting latest available version...")
                 try:
-                    cmk_version = _detect_latest_raw_version()
+                    cmk_version, pkg_prefix = _detect_latest_version()
+                    log_info(f"Detected: {cmk_version} ({pkg_prefix})")
                 except Exception as exc:
-                    # Listing failed (upstream auth required) - fall back to probing from a known seed.
-                    log_warn(f"Could not auto-detect version from listing: {exc}")
+                    # Detection page unreachable (network/auth issue) - fall back to probing from a known seed.
+                    log_warn(f"Could not auto-detect version from download page: {exc}")
                     log_warn("Falling back to automatic probe from known seed URL (2.4.0p20)...")
                     seed_url = (
                         f"https://download.checkmk.com/checkmk/2.4.0p20"
@@ -142,9 +174,11 @@ def run_step(cfg: InstallerConfig) -> None:
                     derived = _derive_latest_from_seed_url(seed_url, codename=codename, arch=arch)
                     log_info(f"Auto-detected latest URL: {derived}")
                     url = derived
+            else:
+                pkg_prefix = _pkg_prefix_for_version(cmk_version)
 
             if not url:
-                url = f"https://download.checkmk.com/checkmk/{cmk_version}/check-mk-raw-{cmk_version}_0.{codename}_{arch}.deb"
+                url = f"https://download.checkmk.com/checkmk/{cmk_version}/{pkg_prefix}-{cmk_version}_0.{codename}_{arch}.deb"
                 log_info(f"Using derived URL: {url}")
 
         deb_path = Path("/tmp") / Path(url).name

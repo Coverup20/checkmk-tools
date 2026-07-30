@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from lib.common import command_exists, log_header, log_info, log_success, log_warn, run as run_cmd
+from lib.common import log_header, log_info, log_success, log_warn, run as run_cmd
 from lib.config import InstallerConfig
 
 _WAIT_POLL_SEC = 5       # intervallo polling
@@ -31,13 +31,15 @@ def _find_local_agent_deb() -> Path | None:
 
 
 def _try_install_agent_via_interactive_script(cfg: InstallerConfig, repo_root: Path | None) -> bool:
+    """install-agent-interactive.sh was archived and removed - install-checkmk-agent-linux.py
+    is the current replacement (its own docstring says so). --quick answers its other prompts
+    (agent install, FRPC) non-interactively; only the allowed-ip allowlist is asked here, since
+    it is security-relevant and shouldn't silently default to a guess."""
     if repo_root is None:
         return False
 
-    installer = repo_root / "script-tools" / "full" / "installation" / "install-agent-interactive.sh"
+    installer = repo_root / "script-tools" / "full" / "installation" / "install-checkmk-agent-linux.py"
     if not installer.exists():
-        return False
-    if not command_exists("bash"):
         return False
 
     site = (cfg.site_name or "monitoring").strip()
@@ -46,15 +48,24 @@ def _try_install_agent_via_interactive_script(cfg: InstallerConfig, repo_root: P
         f"http://localhost/{site}/check_mk/agents",
     ]
 
+    try:
+        allowed_ip = input(
+            "IP autorizzati per il pull dell'agente CheckMK, separati da virgola [127.0.0.1]: "
+        ).strip() or "127.0.0.1"
+    except (EOFError, KeyboardInterrupt):
+        allowed_ip = "127.0.0.1"
+
     for base_url in base_urls:
-        log_info(f"Trying agent install via install-agent-interactive.sh (CHECKMK_BASE_URL={base_url})")
+        log_info(f"Trying agent install via install-checkmk-agent-linux.py (checkmk-url={base_url})")
         cmd = [
-            "bash",
-            "-lc",
-            # Auto-answer prompts:
-            # 1) Do you proceed with the installation? [y/N] -> y
-            # 2) Do you also want to install FRPC? [y/N] -> N
-            f"set -euo pipefail; export CHECKMK_BASE_URL={base_url}; printf 's\\nN\\n' | bash {installer}",
+            "python3",
+            str(installer),
+            "--quick",
+            "--skip-agent-sync",
+            "--checkmk-url",
+            base_url,
+            "--allowed-ip",
+            allowed_ip,
         ]
         run_cmd(cmd, check=False)
 
