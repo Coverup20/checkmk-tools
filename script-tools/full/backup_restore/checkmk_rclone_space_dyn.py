@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 from typing import List
 
-VERSION = "1.0.4"  # Versione script (aggiornare ad ogni modifica)
+VERSION = "1.0.5"  # Versione script (aggiornare ad ogni modifica)
 SCRIPT_NAME = Path(__file__).name
 SITES_BASE = Path("/opt/omd/sites")
 SYSTEMD_DIR = Path("/etc/systemd/system")
@@ -318,28 +318,39 @@ fi
 if [[ "$RETENTION_DAYS_REMOTE" -gt 0 ]]; then
   mapfile -t all_remote_backups < <(
     rclone lsf "$REMOTE_SITE_PATH" --dirs-only "${COMMON_OPTS[@]}" 2>/dev/null || true
-    rclone lsf "$REMOTE_SITE_PATH" --files-only "${COMMON_OPTS[@]}" 2>/dev/null | grep -It's \.(tgz|tar\.gz|tar|zip)$' || true
+    rclone lsf "$REMOTE_SITE_PATH" --files-only "${COMMON_OPTS[@]}" 2>/dev/null | grep -E '\.(tgz|tar\.gz|tar|zip)$' || true
   )
 
   if [[ ${#all_remote_backups[@]} -gt 0 ]]; then
-    # Sort by date extracted from filename (newest first)
-    # Note: sort -r on full name is wrong when job01 < job00 alphabetically but job00 is newer by date
-    mapfile -t sorted_backups < <(
-      printf '%s\n' "${all_remote_backups[@]}" | \
-        sed 's/.*\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-[0-9]\{2\}h[0-9]\{2\}\).*/\1 &/' | \
-        sort -r | \
-        cut -d' ' -f2-
-    )
-    kept=0
-    for backup in "${sorted_backups[@]}"; do
-      kept=$((kept + 1))
-      if [[ $kept -gt $RETENTION_DAYS_REMOTE ]]; then
-        if [[ "$backup" == */ ]]; then
-          rclone purge "${REMOTE_SITE_PATH}/${backup%/}" "${COMMON_OPTS[@]}" 2>/dev/null || true
-        else
-          rclone delete "${REMOTE_SITE_PATH}/${backup}" "${COMMON_OPTS[@]}" 2>/dev/null || true
+    # Sort by embedded timestamp (YYYY-MM-DD-HHhMM), not by full name - the raw
+    # name sorts by job-type label first (e.g. "job01" always lexically ahead
+    # of "job00"), which breaks chronological ordering across job types.
+    # Retention is applied PER JOB TYPE so job00 (daily) and job01 (weekly)
+    # each keep their own newest RETENTION_DAYS_REMOTE backups independently -
+    # otherwise a high-frequency job type permanently evicts a low-frequency one.
+    mapfile -t job_types < <(printf '%s\n' "${all_remote_backups[@]}" | grep -oE 'job[0-9]+' | sort -u || true)
+
+    for job_type in "${job_types[@]}"; do
+      mapfile -t job_backups < <(printf '%s\n' "${all_remote_backups[@]}" | grep -- "-${job_type}-" || true)
+
+      mapfile -t sorted_backups < <(
+        for backup in "${job_backups[@]}"; do
+          timestamp="$(echo "$backup" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}h[0-9]{2}' || true)"
+          printf '%s\t%s\n' "$timestamp" "$backup"
+        done | sort -r -t $'\t' -k1,1 | cut -f2-
+      )
+
+      kept=0
+      for backup in "${sorted_backups[@]}"; do
+        kept=$((kept + 1))
+        if [[ $kept -gt $RETENTION_DAYS_REMOTE ]]; then
+          if [[ "$backup" == */ ]]; then
+            rclone purge "${REMOTE_SITE_PATH}/${backup%/}" "${COMMON_OPTS[@]}" 2>/dev/null || true
+          else
+            rclone delete "${REMOTE_SITE_PATH}/${backup}" "${COMMON_OPTS[@]}" 2>/dev/null || true
+          fi
         fi
-      fi
+      done
     done
   fi
 fi
