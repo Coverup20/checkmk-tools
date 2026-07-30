@@ -4,10 +4,9 @@ import re
 import urllib.error
 import urllib.request
 import urllib.parse
-import shlex
 from pathlib import Path
 
-from lib.common import command_exists, log_header, log_info, log_success, log_warn, run as run_cmd, run_capture
+from lib.common import command_exists, log_header, log_info, log_success, log_warn, run as run_cmd, run_capture, run_stdin
 from lib.config import InstallerConfig
 
 
@@ -169,14 +168,9 @@ def run_step(cfg: InstallerConfig) -> None:
 
     if cfg.checkmk_admin_password:
         log_info("Setting cmkadmin password (value not shown)...")
-        run_cmd(
-            [
-                "omd",
-                "su",
-                cfg.site_name,
-                "-c",
-                f"htpasswd -b ~/etc/htpasswd cmkadmin {shlex.quote(cfg.checkmk_admin_password)}",
-            ],
+        run_stdin(
+            ["omd", "su", cfg.site_name, "-c", "htpasswd -i ~/etc/htpasswd cmkadmin"],
+            f"{cfg.checkmk_admin_password}\n",
             check=False,
         )
 
