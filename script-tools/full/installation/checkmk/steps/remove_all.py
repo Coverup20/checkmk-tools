@@ -68,6 +68,43 @@ def _filter_removal_packages(installed: set[str]) -> list[str]:
     return sorted(to_remove)
 
 
+def _backup_cloud_push_units(site: str) -> tuple[list[str], list[str]]:
+    """Systemd units for the local backup jobs and cloud-push mechanism.
+
+    Returns (units_to_stop_and_disable, unit_files_to_delete). The
+    cloud-push template units (checkmk-cloud-backup-push@.*) are deleted
+    but not stopped directly - only their site-instantiated form
+    (checkmk-cloud-backup-push@<site>.*) is a running unit.
+    """
+    backup_job_units = [
+        "checkmk-backup-job00.service",
+        "checkmk-backup-job00.timer",
+        "checkmk-backup-job01.service",
+        "checkmk-backup-job01.timer",
+    ]
+    cloud_push_instance_units = [
+        f"checkmk-cloud-backup-push@{site}.timer",
+        f"checkmk-cloud-backup-push@{site}.path",
+        f"checkmk-cloud-backup-push@{site}.service",
+    ]
+    cloud_push_template_units = [
+        "checkmk-cloud-backup-push@.service",
+        "checkmk-cloud-backup-push@.path",
+        "checkmk-cloud-backup-push@.timer",
+    ]
+    to_stop = [*backup_job_units, *cloud_push_instance_units]
+    to_delete = [*backup_job_units, *cloud_push_template_units]
+    return to_stop, to_delete
+
+
+def _backup_cloud_push_files(site: str) -> list[Path]:
+    """Non-systemd files left by the backup/cloud-push mechanism, keyed by site."""
+    return [
+        Path("/usr/local/sbin/checkmk_cloud_backup_push_run.sh"),
+        Path(f"/etc/default/checkmk-cloud-backup-push-{site}"),
+    ]
+
+
 def _confirm_or_abort(host: str, site: str) -> None:
     log_header("REMOVE ALL (UNINSTALL)")
     log_warn("This will REMOVE CheckMK/OMD and related services installed by this bootstrap.")
@@ -122,6 +159,20 @@ def run(cfg: InstallerConfig, *, assume_yes: bool = False, confirm_hostname: str
             if tmp_dir.exists():
                 run_cmd(["umount", "-l", str(tmp_dir)], check=False)
             run_cmd(["rm", "-rf", str(site_dir)], check=False)
+
+    log_header("Removing backup / cloud-push jobs")
+    # Local packages/config/systemd units only - the remote rclone bucket
+    # contents are NOT touched here, that stays a deliberate manual step.
+    units_to_stop, units_to_delete = _backup_cloud_push_units(cfg.site_name)
+    for unit in units_to_stop:
+        run_cmd(["systemctl", "disable", "--now", unit], check=False)
+
+    systemd_dir = Path("/etc/systemd/system")
+    for unit in units_to_delete:
+        _delete_dir(systemd_dir / unit)
+    for path in _backup_cloud_push_files(cfg.site_name):
+        _delete_dir(path)
+    run_cmd(["systemctl", "daemon-reload"], check=False)
 
     log_header("Cleaning up installer backup files")
     total_cleaned = 0
