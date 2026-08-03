@@ -143,9 +143,9 @@ def run_step(cfg: InstallerConfig) -> None:
             raise RuntimeError(f"Local CheckMK .deb not found: {deb_path}")
         log_info(f"Using local .deb: {deb_path}")
         # apt-get install accepts a local .deb path directly, resolves missing
-        # dependencies same as gdebi -n did. Dpkg::Progress-Fancy=1 requests a
-        # real percentage progress bar for the unpack, which gdebi never had.
-        run_cmd(["apt-get", "-o", "Dpkg::Progress-Fancy=1", "install", "-y", str(deb_path)])
+        # dependencies same as gdebi -n did - and unlike gdebi, run() injects
+        # Dpkg::Progress-Fancy=1 for a real percentage progress bar.
+        run_cmd(["apt-get", "install", "-y", str(deb_path)])
     else:
         cmk_version = (cfg.cmk_version or "").strip()
 
@@ -185,9 +185,9 @@ def run_step(cfg: InstallerConfig) -> None:
         deb_path = Path("/tmp") / Path(url).name
         run_cmd(["wget", "-O", str(deb_path), url])
         # apt-get install accepts a local .deb path directly, resolves missing
-        # dependencies same as gdebi -n did. Dpkg::Progress-Fancy=1 requests a
-        # real percentage progress bar for the unpack, which gdebi never had.
-        run_cmd(["apt-get", "-o", "Dpkg::Progress-Fancy=1", "install", "-y", str(deb_path)])
+        # dependencies same as gdebi -n did - and unlike gdebi, run() injects
+        # Dpkg::Progress-Fancy=1 for a real percentage progress bar.
+        run_cmd(["apt-get", "install", "-y", str(deb_path)])
 
     if not command_exists("omd"):
         raise RuntimeError("omd command not found after installation")

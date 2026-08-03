@@ -37,6 +37,15 @@ def test_filters_exact_match_dependencies(remove_all_module):
     assert "curl" not in result
 
 
+def test_git_is_never_purged(remove_all_module):
+    # Regression test 2026-08-03: remove-all deliberately keeps
+    # auto-git-sync.service and the /opt/checkmk-tools repo clone running,
+    # both of which need git - purging it left auto-git-sync silently
+    # failing forever, confirmed live on ubntmarzio.
+    result = remove_all_module._filter_removal_packages({"git"})
+    assert "git" not in result
+
+
 def test_empty_installed_set_yields_empty_result(remove_all_module):
     assert remove_all_module._filter_removal_packages(set()) == []
 
@@ -156,3 +165,23 @@ def test_false_when_neither_installed(remove_all_module):
 
 def test_false_for_empty_set(remove_all_module):
     assert remove_all_module._any_checkmk_package_installed(set()) is False
+
+
+# --- _mount_points_to_unmount -------------------------------------------------
+# Added 2026-08-03 alongside explicit /run/timeshift cleanup: a plain package
+# purge doesn't unmount an active bind-mount left by an interrupted backup.
+
+def test_unmount_order_is_deepest_first(remove_all_module):
+    findmnt_out = "/run/timeshift/1161056\n/run/timeshift/1161056/backup\n"
+    result = remove_all_module._mount_points_to_unmount(findmnt_out)
+    assert result == ["/run/timeshift/1161056/backup", "/run/timeshift/1161056"]
+
+
+def test_unmount_order_ignores_blank_lines(remove_all_module):
+    findmnt_out = "\n/run/timeshift/1161056\n\n"
+    result = remove_all_module._mount_points_to_unmount(findmnt_out)
+    assert result == ["/run/timeshift/1161056"]
+
+
+def test_unmount_order_empty_output_yields_empty_list(remove_all_module):
+    assert remove_all_module._mount_points_to_unmount("") == []
