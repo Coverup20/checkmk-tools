@@ -105,9 +105,21 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=False)
 
     sub.add_parser("menu", help="Interactive menu (default when no command given)")
-    sub.add_parser("init", help="Create/update .env with a guided prompt")
-    sub.add_parser("bootstrap", help="Run full installation")
-    sub.add_parser("install", help="Alias for bootstrap")
+
+    # --interactive is also accepted AFTER these subcommands (e.g. "init
+    # --interactive", as documented in README.md) using a separate dest so it
+    # doesn't clobber the global --interactive flag when given before the
+    # subcommand instead - argparse subparser defaults overwrite an
+    # already-set same-named attribute, so a shared dest would silently
+    # reset "--interactive bootstrap" back to False. See main() for the merge.
+    init_p = sub.add_parser("init", help="Create/update .env with a guided prompt")
+    init_p.add_argument("--interactive", action="store_true", dest="init_interactive", help="No-op: init always prompts interactively; accepted for convenience")
+
+    boot_p = sub.add_parser("bootstrap", help="Run full installation")
+    boot_p.add_argument("--interactive", action="store_true", dest="sub_interactive", help="Prompt for key settings (same as the global --interactive flag)")
+    install_p = sub.add_parser("install", help="Alias for bootstrap")
+    install_p.add_argument("--interactive", action="store_true", dest="sub_interactive", help="Prompt for key settings (same as the global --interactive flag)")
+
     sub.add_parser("verify", help="Verify installation")
 
     rm = sub.add_parser("remove-all", help="Remove CheckMK and related services")
@@ -230,7 +242,10 @@ def _is_root() -> bool:
 def main(argv: list[str]) -> int:
     args = build_parser().parse_args(argv)
     env_file = Path(args.env_file)
-    interactive = bool(args.interactive)
+    # --interactive is accepted both before the subcommand (global flag) and
+    # after it (bootstrap/install's own --interactive, dest="sub_interactive"
+    # to avoid clobbering the global one - see build_parser()).
+    interactive = bool(args.interactive) or bool(getattr(args, "sub_interactive", False))
 
     if args.cmd in {None, "menu"}:
         return _menu_loop(env_file)

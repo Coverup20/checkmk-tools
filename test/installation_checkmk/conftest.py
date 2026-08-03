@@ -28,3 +28,10 @@ def remove_all_module():
     import steps.remove_all as module
 
     return module
+
+
+@pytest.fixture()
+def installer_module():
+    import installer as module
+
+    return module
