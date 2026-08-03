@@ -92,3 +92,44 @@ def test_backup_cloud_push_files_site_name_is_not_hardcoded(remove_all_module):
     files = remove_all_module._backup_cloud_push_files("otherSite")
     assert Path("/etc/default/checkmk-cloud-backup-push-otherSite") in files
     assert Path("/etc/default/checkmk-cloud-backup-push-monitoring") not in files
+
+
+# --- _dirs_safe_to_delete -----------------------------------------------------
+# Regression coverage for the gap found 2026-08-03: apt-get purge runs with
+# check=False, so a failed purge (dependency problems, a broken maintainer
+# script) used to leave a package still installed while the leftover-dir
+# cleanup deleted its config directory unconditionally anyway - confirmed live
+# on ubntmarzio for postfix, ufw, fail2ban, apache2 and chrony all at once.
+
+def test_all_dirs_safe_when_nothing_installed(remove_all_module):
+    from pathlib import Path
+
+    safe = remove_all_module._dirs_safe_to_delete(set())
+    assert Path("/etc/postfix") in safe
+    assert Path("/etc/apache2") in safe
+    assert Path("/etc/ufw") in safe
+    assert Path("/etc/fail2ban") in safe
+    assert Path("/etc/chrony") in safe
+
+
+def test_dir_skipped_when_owner_still_installed(remove_all_module):
+    from pathlib import Path
+
+    safe = remove_all_module._dirs_safe_to_delete({"postfix"})
+    assert Path("/etc/postfix") not in safe
+    # unrelated dirs are still safe
+    assert Path("/etc/apache2") in safe
+
+
+def test_multiple_dirs_skipped_when_multiple_owners_still_installed(remove_all_module):
+    from pathlib import Path
+
+    safe = remove_all_module._dirs_safe_to_delete({"postfix", "ufw", "fail2ban", "apache2", "chrony"})
+    assert safe == []
+
+
+def test_unrelated_installed_package_does_not_block_anything(remove_all_module):
+    from pathlib import Path
+
+    safe = remove_all_module._dirs_safe_to_delete({"curl", "vim"})
+    assert len(safe) == len(remove_all_module._LEFTOVER_DIR_OWNERS)

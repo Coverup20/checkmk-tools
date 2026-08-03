@@ -68,6 +68,33 @@ def _filter_removal_packages(installed: set[str]) -> list[str]:
     return sorted(to_remove)
 
 
+# Maps each leftover config dir to the package(s) that must be confirmed gone
+# before it's safe to delete. Regression fix 2026-08-03: apt-get purge runs
+# with check=False, so a failed purge (e.g. the apache2/python3-certbot-apache
+# cross-dependency, or a broken maintainer script) used to leave a package
+# still installed while this step deleted its config dir anyway - dpkg then
+# considers the package "ii" (fully installed) with no config on disk, which
+# breaks any future reinstall/reconfigure of that exact package. Confirmed
+# live on ubntmarzio: postfix, ufw, fail2ban, apache2 and chrony were all
+# found in this broken state from an earlier remove-all run.
+_LEFTOVER_DIR_OWNERS: dict[Path, list[str]] = {
+    Path("/etc/fail2ban"): ["fail2ban"],
+    Path("/etc/apache2"): ["apache2"],
+    Path("/etc/postfix"): ["postfix"],
+    Path("/etc/ufw"): ["ufw"],
+    Path("/etc/chrony"): ["chrony"],
+}
+
+
+def _dirs_safe_to_delete(still_installed: set[str]) -> list[Path]:
+    """Leftover config dirs whose owning package(s) are confirmed NOT installed."""
+    return [
+        path
+        for path, owners in _LEFTOVER_DIR_OWNERS.items()
+        if not any(pkg in still_installed for pkg in owners)
+    ]
+
+
 def _backup_cloud_push_units(site: str) -> tuple[list[str], list[str]]:
     """Systemd units for the local backup jobs and cloud-push mechanism.
 
@@ -194,7 +221,9 @@ def run(cfg: InstallerConfig, *, assume_yes: bool = False, confirm_hostname: str
     if to_remove:
         log_info(f"Purging {len(to_remove)} packages...")
         log_info("Packages: " + " ".join(shlex.quote(p) for p in to_remove))
-        run_cmd(["apt-get", "purge", "-y", *to_remove], check=False)
+        purge_result = run_cmd(["apt-get", "purge", "-y", *to_remove], check=False)
+        if purge_result.returncode != 0:
+            log_warn("apt-get purge exited with an error - some packages may still be installed")
     else:
         log_info("No matching packages to purge")
 
@@ -203,17 +232,19 @@ def run(cfg: InstallerConfig, *, assume_yes: bool = False, confirm_hostname: str
 
     # Explicitly remove leftover config dirs dpkg won't delete when not empty
     # ESCLUSI: /usr/lib/check_mk_agent (contiene i check locali deployati)
+    #
+    # Re-check what's ACTUALLY still installed (not just the purge exit code)
+    # before deleting each dir - only delete when its owning package(s) are
+    # confirmed gone, otherwise skip it and warn. See _LEFTOVER_DIR_OWNERS.
     log_header("Removing leftover config directories")
-    _leftover_dirs: list[Path] = [
-        Path("/etc/fail2ban"),
-        Path("/etc/apache2"),
-        Path("/etc/postfix"),
-        Path("/etc/ufw"),
-        Path("/etc/chrony"),
-        Path("/omd"),
-    ]
-    for d in _leftover_dirs:
-        _delete_dir(d)
+    still_installed = _list_installed_packages()
+    for path, owners in _LEFTOVER_DIR_OWNERS.items():
+        remaining = [pkg for pkg in owners if pkg in still_installed]
+        if remaining:
+            log_warn(f"Skipping {path}: package(s) {remaining} still installed - leaving config in place to avoid an inconsistent state")
+            continue
+        _delete_dir(path)
+    _delete_dir(Path("/omd"))
 
     log_header("Deleting directories")
     dirs_to_delete: list[Path] = [
