@@ -45,3 +45,50 @@ def test_result_is_sorted(remove_all_module):
     installed = {"fail2ban", "apache2", "check-mk-agent"}
     result = remove_all_module._filter_removal_packages(installed)
     assert result == sorted(result)
+
+
+# --- _backup_cloud_push_units / _backup_cloud_push_files ---------------------
+# Regression coverage for the gap found 2026-08-03 alongside the
+# check-mk-community fix: remove-all stopped/purged CheckMK itself but left
+# the backup-job and cloud-backup-push systemd units, scripts and per-site
+# config files behind entirely untouched.
+
+def test_backup_cloud_push_units_stops_site_scoped_instances(remove_all_module):
+    to_stop, _ = remove_all_module._backup_cloud_push_units("monitoring")
+    assert "checkmk-cloud-backup-push@monitoring.timer" in to_stop
+    assert "checkmk-cloud-backup-push@monitoring.path" in to_stop
+    assert "checkmk-cloud-backup-push@monitoring.service" in to_stop
+    assert "checkmk-backup-job00.service" in to_stop
+    assert "checkmk-backup-job01.timer" in to_stop
+
+
+def test_backup_cloud_push_units_deletes_templates_not_instances(remove_all_module):
+    _, to_delete = remove_all_module._backup_cloud_push_units("monitoring")
+    assert "checkmk-cloud-backup-push@.service" in to_delete
+    assert "checkmk-cloud-backup-push@.timer" in to_delete
+    assert "checkmk-cloud-backup-push@.path" in to_delete
+    # the site-instantiated unit names are stopped, not deleted as files -
+    # only the template (with the bare @) is an actual file on disk
+    assert "checkmk-cloud-backup-push@monitoring.service" not in to_delete
+
+
+def test_backup_cloud_push_units_scoped_to_given_site(remove_all_module):
+    to_stop, _ = remove_all_module._backup_cloud_push_units("otherSite")
+    assert "checkmk-cloud-backup-push@otherSite.timer" in to_stop
+    assert "checkmk-cloud-backup-push@monitoring.timer" not in to_stop
+
+
+def test_backup_cloud_push_files_scoped_to_site(remove_all_module):
+    from pathlib import Path
+
+    files = remove_all_module._backup_cloud_push_files("monitoring")
+    assert Path("/usr/local/sbin/checkmk_cloud_backup_push_run.sh") in files
+    assert Path("/etc/default/checkmk-cloud-backup-push-monitoring") in files
+
+
+def test_backup_cloud_push_files_site_name_is_not_hardcoded(remove_all_module):
+    from pathlib import Path
+
+    files = remove_all_module._backup_cloud_push_files("otherSite")
+    assert Path("/etc/default/checkmk-cloud-backup-push-otherSite") in files
+    assert Path("/etc/default/checkmk-cloud-backup-push-monitoring") not in files
