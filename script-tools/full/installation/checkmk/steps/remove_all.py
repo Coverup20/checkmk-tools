@@ -36,6 +36,7 @@ def _list_installed_packages() -> set[str]:
 def _filter_removal_packages(installed: set[str]) -> list[str]:
     prefixes = [
         "check-mk-raw-",
+        "check-mk-community-",
     ]
 
     exact = {
