@@ -100,7 +100,13 @@ def init_env(env_file: Path, interactive: bool) -> None:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="installer.py", description="Python guided installer for CheckMK on Ubuntu")
     p.add_argument("--version", action="version", version=f"%(prog)s v{VERSION}")
-    p.add_argument("--env-file", default=str(Path(__file__).with_name(".env")), help="Path to .env file")
+    # Deliberately outside the repo clone (not Path(__file__).with_name(".env")):
+    # /opt/checkmk-tools is kept in sync by auto-git-sync, and a stray sync
+    # mechanism installed by install-checkmk-agent-linux.py runs git clean -fd
+    # before it gets reconciled away, which wiped an in-repo .env twice during
+    # a single bootstrap run (confirmed live on ubntmarzio 2026-08-03). A path
+    # under /etc is immune to any git operation on the repo, by construction.
+    p.add_argument("--env-file", default="/etc/checkmk-installer.env", help="Path to .env file")
     p.add_argument("--interactive", action="store_true", help="Prompt for key settings")
     sub = p.add_subparsers(dest="cmd", required=False)
 

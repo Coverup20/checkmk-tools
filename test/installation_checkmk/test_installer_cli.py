@@ -48,3 +48,22 @@ def test_interactive_flag_does_not_leak_across_unrelated_commands(installer_modu
     args = installer_module.build_parser().parse_args(["verify"])
     assert bool(args.interactive) is False
     assert getattr(args, "sub_interactive", False) is False
+
+
+# --- --env-file default location ---------------------------------------------
+# Regression test for the bug found 2026-08-03: the default env file used to
+# live next to installer.py inside /opt/checkmk-tools, the auto-git-sync
+# target. A stray sync mechanism (installed by install-checkmk-agent-linux.py
+# before it gets reconciled away) runs "git clean -fd" on that directory,
+# which wiped it twice live on ubntmarzio. The default now points outside the
+# repo entirely so no git operation on it can ever touch the env file.
+
+def test_env_file_default_is_outside_the_repo(installer_module):
+    args = installer_module.build_parser().parse_args(["verify"])
+    assert "checkmk-tools" not in args.env_file
+    assert args.env_file == "/etc/checkmk-installer.env"
+
+
+def test_env_file_still_overridable(installer_module):
+    args = installer_module.build_parser().parse_args(["--env-file", "/tmp/custom.env", "verify"])
+    assert args.env_file == "/tmp/custom.env"

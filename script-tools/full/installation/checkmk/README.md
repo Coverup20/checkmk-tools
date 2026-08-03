@@ -14,7 +14,12 @@ cd /opt/checkmk-tools/script-tools/full/installation/checkmk
 ./installer.py init --interactive
 
 # Alternatively (manual):
-# cp .env.example .env
+# cp .env.example /etc/checkmk-installer.env
+```
+
+The env file lives at `/etc/checkmk-installer.env` by default (`--env-file` to override) - deliberately outside `/opt/checkmk-tools`, since that directory is kept in sync by auto-git-sync and a stray sync mechanism can run `git clean -fd` on it before being reconciled away, which would wipe an in-repo env file.
+
+```bash
 
 # Complete installation (run with sudo)
 sudo -E ./installer.py bootstrap
