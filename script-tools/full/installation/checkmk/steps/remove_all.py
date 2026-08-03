@@ -86,6 +86,22 @@ _LEFTOVER_DIR_OWNERS: dict[Path, list[str]] = {
 }
 
 
+def _any_checkmk_package_installed(installed: set[str]) -> bool:
+    """True if any check-mk-raw-* or check-mk-community-* package is still installed.
+
+    Used to gate the /opt/omd/versions/* force-cleanup below: CheckMK's own
+    postrm script does a plain rmdir on its version directory, which fails
+    (and can abort the whole apt transaction, see check-mk-community's
+    pre-removal check earlier in this file) if anything unrelated was left
+    inside - confirmed live on ubntmarzio 2026-08-03: a stray python_dotenv
+    install under lib/python3.13/site-packages blocked the rmdir, leaving
+    the whole version directory orphaned on disk even though dpkg considers
+    the package (eventually) purged.
+    """
+    prefixes = ("check-mk-raw-", "check-mk-community-")
+    return any(pkg.startswith(prefixes) for pkg in installed)
+
+
 def _dirs_safe_to_delete(still_installed: set[str]) -> list[Path]:
     """Leftover config dirs whose owning package(s) are confirmed NOT installed."""
     return [
@@ -245,6 +261,17 @@ def run(cfg: InstallerConfig, *, assume_yes: bool = False, confirm_hostname: str
             continue
         _delete_dir(path)
     _delete_dir(Path("/omd"))
+
+    # Force-clean any orphaned /opt/omd/versions/* left by a failed postrm,
+    # once no check-mk-raw-*/check-mk-community-* package remains installed
+    # (i.e. dpkg itself is done with them, regardless of postrm's own
+    # rmdir cleanup succeeding or not).
+    if not _any_checkmk_package_installed(_list_installed_packages()):
+        versions_dir = Path("/opt/omd/versions")
+        if versions_dir.is_dir():
+            for version_path in sorted(versions_dir.iterdir()):
+                if version_path.is_dir():
+                    _delete_dir(version_path)
 
     log_header("Deleting directories")
     dirs_to_delete: list[Path] = [

@@ -133,3 +133,26 @@ def test_unrelated_installed_package_does_not_block_anything(remove_all_module):
 
     safe = remove_all_module._dirs_safe_to_delete({"curl", "vim"})
     assert len(safe) == len(remove_all_module._LEFTOVER_DIR_OWNERS)
+
+
+# --- _any_checkmk_package_installed -------------------------------------------
+# Regression coverage for the gap found 2026-08-03: check-mk-community's
+# postrm can fail its own rmdir cleanup (e.g. a stray python_dotenv install
+# under lib/python3.13/site-packages), leaving /opt/omd/versions/<ver>
+# orphaned on disk even after dpkg has genuinely purged the package. This
+# gates a force-cleanup of that directory once no checkmk package remains.
+
+def test_true_when_community_package_installed(remove_all_module):
+    assert remove_all_module._any_checkmk_package_installed({"check-mk-community-2.5.0p10"}) is True
+
+
+def test_true_when_raw_package_installed(remove_all_module):
+    assert remove_all_module._any_checkmk_package_installed({"check-mk-raw-2.4.0p20"}) is True
+
+
+def test_false_when_neither_installed(remove_all_module):
+    assert remove_all_module._any_checkmk_package_installed({"check-mk-agent", "curl"}) is False
+
+
+def test_false_for_empty_set(remove_all_module):
+    assert remove_all_module._any_checkmk_package_installed(set()) is False
