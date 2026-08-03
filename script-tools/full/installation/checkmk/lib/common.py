@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-VERSION = "1.0.42"
+VERSION = "1.0.48"
 
 
 class Colors:
@@ -73,7 +73,35 @@ class RunResult:
     returncode: int
 
 
+def _with_progress_fancy(cmd: list[str]) -> list[str]:
+    """Ask apt/apt-get for a real percentage progress bar (harmless on
+    non-install subcommands too, e.g. update/purge/autoremove) whenever it's
+    attached to a real terminal. Applied centrally here so every step
+    benefits without repeating the flag at each apt-get call site."""
+    if not cmd or cmd[0] not in ("apt-get", "apt"):
+        return cmd
+    if "Dpkg::Progress-Fancy=1" in cmd:
+        return cmd
+    return [cmd[0], "-o", "Dpkg::Progress-Fancy=1", *cmd[1:]]
+
+
 def run(cmd: list[str], *, check: bool = True) -> RunResult:
+    """Run cmd, inheriting stdout/stderr so its own output (including apt's
+    real Dpkg::Progress-Fancy percentage bar) still streams live.
+
+    A custom elapsed-time ticker was tried twice (2026-08-03) to reassure
+    during phases that sit at the same file-count percentage for a long
+    time - both attempts (with and without a leading newline) produced a
+    garbled cascade of output, because the ticker thread and the child
+    process are two independent, uncoordinated writers to the same
+    terminal: the OS can interleave their writes at the byte level no
+    matter how carefully either side formats its own output. Properly
+    fixing that would mean capturing the child's stdout ourselves and
+    proxying it through a single writer - real effort for a cosmetic
+    problem. Dropped in favor of relying solely on Dpkg::Progress-Fancy,
+    which is safe by construction: apt is the only writer during its own
+    operation."""
+    cmd = _with_progress_fancy(cmd)
     log_info(f"Running: {shlex.join(cmd)}")
     res = subprocess.run(cmd, env=_child_env())
     if check and res.returncode != 0:

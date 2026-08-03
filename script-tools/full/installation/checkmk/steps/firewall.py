@@ -18,7 +18,7 @@ def run_step(cfg: InstallerConfig) -> None:
         run_cmd(["ufw", "allow", "443/tcp"], check=False)
     run_cmd(["ufw", "allow", "6556/tcp"], check=False)
 
-    run_cmd(["bash", "-lc", "echo y | ufw enable"], check=False)
+    run_cmd(["ufw", "--force", "enable"], check=False)
     log_success("Firewall configured")
 
 

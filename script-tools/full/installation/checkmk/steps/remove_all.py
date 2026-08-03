@@ -19,6 +19,13 @@ _LEGACY_BACKUP_DIRS: list[Path] = [
 ]
 
 
+def _mount_points_to_unmount(findmnt_output: str) -> list[str]:
+    """Parse `findmnt -R -n -o TARGET <dir>` output into unmount order
+    (deepest/innermost mount first, so nested mounts don't block each other)."""
+    points = [line.strip() for line in findmnt_output.splitlines() if line.strip()]
+    return list(reversed(points))
+
+
 def _delete_dir(path: Path) -> bool:
     """Delete a directory (rm -rf). Returns True if something was deleted."""
     if not path.exists():
@@ -53,8 +60,11 @@ def _filter_removal_packages(installed: set[str]) -> list[str]:
         "timeshift",
         "chrony",
         "unattended-upgrades",
-        "git",
         "python3-pip",
+        # NOT "git": remove-all deliberately keeps auto-git-sync.service and
+        # the /opt/checkmk-tools repo clone running (see run() below) - both
+        # need git to function. Purging it left auto-git-sync silently
+        # failing every cycle forever, confirmed live on ubntmarzio 2026-08-03.
     }
 
     to_remove: set[str] = set()
@@ -216,6 +226,19 @@ def run(cfg: InstallerConfig, *, assume_yes: bool = False, confirm_hostname: str
     for path in _backup_cloud_push_files(cfg.site_name):
         _delete_dir(path)
     run_cmd(["systemctl", "daemon-reload"], check=False)
+
+    log_header("Cleaning up timeshift runtime state")
+    # /run is tmpfs so this vanishes on reboot regardless, but an interrupted
+    # backup can leave an active bind-mount under here that a plain package
+    # purge won't unmount on its own.
+    timeshift_run_dir = Path("/run/timeshift")
+    if timeshift_run_dir.is_dir():
+        findmnt_out = run_capture(["findmnt", "-R", "-n", "-o", "TARGET", str(timeshift_run_dir)], check=False)
+        for mount_point in _mount_points_to_unmount(findmnt_out):
+            run_cmd(["umount", "-l", mount_point], check=False)
+        _delete_dir(timeshift_run_dir)
+    else:
+        log_info("No /run/timeshift runtime state found")
 
     log_header("Cleaning up installer backup files")
     total_cleaned = 0
