@@ -6,7 +6,7 @@ from analyze_notification_recurrence import parse_notifications, analyze_recurre
 
 SITE = 'monitoring'
 FROM_EMAIL = 'srv-monitoring-us@nethesis.it'
-TO_EMAIL = 'marzio@nethesis.it'
+TO_EMAIL = os.environ.get('DAILY_REPORT_TO_EMAIL', 'root@localhost')
 W = 78  # larghezza box titolo
 
 def send_email(subject, body):
