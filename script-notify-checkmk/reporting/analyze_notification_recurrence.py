@@ -2,9 +2,15 @@
 """analyze_notification_recurrence.py — Analisi ricorrenze notifiche per notify.log.
 Modulo condiviso tra notification-limiter-report.py e MCP server."""
 
-import os, gzip, re
+import os, gzip, re, sys
 from collections import defaultdict, Counter
 from datetime import datetime
+
+def _normalize_host(host):
+    """Normalizza il nome host: rimuove FQDN e spazi, cosi' lo stesso host non
+    viene contato come entita' separata quando appare sia come nome corto che
+    come FQDN nei log (es. 'datalogger' vs 'datalogger.urbinoservizi.it')."""
+    return host.strip().replace('.urbinoservizi.it', '')
 
 def parse_notifications(site='monitoring'):
     """Parsa notify.log e restituisce una lista di tuple (host, service, timestamp, state)."""
@@ -38,12 +44,12 @@ def parse_notifications(site='monitoring'):
                 m = pat_svc.search(line)
                 if m:
                     ts = datetime.strptime(m.group(1), '%Y-%m-%d %H:%M:%S')
-                    events[m.group('host')].append((ts, m.group('service'), m.group('state')))
+                    events[_normalize_host(m.group('host'))].append((ts, m.group('service'), m.group('state')))
                     continue
                 m = pat_host.search(line)
                 if m:
                     ts = datetime.strptime(m.group(1), '%Y-%m-%d %H:%M:%S')
-                    events[m.group('host')].append((ts, 'HOST', m.group('state')))
+                    events[_normalize_host(m.group('host'))].append((ts, 'HOST', m.group('state')))
             f.close()
         except:
             pass
@@ -83,7 +89,7 @@ def analyze_recurrences(events):
             cn = sum(1 for t in ct if abs((datetime.strptime(t,'%H:%M')-cdt).total_seconds())<=1800)
             on = sum(1 for t in ot if abs((datetime.strptime(t,'%H:%M')-odt).total_seconds())<=1800)
             ir = (cn/tot>=0.6 and on/tot>=0.6 and freq<2) or (freq<1.5 and tot>=3 and cn/tot>=0.5 and on/tot>=0.5)
-            rows.append((tot, freq, avg, host.replace('.urbinoservizi.it',''), svc, tc, to, ir))
+            rows.append((tot, freq, avg, host, svc, tc, to, ir))
     
     rows.sort(key=lambda r: -r[0])
     total = sum(len(v) for v in events.values())
@@ -93,3 +99,20 @@ def format_dur(s):
     if s < 60: return f"{s:.0f}s"
     if s < 3600: return f"{s/60:.0f}m"
     return f"{s/3600:.1f}h"
+
+
+if __name__ == '__main__':
+    site = sys.argv[1] if len(sys.argv) > 1 else 'monitoring'
+    host_filter = sys.argv[2] if len(sys.argv) > 2 else ''
+
+    events = parse_notifications(site)
+    if host_filter:
+        events = {h: v for h, v in events.items() if host_filter.lower() in h.lower()}
+
+    rows, total = analyze_recurrences(events)
+    print(f'Totale notifiche analizzate: {total}')
+    print(f'Pattern ricorrenti trovati: {len(rows)}')
+    print()
+    print(f'{"tot":>4} {"freq/g":>7} {"avg_dur":>8} {"host":25} {"service":15} {"crit@":6} {"ok@":6} sched')
+    for r in rows:
+        print(f'{r[0]:>4} {r[1]:>7.1f} {format_dur(r[2]):>8} {r[3]:25} {r[4]:15} {r[5]:6} {r[6]:6} {r[7]}')
