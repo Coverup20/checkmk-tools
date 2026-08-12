@@ -487,6 +487,7 @@ opkg install ns-checkmk-utils_0.0.2-r1_all.ipk
 | Script | Description |
 | -------- | ----------- |
 | `vulnerability_management/gvm_to_ciso_import.py` | Import GVM/OpenVAS (by task name, read-only GMP lookup) or nmap scan results into CISO Assistant via REST API - interactive wizard or CLI |
+| `vulnerability_management/default_creds_check.py` | Active default/weak-credential and misconfiguration probe (SSH, FTP, SMB, mail, HTTP admin panels, VNC, Redis, MongoDB, SNMP, CheckMK agent) - imports findings into CISO Assistant, supports save-and-import-later via --from-log |
 
 ### Monitoring Script Deployment
 
