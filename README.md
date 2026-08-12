@@ -117,6 +117,7 @@ checkmk-tools/
 │   │   ├── sync_update/             # Auto-git-sync, script/crontab updates
 │   │   ├── systemd/                 # Systemd unit templates (backup jobs)
 │   │   ├── upgrade_maintenance/     # CheckMK/agent upgrade automation
+│   │   ├── vulnerability_management/ # GVM/OpenVAS -> CISO Assistant import
 │   │   └── wrappers_templates/      # Wrapper/template examples
 │   └── doc/
 ├── Ydea-Toolkit/                # Ydea ticketing integration & API toolkit
@@ -480,6 +481,12 @@ opkg install ns-checkmk-utils_0.0.2-r1_all.ipk
 | `network_scan/scan_nmap.py` | nmap-based network scan |
 | `network_scan/network_scan_to_folder.py` | Scan and export results to folder |
 | `network_scan/scan-nmap-interattivo-verbose-multi-options.py` | Interactive multi-option nmap scan |
+
+### Vulnerability Management
+
+| Script | Description |
+| -------- | ----------- |
+| `vulnerability_management/gvm_to_ciso_import.py` | Import GVM/OpenVAS (by task name, read-only GMP lookup) or nmap scan results into CISO Assistant via REST API - interactive wizard or CLI |
 
 ### Monitoring Script Deployment
 
