@@ -93,6 +93,29 @@ clamped = max(hard_min, min(hard_max, raw))
 Any limiter/learning error → `FAIL_OPEN` → Telegram sent. Telegram API
 errors retain their own error behaviour.
 
+## Resilience (v1.5.0-beta)
+
+If the synchronous send fails (e.g. a transient NIC flap causing DNS/network
+errors), the script detaches a background process that retries every
+`RETRY_INTERVAL` (15s) for up to `RETRY_MAX_WAIT` (300s) instead of blocking
+and failing the CheckMK notification pipeline. The main process reports
+success immediately in this case (`status: DEFERRED`, `rc: 0`), so a
+transient flap is never recorded as a notification failure.
+
+The per-host/category cooldown update (`_update_delivery_cooldown`) is only
+applied on **confirmed** delivery - either the immediate send, or the
+background retry succeeding. If the background retry exhausts its window
+without success, the cooldown state is left untouched, so a real subsequent
+problem on the same host/category is never silently suppressed by a message
+that was never actually delivered.
+
+The final outcome (delivered after N attempts, or permanently failed) is
+logged as a syslog line to the local Event Console Unix socket
+(`$OMD_ROOT/tmp/run/mkeventd/eventsocket`, `application=telegram_retry`) so
+it stays observable — see Monitor → Event Console → Events. This is the same
+mechanism and the same Event Console rule (`match_application=telegram_retry`)
+used by the plain `telegram`/`telegram_selfmon` scripts.
+
 ## Runtime paths
 
 | Resource | Path |
