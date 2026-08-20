@@ -6,7 +6,7 @@ Bulk: no
 CheckMK notification script - sends alerts to a Telegram channel.
 Configured via OMD environment variables.
 
-Version: 1.0.0
+Version: 1.1.0
 """
 #
 # Copyright (C) 2025 Nethesis S.r.l.
@@ -17,11 +17,12 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.parse
 import urllib.request
 import socket
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 # === CONFIG ===
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
@@ -30,6 +31,16 @@ CUSTOMER_NAME = os.environ.get("TELEGRAM_CUSTOMER_NAME", "")
 
 CMK_URL = os.environ.get("CMK_URL", "")
 SITE = "monitoring"
+
+# Resilience: if the immediate send fails (e.g. NIC flap causing DNS/network
+# errors), retry in a detached background process for up to RETRY_MAX_WAIT
+# seconds instead of blocking (and failing) the CheckMK notification
+# pipeline. The outcome (eventual success or permanent failure) is logged
+# to the local Event Console so it stays observable even though CheckMK
+# itself sees an immediate, successful exit.
+EC_SOCKET = "/omd/sites/monitoring/tmp/run/mkeventd/eventsocket"
+RETRY_INTERVAL = 15
+RETRY_MAX_WAIT = 300
 # ==============
 
 ## Utils
@@ -93,6 +104,89 @@ def send_telegram(token, chat_id, text, reply_markup=None):
         raise RuntimeError(f"Telegram API error: {body[:200]}")
     sys.stdout.write("Telegram OK: message sent\n")
 
+
+def _log_ec_event(priority, application, text):
+    """Best-effort: write one syslog-formatted line to the local Event
+    Console socket. Never raises - a logging failure must never affect
+    the notification flow."""
+    try:
+        pri = 16 * 8 + priority  # facility local0 (16)
+        hostname = os.environ.get("NOTIFY_HOSTNAME") or socket.gethostname()
+        ts = time.strftime("%b %d %H:%M:%S")
+        line = f"<{pri}>{ts} {hostname} {application}: {text}\n"
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(3)
+        s.connect(EC_SOCKET)
+        s.sendall(line.encode("utf-8", errors="replace"))
+        s.close()
+    except Exception:
+        pass
+
+
+def send_telegram_resilient(token, chat_id, text, reply_markup=None):
+    """Try to send immediately. On failure, detach a background process
+    that keeps retrying for up to RETRY_MAX_WAIT seconds, and return right
+    away so CheckMK's notification pipeline (and its plugin timeout) is
+    never blocked by a transient flap. The final outcome (success after
+    retry, or permanent failure) is logged to the Event Console."""
+    try:
+        send_telegram(token, chat_id, text, reply_markup)
+        return
+    except Exception as exc:
+        sys.stderr.write(
+            f"telegram v{VERSION}: initial send failed ({exc}), "
+            "handing off to background retry\n"
+        )
+
+    try:
+        pid = os.fork()
+        if pid > 0:
+            return  # parent: CheckMK sees a normal, successful exit now
+    except OSError:
+        return  # can't fork - nothing more we can do
+
+    # First child: detach fully from the notification script's process
+    # group/session so it survives after CheckMK reaps the parent.
+    os.setsid()
+    try:
+        pid2 = os.fork()
+        if pid2 > 0:
+            os._exit(0)
+    except OSError:
+        os._exit(1)
+
+    # Second child: the actual background retry worker, fully detached.
+    os.chdir("/")
+    devnull = os.open(os.devnull, os.O_RDWR)
+    os.dup2(devnull, 0)
+    os.dup2(devnull, 1)
+    os.dup2(devnull, 2)
+
+    started = time.time()
+    deadline = started + RETRY_MAX_WAIT
+    attempt = 1
+    last_exc = None
+    while time.time() < deadline:
+        time.sleep(RETRY_INTERVAL)
+        attempt += 1
+        try:
+            send_telegram(token, chat_id, text, reply_markup)
+            _log_ec_event(
+                6, "telegram_retry",
+                f"Telegram message delivered after {attempt} attempts "
+                f"(~{int(time.time() - started)}s)"
+            )
+            os._exit(0)
+        except Exception as exc:
+            last_exc = exc
+
+    _log_ec_event(
+        3, "telegram_retry",
+        f"Telegram message permanently failed after {attempt} attempts "
+        f"over {RETRY_MAX_WAIT}s: {last_exc}"
+    )
+    os._exit(1)
+
 ## Check
 
 def check():
@@ -154,6 +248,6 @@ def check():
 
     prefix_label = f"[{CUSTOMER_NAME}] " if CUSTOMER_NAME else ""
     msg = f"{prefix_label}{msg}"
-    send_telegram(TOKEN, CHAT_ID, msg, button)
+    send_telegram_resilient(TOKEN, CHAT_ID, msg, button)
 
 check()
