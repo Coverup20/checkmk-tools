@@ -488,7 +488,7 @@ class TicketOperations:
             "contatto": contatto,
             "anagrafica_id": azienda,
             "fonte": "Partner portal",
-            "condizioneAddebito": "F"
+            "condizioneAddebito": "C"
         }
         
         # Aggiungi contrattoId se disponibile
