@@ -31,7 +31,7 @@ import re
 import time
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 SERVICE_PREFIX = "NV8.Status.Trunk"
 SERVICE_SUMMARY = "NV8.Status.Trunks"
 
@@ -304,7 +304,14 @@ def main() -> int:
         server_clean = server_clean.split(";")[0].strip()       # remove SIP parameters
 
         mod = trunk.get("module", "")
-        print(f"{state} {svc_name} - {trunk['status']} | server={server_clean} module={mod}")
+        # Perfdata must be the single whitespace-free 3rd field (CheckMK's
+        # local check parser never re-scans the free-text field for a later
+        # "|") - previously there was no perfdata at all, so no graph icon
+        # ever appeared for these services. "registered" is a 0/1 gauge so
+        # the CheckMK graph renders as a step function showing exactly when
+        # the trunk went down/up.
+        perfdata = f"registered={1 if state == 0 else 0};;;0;1"
+        print(f"{state} {svc_name} {perfdata} - {trunk['status']} | server={server_clean} module={mod}")
 
     # --- 6. Summary line ---
     total = len(all_trunks)
@@ -317,8 +324,9 @@ def main() -> int:
     else:
         summary_msg = f"CRITICAL: {registered_count}/{total} registered, {not_ok} with issues"
 
+    summary_perfdata = f"registered_trunks={registered_count};;;0;{total}|total_trunks={total}"
     print(
-        f"{overall_state} {SERVICE_SUMMARY} - {summary_msg} "
+        f"{overall_state} {SERVICE_SUMMARY} {summary_perfdata} - {summary_msg} "
         f"| modules={modules_str}"
     )
 
