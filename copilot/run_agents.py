@@ -43,7 +43,6 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # All known hosts with SSH key access — used by --all flag.
 # Each entry: (alias, description)
 # Hosts requiring ControlMaster passphrase (vps-01, vps-02) need the socket active first.
-# LAN hosts (10.155.100.x, 192.168.10.x) require Twingate OFF.
 ALL_HOSTS = [
     # VPS / public servers — autonomous SSH key (no passphrase)
     ("checkmk-vps-02-c",    "CheckMK Staging VPS (monitor01.nethlab.it) — no passphrase"),
@@ -51,13 +50,13 @@ ALL_HOSTS = [
     ("ubntmarzio-root",     "Ubuntu 22.04 lab host (10.155.100.108)"),
     # VPS with passphrase — require ControlMaster active
     ("checkmk-vps-01",      "CheckMK Production VPS (monitor.nethlab.it) — needs ControlMaster"),
-    # LAN hosts — require Twingate OFF
+    # LAN hosts
     ("nsec8-stable",        "NethSecurity 8 stable lab (10.155.100.100)"),
-    ("nsec8-test",          "NethSecurity 8.8.0-dev lab (192.168.10.167) — Twingate OFF required"),
+    ("nsec8-test",          "NethSecurity 8.8.0-dev lab (192.168.10.167)"),
     ("rl94ns8",             "NethServer 8 lab (10.155.100.40)"),
     ("rl94ns81",            "NethServer 8 lab webtop (10.155.100.41)"),
-    ("checkmk-z1-00",       "CheckMK local (192.168.10.128) — Twingate OFF required"),
-    ("checkmk-z1-01",       "CheckMK local (192.168.10.126) — Twingate OFF required"),
+    ("checkmk-z1-00",       "CheckMK local (192.168.10.128)"),
+    ("checkmk-z1-01",       "CheckMK local (192.168.10.126)"),
     ("redteam-shell",       "Redteam shell (redteam.security.nethesis.it) — via sos ProxyJump"),
 ]
 
