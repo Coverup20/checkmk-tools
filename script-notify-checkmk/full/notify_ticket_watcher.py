@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """notify_ticket_watcher.py - CheckMK log watcher for Telegram ticket notifications
-Reads notify.log, intercepts [TICKET-EVENT] [CREATED] and sends Telegram message.
+Reads notify.log, intercepts ticket creation/reopen [TICKET-EVENT] lines and
+ydea_la's "Private note added" confirmations, and sends a Telegram message for each.
 Completely independent of the CheckMK notification system.
 
-Version: 1.3.0"""
+Version: 1.4.0"""
 
 import os
 import re
@@ -13,7 +14,7 @@ import urllib.request
 import urllib.parse
 import sys
 
-VERSION = "1.3.1"
+VERSION = "1.4.0"
 
 LOG_FILE   = "/omd/sites/monitoring/var/log/notify.log"
 STATE_FILE = "/omd/sites/monitoring/var/log/notify_ticket_watcher.json"
@@ -26,9 +27,20 @@ CMK_URL  = os.environ.get("CMK_URL", "")
 def _cmk_url_valid(url):
     return bool(url) and url.startswith(("http://", "https://")) and "<" not in url
 
-# Match only lines [cmk.base.notify] Output: to avoid duplicates
-PATTERN = re.compile(
-    r'\[cmk\.base\.notify\].*Output:.*\[TICKET-EVENT\] \[CREATO\] #(\d+) ([^/\n]+)/(.+?) (CRIT\w*|DOWN\w*|CRITICAL)'
+# Ticket creato/riaperto: host/servizio/stato sono già nella stessa riga [TICKET-EVENT],
+# scritta da ydea_la via log_ticket_event() - match self-contained, nessuna correlazione.
+EVENT_PATTERN = re.compile(
+    r'\[cmk\.base\.notify\].*Output:.*\[TICKET-EVENT\] \[(CREATO|RIAPERTO)\] #(\d+) ([^/\n]+)/(.+?) (OK|UP|WARN\w*|CRIT\w*|DOWN\w*|CRITICAL)'
+)
+
+# Nota aggiunta a un ticket già aperto (cambio di stato su un ticket esistente):
+# la riga "Private note added" di ydea_la non riporta host/servizio/stato, li
+# recuperiamo dalla riga "SERVICE NOTIFICATION: ...;ydea_la;..." che la precede
+# sempre, poche righe prima, nella stessa esecuzione del plugin.
+NOTE_PATTERN = re.compile(
+    r'SERVICE NOTIFICATION: [^;\n]+;([^;\n]+);([^;\n]+);([^;\n]+);ydea_la;.*?'
+    r'Output: \[.*?\] Private note added to ticket #(\d+)',
+    re.DOTALL
 )
 
 
@@ -72,9 +84,22 @@ def get_service_info(hostname: str, service: str) -> tuple[str, str]:
     return "", ""
 
 
-def send_telegram(ticket_id: str, hostname: str, service: str, state_str: str,
+ACTION_TEXT = {
+    "CREATO": "aperto",
+    "RIAPERTO": "riaperto",
+    "NOTA": "aggiornato",
+}
+
+
+def send_telegram(event_type: str, ticket_id: str, hostname: str, service: str, state_str: str,
                  host_address: str = "", svc_output: str = ""):
-    emoji = "\U0001f534" if "CRIT" in state_str.upper() else "\U0001f7e0"
+    state_up = state_str.upper()
+    if state_up in ("OK", "UP"):
+        emoji = "\U0001f7e2"
+    elif "WARN" in state_up:
+        emoji = "\U0001f7e0"
+    else:
+        emoji = "\U0001f534"
     host_enc = urllib.parse.quote(hostname, safe="")
 
     # Host line: «Hostname (IP)» if the IP is available
@@ -91,8 +116,9 @@ def send_telegram(ticket_id: str, hostname: str, service: str, state_str: str,
     cmk_link = ""
     if _cmk_url_valid(CMK_URL):
         cmk_link = f'\n<a href="{CMK_URL}/check_mk/view.py?view_name=host&host={host_enc}">Vai a CheckMK</a>'
+    action_text = ACTION_TEXT.get(event_type, "aggiornato")
     text = (
-        f"\U0001f3ab <b>Ticket #{ticket_id} aperto</b>\n"
+        f"\U0001f3ab <b>Ticket #{ticket_id} {action_text}</b>\n"
         f"{emoji} <b>{state_str}</b> \u2014 {host_line}\n"
         f"\U0001f4cb {service}{output_line}{cmk_link}"
     )
@@ -131,19 +157,47 @@ def main():
         new_pos = f.tell()
 
     errors = []
-    for match in PATTERN.finditer(new_lines):
-        ticket_id = match.group(1)
-        hostname  = match.group(2).strip()
-        service   = match.group(3).strip()
-        state_str = match.group(4).strip()
+    seen_this_run = set()
 
-        if ticket_id in sent:
-            continue
+    events = []
+    for match in EVENT_PATTERN.finditer(new_lines):
+        events.append((
+            match.group(1),           # event_type: CREATO | RIAPERTO
+            match.group(2),           # ticket_id
+            match.group(3).strip(),   # hostname
+            match.group(4).strip(),   # service
+            match.group(5).strip(),   # state_str
+        ))
+    for match in NOTE_PATTERN.finditer(new_lines):
+        events.append((
+            "NOTA",
+            match.group(4),           # ticket_id
+            match.group(1).strip(),   # hostname
+            match.group(2).strip(),   # service
+            match.group(3).strip(),   # state_str
+        ))
+
+    for event_type, ticket_id, hostname, service, state_str in events:
+        if event_type == "CREATO":
+            # Un ticket viene creato una sola volta: dedup permanente su disco.
+            key = f"CREATO:{ticket_id}"
+            if key in sent:
+                continue
+        else:
+            # RIAPERTO/NOTA si ripetono nel tempo per lo stesso ticket: dedup
+            # solo all'interno di questa esecuzione, per collassare le righe
+            # duplicate generate dai contatti multipli (cmkadmin/nick/massimo)
+            # sullo stesso evento, senza bloccare i prossimi eventi reali.
+            key = f"{event_type}:{ticket_id}:{hostname}:{service}:{state_str}"
+            if key in seen_this_run:
+                continue
+            seen_this_run.add(key)
 
         try:
             host_address, svc_output = get_service_info(hostname, service)
-            send_telegram(ticket_id, hostname, service, state_str, host_address, svc_output)
-            sent.add(ticket_id)
+            send_telegram(event_type, ticket_id, hostname, service, state_str, host_address, svc_output)
+            if event_type == "CREATO":
+                sent.add(key)
         except Exception as e:
             errors.append(str(e))
 
