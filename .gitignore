@@ -44,5 +44,11 @@ Ydea-Toolkit/config/.ydea-cookies
 # Private operational docs (do not commit)
 MACHINE_ACCESS_GUIDE.md
 
+# network_topology_map.py scan artifacts (real customer network/credential data — NEVER commit!)
+network_topology_creds.json
+script-tools/full/network_scan/topology-output/
+network-topology-*.drawio
+network-topology-*.json
+
 # MCP config (local only)
 .mcp.json

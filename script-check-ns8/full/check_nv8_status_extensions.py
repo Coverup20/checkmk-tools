@@ -38,7 +38,7 @@ import sys
 import time
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "1.0.3"
+VERSION = "1.1.0"
 SERVICE_SUMMARY  = "NV8.Status.Extensions"
 SERVICE_EXT      = "NV8.Status.Extension"
 
@@ -251,9 +251,12 @@ def main() -> int:
     unreg_pct   = (unreg_count / total * 100) if total > 0 else 0.0
 
     # One CRIT line for each unregistered extension → separate service → individual notification
+    # Perfdata must be the single whitespace-free 3rd field (CheckMK's local
+    # check parser never re-scans the free-text field for a later "|") -
+    # previously there was none at all, so no graph icon ever appeared.
     for ep in unreg:
         svc = f"{SERVICE_EXT}.{sanitize_name(ep['name'])}"
-        print(f"2 {svc} - Unregistered | name={ep['name']} state={ep['state']} module={ep['module']}")
+        print(f"2 {svc} registered=0;;;0;1 - Unregistered | name={ep['name']} state={ep['state']} module={ep['module']}")
 
     # Concise summary (counts only)
     if unreg_count == 0:
@@ -269,9 +272,13 @@ def main() -> int:
         overall = 0
         msg = f"OK: {reg_count}/{total} registered, {unreg_count} unregistered ({unreg_pct:.0f}%)"
 
-    perf = f"registered={reg_count};;;0;{total} unregistered={unreg_count};;;0;{total} total={total}"
+    # Previously three separate space-separated tokens after the message
+    # dash, so only "registered" was ever actually graphed (unregistered/
+    # total were dead decorative text, and the "-" placeholder meant no
+    # metric was graphed anyway).
+    perf = f"registered={reg_count};;;0;{total}|unregistered={unreg_count};;;0;{total}|total={total}"
     modules_str = ",".join(modules_checked)
-    print(f"{overall} {SERVICE_SUMMARY} - {msg} | {perf} modules={modules_str}")
+    print(f"{overall} {SERVICE_SUMMARY} {perf} - {msg} | modules={modules_str}")
 
     return 0
 
