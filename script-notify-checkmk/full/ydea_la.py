@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -33,7 +33,6 @@ RESOLVED_TICKET_TTL = 5 * 24 * 3600  # 5 giorni
 CACHE_MAX_AGE = 30 * 24 * 3600  # 30 giorni
 FLAPPING_THRESHOLD = 5  # Numero cambi stato
 FLAPPING_WINDOW = 600  # 10 minuti
-EFFETTUATO_GRACE_SECONDS = 24 * 3600  # 24 ore finestra grace post-Effettuato
 
 AGGREGATE_BY_HOST = int(os.getenv("AGGREGATE_BY_HOST", "1"))
 RESOLVE_ON_SERVICE_OK = int(os.getenv("RESOLVE_ON_SERVICE_OK", "0"))
@@ -369,11 +368,9 @@ def mark_ticket_resolved(key: str):
         now = int(time.time())
         if key in data:
             data[key]['resolved_at'] = now
-            data[key]['effettuato_at'] = now
-            data[key]['reopen_at'] = None
             data[key]['last_update'] = now
             atomic_cache_write(TICKET_CACHE, json.dumps(data))
-            debug(f"Ticket {key} marked as resolved (effettuato_at set)")
+            debug(f"Ticket {key} marked as resolved")
     except Exception as e:
         log(f"WARN: mark_ticket_resolved failed: {e}")
 
@@ -438,28 +435,6 @@ def set_cache_field(key: str, field: str, value: Any) -> bool:
     except Exception as e:
         log(f"WARN: set_cache_field({field}) failed: {e}")
         return False
-
-
-def check_effettuato_grace(key: str) -> Optional[bool]:
-    """Check if the ticket is in the 24h post-Accomplished grace window.
-    Returns:
-      None -> active ticket (not in Fulfilled status, or already reopened)
-      True -> in grace window (< 24h from performed_at)
-      False -> out of grace window (>= 24h)"""
-    # If the ticket was reopened by a CRITICAL, treat it as active
-    if get_cache_field(key, 'reopen_at') is not None:
-        debug(f"Ticket {key}: reopen_at set -> attivo")
-        return None
-
-    effettuato_at = get_cache_field(key, 'effettuato_at')
-    if not effettuato_at:
-        return None  # Nessuna finestra grace attiva
-
-    now = int(time.time())
-    elapsed = now - int(effettuato_at)
-    in_grace = elapsed < EFFETTUATO_GRACE_SECONDS
-    debug(f"Ticket {key}: effettuato {elapsed/3600:.1f}h fa, in_grace={in_grace}")
-    return in_grace
 
 
 RESOLVED_STATES = {'effettuato', 'chiuso', 'completato', 'risolto'}
@@ -775,56 +750,20 @@ def main():
     # Get existing ticket
     ticket_id = get_ticket_id(ticket_key)
 
-    # === GRACE WINDOW: post-Effettuato 24h ===
-    # When a ticket is in the Fulfilled status, for the following 24 hours:
-    #   - WARNING  -> scartato silenziosamente (nessun commento)
-    # - CRITICAL -> reopening with private comment
+    # === EFFETTUATO CHECK ===
+    # If the existing ticket is already in "Effettuato" (or equivalent) status
+    # on Ydea, it is no longer updated/reopened: it is removed from the cache
+    # so that the next alert creates a brand new ticket instead of
+    # annotating/reopening the one already closed.
     if ticket_id and state not in ["OK", "UP"]:
-        # If carried_at is not yet in cache, query Ydea to detect
-        # if the operator closed the ticket manually (without OK from CheckMK)
-        if get_cache_field(ticket_key, 'effettuato_at') is None and \
-                get_cache_field(ticket_key, 'reopen_at') is None:
-            ydea_stato = fetch_ticket_stato(ticket_id)
-            debug(f"Ticket #{ticket_id} stato Ydea: {ydea_stato}")
-            if ydea_stato and ydea_stato.lower() in RESOLVED_STATES:
-                log(f"Ticket #{ticket_id} risulta '{ydea_stato}' su Ydea - setto effettuato_at")
-                set_cache_field(ticket_key, 'effettuato_at', int(time.time()))
-                set_cache_field(ticket_key, 'reopen_at', None)
-        grace = check_effettuato_grace(ticket_key)
-        if grace is False:
-            # Out of 24 hours - ticket expired, remove from cache
-            log(f"Ticket #{ticket_id} fuori finestra grace 24h (Effettuato) - rimozione cache")
+        ydea_stato = fetch_ticket_stato(ticket_id)
+        debug(f"Ticket #{ticket_id} stato Ydea: {ydea_stato}")
+        if ydea_stato and ydea_stato.lower() in RESOLVED_STATES:
+            log(f"Ticket #{ticket_id} risulta '{ydea_stato}' su Ydea - non verra' piu' aggiornato, rimozione da cache")
+            log_ticket_event("EFFETTUATO", ticket_id, f"{hostname}/{service} - il prossimo alert generera' un ticket nuovo")
             remove_ticket_from_cache(ticket_key)
             ticket_id = None
-        elif grace is True:
-            # Dentro finestra grace 24h
-            if state in ["WARNING", "WARN"]:
-                log(f"[GRACE] WARNING scartato: ticket #{ticket_id} in Effettuato (grace 24h)")
-                return 0
-            elif state in ["CRITICAL", "CRIT", "DOWN"]:
-                log(f"[GRACE] CRITICAL: riapertura ticket #{ticket_id} con commento privato")
-                grace_note = (
-                    f"[{datetime.now().strftime('%d/%m/%y %H:%M')}] *** RIAPERTURA ALERT ***\n"
-                    f"\n"
-                    f"Host: {hostname} ({real_ip})\n"
-                    f"Servizio: {service}\n"
-                    f"Stato: {last_state} → {state}\n"
-                    f"Output: {full_output}"
-                )
-                result = add_private_note(ticket_id, grace_note)
-                if result == 0:
-                    set_cache_field(ticket_key, 'reopen_at', int(time.time()))
-                    update_ticket_state(ticket_key, state)
-                    log_ticket_event("RIAPERTO", ticket_id, f"{hostname}/{service} {state}")
-                    log(f"Ticket #{ticket_id} riaperto con commento privato")
-                elif result == 2:
-                    log(f"Ticket #{ticket_id} not found (404), removing from cache")
-                    remove_ticket_from_cache(ticket_key)
-                    ticket_id = None
-                else:
-                    log(f"ERROR: aggiunta nota riapertura fallita su #{ticket_id}")
-                return 0
-    # === END GRACE WINDOW ===
+    # === END EFFETTUATO CHECK ===
 
     if ticket_id:
         # Update existing ticket

@@ -27,7 +27,7 @@ except ImportError:
     print("   pip3 install requests python-dotenv")
     sys.exit(127)
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
 # ===== GLOBAL CONFIGURATION =====
 
@@ -424,20 +424,28 @@ class TicketOperations:
         if not ticket_id:
             logger.error("Ticket ID richiesto")
             raise ValueError("ticket_id obbligatorio")
-        
+
         logger.info(f"Recupero ticket #{ticket_id}...")
-        
-        # The /tickets/{id} endpoint is not accessible, we use list and filter
-        all_tickets_response = TicketOperations.list_tickets(limit=100)
-        ticket_data = next(
-            (t for t in all_tickets_response.get('objs', []) if t.get('id') == ticket_id),
-            None
-        )
-        
+
+        # /tickets/{id} (plural) returns 404. The singular /ticket/{id}
+        # endpoint works and fetches a ticket directly by ID, unlike
+        # list_tickets() which the API always caps to the ~20 most recent
+        # tickets across the whole shared Ydea instance (thousands of
+        # tickets/day, multi-tenant): any ticket that wasn't extremely
+        # recent used to come back "not found" even though it was valid.
+        try:
+            response, _ = api.api_call("GET", f"/ticket/{ticket_id}")
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 404:
+                logger.error(f"Ticket #{ticket_id} non trovato")
+                raise ValueError(f"Ticket {ticket_id} non trovato")
+            raise
+
+        ticket_data = response.get('ticket') if isinstance(response, dict) else None
         if not ticket_data:
             logger.error(f"Ticket #{ticket_id} non trovato")
             raise ValueError(f"Ticket {ticket_id} non trovato")
-        
+
         return ticket_data
     
     @staticmethod
@@ -703,38 +711,38 @@ class TrackingSystem:
         with open(self.tracking_file, 'r', encoding='utf-8') as f:
             tracking = json.load(f)
         
-        # Retrieve all tickets from the API
-        try:
-            all_tickets_response = tickets.list_tickets(limit=100)
-            all_tickets = {t['id']: t for t in all_tickets_response.get('objs', [])}
-        except Exception:
-            logger.error("Errore recupero ticket dall'API")
-            return
-        
         for ticket_entry in tracking['tickets']:
             if ticket_entry.get('resolved_at'):
                 continue  # Skip ticket già risolti
-            
+
             ticket_id = ticket_entry['ticket_id']
             count += 1
-            
+
             logger.debug(f"Controllo ticket #{ticket_id}...")
-            
-            ticket_data = all_tickets.get(ticket_id, {})
-            
-            if not ticket_data:
+
+            # Direct per-ID lookup (get_ticket uses /ticket/{id}): list_tickets()
+            # only returns the ~20 most recent tickets across the whole shared
+            # Ydea instance, which used to mark any tracked ticket that wasn't
+            # extremely recent as "not found"/"Eliminato" even though it was
+            # still perfectly valid.
+            try:
+                ticket_data = TicketOperations.get_ticket(ticket_id)
+            except ValueError:
                 logger.warn(f" Ticket #{ticket_id} non trovato, potrebbe essere stato eliminato - contrassegnato come risolto")
                 ticket_entry['stato'] = 'Eliminato'
                 ticket_entry['resolved_at'] = now
                 ticket_entry['last_update'] = now
                 resolved += 1
                 continue
-            
+            except Exception as e:
+                logger.error(f"Errore recupero ticket #{ticket_id}: {e}")
+                continue
+
             stato = ticket_data.get('stato', 'Sconosciuto')
             descrizione_ticket = ticket_data.get('descrizione', '')
             priorita = ticket_data.get('priorita', 'Normale')
-            
-            assigned = ticket_data.get('assegnatoA')
+
+            assigned = ticket_data.get('assegnatoA') or ticket_data.get('assegnatoa')
             if isinstance(assigned, dict):
                 if assigned:
                     assegnato_a = ', '.join(str(v) for v in assigned.values())
