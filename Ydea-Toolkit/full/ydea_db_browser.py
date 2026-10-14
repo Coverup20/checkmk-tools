@@ -17,7 +17,11 @@ The only things this script can ever write are its own AUTH_FILE (one
 "user:password" line per account, via /account) and in-memory sessions -
 never the database.
 
-Version: 5.0.0"""
+Login and account pages reuse Checkmk's own #login_window card look (exact
+colors and real rounded-icon logo pulled from this server's own Checkmk
+theme), not an approximation of it.
+
+Version: 5.1.0"""
 
 import html
 import os
@@ -43,9 +47,13 @@ KEY_FILE = f"{CONFIG_DIR}/db_browser.key"
 COOKIE_NAME = "ydea_session"
 SESSION_TTL = 12 * 3600  # hours a login stays valid without re-authenticating
 
-# Checkmk's own brand colors, pulled from the real logo/theme shipped on this
-# same server (not guessed): dark background and teal/green accent are the
-# two most-used colors in /omd/versions/*/share/check_mk/web/htdocs/themes/facelift/theme.css
+# Checkmk's own brand colors and login-page layout values, pulled from the
+# real theme and login.py shipped on this same server (not guessed):
+# /omd/versions/*/share/check_mk/web/htdocs/themes/facelift/theme.css
+# (#1e262e / #13d389 are its two most-used colors; #efeff5 is the exact
+# background of #login_window, the real Checkmk login card) and
+# /omd/versions/*/lib/python3/cmk/gui/login.py (the #login/#login_window/
+# #logo page structure every Checkmk login page actually uses).
 CMK_BG = "#1e262e"
 CMK_BG_PANEL = "#242e38"
 CMK_ACCENT = "#13d389"
@@ -53,12 +61,16 @@ CMK_BORDER = "#2f3b45"
 CMK_ERROR = "#c83232"
 CMK_TEXT = "#e8e8ee"
 CMK_TEXT_DIM = "#8c96a0"
+CMK_CARD_BG = "#efeff5"
+CMK_CARD_TEXT = "#1e262e"
+CMK_CARD_BORDER = "#cccfdb"
 
-# Checkmk's own logo SVG (icon_checkmk_logo.svg from the same facelift theme),
-# embedded inline instead of re-hosting a separate asset file.
-CMK_LOGO_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 80 80">
-  <rect x="1" y="1" width="78" height="78" fill="#1e262e" rx="12" stroke="#13d389" stroke-width="2"/>
-  <path d="M20 42 L34 56 L60 24" fill="none" stroke="#13d389" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+# Checkmk's own rounded-icon logo (icon_checkmk_logo_min.svg from the same
+# facelift theme), embedded inline instead of re-hosting a separate asset
+# file - the real icon, not an approximation.
+CMK_LOGO_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 28 28" width="28" height="28">
+  <defs><clipPath id="rounded"><rect width="28" height="28" rx="7" ry="7"/></clipPath></defs>
+  <image x="0" y="0" width="28" height="28" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4CAYAAAA5ZDbSAAAACXBIWXMAAAsSAAALEgHS3X78AAAEeElEQVR4nO3czW4aVxyG8X9GeEptbA9YFokqakts6k09i3rjTcgmqy7IFWRyBeESuIPSKyjqBVR0603owt40C1i5G1pTFo6F4oEUHGdA0y6sRK2UkjMD83Fevb+lNWKOeMyZOWZ87smPv/8tBMtIegAULQYGx8DgGBgcA4NjYHAMDI6BwTEwOAYGx8DgGBgcA4NjYHAMDI6BwTEwOAYGx8DgGBhcJukBiIg0jnbEzpsLj+m4ntR+fR3TiHCkIrCdN+VhMZv0MCBxigbHwOAYGBwDg2NgcAwMjoHBMTA4BgbHwOAYGBwDg9MmcPvqNukhaEmbwK3BNOkhaEmLwP3pXDrXXtLD0JIWgZ3TYdJD0FbqAz87G/L6u4RUPNHxMeOZL87pUFqDm6SHorXUBe66njR7f0mzN5GR56/89e2CKdaaIZZpiF347MPPO9fvPpwPacZIReDay9dirRnScb2VR7ULpjjlzcDPfXVdT9pXt9J+9VbrWeQe4laGlmmIU85J7WBb9jaW/x0ez3xp9ibSOB/LxWS+ghHGBy5w7WBL6od52V6L5v7x+9/eSL3rRnL5iAJM4P1cRprHu7E8ftufzsU51ePuPvXLJBWVYlY6334R27PVexsZefH4gdQOtmI53zK0D+yUc/Li8YPIpuRFvvtmR5rHu7GfNwitAzvlnPyQ8Bv8tJyTxtFOomNYRNvAdsFMzRv7/Kstccq5pIfxUalYBwdlmYY0j3dDT8v96VwuJvP/rLsrxaxYpiGHn/gnuP/TONqR9tVt6pZRWgauHWwHDtGfzqVxPpbW4GZhBMs0pFpaF6e8GeimbXvt7peucnIZaFxR026ZtJ/LyB9PSsrHj2e+1LuuNM7fBD5XpZiV1qNioJni0cllqpZP2l2D61/nlY8dz3ypnFyGiity9zfp/Z8G0nXVv4uuH6qPLw5aBbZMQ6pfrisd+z7usg8KjLy711GN/LCYFbsQ7joeBa0CV0vrytOlczpc2VMgI88X52wo45nanyed8uZKzrsKWgWuFD9XOu7nwc3KvwHqXHvKU321pDbLxEGvwPfV7mprL6PZy6NxPlb6FO9tZMQy0/HWpmMUCizTUPrqr+t6ka1FR54vrT/VZoZPbSoTF20Cq75hUX85r/r4buW+2uUkatoEVp3y2q/eRjqONK1xVWgT+N/PTy3SCbBmDWPk+UrXYV6DIxLHkxYqyy9egykWDAyOgcExMDgGBsfA4BgYHAODY2BwDAyOgcExMDgGBsfA4BgYHAODY2BwDAyOgcExMDgGBsfA4BgYHAODY2BwDAyOgcExMDgGDiFtm50twsAhtK+i/R/kVWLgEFqDG+Udd5LGwCGMPD/05mpxY+CQ6l030A54SWHgJVROLuWXlO/ZwcBLeL/N4bOzofSn6byz1mY74YvJLLWflmZvIs3eROyCKdXShth5Uy5SEly77YQpGE7R4BgYHAODY2BwDAyOgcExMDgGBsfA4BgYHAODY2BwDAyOgcExMDgGBsfA4BgYHAODY2Bw/wCiMEuJtr6fmQAAAABJRU5ErkJggg==" preserveAspectRatio="xMidYMid meet" clip-path="url(#rounded)"/>
 </svg>'''
 
 # In-memory only: token -> (username, expires_at). A service restart logs
@@ -104,17 +116,7 @@ def query_tickets(search: str = ""):
     return rows
 
 
-def page_shell(title: str, body: str, current_user: str = "") -> bytes:
-    brand = f'{CMK_LOGO_SVG}<span class="brand-text">Ydea ticket cache</span>'
-    nav_links = ""
-    if current_user:
-        nav_links = f'<a href="/">Ticket</a><a href="/account">Account ({html.escape(current_user)})</a><a href="/logout">Esci</a>'
-    return f"""<!doctype html>
-<html lang="it">
-<head>
-<meta charset="utf-8">
-<title>{html.escape(title)}</title>
-<style>
+CMK_SHARED_CSS = f"""
   body {{ font-family: "Inter", system-ui, sans-serif; margin: 0; background: {CMK_BG}; color: {CMK_TEXT}; }}
   .page {{ max-width: 100%; padding: 1.5rem 2rem; }}
   header {{ display: flex; align-items: center; gap: 1.5rem; padding: 0.8rem 2rem; background: {CMK_BG_PANEL}; border-bottom: 2px solid {CMK_ACCENT}; }}
@@ -125,12 +127,6 @@ def page_shell(title: str, body: str, current_user: str = "") -> bytes:
   nav a:hover {{ color: {CMK_ACCENT}; }}
   h1 {{ font-size: 1.2rem; color: {CMK_TEXT}; margin-top: 0; }}
   .meta {{ color: {CMK_TEXT_DIM}; font-size: 0.85rem; margin-bottom: 1rem; }}
-  form {{ margin-bottom: 1rem; }}
-  fieldset {{ border: 1px solid {CMK_BORDER}; margin-bottom: 1rem; max-width: 24rem; border-radius: 4px; }}
-  legend {{ color: {CMK_TEXT_DIM}; padding: 0 0.4rem; }}
-  input[type=text], input[type=password] {{ padding: 0.4rem; width: 20rem; background: {CMK_BG}; color: {CMK_TEXT}; border: 1px solid {CMK_BORDER}; border-radius: 3px; }}
-  button {{ padding: 0.45rem 1rem; background: {CMK_ACCENT}; color: #0a1410; border: none; border-radius: 3px; font-weight: 600; cursor: pointer; }}
-  button:hover {{ opacity: 0.85; }}
   table {{ border-collapse: collapse; width: 100%; font-size: 0.85rem; }}
   th, td {{ border: 1px solid {CMK_BORDER}; padding: 0.4rem 0.6rem; text-align: left; white-space: nowrap; }}
   th {{ background: {CMK_BG_PANEL}; color: {CMK_TEXT_DIM}; font-weight: 600; }}
@@ -138,6 +134,36 @@ def page_shell(title: str, body: str, current_user: str = "") -> bytes:
   a {{ color: {CMK_ACCENT}; }}
   .error {{ color: {CMK_ERROR}; }}
   .ok {{ color: {CMK_ACCENT}; }}
+
+  /* Checkmk's own #login_window card: same background, radius and padding
+     as the real login page, reused here for the login card itself and for
+     every form panel on the account page (same visual language). */
+  .cmk-card {{ background: {CMK_CARD_BG}; color: {CMK_CARD_TEXT}; border-radius: 8px; padding: 25px 40px; box-sizing: border-box; max-width: 370px; margin: 0 auto 1.5rem; box-shadow: 0 4px 18px rgba(0,0,0,.35); }}
+  .cmk-card h2, .cmk-card legend {{ font-size: 1rem; margin: 0 0 1rem; color: {CMK_CARD_TEXT}; }}
+  .cmk-card label {{ display: block; font-size: 0.85rem; margin: 0.8rem 0 0.2rem; color: {CMK_CARD_TEXT}; }}
+  .cmk-card input[type=text], .cmk-card input[type=password] {{ width: 100%; padding: 0.45rem 0.5rem; background: #fff; color: {CMK_CARD_TEXT}; border: 1px solid {CMK_CARD_BORDER}; border-radius: 3px; box-sizing: border-box; }}
+  .cmk-card button {{ margin-top: 1.2rem; width: 100%; }}
+  .cmk-card .error {{ font-size: 0.85rem; }}
+  .cmk-card .ok {{ font-size: 0.85rem; }}
+
+  button {{ padding: 0.5rem 1rem; background: {CMK_ACCENT}; color: #0a1410; border: none; border-radius: 3px; font-weight: 600; cursor: pointer; }}
+  button:hover {{ opacity: 0.85; }}
+"""
+
+
+def page_shell(title: str, body: str, current_user: str = "") -> bytes:
+    brand = f'{CMK_LOGO_SVG}<span class="brand-text">Ydea ticket cache</span>'
+    nav_links = ""
+    if current_user:
+        nav_links = f'<a href="/">Ticket</a><a href="/account">Account ({html.escape(current_user)})</a><a href="/logout">Esci</a>'
+    return f"""<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>{html.escape(title)}</title>
+<style>{CMK_SHARED_CSS}
+  form {{ margin-bottom: 1rem; }}
+  input[type=text], input[type=password] {{ padding: 0.4rem; width: 20rem; background: {CMK_BG}; color: {CMK_TEXT}; border: 1px solid {CMK_BORDER}; border-radius: 3px; }}
 </style>
 </head>
 <body>
@@ -154,17 +180,37 @@ def page_shell(title: str, body: str, current_user: str = "") -> bytes:
 
 def render_login_page(message: str = "") -> bytes:
     msg_html = f'<p class="error">{html.escape(message)}</p>' if message else ""
-    body = f"""
-<h1>Ydea ticket cache - login</h1>
-{msg_html}
-<fieldset>
-<form method="post" action="/login">
-  <p>Utente: <input type="text" name="username" required autofocus></p>
-  <p>Password: <input type="password" name="password" required></p>
-  <button type="submit">Accedi</button>
-</form>
-</fieldset>"""
-    return page_shell("Login", body)
+    # Mirrors Checkmk's own login.py structure: #login (full-screen, centered)
+    # > #login_window (the card) > logo, then the form, same as every real
+    # Checkmk login page - not just the colors.
+    return f"""<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Login - Ydea ticket cache</title>
+<style>{CMK_SHARED_CSS}
+  body.login {{ display: flex; align-items: center; justify-content: center; min-height: 100vh; }}
+  #login_window {{ text-align: center; }}
+  #logo {{ margin-bottom: 1.2rem; }}
+  .cmk-card form {{ text-align: left; }}
+  #foot {{ margin-top: 1.5rem; color: {CMK_TEXT_DIM}; font-size: 0.75rem; text-align: center; }}
+</style>
+</head>
+<body class="login">
+<div id="login_window" class="cmk-card">
+  <div id="logo">{CMK_LOGO_SVG}</div>
+  {msg_html}
+  <form method="post" action="/login">
+    <label for="input_user">Utente:</label>
+    <input type="text" name="username" id="input_user" required autofocus autocomplete="username">
+    <label for="input_pass">Password:</label>
+    <input type="password" name="password" id="input_pass" required autocomplete="current-password">
+    <button type="submit">Accedi</button>
+  </form>
+</div>
+<div id="foot">Ydea ticket cache</div>
+</body>
+</html>""".encode("utf-8")
 
 
 def render_tickets_page(search: str, current_user: str) -> bytes:
@@ -224,24 +270,28 @@ def render_account_page(current_user: str, message: str = "", is_error: bool = F
 <h1>Account</h1>
 <div class="meta">Autenticato come <b>{html.escape(current_user)}</b>. Utenti esistenti: <ul>{users_html}</ul></div>
 {msg_html}
-<fieldset>
-<legend>Cambia la tua password</legend>
+<div class="cmk-card">
+<h2>Cambia la tua password</h2>
 <form method="post" action="/account">
   <input type="hidden" name="action" value="change_password">
-  <p>Nuova password: <input type="password" name="new_password" required minlength="8"></p>
-  <p>Conferma: <input type="password" name="confirm_password" required minlength="8"></p>
+  <label for="new_password">Nuova password:</label>
+  <input type="password" name="new_password" id="new_password" required minlength="8">
+  <label for="confirm_password">Conferma:</label>
+  <input type="password" name="confirm_password" id="confirm_password" required minlength="8">
   <button type="submit">Cambia password</button>
 </form>
-</fieldset>
-<fieldset>
-<legend>Crea nuovo utente</legend>
+</div>
+<div class="cmk-card">
+<h2>Crea nuovo utente</h2>
 <form method="post" action="/account">
   <input type="hidden" name="action" value="add_user">
-  <p>Nome utente: <input type="text" name="new_username" required></p>
-  <p>Password: <input type="password" name="new_user_password" required minlength="8"></p>
+  <label for="new_username">Nome utente:</label>
+  <input type="text" name="new_username" id="new_username" required>
+  <label for="new_user_password">Password:</label>
+  <input type="password" name="new_user_password" id="new_user_password" required minlength="8">
   <button type="submit">Crea utente</button>
 </form>
-</fieldset>"""
+</div>"""
     return page_shell("Account", body, current_user)
 
 
