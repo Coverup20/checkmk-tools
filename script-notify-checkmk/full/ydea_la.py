@@ -573,8 +573,8 @@ def is_transient_network_error(text: str) -> bool:
     ))
 
 
-def create_ydea_ticket(title: str, description: str, priority: str, 
-                       category_id: int, hostname: str, service: str, 
+def create_ydea_ticket(title: str, description: str, priority: str,
+                       category_id: int, hostname: str, service: str,
                        output: str) -> Optional[int]:
     """Create Ydea ticket. Retries up to YDEA_MAX_RETRIES times on transient network errors."""
     tipo = determine_tipo(hostname, service, output)
