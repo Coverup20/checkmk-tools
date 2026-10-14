@@ -21,7 +21,7 @@ Login and account pages reuse Checkmk's own #login_window card look (exact
 colors and real rounded-icon logo pulled from this server's own Checkmk
 theme), not an approximation of it.
 
-Version: 5.1.0"""
+Version: 5.1.1"""
 
 import html
 import os
@@ -245,7 +245,6 @@ def render_tickets_page(search: str, current_user: str) -> bytes:
 
     body = f"""
 <h1>Ydea ticket cache - shadow SQLite (sola lettura)</h1>
-<div class="meta">DB: {html.escape(DB_PATH)} - JSON resta la fonte autorevole per le decisioni dello script di notifica. I campi Ydea (stato, assegnatario, ...) sono sincronizzati periodicamente da ydea_cache_validator.py, non letti in tempo reale.</div>
 <form method="get">
   <input type="text" name="q" placeholder="filtra per host, azienda o titolo..." value="{html.escape(search)}">
   <button type="submit">Cerca</button>
