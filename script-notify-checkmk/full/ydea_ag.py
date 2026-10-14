@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -220,11 +220,27 @@ def atomic_cache_write(cache_file: str, content: str) -> bool:
         return False
 
 
+def _fix_db_perms():
+    """Make the db file and its WAL/SHM sidecars world-writable, matching the
+    JSON cache files (atomic_cache_write chmods those to 0o666 too). Without
+    this, whichever user first creates the file - root during manual testing,
+    the OMD site user ('monitoring') during a real notification - locks the
+    other one out of writing to it."""
+    for suffix in ("", "-wal", "-shm"):
+        path = DB_PATH + suffix
+        if os.path.exists(path):
+            try:
+                os.chmod(path, 0o666)
+            except Exception as e:
+                debug(f"_fix_db_perms({path}) failed: {e}")
+
+
 def _db_connect() -> Optional[sqlite3.Connection]:
     """Open a short-lived SQLite connection for the shadow write. Returns
     None on any failure - callers must treat that as 'skip, not fatal'."""
     try:
         conn = sqlite3.connect(DB_PATH, timeout=5)
+        _fix_db_perms()
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
         return conn
@@ -264,6 +280,7 @@ def init_db():
         debug(f"init_db failed: {e}")
     finally:
         conn.close()
+        _fix_db_perms()
 
 
 def db_upsert_ticket(key: str, ticket_id: int, state: str, created_at: int,
