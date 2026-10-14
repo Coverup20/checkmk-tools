@@ -4,22 +4,30 @@
 Binds to 127.0.0.1 only - reachable exclusively via SSH tunnel or locally on
 the host. Opens the database in SQLite's own read-only URI mode, so even a
 bug here cannot write to or corrupt the cache the notification scripts use.
-Serves HTTPS with a self-signed certificate and requires HTTP Basic Auth.
+Serves HTTPS with a self-signed certificate behind a real login page and
+server-side sessions (cookie-based) - not HTTP Basic Auth, so a real logout
+is possible (Basic Auth credentials otherwise stay cached by the browser
+until it is closed, with no way to clear them from the server side).
 
 All Ydea-side fields (title, status, assignee, link, company, ...) come from
 the ticket_details table, kept in sync by ydea_cache_validator.py - this
 viewer never calls the Ydea API itself, it only reads the local database.
 
-Version: 3.0.0"""
+The only things this script can ever write are its own AUTH_FILE (one
+"user:password" line per account, via /account) and in-memory sessions -
+never the database.
 
-import base64
+Version: 5.0.0"""
+
 import html
 import os
 import secrets
 import sqlite3
 import ssl
 import subprocess
+import time
 from datetime import datetime, timezone
+from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -31,6 +39,32 @@ CONFIG_DIR = "/opt/ydea-toolkit/config"
 AUTH_FILE = f"{CONFIG_DIR}/db_browser_auth"
 CERT_FILE = f"{CONFIG_DIR}/db_browser.crt"
 KEY_FILE = f"{CONFIG_DIR}/db_browser.key"
+
+COOKIE_NAME = "ydea_session"
+SESSION_TTL = 12 * 3600  # hours a login stays valid without re-authenticating
+
+# Checkmk's own brand colors, pulled from the real logo/theme shipped on this
+# same server (not guessed): dark background and teal/green accent are the
+# two most-used colors in /omd/versions/*/share/check_mk/web/htdocs/themes/facelift/theme.css
+CMK_BG = "#1e262e"
+CMK_BG_PANEL = "#242e38"
+CMK_ACCENT = "#13d389"
+CMK_BORDER = "#2f3b45"
+CMK_ERROR = "#c83232"
+CMK_TEXT = "#e8e8ee"
+CMK_TEXT_DIM = "#8c96a0"
+
+# Checkmk's own logo SVG (icon_checkmk_logo.svg from the same facelift theme),
+# embedded inline instead of re-hosting a separate asset file.
+CMK_LOGO_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 80 80">
+  <rect x="1" y="1" width="78" height="78" fill="#1e262e" rx="12" stroke="#13d389" stroke-width="2"/>
+  <path d="M20 42 L34 56 L60 24" fill="none" stroke="#13d389" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>'''
+
+# In-memory only: token -> (username, expires_at). A service restart logs
+# everyone out, which is an acceptable trade-off for a tool with no database
+# of its own to persist sessions into.
+SESSIONS = {}
 
 
 def fmt_ts(ts):
@@ -70,7 +104,70 @@ def query_tickets(search: str = ""):
     return rows
 
 
-def render_page(search: str = "") -> bytes:
+def page_shell(title: str, body: str, current_user: str = "") -> bytes:
+    brand = f'{CMK_LOGO_SVG}<span class="brand-text">Ydea ticket cache</span>'
+    nav_links = ""
+    if current_user:
+        nav_links = f'<a href="/">Ticket</a><a href="/account">Account ({html.escape(current_user)})</a><a href="/logout">Esci</a>'
+    return f"""<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>{html.escape(title)}</title>
+<style>
+  body {{ font-family: "Inter", system-ui, sans-serif; margin: 0; background: {CMK_BG}; color: {CMK_TEXT}; }}
+  .page {{ max-width: 100%; padding: 1.5rem 2rem; }}
+  header {{ display: flex; align-items: center; gap: 1.5rem; padding: 0.8rem 2rem; background: {CMK_BG_PANEL}; border-bottom: 2px solid {CMK_ACCENT}; }}
+  .brand {{ display: flex; align-items: center; gap: 0.6rem; font-weight: 600; font-size: 1.05rem; }}
+  .brand-text {{ color: {CMK_TEXT}; }}
+  nav {{ font-size: 0.9rem; margin-left: auto; }}
+  nav a {{ margin-left: 1.2rem; color: {CMK_TEXT_DIM}; text-decoration: none; }}
+  nav a:hover {{ color: {CMK_ACCENT}; }}
+  h1 {{ font-size: 1.2rem; color: {CMK_TEXT}; margin-top: 0; }}
+  .meta {{ color: {CMK_TEXT_DIM}; font-size: 0.85rem; margin-bottom: 1rem; }}
+  form {{ margin-bottom: 1rem; }}
+  fieldset {{ border: 1px solid {CMK_BORDER}; margin-bottom: 1rem; max-width: 24rem; border-radius: 4px; }}
+  legend {{ color: {CMK_TEXT_DIM}; padding: 0 0.4rem; }}
+  input[type=text], input[type=password] {{ padding: 0.4rem; width: 20rem; background: {CMK_BG}; color: {CMK_TEXT}; border: 1px solid {CMK_BORDER}; border-radius: 3px; }}
+  button {{ padding: 0.45rem 1rem; background: {CMK_ACCENT}; color: #0a1410; border: none; border-radius: 3px; font-weight: 600; cursor: pointer; }}
+  button:hover {{ opacity: 0.85; }}
+  table {{ border-collapse: collapse; width: 100%; font-size: 0.85rem; }}
+  th, td {{ border: 1px solid {CMK_BORDER}; padding: 0.4rem 0.6rem; text-align: left; white-space: nowrap; }}
+  th {{ background: {CMK_BG_PANEL}; color: {CMK_TEXT_DIM}; font-weight: 600; }}
+  tr:hover td {{ background: {CMK_BG_PANEL}; }}
+  a {{ color: {CMK_ACCENT}; }}
+  .error {{ color: {CMK_ERROR}; }}
+  .ok {{ color: {CMK_ACCENT}; }}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">{brand}</div>
+  <nav>{nav_links}</nav>
+</header>
+<div class="page">
+{body}
+</div>
+</body>
+</html>""".encode("utf-8")
+
+
+def render_login_page(message: str = "") -> bytes:
+    msg_html = f'<p class="error">{html.escape(message)}</p>' if message else ""
+    body = f"""
+<h1>Ydea ticket cache - login</h1>
+{msg_html}
+<fieldset>
+<form method="post" action="/login">
+  <p>Utente: <input type="text" name="username" required autofocus></p>
+  <p>Password: <input type="password" name="password" required></p>
+  <button type="submit">Accedi</button>
+</form>
+</fieldset>"""
+    return page_shell("Login", body)
+
+
+def render_tickets_page(search: str, current_user: str) -> bytes:
     try:
         rows = query_tickets(search)
         error = None
@@ -100,26 +197,7 @@ def render_page(search: str = "") -> bytes:
 
     error_html = f'<p class="error">Errore: {html.escape(error)}</p>' if error else ""
 
-    return f"""<!doctype html>
-<html lang="it">
-<head>
-<meta charset="utf-8">
-<title>Ydea ticket cache (sola lettura)</title>
-<style>
-  body {{ font-family: system-ui, sans-serif; margin: 2rem; background: #111; color: #ddd; }}
-  h1 {{ font-size: 1.3rem; }}
-  .meta {{ color: #888; font-size: 0.85rem; margin-bottom: 1rem; }}
-  form {{ margin-bottom: 1rem; }}
-  input[type=text] {{ padding: 0.4rem; width: 20rem; background: #222; color: #eee; border: 1px solid #444; }}
-  button {{ padding: 0.4rem 0.8rem; }}
-  table {{ border-collapse: collapse; width: 100%; font-size: 0.85rem; }}
-  th, td {{ border: 1px solid #333; padding: 0.35rem 0.5rem; text-align: left; white-space: nowrap; }}
-  th {{ background: #1b1b1b; }}
-  a {{ color: #6cf; }}
-  .error {{ color: #e55; }}
-</style>
-</head>
-<body>
+    body = f"""
 <h1>Ydea ticket cache - shadow SQLite (sola lettura)</h1>
 <div class="meta">DB: {html.escape(DB_PATH)} - JSON resta la fonte autorevole per le decisioni dello script di notifica. I campi Ydea (stato, assegnatario, ...) sono sincronizzati periodicamente da ydea_cache_validator.py, non letti in tempo reale.</div>
 <form method="get">
@@ -129,19 +207,48 @@ def render_page(search: str = "") -> bytes:
 {error_html}
 <table>
 <tr>
-  <th>Host/key</th><th>Ticket</th><th>Titolo</th><th>Stato</th><th>Priorita</th><th>Tipo</th>
+  <th>Host</th><th>Ticket</th><th>Titolo</th><th>Stato</th><th>Priorita</th><th>Tipo</th>
   <th>Assegnatario</th><th>Azienda</th><th>Contratto</th>
   <th>Creato (Ydea)</th><th>Modificato (Ydea)</th><th>Chiuso (Ydea)</th><th>Sync</th>
 </tr>
 {"".join(body_rows) if body_rows else "<tr><td colspan='13'>Nessun ticket in cache.</td></tr>"}
-</table>
-</body>
-</html>""".encode("utf-8")
+</table>"""
+    return page_shell("Ydea ticket cache", body, current_user)
 
 
-def load_credentials():
-    """Read 'username:password' from AUTH_FILE. Generates one on first run
-    if missing, so a fresh deploy never starts without auth."""
+def render_account_page(current_user: str, message: str = "", is_error: bool = False) -> bytes:
+    users = list(load_all_credentials().keys())
+    msg_html = f'<p class="{"error" if is_error else "ok"}">{html.escape(message)}</p>' if message else ""
+    users_html = "".join(f"<li>{html.escape(u)}</li>" for u in users)
+    body = f"""
+<h1>Account</h1>
+<div class="meta">Autenticato come <b>{html.escape(current_user)}</b>. Utenti esistenti: <ul>{users_html}</ul></div>
+{msg_html}
+<fieldset>
+<legend>Cambia la tua password</legend>
+<form method="post" action="/account">
+  <input type="hidden" name="action" value="change_password">
+  <p>Nuova password: <input type="password" name="new_password" required minlength="8"></p>
+  <p>Conferma: <input type="password" name="confirm_password" required minlength="8"></p>
+  <button type="submit">Cambia password</button>
+</form>
+</fieldset>
+<fieldset>
+<legend>Crea nuovo utente</legend>
+<form method="post" action="/account">
+  <input type="hidden" name="action" value="add_user">
+  <p>Nome utente: <input type="text" name="new_username" required></p>
+  <p>Password: <input type="password" name="new_user_password" required minlength="8"></p>
+  <button type="submit">Crea utente</button>
+</form>
+</fieldset>"""
+    return page_shell("Account", body, current_user)
+
+
+def load_all_credentials() -> dict:
+    """Read every 'username:password' line from AUTH_FILE. Generates a
+    first admin user on first run if the file is missing, so a fresh
+    deploy never starts without auth."""
     if not os.path.exists(AUTH_FILE):
         os.makedirs(CONFIG_DIR, exist_ok=True, mode=0o750)
         username = "ydea-viewer"
@@ -150,10 +257,22 @@ def load_credentials():
             f.write(f"{username}:{password}\n")
         os.chmod(AUTH_FILE, 0o600)
         print(f"Generated credentials in {AUTH_FILE}: {username}:{password}")
+    creds = {}
     with open(AUTH_FILE, "r") as f:
-        line = f.read().strip()
-    user, _, pwd = line.partition(":")
-    return user, pwd
+        for line in f:
+            line = line.strip()
+            if not line or ":" not in line:
+                continue
+            user, _, pwd = line.partition(":")
+            creds[user] = pwd
+    return creds
+
+
+def save_all_credentials(creds: dict):
+    with open(AUTH_FILE, "w") as f:
+        for user, pwd in creds.items():
+            f.write(f"{user}:{pwd}\n")
+    os.chmod(AUTH_FILE, 0o600)
 
 
 def ensure_cert():
@@ -170,54 +289,170 @@ def ensure_cert():
     os.chmod(CERT_FILE, 0o644)
 
 
+def create_session(username: str) -> str:
+    token = secrets.token_urlsafe(32)
+    SESSIONS[token] = (username, time.time() + SESSION_TTL)
+    return token
+
+
+def resolve_session(token: str):
+    entry = SESSIONS.get(token)
+    if not entry:
+        return None
+    username, expires_at = entry
+    if time.time() > expires_at:
+        SESSIONS.pop(token, None)
+        return None
+    return username
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass  # keep stdout clean under systemd; journald captures connections separately if needed
 
-    def _check_auth(self) -> bool:
-        header = self.headers.get("Authorization", "")
-        if not header.startswith("Basic "):
-            return False
-        try:
-            decoded = base64.b64decode(header[6:]).decode("utf-8")
-        except Exception:
-            return False
-        user, _, pwd = decoded.partition(":")
-        expected_user, expected_pwd = load_credentials()
-        return secrets.compare_digest(user, expected_user) and secrets.compare_digest(pwd, expected_pwd)
+    def _current_user(self):
+        raw_cookie = self.headers.get("Cookie")
+        if not raw_cookie:
+            return None
+        jar = cookies.SimpleCookie()
+        jar.load(raw_cookie)
+        morsel = jar.get(COOKIE_NAME)
+        if not morsel:
+            return None
+        return resolve_session(morsel.value)
 
-    def _require_auth(self):
-        self.send_response(401)
-        self.send_header("WWW-Authenticate", 'Basic realm="Ydea ticket cache"')
+    def _set_session_cookie(self, token: str):
+        self.send_header(
+            "Set-Cookie",
+            f"{COOKIE_NAME}={token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age={SESSION_TTL}"
+        )
+
+    def _clear_session_cookie(self):
+        self.send_header("Set-Cookie", f"{COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0")
+
+    def _redirect(self, location: str, clear_cookie: bool = False):
+        self.send_response(302)
+        self.send_header("Location", location)
+        if clear_cookie:
+            self._clear_session_cookie()
         self.send_header("Content-Length", "0")
         self.end_headers()
 
-    def do_GET(self):
-        if not self._check_auth():
-            self._require_auth()
-            return
-        parsed = urlparse(self.path)
-        if parsed.path not in ("/", ""):
-            self.send_response(404)
-            self.end_headers()
-            return
-        search = parse_qs(parsed.query).get("q", [""])[0]
-        body = render_page(search)
-        self.send_response(200)
+    def _send_html(self, body: bytes, status: int = 200):
+        self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
+    def _read_form(self) -> dict:
+        length = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(length).decode("utf-8") if length else ""
+        return parse_qs(raw)
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        current_user = self._current_user()
+
+        if parsed.path == "/login":
+            if current_user:
+                self._redirect("/")
+                return
+            self._send_html(render_login_page())
+            return
+
+        if parsed.path == "/logout":
+            self._redirect("/login", clear_cookie=True)
+            return
+
+        if not current_user:
+            self._redirect("/login")
+            return
+
+        if parsed.path in ("/", ""):
+            search = parse_qs(parsed.query).get("q", [""])[0]
+            self._send_html(render_tickets_page(search, current_user))
+        elif parsed.path == "/account":
+            self._send_html(render_account_page(current_user))
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def do_POST(self):
+        parsed = urlparse(self.path)
+
+        if parsed.path == "/login":
+            fields = self._read_form()
+            username = fields.get("username", [""])[0]
+            password = fields.get("password", [""])[0]
+            creds = load_all_credentials()
+            expected = creds.get(username)
+            if expected is not None and secrets.compare_digest(password, expected):
+                token = create_session(username)
+                self.send_response(302)
+                self.send_header("Location", "/")
+                self._set_session_cookie(token)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+            else:
+                self._send_html(render_login_page("Utente o password non validi."), status=401)
+            return
+
+        current_user = self._current_user()
+        if not current_user:
+            self._redirect("/login")
+            return
+
+        if parsed.path != "/account":
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        fields = self._read_form()
+        action = fields.get("action", [""])[0]
+        creds = load_all_credentials()
+        message, is_error = "", False
+
+        if action == "change_password":
+            new_pwd = fields.get("new_password", [""])[0]
+            confirm_pwd = fields.get("confirm_password", [""])[0]
+            if len(new_pwd) < 8:
+                message, is_error = "La password deve avere almeno 8 caratteri.", True
+            elif new_pwd != confirm_pwd:
+                message, is_error = "Le due password non coincidono.", True
+            else:
+                creds[current_user] = new_pwd
+                save_all_credentials(creds)
+                message = "Password aggiornata."
+
+        elif action == "add_user":
+            new_user = fields.get("new_username", [""])[0].strip()
+            new_pwd = fields.get("new_user_password", [""])[0]
+            if not new_user:
+                message, is_error = "Nome utente mancante.", True
+            elif new_user in creds:
+                message, is_error = f"L'utente '{new_user}' esiste gia'.", True
+            elif len(new_pwd) < 8:
+                message, is_error = "La password deve avere almeno 8 caratteri.", True
+            else:
+                creds[new_user] = new_pwd
+                save_all_credentials(creds)
+                message = f"Utente '{new_user}' creato."
+
+        else:
+            message, is_error = "Azione sconosciuta.", True
+
+        self._send_html(render_account_page(current_user, message, is_error))
+
 
 def main():
     ensure_cert()
-    load_credentials()  # generates on first run if missing
+    load_all_credentials()  # generates the first user on first run if missing
     server = ThreadingHTTPServer((BIND_HOST, BIND_PORT), Handler)
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(certfile=CERT_FILE, keyfile=KEY_FILE)
     server.socket = ctx.wrap_socket(server.socket, server_side=True)
-    print(f"ydea_db_browser listening on https://{BIND_HOST}:{BIND_PORT} (read-only, auth required)")
+    print(f"ydea_db_browser listening on https://{BIND_HOST}:{BIND_PORT} (read-only, login required)")
     server.serve_forever()
 
 
