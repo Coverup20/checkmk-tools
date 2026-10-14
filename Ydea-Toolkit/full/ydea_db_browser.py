@@ -17,11 +17,12 @@ The only things this script can ever write are its own AUTH_FILE (one
 "user:password" line per account, via /account) and in-memory sessions -
 never the database.
 
-Login and account pages reuse Checkmk's own #login_window card look (exact
-colors and real rounded-icon logo pulled from this server's own Checkmk
-theme), not an approximation of it.
+Login and account pages reuse Checkmk's own #login_window card look (the
+real dark modern-dark theme, not the lighter facelift one a prior pass of
+this file mistakenly used) and the real rounded-hexagon logo vector, not
+an approximation of either.
 
-Version: 5.1.1"""
+Version: 5.2.0"""
 
 import html
 import os
@@ -48,12 +49,13 @@ COOKIE_NAME = "ydea_session"
 SESSION_TTL = 12 * 3600  # hours a login stays valid without re-authenticating
 
 # Checkmk's own brand colors and login-page layout values, pulled from the
-# real theme and login.py shipped on this same server (not guessed):
-# /omd/versions/*/share/check_mk/web/htdocs/themes/facelift/theme.css
-# (#1e262e / #13d389 are its two most-used colors; #efeff5 is the exact
-# background of #login_window, the real Checkmk login card) and
-# /omd/versions/*/lib/python3/cmk/gui/login.py (the #login/#login_window/
-# #logo page structure every Checkmk login page actually uses).
+# real theme shipped on this same server (not guessed), specifically from
+# modern-dark/theme.css - the dark theme Checkmk actually renders by default,
+# not the lighter "facelift" one an earlier pass of this file wrongly read:
+# /omd/versions/*/share/check_mk/web/htdocs/themes/modern-dark/theme.css
+# #login_window { background:#11181d; ... } is the real dark login card,
+# input[type=text] { background-color:#303946; color:#fff; } the real
+# text fields, and rgb(18.67,185.83,...) (~#13d389) the real button green.
 CMK_BG = "#1e262e"
 CMK_BG_PANEL = "#242e38"
 CMK_ACCENT = "#13d389"
@@ -61,16 +63,20 @@ CMK_BORDER = "#2f3b45"
 CMK_ERROR = "#c83232"
 CMK_TEXT = "#e8e8ee"
 CMK_TEXT_DIM = "#8c96a0"
-CMK_CARD_BG = "#efeff5"
-CMK_CARD_TEXT = "#1e262e"
-CMK_CARD_BORDER = "#cccfdb"
+CMK_CARD_BG = "#11181d"
+CMK_CARD_TEXT = "#ffffff"
+CMK_CARD_INPUT_BG = "#303946"
 
-# Checkmk's own rounded-icon logo (icon_checkmk_logo_min.svg from the same
-# facelift theme), embedded inline instead of re-hosting a separate asset
-# file - the real icon, not an approximation.
-CMK_LOGO_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 28 28" width="28" height="28">
-  <defs><clipPath id="rounded"><rect width="28" height="28" rx="7" ry="7"/></clipPath></defs>
-  <image x="0" y="0" width="28" height="28" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4CAYAAAA5ZDbSAAAACXBIWXMAAAsSAAALEgHS3X78AAAEeElEQVR4nO3czW4aVxyG8X9GeEptbA9YFokqakts6k09i3rjTcgmqy7IFWRyBeESuIPSKyjqBVR0603owt40C1i5G1pTFo6F4oEUHGdA0y6sRK2UkjMD83Fevb+lNWKOeMyZOWZ87smPv/8tBMtIegAULQYGx8DgGBgcA4NjYHAMDI6BwTEwOAYGx8DgGBgcA4NjYHAMDI6BwTEwOAYGx8DgGBhcJukBiIg0jnbEzpsLj+m4ntR+fR3TiHCkIrCdN+VhMZv0MCBxigbHwOAYGBwDg2NgcAwMjoHBMTA4BgbHwOAYGBwDg9MmcPvqNukhaEmbwK3BNOkhaEmLwP3pXDrXXtLD0JIWgZ3TYdJD0FbqAz87G/L6u4RUPNHxMeOZL87pUFqDm6SHorXUBe66njR7f0mzN5GR56/89e2CKdaaIZZpiF347MPPO9fvPpwPacZIReDay9dirRnScb2VR7ULpjjlzcDPfXVdT9pXt9J+9VbrWeQe4laGlmmIU85J7WBb9jaW/x0ez3xp9ibSOB/LxWS+ghHGBy5w7WBL6od52V6L5v7x+9/eSL3rRnL5iAJM4P1cRprHu7E8ftufzsU51ePuPvXLJBWVYlY6334R27PVexsZefH4gdQOtmI53zK0D+yUc/Li8YPIpuRFvvtmR5rHu7GfNwitAzvlnPyQ8Bv8tJyTxtFOomNYRNvAdsFMzRv7/Kstccq5pIfxUalYBwdlmYY0j3dDT8v96VwuJvP/rLsrxaxYpiGHn/gnuP/TONqR9tVt6pZRWgauHWwHDtGfzqVxPpbW4GZhBMs0pFpaF6e8GeimbXvt7peucnIZaFxR026ZtJ/LyB9PSsrHj2e+1LuuNM7fBD5XpZiV1qNioJni0cllqpZP2l2D61/nlY8dz3ypnFyGiity9zfp/Z8G0nXVv4uuH6qPLw5aBbZMQ6pfrisd+z7usg8KjLy711GN/LCYFbsQ7joeBa0CV0vrytOlczpc2VMgI88X52wo45nanyed8uZKzrsKWgWuFD9XOu7nwc3KvwHqXHvKU321pDbLxEGvwPfV7mprL6PZy6NxPlb6FO9tZMQy0/HWpmMUCizTUPrqr+t6ka1FR54vrT/VZoZPbSoTF20Cq75hUX85r/r4buW+2uUkatoEVp3y2q/eRjqONK1xVWgT+N/PTy3SCbBmDWPk+UrXYV6DIxLHkxYqyy9egykWDAyOgcExMDgGBsfA4BgYHAODY2BwDAyOgcExMDgGBsfA4BgYHAODY2BwDAyOgcExMDgGBsfA4BgYHAODY2BwDAyOgcExMDgGDiFtm50twsAhtK+i/R/kVWLgEFqDG+Udd5LGwCGMPD/05mpxY+CQ6l030A54SWHgJVROLuWXlO/ZwcBLeL/N4bOzofSn6byz1mY74YvJLLWflmZvIs3eROyCKdXShth5Uy5SEly77YQpGE7R4BgYHAODY2BwDAyOgcExMDgGBsfA4BgYHAODY2BwDAyOgcExMDgGBsfA4BgYHAODY2Bw/wCiMEuJtr6fmQAAAABJRU5ErkJggg==" preserveAspectRatio="xMidYMid meet" clip-path="url(#rounded)"/>
+# Checkmk's own real rounded-hexagon icon (icon_checkmk_logo_min.svg from
+# the facelift theme images, the same file every Checkmk login page links
+# to via .login_window_logo_link) - the actual vector path, not a PNG
+# approximation of something else. Rendered at 120px on the login card
+# (the real .login_window_logo_link width) and smaller in the page header.
+def cmk_logo_svg(width: int) -> str:
+    height = round(width * 28 / 24)
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 28" width="{width}" height="{height}">
+  <path fill="#15d1a0" fill-rule="evenodd" clip-rule="evenodd"
+    d="M12,0l12,7v13.9l-12,7l-12-7V7L12,0z M4.1,10.1v4.6L9.8,11v9.5l2.2,1.3l2.2-1.3V11l5.7,3.7v-4.6l-7.9-5L4.1,10.1z"/>
 </svg>'''
 
 # In-memory only: token -> (username, expires_at). A service restart logs
@@ -135,13 +141,15 @@ CMK_SHARED_CSS = f"""
   .error {{ color: {CMK_ERROR}; }}
   .ok {{ color: {CMK_ACCENT}; }}
 
-  /* Checkmk's own #login_window card: same background, radius and padding
-     as the real login page, reused here for the login card itself and for
-     every form panel on the account page (same visual language). */
-  .cmk-card {{ background: {CMK_CARD_BG}; color: {CMK_CARD_TEXT}; border-radius: 8px; padding: 25px 40px; box-sizing: border-box; max-width: 370px; margin: 0 auto 1.5rem; box-shadow: 0 4px 18px rgba(0,0,0,.35); }}
+  /* Checkmk's own #login_window card, straight from modern-dark/theme.css:
+     background #11181d, border-radius 8px, padding 25px 40px, width 370px -
+     reused here for the login card itself and for every form panel on the
+     account page (same visual language), with the real input styling
+     (background #303946, color #fff, border-radius 4px, no border). */
+  .cmk-card {{ background: {CMK_CARD_BG}; color: {CMK_CARD_TEXT}; border-radius: 8px; padding: 25px 40px; box-sizing: border-box; max-width: 370px; margin: 0 auto 1.5rem; }}
   .cmk-card h2, .cmk-card legend {{ font-size: 1rem; margin: 0 0 1rem; color: {CMK_CARD_TEXT}; }}
-  .cmk-card label {{ display: block; font-size: 0.85rem; margin: 0.8rem 0 0.2rem; color: {CMK_CARD_TEXT}; }}
-  .cmk-card input[type=text], .cmk-card input[type=password] {{ width: 100%; padding: 0.45rem 0.5rem; background: #fff; color: {CMK_CARD_TEXT}; border: 1px solid {CMK_CARD_BORDER}; border-radius: 3px; box-sizing: border-box; }}
+  .cmk-card label {{ display: block; font-size: 0.85rem; letter-spacing: 1px; margin: 0.8rem 0 0.2rem; color: {CMK_CARD_TEXT}; }}
+  .cmk-card input[type=text], .cmk-card input[type=password] {{ width: 100%; padding: 6px 8px; background: {CMK_CARD_INPUT_BG}; color: {CMK_CARD_TEXT}; border: none; border-radius: 4px; box-shadow: none; box-sizing: border-box; }}
   .cmk-card button {{ margin-top: 1.2rem; width: 100%; }}
   .cmk-card .error {{ font-size: 0.85rem; }}
   .cmk-card .ok {{ font-size: 0.85rem; }}
@@ -152,7 +160,7 @@ CMK_SHARED_CSS = f"""
 
 
 def page_shell(title: str, body: str, current_user: str = "") -> bytes:
-    brand = f'{CMK_LOGO_SVG}<span class="brand-text">Ydea ticket cache</span>'
+    brand = f'{cmk_logo_svg(24)}<span class="brand-text">Ydea ticket cache</span>'
     nav_links = ""
     if current_user:
         nav_links = f'<a href="/">Ticket</a><a href="/account">Account ({html.escape(current_user)})</a><a href="/logout">Esci</a>'
@@ -198,7 +206,7 @@ def render_login_page(message: str = "") -> bytes:
 </head>
 <body class="login">
 <div id="login_window" class="cmk-card">
-  <div id="logo">{CMK_LOGO_SVG}</div>
+  <div id="logo">{cmk_logo_svg(120)}</div>
   {msg_html}
   <form method="post" action="/login">
     <label for="input_user">Utente:</label>
