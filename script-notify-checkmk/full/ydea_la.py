@@ -12,13 +12,14 @@ import sys
 import json
 import subprocess
 import fcntl
+import sqlite3
 import time
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.2.3"
+VERSION = "1.3.0"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -28,6 +29,12 @@ YDEA_CACHE_DIR = "/opt/ydea-toolkit/cache"
 TICKET_CACHE = f"{YDEA_CACHE_DIR}/ydea_checkmk_tickets.json"
 FLAPPING_CACHE = f"{YDEA_CACHE_DIR}/ydea_checkmk_flapping.json"
 CACHE_LOCK = f"{YDEA_CACHE_DIR}/ydea_cache.lock"
+
+# JSON stays authoritative for every decision the script makes. SQLite is
+# written in parallel, best-effort, purely to validate the migration before
+# any future cutover - it must never be able to block or break a notification.
+DB_PATH = f"{YDEA_CACHE_DIR}/ydea_checkmk.db"
+DB_SHADOW_WRITE = os.getenv("YDEA_DB_SHADOW_WRITE", "1") == "1"
 
 RESOLVED_TICKET_TTL = 5 * 24 * 3600  # 5 giorni
 CACHE_MAX_AGE = 30 * 24 * 3600  # 30 giorni
@@ -213,11 +220,115 @@ def atomic_cache_write(cache_file: str, content: str) -> bool:
         return False
 
 
+def _db_connect() -> Optional[sqlite3.Connection]:
+    """Open a short-lived SQLite connection for the shadow write. Returns
+    None on any failure - callers must treat that as 'skip, not fatal'."""
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=5)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+        return conn
+    except Exception as e:
+        debug(f"db_connect failed: {e}")
+        return None
+
+
+def init_db():
+    """Create the shadow SQLite schema if missing. Never raises."""
+    if not DB_SHADOW_WRITE:
+        return
+    conn = _db_connect()
+    if not conn:
+        return
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS tickets (
+                key TEXT PRIMARY KEY,
+                ticket_id INTEGER NOT NULL,
+                state TEXT,
+                created_at INTEGER,
+                last_update INTEGER,
+                resolved_at INTEGER
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS flapping_events (
+                key TEXT,
+                state TEXT,
+                ts INTEGER
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_flapping_key_ts ON flapping_events(key, ts)")
+        conn.commit()
+    except Exception as e:
+        debug(f"init_db failed: {e}")
+    finally:
+        conn.close()
+
+
+def db_upsert_ticket(key: str, ticket_id: int, state: str, created_at: int,
+                      last_update: int, resolved_at: Optional[int]):
+    """Shadow-write a ticket row. Best-effort: any failure is logged and swallowed."""
+    if not DB_SHADOW_WRITE:
+        return
+    conn = _db_connect()
+    if not conn:
+        return
+    try:
+        conn.execute(
+            """INSERT INTO tickets (key, ticket_id, state, created_at, last_update, resolved_at)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(key) DO UPDATE SET
+                   ticket_id=excluded.ticket_id, state=excluded.state,
+                   created_at=excluded.created_at, last_update=excluded.last_update,
+                   resolved_at=excluded.resolved_at""",
+            (key, ticket_id, state, created_at, last_update, resolved_at)
+        )
+        conn.commit()
+    except Exception as e:
+        debug(f"db_upsert_ticket({key}) failed: {e}")
+    finally:
+        conn.close()
+
+
+def db_remove_ticket(key: str):
+    """Shadow-delete a ticket row. Best-effort."""
+    if not DB_SHADOW_WRITE:
+        return
+    conn = _db_connect()
+    if not conn:
+        return
+    try:
+        conn.execute("DELETE FROM tickets WHERE key=?", (key,))
+        conn.commit()
+    except Exception as e:
+        debug(f"db_remove_ticket({key}) failed: {e}")
+    finally:
+        conn.close()
+
+
+def db_record_flapping(key: str, state: str, ts: int):
+    """Shadow-write a flapping state-change event. Best-effort."""
+    if not DB_SHADOW_WRITE:
+        return
+    conn = _db_connect()
+    if not conn:
+        return
+    try:
+        conn.execute("INSERT INTO flapping_events (key, state, ts) VALUES (?, ?, ?)", (key, state, ts))
+        conn.commit()
+    except Exception as e:
+        debug(f"db_record_flapping({key}) failed: {e}")
+    finally:
+        conn.close()
+
+
 def init_cache():
     """Initialize cache with validation."""
     cache_dir = Path(YDEA_CACHE_DIR)
     cache_dir.mkdir(parents=True, exist_ok=True, mode=0o777)
-    
+    init_db()
+
     lock_path = Path(CACHE_LOCK)
     if not lock_path.exists():
         lock_path.touch(mode=0o666, exist_ok=True)
@@ -351,6 +462,7 @@ def save_ticket_cache(key: str, ticket_id: int, state: str):
     
     atomic_cache_write(TICKET_CACHE, json.dumps(data))
     debug(f"Ticket saved in cache: {key} -> {ticket_id}")
+    db_upsert_ticket(key, ticket_id, state, now, now, None)
 
 
 def mark_ticket_resolved(key: str):
@@ -371,6 +483,8 @@ def mark_ticket_resolved(key: str):
             data[key]['last_update'] = now
             atomic_cache_write(TICKET_CACHE, json.dumps(data))
             debug(f"Ticket {key} marked as resolved")
+            db_upsert_ticket(key, data[key]['ticket_id'], data[key]['state'],
+                              data[key]['created_at'], now, now)
     except Exception as e:
         log(f"WARN: mark_ticket_resolved failed: {e}")
 
@@ -391,8 +505,10 @@ def update_ticket_state(key: str, state: str):
             # Reset resolved_at on CRITICAL/DOWN
             if state in ['CRITICAL', 'CRIT', 'DOWN']:
                 data[key]['resolved_at'] = None
-            
+
             atomic_cache_write(TICKET_CACHE, json.dumps(data))
+            db_upsert_ticket(key, data[key]['ticket_id'], data[key]['state'],
+                              data[key]['created_at'], now, data[key]['resolved_at'])
     except Exception as e:
         log(f"WARN: update_ticket_state failed: {e}")
 
@@ -407,6 +523,7 @@ def remove_ticket_from_cache(key: str):
             del data[key]
             atomic_cache_write(TICKET_CACHE, json.dumps(data))
             debug(f"Ticket {key} removed from cache")
+            db_remove_ticket(key)
     except Exception as e:
         log(f"WARN: remove_ticket_from_cache failed: {e}")
 
@@ -472,6 +589,7 @@ def record_state_change(key: str, state: str):
     
     data[key].append({'state': state, 'timestamp': now})
     atomic_cache_write(FLAPPING_CACHE, json.dumps(data))
+    db_record_flapping(key, state, now)
 
 
 def is_flapping(key: str) -> Tuple[bool, str]:
