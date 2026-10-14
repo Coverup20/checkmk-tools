@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -506,6 +506,17 @@ def determine_tipo(hostname: str, service: str, output: str) -> str:
         debug(f"Config file not found: {YDEA_CONFIG}, using default 'Server'")
         return "Server"
     
+    # Check CheckMK discovered OS caption first - distinguishes a real Windows
+    # Server edition from a desktop/workstation one, which os_family alone
+    # cannot do (it's just "windows" for both).
+    os_name = os.getenv("NOTIFY_HOSTLABEL_cmk_os_name", "")
+    if os_name:
+        debug(f"Using OS name from label: {os_name}")
+        if "server" in os_name.lower():
+            return "Server"
+        if os_name.lower().startswith("microsoft windows"):
+            return "Computer Client"
+
     # Check CheckMK label
     os_family = os.getenv("NOTIFY_HOSTLABEL_cmk_os_family", "")
     if os_family:
@@ -517,7 +528,7 @@ def determine_tipo(hostname: str, service: str, output: str) -> str:
             "unix": "Server"
         }
         return os_map.get(os_family.lower(), "Server")
-    
+
     # Default
     return "Server"
 
@@ -754,8 +765,10 @@ def main():
     # If the existing ticket is already in "Effettuato" (or equivalent) status
     # on Ydea, it is no longer updated/reopened: it is removed from the cache
     # so that the next alert creates a brand new ticket instead of
-    # annotating/reopening the one already closed.
-    if ticket_id and state not in ["OK", "UP"]:
+    # annotating/reopening the one already closed. Checked on every state,
+    # OK/UP included: a flapping service can recover after a technician has
+    # already closed the ticket, and that recovery note must not land there.
+    if ticket_id:
         ydea_stato = fetch_ticket_stato(ticket_id)
         debug(f"Ticket #{ticket_id} stato Ydea: {ydea_stato}")
         if ydea_stato and ydea_stato.lower() in RESOLVED_STATES:

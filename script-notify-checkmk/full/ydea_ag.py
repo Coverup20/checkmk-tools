@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -531,6 +531,17 @@ def determine_tipo(hostname: str, service: str, output: str) -> str:
         debug(f"Config file not found: {YDEA_CONFIG}, using default 'Server'")
         return "Server"
     
+    # Check CheckMK discovered OS caption first - distinguishes a real Windows
+    # Server edition from a desktop/workstation one, which os_family alone
+    # cannot do (it's just "windows" for both).
+    os_name = os.getenv("NOTIFY_HOSTLABEL_cmk_os_name", "")
+    if os_name:
+        debug(f"Using OS name from label: {os_name}")
+        if "server" in os_name.lower():
+            return "Server"
+        if os_name.lower().startswith("microsoft windows"):
+            return "Computer Client"
+
     # Check CheckMK label
     os_family = os.getenv("NOTIFY_HOSTLABEL_cmk_os_family", "")
     if os_family:
@@ -542,7 +553,7 @@ def determine_tipo(hostname: str, service: str, output: str) -> str:
             "unix": "Server"
         }
         return os_map.get(os_family.lower(), "Server")
-    
+
     # Default
     return "Server"
 
@@ -777,9 +788,12 @@ def main():
 
     # === GRACE WINDOW: post-Effettuato 24h ===
     # When a ticket is in the Fulfilled status, for the following 24 hours:
-    #   - WARNING  -> scartato silenziosamente (nessun commento)
+    #   - OK/UP/WARNING -> scartato silenziosamente (nessun commento)
     # - CRITICAL -> reopening with private comment
-    if ticket_id and state not in ["OK", "UP"]:
+    # Checked on every state, OK/UP included: a flapping service can recover
+    # after a technician has already closed the ticket, and that recovery
+    # note must not land there either.
+    if ticket_id:
         # If carried_at is not yet in cache, query Ydea to detect
         # if the operator closed the ticket manually (without OK from CheckMK)
         if get_cache_field(ticket_key, 'effettuato_at') is None and \
@@ -798,7 +812,10 @@ def main():
             ticket_id = None
         elif grace is True:
             # Dentro finestra grace 24h
-            if state in ["WARNING", "WARN"]:
+            if state in ["OK", "UP"]:
+                log(f"[GRACE] {state} scartato: ticket #{ticket_id} in Effettuato (grace 24h)")
+                return 0
+            elif state in ["WARNING", "WARN"]:
                 log(f"[GRACE] WARNING scartato: ticket #{ticket_id} in Effettuato (grace 24h)")
                 return 0
             elif state in ["CRITICAL", "CRIT", "DOWN"]:
