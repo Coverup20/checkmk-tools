@@ -109,6 +109,42 @@ def _urlopen_with_retry(req: urllib.request.Request, timeout: float):
             time.sleep(RETRY_BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 0.2))
 
 
+NS8_MODULES_CACHE = os.environ.get("NS8_MODULES_CACHE", "/var/lib/ns8-modules-cache.json")
+NS8_MODULES_TTL = int(os.environ.get("NS8_MODULES_TTL", "3600"))
+
+
+def cached_ns8_task(agent, action, timeout=15.0):
+    """ns8_task() with a one-hour cache shared by all the local checks: the module list is the same for everybody, so the
+    NS8 API gets one call per hour instead of one per check and per agent run (the API answers HTTP 503 when the
+    ~15 checks hit it together: Redis 'max number of clients reached'). Falls back to the stale cache when the API
+    does not answer."""
+    key = "%s|%s" % (agent, action)
+    cache = {}
+    try:
+        with open(NS8_MODULES_CACHE, encoding="utf-8") as fh:
+            cache = json.load(fh)
+    except (OSError, ValueError):
+        pass
+    if not isinstance(cache, dict):
+        cache = {}
+    hit = cache.get(key)
+    if hit and time.time() - hit.get("ts", 0) <= NS8_MODULES_TTL:
+        return hit["out"], ""
+    out, err = ns8_task(agent, action, timeout)
+    if err or out is None:
+        return (hit["out"], "") if hit else (out, err)
+    try:
+        cache[key] = {"ts": time.time(), "out": out}
+        tmp = "%s.%d.tmp" % (NS8_MODULES_CACHE, os.getpid())
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            json.dump(cache, fh)
+        os.replace(tmp, NS8_MODULES_CACHE)
+    except OSError:
+        pass
+    return out, err
+
+
 def ns8_task(agent: str, action: str, timeout: float = 15.0) -> Tuple[Optional[object], str]:
     """Runs a no-input NS8 action through the REST API.
 
@@ -150,7 +186,7 @@ def ns8_task(agent: str, action: str, timeout: float = 15.0) -> Tuple[Optional[o
 
 def get_instances() -> List[str]:
     """Module instances installed on this node (REST API, no redis-cli)."""
-    out, _ = ns8_task("cluster", "list-installed-modules")
+    out, _ = cached_ns8_task("cluster", "list-installed-modules")
     if not isinstance(out, dict):
         return []
     node_id = get_local_node_id()
