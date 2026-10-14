@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
 
-VERSION = "1.2.2"
+VERSION = "1.2.3"
 
 # ===== CONFIG =====
 YDEA_TOOLKIT_DIR = "/opt/ydea-toolkit"
@@ -501,14 +501,13 @@ def is_flapping(key: str) -> Tuple[bool, str]:
 
 
 def determine_tipo(hostname: str, service: str, output: str) -> str:
-    """Determine Ydea type from config."""
-    if not os.path.exists(YDEA_CONFIG):
-        debug(f"Config file not found: {YDEA_CONFIG}, using default 'Server'")
-        return "Server"
-    
+    """Determine Ydea type by matching keywords (from config 'tipologie') against
+    hostname/service/output. Fixes previous bug where every ticket was hardcoded
+    to 'Server' regardless of host type (see premium-mon-config.json 'tipologie')."""
     # Check CheckMK discovered OS caption first - distinguishes a real Windows
-    # Server edition from a desktop/workstation one, which os_family alone
-    # cannot do (it's just "windows" for both).
+    # Server edition from a desktop/workstation one, which keyword matching on
+    # the hostname cannot do reliably (e.g. "fs-windows" matches the generic
+    # "windows" keyword before "server").
     os_name = os.getenv("NOTIFY_HOSTLABEL_cmk_os_name", "")
     if os_name:
         debug(f"Using OS name from label: {os_name}")
@@ -517,19 +516,36 @@ def determine_tipo(hostname: str, service: str, output: str) -> str:
         if os_name.lower().startswith("microsoft windows"):
             return "Computer Client"
 
-    # Check CheckMK label
-    os_family = os.getenv("NOTIFY_HOSTLABEL_cmk_os_family", "")
-    if os_family:
-        debug(f"Using OS family from label: {os_family}")
-        # Map OS family to tipo
-        os_map = {
-            "linux": "Server",
-            "windows": "Server",
-            "unix": "Server"
-        }
-        return os_map.get(os_family.lower(), "Server")
+    if not os.path.exists(YDEA_CONFIG):
+        debug(f"Config file not found: {YDEA_CONFIG}, using default 'Server'")
+        return "Server"
 
-    # Default
+    try:
+        with open(YDEA_CONFIG, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    except Exception as e:
+        debug(f"Error reading {YDEA_CONFIG}: {e}, using default 'Server'")
+        return "Server"
+
+    tipologie = cfg.get("tipologie", {})
+    haystack = f"{hostname} {service} {output}".lower()
+
+    def _kw_matches(kw: str) -> bool:
+        # Soft word boundary: avoids false positives like 'cti' inside
+        # 'connection'. Doesn't require a classic \b so hyphenated keywords
+        # (e.g. 'fw-') still work: it just can't be preceded/followed by
+        # another alphanumeric character.
+        pattern = r'(?<![a-z0-9])' + re.escape(kw.lower()) + r'(?![a-z0-9])'
+        return re.search(pattern, haystack) is not None
+
+    for key, entry in tipologie.items():
+        for kw in entry.get("keywords", []):
+            if _kw_matches(kw):
+                tipo = entry.get("tipo_ydea", "Server")
+                debug(f"Matched keyword '{kw}' (categoria '{key}') -> tipo: {tipo}")
+                return tipo
+
+    debug("No keyword match in tipologie config, using default 'Server'")
     return "Server"
 
 
