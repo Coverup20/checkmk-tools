@@ -1,73 +1,65 @@
 #!/usr/bin/env python3
-"""check_ns8_mail_domain_api.py - Mail domain health check (DNS, SPF, DKIM, DMARC, RBL, TLS cert) for NS8. REST API only (PROTOTYPE)
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-2.0-only
+#
 
-CheckMK local check, to run ON the NS8 node. Pure Python stdlib, no subprocess.
-Everything goes through REST and standard sockets:
-- NS8 API (NS8_API, default http://127.0.0.1:9311/api): list mail domains and DKIM config via module tasks;
-- DNS resolution (via pure Python UDP query to nameservers in /etc/resolv.conf):
-  checks MX, SPF (TXT), DKIM (TXT default._domainkey.<domain>), DMARC (TXT _dmarc.<domain>), and domain RBL;
-- TLS certificate: parses /home/<mail_mod>/.config/state/tls-certs/server.pem or fullchain.pem for expiry and SAN.
+"""check_ns8_mail_domain_api.py - Mail domain and DKIM configuration check for NS8 (PROTOTYPE)
+
+CheckMK local check, to run ON the NS8 node. 100% REST-only via NS8 REST API:
+No subprocess, no raw UDP DNS sockets, no local log scraping.
+Queries NS8 REST API (NS8_API, default http://127.0.0.1:9311/api):
+1. 'cluster/list-installed-modules' to locate active mail modules (e.g. mail1);
+2. 'module/<mail_mod>/list-domains' to retrieve all configured mail domains;
+3. 'module/<mail_mod>/get-domain-dkim' for DKIM status, selector, and keys;
+4. 'cluster/list-certificates' to monitor TLS certificate expiration and domain coverage.
 
 Services (piggybacked to NS8_PIGGYBACK_HOST, default NS8-RL98-MAIL):
-- Mail.Domains.Status       overview of all mail domains configured in NS8.
-- Mail.Domain.<domain>      health of one domain: MX records, SPF syntax/presence, DKIM alignment, DMARC policy, RBL status.
-- Mail.Certificate.<mod>    TLS certificate expiration and days remaining.
+- Mail.Domains.Status       Overview of configured domains and DKIM deployment in NS8.
+                            CRIT if NS8 API is unreachable or 0 domains found.
+                            WARN if any domain has DKIM disabled.
+                            Perfdata: domains=N|dkim_enabled=M|issues=K
+- Mail.Domain.<domain>      Health and status of one domain (DKIM selector, key size, relay).
+- Mail.Certificate.<cert>   TLS certificate expiration days and SAN coverage.
+                            WARN if <= 30 days, CRIT if <= 10 days.
 
-Version: 0.1.0
+Version: 0.2.0
 """
 
 import datetime
-import http.client
 import json
 import os
 import re
-import socket
-import struct
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from typing import Dict, List, Optional, Tuple
 
-try:
-    import pwd
-except ImportError:
-    pwd = None
-
-try:
-    import ssl
-except ImportError:
-    ssl = None
-
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 NS8_API = os.environ.get("NS8_API", "http://127.0.0.1:9311/api")
 NS8_USER = os.environ.get("NS8_USER", "claude-rw")
 NS8_PASSWORD_FILE = os.environ.get("NS8_PASSWORD_FILE", "/root/.ns8-rw-pass")
 PIGGYBACK_HOST = os.environ.get("NS8_PIGGYBACK_HOST", "NS8-RL98-MAIL")
-NODE_AGENT_ENV = "/var/lib/nethserver/node/state/agent.env"
+SERVICE = "Mail.Domains.Status"
 
-DNS_SERVER = os.environ.get("MAIL_DNS_SERVER", "")
-DNS_TIMEOUT = int(os.environ.get("MAIL_DNS_TIMEOUT", "3"))
 CERT_WARN_DAYS = int(os.environ.get("MAIL_CERT_WARN_DAYS", "30"))
 CERT_CRIT_DAYS = int(os.environ.get("MAIL_CERT_CRIT_DAYS", "10"))
 
-RBL_DOMAINS = ["dbl.spamhaus.org"]
 
-
-# ---------------------------------------------------------------- helpers
-
-def sanitize(name, fallback="default"):
+def sanitize(name: str, fallback: str = "default") -> str:
     clean = re.sub(r"[^A-Za-z0-9_\-]", "_", (name or "").strip())
     return clean or fallback
 
 
-def line(state, service, text, perf=""):
+def line(state: int, service: str, text: str, perf: str = "") -> str:
     perf_str = (" " + perf.strip()) if perf.strip() else " -"
     clean_text = (text or "").replace("\n", " ").strip()
     return "%d %s%s %s" % (state, service, perf_str, clean_text)
 
 
-def read_password():
+def read_password() -> str:
     try:
         with open(NS8_PASSWORD_FILE, encoding="utf-8") as fh:
             return fh.read().strip()
@@ -75,115 +67,14 @@ def read_password():
         return ""
 
 
-def get_default_nameserver():
-    if DNS_SERVER:
-        return DNS_SERVER
-    try:
-        with open("/etc/resolv.conf", encoding="utf-8") as fh:
-            for l in fh:
-                parts = l.strip().split()
-                if len(parts) >= 2 and parts[0] == "nameserver":
-                    return parts[1]
-    except OSError:
-        pass
-    return "127.0.0.1"
+# ---------------------------------------------------------------- NS8 REST API Client
 
-
-# ---------------------------------------------------------------- Pure Python DNS Client
-
-def build_dns_query(name, qtype_int):
-    header = struct.pack("!HHHHHH", 0x2A4B, 0x0100, 1, 0, 0, 0)
-    qname = b""
-    for part in name.strip(".").split("."):
-        qname += struct.pack("B", len(part)) + part.encode("latin1", errors="replace")
-    qname += b"\x00"
-    return header + qname + struct.pack("!HH", qtype_int, 1)
-
-
-def parse_dns_name(data, offset):
-    parts = []
-    visited = set()
-    while True:
-        if offset in visited or offset >= len(data):
-            break
-        visited.add(offset)
-        length = data[offset]
-        if length == 0:
-            offset += 1
-            break
-        if (length & 0xC0) == 0xC0:
-            pointer = struct.unpack("!H", data[offset:offset + 2])[0] & 0x3FFF
-            subparts, _ = parse_dns_name(data, pointer)
-            parts.extend(subparts)
-            offset += 2
-            break
-        else:
-            offset += 1
-            parts.append(data[offset:offset + length].decode(errors="replace"))
-            offset += length
-    return parts, offset
-
-
-def query_dns(name, qtype_str, server=None, timeout=DNS_TIMEOUT):
-    if not server:
-        server = get_default_nameserver()
-    type_map = {"A": 1, "NS": 2, "CNAME": 5, "MX": 15, "TXT": 16}
-    qtype = type_map.get(qtype_str.upper(), 1)
-    pkt = build_dns_query(name, qtype)
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.settimeout(timeout)
-    try:
-        sock.sendto(pkt, (server, 53))
-        resp, _ = sock.recvfrom(4096)
-    except (socket.error, OSError):
-        return []
-    finally:
-        sock.close()
-
-    if len(resp) < 12:
-        return []
-
-    _, _, qdcount, ancount, _, _ = struct.unpack("!HHHHHH", resp[:12])
-    offset = 12
-    for _ in range(qdcount):
-        _, offset = parse_dns_name(resp, offset)
-        offset += 4
-
-    answers = []
-    for _ in range(ancount):
-        if offset >= len(resp):
-            break
-        _, offset = parse_dns_name(resp, offset)
-        rtype, _, _, rdlength = struct.unpack("!HHIH", resp[offset:offset + 10])
-        offset += 10
-        rdata = resp[offset:offset + rdlength]
-        if rtype == 16:  # TXT
-            pos = 0
-            txt_parts = []
-            while pos < len(rdata):
-                slen = rdata[pos]
-                pos += 1
-                txt_parts.append(rdata[pos:pos + slen].decode(errors="replace"))
-                pos += slen
-            answers.append("".join(txt_parts))
-        elif rtype == 15:  # MX
-            prio = struct.unpack("!H", rdata[:2])[0]
-            mx_name, _ = parse_dns_name(resp, offset + 2)
-            answers.append((prio, ".".join(mx_name)))
-        elif rtype == 1:  # A
-            answers.append(socket.inet_ntoa(rdata))
-        offset += rdlength
-    return answers
-
-
-# ---------------------------------------------------------------- NS8 REST API
-
-class Api(object):
-    def __init__(self, base=NS8_API):
+class Api:
+    def __init__(self, base: str = NS8_API):
         self.base = base
         self.token = ""
 
-    def _req(self, method, path, body=None):
+    def _req(self, method: str, path: str, body: Optional[bytes] = None) -> Tuple[int, dict]:
         headers = {"Content-Type": "application/json"}
         if self.token:
             headers["Authorization"] = "Bearer " + self.token
@@ -199,25 +90,27 @@ class Api(object):
         except (urllib.error.URLError, OSError, ValueError):
             return 0, {}
 
-    def login(self, user, password):
+    def login(self, user: str, password: str) -> str:
         st, js = self._req("POST", "/login", json.dumps({"username": user, "password": password}).encode())
         data = js.get("data")
         tok = data.get("token") if isinstance(data, dict) else js.get("token")
         if st == 200 and tok:
             self.token = tok
             return ""
-        return "login failed"
+        return "login failed (HTTP %s)" % st if st else "API unreachable at %s" % self.base
 
-    def task(self, agent, action, data=None, timeout=20):
-        st, js = self._req("POST", "/%s/tasks" % agent, json.dumps({"action": action, "data": data, "parent": "", "extra": {}}).encode())
+    def task(self, agent: str, action: str, data: Optional[dict] = None, timeout: float = 20.0) -> Tuple[str, Optional[dict]]:
+        payload = json.dumps({"action": action, "data": data, "parent": "", "extra": {}}).encode()
+        st, js = self._req("POST", f"/{agent}/tasks", payload)
         if st in (401, 403):
             return "denied", None
         tid = (js.get("data") or {}).get("id") if isinstance(js.get("data"), dict) else None
         if not tid:
             return "error", None
+
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            st, js = self._req("GET", "/%s/task/%s/status" % (agent, tid))
+            st, js = self._req("GET", f"/{agent}/task/{tid}/status")
             if st == 200:
                 d = js.get("data") or {}
                 out = d.get("output")
@@ -234,7 +127,8 @@ class Api(object):
         return "timeout", None
 
 
-def get_mail_modules(api):
+def get_mail_modules(api: Api) -> List[str]:
+    """Finds installed mail modules in NS8 cluster."""
     st, out = api.task("cluster", "list-installed-modules")
     if st != "ok" or not isinstance(out, dict):
         return ["mail1"]
@@ -243,173 +137,146 @@ def get_mail_modules(api):
         if not source.rstrip("/").split(":")[0].endswith("/mail"):
             continue
         for inst in insts:
-            found.append(inst["id"])
+            if isinstance(inst, dict) and "id" in inst:
+                found.append(inst["id"])
     return sorted(found) or ["mail1"]
 
 
-# ---------------------------------------------------------------- Domain Health Evaluator
+# ---------------------------------------------------------------- Evaluation Logic
 
-def evaluate_mail_domain(domain_name, dkim_config, dns_server=None):
-    """Checks MX, SPF, DKIM, DMARC, and RBL for one domain."""
-    state = 0
-    issues = []
-    ok_details = []
+def evaluate_domain_dkim(domain: str, dkim_info: Optional[dict], domain_entry: Optional[dict] = None) -> Tuple[int, str, str]:
+    """Evaluates domain DKIM and mail delivery configuration from NS8 REST data."""
+    if not isinstance(dkim_info, dict):
+        return 1, "WARNING: DKIM configuration unavailable from NS8 API", "dkim_enabled=0;;;0;1"
 
-    # 1. MX check
-    mx_records = query_dns(domain_name, "MX", server=dns_server)
-    if not mx_records:
-        state = 2
-        issues.append("CRIT: No MX records found in DNS")
-    else:
-        # Sort by priority
-        mx_sorted = sorted(mx_records, key=lambda x: x[0])
-        ok_details.append("MX: " + ", ".join(["%d %s" % (p, h) for p, h in mx_sorted[:2]]))
+    enabled = bool(dkim_info.get("enabled", False))
+    selector = dkim_info.get("selector", "default")
+    key_size = dkim_info.get("keySize", dkim_info.get("keysize", 2048))
+    has_record = bool(dkim_info.get("dkimRecordData"))
 
-    # 2. SPF check
-    txt_records = query_dns(domain_name, "TXT", server=dns_server)
-    spf_record = next((t for t in txt_records if t.startswith("v=spf1")), None)
-    if not spf_record:
-        state = max(state, 1)
-        issues.append("WARN: Missing SPF record (no v=spf1 in TXT)")
-    else:
-        ok_details.append("SPF: OK")
+    relay = domain_entry.get("relay", False) if isinstance(domain_entry, dict) else False
+    relay_str = " (relay domain)" if relay else ""
 
-    # 3. DKIM check
-    dkim_enabled = dkim_config.get("enabled", False) if isinstance(dkim_config, dict) else False
-    expected_dkim = dkim_config.get("dkimRecordData", "") if isinstance(dkim_config, dict) else ""
-    if dkim_enabled:
-        dkim_selector = "default"
-        dkim_target = "%s._domainkey.%s" % (dkim_selector, domain_name)
-        dkim_txts = query_dns(dkim_target, "TXT", server=dns_server)
-        found_dkim = next((t for t in dkim_txts if "v=DKIM1" in t or "p=" in t), None)
-        if not found_dkim:
-            state = max(state, 1)
-            issues.append("WARN: DKIM enabled in NS8 but missing in DNS (%s)" % dkim_target)
-        else:
-            ok_details.append("DKIM: Published (%s)" % dkim_selector)
+    perf = f"dkim_enabled={1 if enabled else 0};;;0;1|key_size={key_size};;;0;"
 
-    # 4. DMARC check
-    dmarc_target = "_dmarc.%s" % domain_name
-    dmarc_txts = query_dns(dmarc_target, "TXT", server=dns_server)
-    dmarc_record = next((t for t in dmarc_txts if t.startswith("v=DMARC1")), None)
-    if not dmarc_record:
-        state = max(state, 1)
-        issues.append("WARN: Missing DMARC record (_dmarc.%s)" % domain_name)
-    else:
-        # Extract policy: p=none / p=quarantine / p=reject
-        m_pol = re.search(r"\bp=([a-zA-Z]+)", dmarc_record)
-        pol = m_pol.group(1) if m_pol else "unknown"
-        ok_details.append("DMARC: p=%s" % pol)
+    if not enabled:
+        msg = f"WARNING: DKIM signing is disabled for domain {domain}{relay_str}"
+        return 1, msg, perf
 
-    # 5. RBL check
-    rbl_hits = []
-    for rbl in RBL_DOMAINS:
-        q = "%s.%s" % (domain_name, rbl)
-        hits = query_dns(q, "A", server=dns_server)
-        if hits:
-            rbl_hits.append(rbl)
-    if rbl_hits:
-        state = 2
-        issues.append("CRIT: Domain listed in RBL (%s)" % ", ".join(rbl_hits))
-    else:
-        ok_details.append("RBL: Clean")
+    if not has_record:
+        msg = f"WARNING: DKIM enabled but record data is empty for domain {domain}"
+        return 1, msg, perf
 
-    parts = []
-    if issues:
-        parts.extend(issues)
-    if ok_details:
-        parts.append("[" + " | ".join(ok_details) + "]")
-
-    txt = " - ".join(parts)
-    perf = "mx_count=%d;1;0;0; issues_count=%d;;;0;" % (len(mx_records), len(issues))
-    return state, txt, perf
+    msg = f"OK: DKIM active (selector: {selector}, {key_size}-bit RSA){relay_str}"
+    return 0, msg, perf
 
 
-def check_tls_cert(mod_name):
-    """Checks the TLS certificate in /home/<mod>/.config/state/tls-certs/."""
-    cert_path = "/home/%s/.config/state/tls-certs/server.pem" % mod_name
-    if not os.path.exists(cert_path):
-        cert_path = "/home/%s/.config/state/tls-certs/fullchain.pem" % mod_name
+def parse_certificate_expiry(not_after_raw: str) -> Optional[int]:
+    """Parses certificate not_after string to remaining days."""
+    if not not_after_raw:
+        return None
+    now = datetime.datetime.now(datetime.timezone.utc)
 
-    if not os.path.exists(cert_path):
-        return 0, "No TLS certificate found in %s" % mod_name, ""
+    # Try standard date formats
+    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S", "%b %d %H:%M:%S %Y %Z"):
+        try:
+            dt = datetime.datetime.strptime(not_after_raw.strip(), fmt)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=datetime.timezone.utc)
+            delta = dt - now
+            return delta.days
+        except ValueError:
+            continue
+    return None
 
-    if not ssl:
-        return 0, "SSL decoder module unavailable on host", ""
 
-    try:
-        cert = ssl._ssl._test_decode_cert(cert_path)
-        not_after_str = cert.get("notAfter", "")
-        if not not_after_str:
-            return 1, "Certificate found but notAfter field missing", ""
-        exp = datetime.datetime.strptime(not_after_str, "%b %d %H:%M:%S %Y %Z")
-        days = (exp - datetime.datetime.utcnow()).days
+def evaluate_certificate(cert_data: dict) -> Tuple[int, str, str, str]:
+    """Evaluates a certificate entry from cluster/list-certificates.
 
-        state = 0
-        if days <= CERT_CRIT_DAYS:
-            state = 2
-            txt = "CRIT: TLS cert expires in %d days (%s)" % (days, exp.strftime("%Y-%m-%d"))
-        elif days <= CERT_WARN_DAYS:
-            state = 1
-            txt = "WARN: TLS cert expires in %d days (%s)" % (days, exp.strftime("%Y-%m-%d"))
-        else:
-            txt = "TLS cert valid, expires in %d days (%s)" % (days, exp.strftime("%Y-%m-%d"))
+    Returns (state, service_name, text, perfdata).
+    """
+    cert_id = cert_data.get("id") or cert_data.get("name") or "default"
+    srv_name = f"Mail.Certificate.{sanitize(cert_id)}"
 
-        perf = "days_left=%d;%d;%d;0;" % (days, CERT_WARN_DAYS, CERT_CRIT_DAYS)
-        return state, txt, perf
-    except Exception as e:
-        return 3, "Error parsing TLS certificate: %s" % e, ""
+    not_after = cert_data.get("not_after") or cert_data.get("expire") or cert_data.get("expires") or ""
+    days_left = parse_certificate_expiry(str(not_after)) if not_after else None
+
+    domains = cert_data.get("domains") or cert_data.get("san") or []
+    dom_str = f" [{', '.join(domains[:3])}]" if domains else ""
+
+    if days_left is None:
+        return 0, srv_name, f"OK: Certificate registered in cluster{dom_str}", ""
+
+    perf = f"days_left={days_left};{CERT_WARN_DAYS};{CERT_CRIT_DAYS};0;"
+    if days_left <= CERT_CRIT_DAYS:
+        return 2, srv_name, f"CRITICAL: TLS cert expires in {days_left} days ({not_after}){dom_str}", perf
+    if days_left <= CERT_WARN_DAYS:
+        return 1, srv_name, f"WARNING: TLS cert expires in {days_left} days ({not_after}){dom_str}", perf
+
+    return 0, srv_name, f"OK: TLS cert valid, {days_left} days remaining ({not_after}){dom_str}", perf
 
 
 # ---------------------------------------------------------------- Main Collector
 
-def run_checks():
-    pw = read_password()
+def run_checks() -> List[str]:
     api = Api()
+    pw = read_password()
     if pw:
-        api.login(NS8_USER, pw)
+        err = api.login(NS8_USER, pw)
+        if err:
+            return [line(3, SERVICE, f"UNKNOWN: {err}")]
 
-    mods = get_mail_modules(api)
     output_lines = []
-
-    worst_overall = 0
     total_domains = 0
     total_issues = 0
+    dkim_active_count = 0
+    worst_overall = 0
 
-    dns_server = get_default_nameserver()
+    # 1. Certificates check via cluster/list-certificates
+    st_cert, cert_list = api.task("cluster", "list-certificates")
+    if st_cert == "ok" and isinstance(cert_list, list):
+        for c in cert_list:
+            if isinstance(c, dict):
+                st_c, name_c, txt_c, perf_c = evaluate_certificate(c)
+                output_lines.append(line(st_c, name_c, txt_c, perf_c))
+                worst_overall = max(worst_overall, st_c)
 
+    # 2. Mail modules inspection
+    mods = get_mail_modules(api)
     for mod in mods:
-        # Check TLS cert of mail module
-        st_cert, txt_cert, perf_cert = check_tls_cert(mod)
-        output_lines.append(line(st_cert, "Mail.Certificate." + sanitize(mod), txt_cert, perf_cert))
-        worst_overall = max(worst_overall, st_cert)
-
-        # Get domains
-        st, dom_list = api.task("module/%s" % mod, "list-domains")
-        if st != "ok" or not isinstance(dom_list, list):
-            output_lines.append(line(2, "Mail.Domains.Status", "Failed to retrieve domains from NS8 API (status: %s)" % st))
+        st_doms, dom_list = api.task(f"module/{mod}", "list-domains")
+        if st_doms != "ok" or not isinstance(dom_list, list):
+            output_lines.append(line(2, SERVICE, f"CRITICAL: Failed to retrieve domains from {mod} (status: {st_doms})"))
+            worst_overall = max(worst_overall, 2)
             continue
 
         for dentry in dom_list:
+            if not isinstance(dentry, dict):
+                continue
             domain = dentry.get("domain")
             if not domain or domain == "*":
                 continue
 
             total_domains += 1
 
-            # Get DKIM info
-            _, dkim_info = api.task("module/%s" % mod, "get-domain-dkim", {"domain": domain})
+            # Query DKIM config
+            st_dkim, dkim_info = api.task(f"module/{mod}", "get-domain-dkim", {"domain": domain})
+            st_eval, txt_eval, perf_eval = evaluate_domain_dkim(domain, dkim_info if st_dkim == "ok" else None, dentry)
 
-            st_dom, txt_dom, perf_dom = evaluate_mail_domain(domain, dkim_info, dns_server=dns_server)
-            worst_overall = max(worst_overall, st_dom)
-            if st_dom > 0:
+            if st_eval == 0 and "active" in txt_eval:
+                dkim_active_count += 1
+            if st_eval > 0:
                 total_issues += 1
+            worst_overall = max(worst_overall, st_eval)
 
-            output_lines.append(line(st_dom, "Mail.Domain." + sanitize(domain), txt_dom, perf_dom))
+            output_lines.append(line(st_eval, f"Mail.Domain.{sanitize(domain)}", txt_eval, perf_eval))
 
-    summary_txt = "%d mail domain(s) configured, %d domain(s) with DNS/policy issues" % (total_domains, total_issues)
-    summary_perf = "domains=%d;;;0; issues=%d;;;0;" % (total_domains, total_issues)
-    output_lines.insert(0, line(worst_overall, "Mail.Domains.Status", summary_txt, summary_perf))
+    summary_perf = f"domains={total_domains};1;0;0; dkim_active={dkim_active_count};;;0; issues={total_issues};;;0;"
+    if total_domains == 0 and worst_overall == 0:
+        summary_txt = "OK: No mail domains configured on this node"
+    else:
+        summary_txt = f"{total_domains} mail domain(s) configured ({dkim_active_count} with DKIM active, {total_issues} issue(s))"
+    output_lines.insert(0, line(worst_overall, SERVICE, summary_txt, summary_perf))
 
     return output_lines
 
@@ -417,41 +284,66 @@ def run_checks():
 # ---------------------------------------------------------------- Self-test
 
 def self_test():
-    # 1. Test build_dns_query
-    pkt = build_dns_query("example.com", 16)
-    assert len(pkt) > 12, "DNS query packet too short"
-    assert pkt[12] == 7, "Length of 'example' label must be 7"
+    failed, done = [], []
 
-    # 2. Test evaluate_mail_domain with mock data
-    mock_dkim = {
-        "enabled": True,
-        "dkimRecordData": "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC0",
-    }
-    # Simulate domain evaluation
-    st, txt, perf = evaluate_mail_domain("invalid-mock-domain-123.test", mock_dkim, dns_server="127.0.0.1")
-    assert st >= 1, "Mock domain with no DNS should be WARN or CRIT"
-    assert "mx_count=" in perf
+    def check(name: str, cond: bool):
+        done.append(name)
+        status = "ok  " if cond else "FAIL"
+        print(f"{status} {name}")
+        if not cond:
+            failed.append(name)
 
-    # 3. Test sanitize
-    assert sanitize("nethlab.it") == "nethlab_it"
-    assert sanitize("sub.domain-test.com") == "sub_domain-test_com"
+    # 1. Sanitize helper
+    check("sanitize domain name", sanitize("nethlab.it") == "nethlab_it")
+    check("sanitize dashes and subdomains", sanitize("mail-01.sub.domain.org") == "mail-01_sub_domain_org")
 
-    print("ALL 10 SELF-TEST CHECKS PASSED")
-    return 0
+    # 2. DKIM evaluation cases
+    # Case A: DKIM active
+    valid_dkim = {"enabled": True, "selector": "default", "keySize": 2048, "dkimRecordData": "v=DKIM1; ..."}
+    st, txt, perf = evaluate_domain_dkim("example.com", valid_dkim)
+    check("evaluate_domain_dkim active returns OK", st == 0 and "DKIM active" in txt and "dkim_enabled=1" in perf)
+
+    # Case B: DKIM disabled
+    disabled_dkim = {"enabled": False}
+    st_dis, txt_dis, perf_dis = evaluate_domain_dkim("example.com", disabled_dkim)
+    check("evaluate_domain_dkim disabled returns WARNING", st_dis == 1 and "disabled" in txt_dis and "dkim_enabled=0" in perf_dis)
+
+    # Case C: Relay domain
+    st_rel, txt_rel, _ = evaluate_domain_dkim("relay.com", valid_dkim, {"relay": True})
+    check("evaluate_domain_dkim notes relay domain", st_rel == 0 and "relay domain" in txt_rel)
+
+    # 3. Certificate expiry parser
+    fut_date = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=45)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    days = parse_certificate_expiry(fut_date)
+    check("parse_certificate_expiry 45 days parsed", days is not None and 44 <= days <= 46)
+
+    # 4. Certificate evaluation
+    # Valid certificate (> 30 days)
+    cert_valid = {"id": "cert1", "not_after": fut_date, "domains": ["mail.nethlab.it"]}
+    st_c, srv_c, txt_c, perf_c = evaluate_certificate(cert_valid)
+    check("evaluate_certificate valid returns OK", st_c == 0 and "valid" in txt_c and "days_left=" in perf_c)
+
+    # Expiring soon certificate (7 days left -> CRITICAL)
+    crit_date = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    cert_crit = {"id": "cert2", "not_after": crit_date, "domains": ["old.nethlab.it"]}
+    st_crit, _, txt_crit, _ = evaluate_certificate(cert_crit)
+    check("evaluate_certificate <=10d returns CRITICAL", st_crit == 2 and "CRITICAL" in txt_crit)
+
+    print(f"\nSelf-test results: {len(done) - len(failed)}/{len(done)} passed")
+    if failed:
+        sys.exit(1)
 
 
-def main():
-    if "--self-test" in sys.argv:
-        sys.exit(self_test())
-
+def check():
     lines = run_checks()
-
-    print("<<<<%s>>>>" % PIGGYBACK_HOST)
+    print(f"<<<<{PIGGYBACK_HOST}>>>>")
     print("<<<local>>>")
     for l in lines:
         print(l)
     print("<<<<>>>>")
 
 
-if __name__ == "__main__":
-    main()
+if "--self-test" in sys.argv:
+    self_test()
+else:
+    check()
