@@ -39,7 +39,10 @@ Ydea-Toolkit/config/.ydea-cookies
 .claude/
 
 # Backup artifacts
-*.bak
+*.bak*
+
+# MCP / tooling caches
+.playwright-mcp/
 
 # Private operational docs (do not commit)
 MACHINE_ACCESS_GUIDE.md
