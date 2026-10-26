@@ -1,0 +1,5 @@
+# Credentials and extracted data never belong in the repository.
+.env
+.env.*
+cache/
+*.jsonl
