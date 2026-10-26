@@ -10,7 +10,7 @@ management, and a post-creation group fix that survives helpdesk automation.
 Modelled on the Ydea notification script, with the toolkit subprocess calls
 replaced by direct Freshdesk REST calls.
 
-Version: 1.0.0
+Version: 1.0.1
 """
 #
 # Copyright (C) 2025 Nethesis S.r.l.
@@ -30,11 +30,45 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
+
+# Credentials live in a root-owned file on the monitoring host, not in the
+# CheckMK notification rule: a rule parameter is readable by anyone who can
+# open the rule in the UI, and ends up in the site configuration backups.
+# Values already exported by CheckMK win over the file, so a rule can still
+# override any of them without the file being edited.
+ENV_FILE = os.environ.get("FRESHDESK_ENV", "/opt/freshdesk-toolkit/.env")
+
+
+def load_env(path):
+    """Load KEY=VALUE lines from an env file into the process environment.
+
+    Accepts the 'export KEY=value' form and quoted values. Never raises: a
+    missing or unreadable file only means the values have to come from the
+    environment instead, which the caller reports on its own.
+    """
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                line = line.replace("export ", "", 1).strip()
+                key, value = line.split("=", 1)
+                key = key.strip()
+                if key not in os.environ:
+                    os.environ[key] = value.strip().strip('"').strip("'")
+    except Exception as e:
+        print(f"WARNING: could not read {path}: {e}", file=sys.stderr)
+
+
+load_env(ENV_FILE)
 
 # === CONFIG ===
-# Everything environment-specific comes from the OMD environment or from an
-# .env file on the monitoring host - never from this file.
+# Everything environment-specific comes from the OMD environment or from the
+# env file loaded above - never from this file.
 FRESHDESK_DOMAIN = os.environ.get("FRESHDESK_DOMAIN", "")
 FRESHDESK_API_KEY = os.environ.get("FRESHDESK_API_KEY", "")
 FRESHDESK_GROUP_ID = os.environ.get("FRESHDESK_GROUP_ID", "")
@@ -629,6 +663,34 @@ def self_test():
     check("is_ticket_usable spam",
           is_ticket_usable({"status": 2, "deleted": False, "spam": True}), False)
     check("is_ticket_usable missing", is_ticket_usable(None), False)
+
+    # An env file must not clobber a value CheckMK already exported, and a
+    # missing file must stay silent rather than abort the notification.
+    env_probe = f"FRESHDESK_SELFTEST_{os.getpid()}"
+    os.environ[env_probe] = "from-environment"
+    tmp_env = os.path.join(os.path.dirname(TICKET_CACHE) or ".", f".selftest.{os.getpid()}.env")
+    try:
+        os.makedirs(os.path.dirname(tmp_env) or ".", exist_ok=True)
+        with open(tmp_env, "w") as f:
+            f.write("# comment\n")
+            f.write(f'export {env_probe}="from-file"\n')
+            f.write("FRESHDESK_SELFTEST_ONLY_IN_FILE='file-value'\n")
+        load_env(tmp_env)
+        check("load_env keeps existing value",
+              os.environ.get(env_probe), "from-environment")
+        check("load_env sets missing value",
+              os.environ.get("FRESHDESK_SELFTEST_ONLY_IN_FILE"), "file-value")
+    except Exception as e:
+        print(f"FAIL: load_env file cases: {e}")
+        failures += 1
+    finally:
+        for name in (env_probe, "FRESHDESK_SELFTEST_ONLY_IN_FILE"):
+            os.environ.pop(name, None)
+        if os.path.exists(tmp_env):
+            os.remove(tmp_env)
+
+    load_env("/nonexistent/freshdesk/env/file")
+    check("load_env tolerates missing file", True, True)
 
     check("is_transient_network_error true",
           is_transient_network_error("Temporary failure in name resolution"), True)
