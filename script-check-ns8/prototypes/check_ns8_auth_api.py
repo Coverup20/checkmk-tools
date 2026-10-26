@@ -3,7 +3,8 @@
 
 CheckMK local check, to run ON the NS8 node. No subprocess: everything goes through REST.
 - NS8 API (NS8_API, default http://127.0.0.1:9311/api), logged in with NS8_USER / NS8_PASSWORD_FILE
-  (an owner/administrator account: export-users and the Grafana route need it);
+  (a reader account is enough, provided export-users on the AD module and authorize-metrics on the
+  metrics module are granted to its role);
 - Grafana -> Loki through the node's own Traefik (https://<node fqdn>/grafana/api/datasources/proxy/uid/loki/...,
   connect to 127.0.0.1:443 with SNI/Host = the node FQDN) for the Dovecot and Postfix log lines.
 
@@ -52,10 +53,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 NS8_API = os.environ.get("NS8_API", "http://127.0.0.1:9311/api")
-NS8_USER = os.environ.get("NS8_USER", "claude-rw")
-NS8_PASSWORD_FILE = os.environ.get("NS8_PASSWORD_FILE", "/root/.ns8-rw-pass")
+NS8_USER = os.environ.get("NS8_USER", "claude-ro")
+NS8_PASSWORD_FILE = os.environ.get("NS8_PASSWORD_FILE", "/root/.ns8-ro-pass")
 NODE_FQDN = os.environ.get("NS8_NODE_FQDN", "")
 PIGGYBACK_HOST = os.environ.get("NS8_PIGGYBACK_HOST", "NS8-RL98-MAIL")  # same convention as the other NS8-RL98 local checks
 
