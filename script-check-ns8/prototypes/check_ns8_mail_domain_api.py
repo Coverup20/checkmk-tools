@@ -37,10 +37,10 @@ import urllib.parse
 import urllib.request
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 NS8_API = os.environ.get("NS8_API", "http://127.0.0.1:9311/api")
-NS8_USER = os.environ.get("NS8_USER", "claude-rw")
-NS8_PASSWORD_FILE = os.environ.get("NS8_PASSWORD_FILE", "/root/.ns8-rw-pass")
+NS8_USER = os.environ.get("NS8_USER", "claude-ro")
+NS8_PASSWORD_FILE = os.environ.get("NS8_PASSWORD_FILE", "/root/.ns8-ro-pass")
 PIGGYBACK_HOST = os.environ.get("NS8_PIGGYBACK_HOST", "NS8-RL98-MAIL")
 SERVICE = "Mail.Domains.Status"
 
