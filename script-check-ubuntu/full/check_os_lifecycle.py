@@ -27,7 +27,7 @@ import datetime
 
 SERVICE = "OS.Lifecycle"
 CONTROL = "PR.PS-02.1"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 OS_RELEASE = "/etc/os-release"
 
@@ -107,6 +107,17 @@ def parse_date(value):
 def days_between(start, end):
     """Whole days from start to end, negative when end is in the past."""
     return (end - start).days
+
+
+# Other checks on the same host may close a piggyback block with <<<<>>>>,
+# which leaves no section open. Emitting our own header keeps these lines
+# inside the local section regardless of what ran before us.
+LOCAL_SECTION = "<<<local:sep(0)>>>"
+
+
+def local_line(state, service, perfdata, message):
+    """Build one CheckMK local-check line: state, service, metrics (or -), detail."""
+    return f"{state} {service} {perfdata or '-'} {message}"
 
 
 def evaluate(os_id, release, today, table=None, data_as_of=DATA_AS_OF):
@@ -241,12 +252,13 @@ def self_test():
 ## Check
 
 def check():
+    print(LOCAL_SECTION)
     if not os.path.exists(OS_RELEASE):
-        print(f"3 {SERVICE} - UNKNOWN: {OS_RELEASE} not found")
+        print(local_line(3, SERVICE, "-", f"UNKNOWN: {OS_RELEASE} not found"))
         return
     os_id, release = identify(parse_os_release())
     state, perf, message = evaluate(os_id, release, datetime.date.today())
-    print(f"{state} {SERVICE} {perf} {message}")
+    print(local_line(state, SERVICE, perf, message))
 
 
 if "--self-test" in sys.argv:

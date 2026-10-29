@@ -36,7 +36,7 @@ import datetime
 
 SERVICE = "Patch.Posture"
 CONTROL = "PR.PS-02.2"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 # Remediation deadlines, in days, measured from first observation.
 #
@@ -86,6 +86,17 @@ def have(binary):
     """True when the binary is on PATH."""
     code, _, _ = run(["which", binary], timeout=10)
     return code == 0
+
+
+# Other checks on the same host may close a piggyback block with <<<<>>>>,
+# which leaves no section open. Emitting our own header keeps these lines
+# inside the local section regardless of what ran before us.
+LOCAL_SECTION = "<<<local:sep(0)>>>"
+
+
+def local_line(state, service, perfdata, message):
+    """Build one CheckMK local-check line: state, service, metrics (or -), detail."""
+    return "%s %s %s %s" % (state, service, perfdata or "-", message)
 
 
 def newest_mtime(path):
@@ -433,6 +444,7 @@ def self_test():
 ## Check
 
 def check():
+    print(LOCAL_SECTION)
     if have("apt-get"):
         manager = "apt"
         security, total = apt_pending()
@@ -440,7 +452,8 @@ def check():
         manager = "dnf"
         security, total = dnf_pending()
     else:
-        print("3 %s - UNKNOWN: no supported package manager found (apt, dnf)" % SERVICE)
+        print(local_line(3, SERVICE, "-",
+                         "UNKNOWN: no supported package manager found (apt, dnf)"))
         return
 
     today = datetime.date.today()
@@ -458,7 +471,7 @@ def check():
         reboot_required(manager), metadata_age_days(manager),
         first_run=first_run,
     )
-    print("%s %s %s %s" % (state, SERVICE, perf, message))
+    print(local_line(state, SERVICE, perf, message))
 
 
 if "--self-test" in sys.argv:
