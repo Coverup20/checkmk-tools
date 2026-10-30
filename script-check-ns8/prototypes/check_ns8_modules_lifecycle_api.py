@@ -40,7 +40,7 @@ import time
 import urllib.error
 import urllib.request
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 SVC_UPDATES = "NS8.Modules.Updates"
 SVC_LIFECYCLE = "NS8.Modules.Lifecycle"
@@ -66,6 +66,10 @@ STALE_AFTER_DAYS = 180
 WARN_BEFORE_DAYS = int(os.environ.get("CHECK_NS8_EOL_WARN_DAYS", "180"))
 IMAGE_WARN_AGE_DAYS = int(os.environ.get("CHECK_NS8_IMAGE_WARN_DAYS", "365"))
 IMAGE_CRIT_AGE_DAYS = int(os.environ.get("CHECK_NS8_IMAGE_CRIT_DAYS", "730"))
+
+# Beyond this many days, an EOL date in the table is a "not scheduled yet"
+# placeholder rather than a real commitment, and is not graphed as a metric.
+OPEN_ENDED_DAYS = 3650
 
 STATE_CANDIDATES = (
     "/var/lib/check_mk_agent/ns8_modules_updates_state.json",
@@ -643,121 +647,173 @@ def discover_module_images():
     return records
 
 
-def evaluate_inner_lifecycle(records, today, table=None, data_as_of=DATA_AS_OF,
-                             warn_before=None, img_warn_days=None, img_crit_days=None):
-    """Evaluate Layer 3 records against COMPONENT_LIFECYCLE and image build age.
+def service_token(value):
+    """Make a string safe for a CheckMK service name (no spaces or separators)."""
+    token = re.sub(r"[^A-Za-z0-9_-]+", "-", (value or "").strip())
+    return re.sub(r"-{2,}", "-", token).strip("-") or "unknown"
 
-    Pure function so self_test() can exercise every branch."""
+
+def evaluate_image(rec, today, table=None, warn_before=None,
+                   img_warn_days=None, img_crit_days=None):
+    """Evaluate one container image on its own.
+
+    Returns None when the image carries no recognised component and is not old
+    enough to flag, so healthy vendor images do not each become a service.
+    Otherwise returns (service_suffix, state, perfdata, message)."""
     table = COMPONENT_LIFECYCLE if table is None else table
     warn_before = WARN_BEFORE_DAYS if warn_before is None else warn_before
     img_warn_days = IMAGE_WARN_AGE_DAYS if img_warn_days is None else img_warn_days
     img_crit_days = IMAGE_CRIT_AGE_DAYS if img_crit_days is None else img_crit_days
 
+    mod = rec.get("module") or "?"
+    img = rec.get("image") or "?"
+    short_img = img.rsplit("/", 1)[-1]
+    image_name = short_img.rsplit(":", 1)[0]
+
+    created = rec.get("created")
+    img_age = None
+    built_date = None
+    if isinstance(created, (int, float)) and created > 0:
+        built_date = datetime.datetime.fromtimestamp(created, datetime.timezone.utc).date()
+        img_age = (today - built_date).days
+
+    state = 0
+    findings = []
+    components = 0
+    worst_days_left = None
+
+    for product, cycle, hint in parse_image_components(img, rec.get("labels")):
+        entry = table.get((product, cycle))
+        if entry is None:
+            continue
+        eol = parse_date(entry[0])
+        if eol is None:
+            continue
+        components += 1
+        eoes = parse_date(entry[1]) if entry[1] else None
+        left = (eol - today).days
+        if worst_days_left is None or left < worst_days_left:
+            worst_days_left = left
+        if left < 0:
+            gone = -left
+            if eoes and today < eoes:
+                state = max(state, 1)
+                findings.append(
+                    "%s left standard support on %s (%d days ago), extended support until %s "
+                    "which needs an active subscription" % (hint, eol, gone, eoes)
+                )
+            else:
+                state = 2
+                findings.append(
+                    "%s reached end of life on %s (%d days ago), no extended support"
+                    % (hint, eol, gone)
+                )
+        elif left <= warn_before:
+            state = max(state, 1)
+            findings.append("%s reaches end of life on %s (%d days left)" % (hint, eol, left))
+
+    # Build age only matters when no component rule already judged this image.
+    if not findings and img_age is not None:
+        if img_age >= img_crit_days:
+            state = 2
+            findings.append(
+                "image has not been rebuilt for %d days (built %s)" % (img_age, built_date)
+            )
+        elif img_age >= img_warn_days:
+            state = max(state, 1)
+            findings.append(
+                "image has not been rebuilt for %d days (built %s)" % (img_age, built_date)
+            )
+
+    if not findings and components == 0:
+        return None  # nothing recognised and not old: not worth its own service
+
+    perf_parts = []
+    # A placeholder far-future EOL means the upstream project has not scheduled
+    # one yet; graphing it as thousands of days left would be misleading.
+    if worst_days_left is not None and worst_days_left <= OPEN_ENDED_DAYS:
+        perf_parts.append("days_to_eol=%d" % worst_days_left)
+    if img_age is not None:
+        perf_parts.append("image_age_days=%d" % img_age)
+    perf = "|".join(perf_parts) if perf_parts else "-"
+
+    suffix = "%s.%s" % (service_token(mod), service_token(image_name))
+
+    if state == 0:
+        age_note = ", image built %d days ago" % img_age if img_age is not None else ""
+        if worst_days_left is not None and worst_days_left <= OPEN_ENDED_DAYS:
+            message = "OK: %s supported, %d days before end of life%s" % (
+                short_img, worst_days_left, age_note)
+        else:
+            message = "OK: %s supported, no end of life scheduled%s" % (short_img, age_note)
+    else:
+        label = "CRITICAL" if state == 2 else "WARNING"
+        message = "%s [%s]: %s" % (label, CTRL_LIFECYCLE, "; ".join(findings))
+
+    return suffix, state, perf, message
+
+
+def evaluate_inner_lifecycle(records, today, table=None, data_as_of=DATA_AS_OF,
+                             warn_before=None, img_warn_days=None, img_crit_days=None):
+    """Build the per-image services plus the summary service.
+
+    Returns (items, summary) where items is a list of
+    (service_suffix, state, perfdata, message) and summary is
+    (state, perfdata, message). Pure function so self_test() can drive it."""
+    table = COMPONENT_LIFECYCLE if table is None else table
+
     if not records:
-        return 3, "-", "UNKNOWN: no rootless Podman module images found"
+        return [], (3, "-", "UNKNOWN: no rootless Podman module images found")
 
-    crit_items = []
-    warn_eol_items = []
-    warn_age_items = []
-    checked_components = 0
+    items = []
     oldest_image_days = 0
-
     for rec in records:
-        mod = rec.get("module") or "?"
-        img = rec.get("image") or "?"
-        short_img = img.rsplit("/", 1)[-1]
         created = rec.get("created")
-        img_age = None
-        built_date = None
         if isinstance(created, (int, float)) and created > 0:
-            built_date = datetime.datetime.fromtimestamp(created, datetime.timezone.utc).date()
-            img_age = (today - built_date).days
-            if img_age > oldest_image_days:
-                oldest_image_days = img_age
+            built = datetime.datetime.fromtimestamp(created, datetime.timezone.utc).date()
+            oldest_image_days = max(oldest_image_days, (today - built).days)
+        result = evaluate_image(
+            rec, today, table=table, warn_before=warn_before,
+            img_warn_days=img_warn_days, img_crit_days=img_crit_days,
+        )
+        if result is not None:
+            items.append(result)
 
-        rec_flagged_eol = False
-        for product, cycle, hint in parse_image_components(img, rec.get("labels")):
-            entry = table.get((product, cycle))
-            if entry is None:
-                continue
-            checked_components += 1
-            eol = parse_date(entry[0])
-            eoes = parse_date(entry[1]) if entry[1] else None
-            if eol is None:
-                continue
-            left = (eol - today).days
-            if left < 0:
-                gone = -left
-                rec_flagged_eol = True
-                if eoes and today < eoes:
-                    warn_eol_items.append(
-                        "%s: %s left standard support on %s (%dd ago, extended until %s)"
-                        % (mod, hint, eol, gone, eoes)
-                    )
-                else:
-                    age_suffix = ", image built %dd ago" % img_age if (img_age and img_age >= img_warn_days) else ""
-                    crit_items.append(
-                        "%s: %s EOL on %s (%dd ago%s)" % (mod, hint, eol, gone, age_suffix)
-                    )
-            elif left <= warn_before:
-                rec_flagged_eol = True
-                warn_eol_items.append(
-                    "%s: %s reaches EOL on %s (%dd left)" % (mod, hint, eol, left)
-                )
+    # Worst first, then alphabetically, so the GUI lists problems at the top.
+    items.sort(key=lambda it: (-it[1], it[0]))
 
-        # Fall back to build age only when the image was not already flagged by
-        # a more specific component lifecycle rule, so one container is not
-        # double-counted in eol_critical.
-        if not rec_flagged_eol and img_age is not None:
-            if img_age >= img_crit_days:
-                crit_items.append(
-                    "%s/%s built %d days ago (%s)" % (mod, short_img, img_age, built_date)
-                )
-            elif img_age >= img_warn_days:
-                warn_age_items.append(
-                    "%s/%s built %d days ago (%s)" % (mod, short_img, img_age, built_date)
-                )
-
-    warn_items = warn_eol_items + warn_age_items
-
-    perf = "images_scanned=%d|components_checked=%d|eol_critical=%d|eol_warning=%d|oldest_image_days=%d" % (
-        len(records), checked_components, len(crit_items), len(warn_items), oldest_image_days,
+    crit = sum(1 for it in items if it[1] == 2)
+    warn = sum(1 for it in items if it[1] == 1)
+    perf = "images_scanned=%d|components_tracked=%d|eol_critical=%d|eol_warning=%d|oldest_image_days=%d" % (
+        len(records), len(items), crit, warn, oldest_image_days,
     )
 
-    # CheckMK rewrites ";" inside a local-check summary (it separates perfdata
-    # fields), so items are joined with " | " to stay readable in the GUI.
-    if crit_items:
-        all_issues = crit_items + warn_items
-        preview = " | ".join(all_issues[:5])
-        if len(all_issues) > 5:
-            preview += " (+%d more)" % (len(all_issues) - 5)
-        return 2, perf, (
-            "CRITICAL [%s]: %d end-of-life or ancient inner component%s across NS8 modules "
-            "(+%d warning) - %s"
-            % (CTRL_LIFECYCLE, len(crit_items), "" if len(crit_items) == 1 else "s", len(warn_items), preview)
-        )
-
-    if warn_items:
-        preview = " | ".join(warn_items[:5])
-        if len(warn_items) > 5:
-            preview += " (+%d more)" % (len(warn_items) - 5)
-        return 1, perf, (
-            "WARNING [%s]: %d inner component%s on extended support or approaching EOL - %s"
-            % (CTRL_LIFECYCLE, len(warn_items), "" if len(warn_items) == 1 else "s", preview)
-        )
-
-    # Guard against a stale embedded table claiming everything is still supported.
-    refreshed = parse_date(data_as_of)
-    if refreshed is None or (today - refreshed).days > STALE_AFTER_DAYS:
-        return 3, perf, (
-            "UNKNOWN: embedded component lifecycle table is stale (DATA_AS_OF=%s) - redeploy this check"
-            % data_as_of
-        )
-
-    return 0, perf, (
-        "OK: %d inner container images (%d versioned components) supported, oldest image built %d days ago"
-        % (len(records), checked_components, oldest_image_days)
-    )
+    if crit:
+        summary = (2, perf, (
+            "CRITICAL [%s]: %d of %d tracked component%s at end of life, %d on extended "
+            "support or approaching it - see the per-component services"
+            % (CTRL_LIFECYCLE, crit, len(items), "" if crit == 1 else "s", warn)
+        ))
+    elif warn:
+        summary = (1, perf, (
+            "WARNING [%s]: %d of %d tracked components on extended support or approaching "
+            "end of life - see the per-component services"
+            % (CTRL_LIFECYCLE, warn, len(items))
+        ))
+    else:
+        refreshed = parse_date(data_as_of)
+        if refreshed is None or (today - refreshed).days > STALE_AFTER_DAYS:
+            summary = (3, perf, (
+                "UNKNOWN: embedded component lifecycle table is stale (DATA_AS_OF=%s) - "
+                "redeploy this check" % data_as_of
+            ))
+        else:
+            summary = (0, perf, (
+                "OK: %d tracked components across %d container images supported, "
+                "oldest image built %d days ago"
+                % (len(items), len(records), oldest_image_days)
+            ))
+    return items, summary
 
 
 ## Self-test
@@ -769,9 +825,11 @@ def self_test():
     stale_dt = datetime.datetime(2026, 10, 1, 6, 0, tzinfo=datetime.timezone.utc)
 
     failures = 0
+    ran = 0
 
     def expect(name, cond, detail=""):
-        nonlocal failures
+        nonlocal failures, ran
+        ran += 1
         if not cond:
             failures += 1
         print("%s  %s" % ("PASS" if cond else "FAIL", name))
@@ -847,14 +905,34 @@ def self_test():
             },
         },
     ]
-    st, _, msg = evaluate_inner_lifecycle(real_like, today)
-    expect("L3: detects EOL Redis 7.0 + Mattermost 10.11 and extended-only MariaDB 10.6 + Ubuntu 20.04",
-           st == 2 and "redis:7.0.10-alpine EOL" in msg and "mattermost" in msg, msg)
+    items, (st, _, msg) = evaluate_inner_lifecycle(real_like, today)
+    by_suffix = {suffix: (state, text) for suffix, state, _p, text in items}
+    expect("L3: summary turns CRITICAL and points at the per-component services",
+           st == 2 and "per-component services" in msg, msg)
+    expect("L3: emits one service per tracked image, not one aggregate",
+           len(items) == 4, "got %d items: %s" % (len(items), sorted(by_suffix)))
+    expect("L3: EOL Redis 7.0 is its own CRITICAL service",
+           by_suffix.get("nethvoice1.redis", (None, ""))[0] == 2
+           and "end of life" in by_suffix.get("nethvoice1.redis", (None, ""))[1],
+           str(by_suffix.get("nethvoice1.redis")))
+    expect("L3: EOL Mattermost 10.11 is its own CRITICAL service",
+           by_suffix.get("mattermost1.mattermost-team-edition", (None, ""))[0] == 2,
+           str(by_suffix.get("mattermost1.mattermost-team-edition")))
+    expect("L3: extended-support MariaDB 10.6 is its own WARNING service",
+           by_suffix.get("nextcloud1.mariadb", (None, ""))[0] == 1
+           and "extended support" in by_suffix.get("nextcloud1.mariadb", (None, ""))[1],
+           str(by_suffix.get("nextcloud1.mariadb")))
+    expect("L3: Ubuntu 20.04 base image is its own WARNING service",
+           by_suffix.get("nethvoice-proxy2.nethvoice-proxy-kamailio", (None, ""))[0] == 1,
+           str(by_suffix.get("nethvoice-proxy2.nethvoice-proxy-kamailio")))
+    expect("L3: worst-first ordering puts CRITICAL services at the top",
+           [it[1] for it in items] == sorted([it[1] for it in items], reverse=True),
+           str([it[1] for it in items]))
 
     only_warn = real_like[2:]  # MariaDB 10.6 + Ubuntu 20.04 base
-    st, _, msg = evaluate_inner_lifecycle(only_warn, today)
-    expect("L3: extended-support-only inner components report WARNING",
-           st == 1 and "mariadb" in msg and "ubuntu 20.04" in msg, msg)
+    items_w, (st, _, msg) = evaluate_inner_lifecycle(only_warn, today)
+    expect("L3: extended-support-only components keep the summary at WARNING",
+           st == 1 and len(items_w) == 2, msg)
 
     healthy = [
         {
@@ -870,16 +948,44 @@ def self_test():
             "labels": {},
         },
     ]
-    st, _, msg = evaluate_inner_lifecycle(healthy, today)
+    items_h, (st, _, msg) = evaluate_inner_lifecycle(healthy, today)
     expect("L3: healthy modern inner components report OK",
            st == 0 and "supported" in msg, msg)
+    expect("L3: healthy tracked components still get their own OK service",
+           len(items_h) == 2 and all(it[1] == 0 for it in items_h),
+           str([(it[0], it[1]) for it in items_h]))
 
-    st, _, msg = evaluate_inner_lifecycle(healthy, today, data_as_of="2025-01-01")
+    unknown_image = [{
+        "module": "webtop1",
+        "image": "ghcr.io/nethserver/webtop-phonebook:1.5.16",
+        "created": int(datetime.datetime(2026, 9, 1, tzinfo=datetime.timezone.utc).timestamp()),
+        "labels": {},
+    }]
+    items_u, _ = evaluate_inner_lifecycle(unknown_image, today)
+    expect("L3: unrecognised recent vendor image creates no service",
+           items_u == [], str(items_u))
+
+    expect("L3: service names carry no character CheckMK would rewrite",
+           service_token("docker.io/library/redis") == "docker-io-library-redis",
+           service_token("docker.io/library/redis"))
+
+    open_ended = [{
+        "module": "traefik1",
+        "image": "docker.io/library/traefik:v3.7.14",
+        "created": int(datetime.datetime(2026, 10, 6, tzinfo=datetime.timezone.utc).timestamp()),
+        "labels": {},
+    }]
+    items_o, _ = evaluate_inner_lifecycle(open_ended, today)
+    expect("L3: an unscheduled EOL is not graphed as thousands of days left",
+           len(items_o) == 1 and "days_to_eol" not in items_o[0][2]
+           and "no end of life scheduled" in items_o[0][3],
+           "%s | %s" % (items_o[0][2], items_o[0][3]) if items_o else "no item")
+
+    _, (st, _, msg) = evaluate_inner_lifecycle(healthy, today, data_as_of="2025-01-01")
     expect("L3: stale embedded table downgrades OK to UNKNOWN",
            st == 3 and "stale" in msg, msg)
 
-    total = 11
-    print("\n%d/%d passed" % (total - failures, total))
+    print("\n%d/%d passed" % (ran - failures, ran))
     sys.exit(1 if failures else 0)
 
 
@@ -914,9 +1020,13 @@ def check():
         print(local_line(st, SVC_UPDATES, perf, msg))
 
     # --- Service 2: NS8.Modules.Lifecycle (Layer 3) ---
+    # One service per tracked container component, so each can be acknowledged
+    # and trended on its own, plus one roll-up service for the node.
     records = discover_module_images()
-    st3, perf3, msg3 = evaluate_inner_lifecycle(records, today)
+    items, (st3, perf3, msg3) = evaluate_inner_lifecycle(records, today)
     print(local_line(st3, SVC_LIFECYCLE, perf3, msg3))
+    for suffix, state, perf, message in items:
+        print(local_line(state, "%s.%s" % (SVC_LIFECYCLE, suffix), perf, message))
 
 
 if "--self-test" in sys.argv:

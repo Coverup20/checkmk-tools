@@ -37,6 +37,7 @@ Ydea-Toolkit/config/.ydea-cookies
 
 # Claude editor config (local only)
 .claude/
+CLAUDE.md
 
 # Backup artifacts
 *.bak*
