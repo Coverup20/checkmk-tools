@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-# Colori
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -22,12 +22,12 @@ NOTIFY_SCRIPT="/omd/sites/${CHECKMK_SITE}/local/share/check_mk/notifications/yde
 HEALTH_SCRIPT="/opt/ydea-toolkit/ydea-health-monitor.sh"
 YDEA_TOOLKIT="/opt/ydea-toolkit/ydea-toolkit.sh"
 
-# Contatori
+# Counters
 TESTS_PASSED=0
 TESTS_FAILED=0
 TESTS_TOTAL=0
 
-# Funzioni
+# Functions
 test_start() {
   TESTS_TOTAL=$((TESTS_TOTAL + 1))
   echo -e "${BLUE}[TEST $TESTS_TOTAL]${NC} $1"
@@ -146,7 +146,7 @@ for cache_file in "$TICKET_CACHE" "$FLAPPING_CACHE"; do
   fi
 done
 
-# ===== TEST 6: Dipendenze =====
+# ===== TEST 6: Dependencies =====
 test_start "Verifica dipendenze sistema"
 
 for cmd in jq curl bash date; do
@@ -188,7 +188,7 @@ else
   test_warn "Log health non trovato (verrà creato al primo run)"
 fi
 
-# ===== TEST 9: Simulazione Notifica =====
+# ===== TEST 9: Notification Simulation =====
 test_start "Test simulazione notifica (opzionale)"
 
 echo -e "${YELLOW}Vuoi eseguire un test di notifica simulata? (y/n)${NC}"
@@ -247,7 +247,7 @@ else
 fi
 echo ""
 
-# ===== RIEPILOGO =====
+# ===== SUMMARY =====
 echo ""
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║                     RIEPILOGO TEST                        ║${NC}"

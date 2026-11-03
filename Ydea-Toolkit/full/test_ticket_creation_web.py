@@ -30,7 +30,7 @@ from pathlib import Path
 YDEA_BASE_URL = "https://my.ydea.cloud"
 COOKIE_FILE = Path("/tmp/ydea_cookies.txt")
 
-# Colori
+# Colors
 class Colors:
     RED = '\033[0;31m'
     GREEN = '\033[0;32m'

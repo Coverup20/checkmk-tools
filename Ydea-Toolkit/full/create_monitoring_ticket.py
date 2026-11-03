@@ -14,7 +14,7 @@ Example:
 
 Version: 1.0.0 (ported from Bash)"""
 
-VERSION = "1.0.0"  # Versione script (aggiornare ad ogni modifica)
+VERSION = "1.0.0"  # Script version (update on every change)
 
 import sys
 import os
@@ -23,7 +23,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-# Import moduli locali
+# Import local modules
 script_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(script_dir))
 
@@ -38,7 +38,7 @@ if spec and spec.loader:
 else:
     raise ImportError("Cannot load ydea-toolkit.py")
 
-# Estrai classi necessarie
+# Extract required classes
 YdeaAPI = ydea_toolkit.YdeaAPI
 TicketOperations = ydea_toolkit.TicketOperations
 TrackingSystem = ydea_toolkit.TrackingSystem
@@ -49,7 +49,7 @@ TrackingSystem = ydea_toolkit.TrackingSystem
 CONFIG_FILE = script_dir.parent / "config" / "premium-mon-config.json"
 
 
-# ===== FUNZIONI UTILITY =====
+# ===== UTILITY FUNCTIONS =====
 
 def determine_tipo(service: str, output: str, host: str, config: Dict[str, Any]) -> str:
     """Determine ticket type based on service/output/host
@@ -161,7 +161,7 @@ def build_private_note(
 def main():
     """Main function"""
     
-    # Parse argomenti
+    # Parse arguments
     if len(sys.argv) < 5:
         print(" Uso: create_monitoring_ticket.py <HOST> <SERVICE> <STATE> <OUTPUT> [HOST_IP]")
         print("")
@@ -202,21 +202,21 @@ def main():
     
     Logger.debug(f"Config: anagrafica={anagrafica_id}, priorita={priorita_id}, sla={sla_id}, assegnatoa={assegnatoa_id}")
     
-    # Determina tipologia
+    # Determine type
     tipo = determine_tipo(cmk_service, cmk_output, cmk_host, config)
     Logger.info(f"Tipologia determinata: {tipo}")
     
-    # Costruisci titolo e descrizione
+    # Build title and description
     titolo = build_ticket_title(cmk_host, cmk_service, cmk_state, cmk_hostip)
     descrizione = "Allarme da sistema di monitoraggio CheckMK"
     
     Logger.info(f"Titolo: {titolo}")
     
-    # Inizializza API e tracking
+    # Initialize API and tracking
     api = YdeaAPI()
     tracking = TrackingSystem()
     
-    # Costruisci body ticket base
+    # Build base ticket body
     ticket_body = {
         "titolo": titolo,
         "descrizione": descrizione,
@@ -226,7 +226,7 @@ def main():
         "tipo": tipo
     }
     
-    # Aggiungi campi opzionali se presenti
+    # Add optional fields if present
     if assegnatoa_id:
         ticket_body["assegnatoa"] = [assegnatoa_id]
     
@@ -235,7 +235,7 @@ def main():
     
     Logger.debug(f"Body: {ticket_body}")
     
-    # Crea ticket
+    # Create ticket
     Logger.info("Creazione ticket in corso...")
     
     try:

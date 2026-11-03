@@ -15,7 +15,7 @@ Examples:
 
 Version: 1.0.0 (ported from Bash)"""
 
-VERSION = "1.0.0"  # Versione script (aggiornare ad ogni modifica)
+VERSION = "1.0.0"  # Script version (update on every change)
 
 import sys
 import os
@@ -33,7 +33,7 @@ except ImportError:
     print("ERRORE: psutil non installato. Eseguire: pip3 install psutil")
     sys.exit(1)
 
-# Import moduli locali
+# Import local modules
 script_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(script_dir))
 
@@ -48,14 +48,14 @@ if spec and spec.loader:
 else:
     raise ImportError("Cannot load ydea-toolkit.py")
 
-# Estrai classi necessarie
+# Extract required classes
 YdeaAPI = ydea_toolkit.YdeaAPI
 TicketOperations = ydea_toolkit.TicketOperations
 
 
 # ===== CONFIGURATION =====
 
-# Soglie alert
+# Alert thresholds
 ALERT_THRESHOLD_CPU = int(os.getenv("ALERT_THRESHOLD_CPU", "90"))
 ALERT_THRESHOLD_MEM = int(os.getenv("ALERT_THRESHOLD_MEM", "85"))
 ALERT_THRESHOLD_DISK = int(os.getenv("ALERT_THRESHOLD_DISK", "90"))
@@ -67,7 +67,7 @@ TICKET_CACHE_FILE = Path("/tmp/ydea_tickets_cache.json")
 CACHE_MAX_AGE_HOURS = 24
 
 
-# ===== GESTIONE CACHE TICKET =====
+# ===== TICKET CACHE MANAGEMENT =====
 
 cache = CacheManager(TICKET_CACHE_FILE)
 
@@ -122,7 +122,7 @@ def cleanup_cache():
         Logger.info(f"Rimossi {removed_count} ticket vecchi dalla cache")
 
 
-# ===== FUNZIONI CREAZIONE TICKET =====
+# ===== TICKET CREATION FUNCTIONS =====
 
 def create_ticket(title: str, description: str, priority: str = "normal", tags: list = None) -> Optional[int]:
     """Create Ydea ticket
@@ -209,7 +209,7 @@ ps auxf --sort=-%cpu | head -10
             if ticket_id:
                 save_ticket_cache(alert_key, ticket_id)
     else:
-        # CPU OK - rimuovi ticket se esistente
+        # CPU OK - remove ticket if it exists
         if ticket_exists(alert_key):
             Logger.info(f"CPU tornata normale ({cpu_usage}%), rimuovo ticket dalla cache")
             remove_ticket_cache(alert_key)
@@ -401,7 +401,7 @@ def main():
     """Main function - performs all checks"""
     Logger.info("Inizio controlli monitoraggio")
     
-    # Pulizia cache
+    # Cache cleanup
     cleanup_cache()
     
     # Default controls

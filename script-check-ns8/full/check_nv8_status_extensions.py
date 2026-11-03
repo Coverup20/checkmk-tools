@@ -107,7 +107,7 @@ def sanitize_name(name: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Discovery moduli e container
+# Module and container discovery
 # ---------------------------------------------------------------------------
 
 def get_modules() -> List[str]:

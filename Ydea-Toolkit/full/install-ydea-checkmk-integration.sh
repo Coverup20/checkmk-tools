@@ -22,7 +22,7 @@ echo -e "${BLUE}║      Installazione Integrazione CheckMK → Ydea           �
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-# Funzioni utility
+# Utility functions
 info() { echo -e "${BLUE}ℹ  $*${NC}"; }
 success() { echo -e "${GREEN} $*${NC}"; }
 warn() { echo -e "${YELLOW}  $*${NC}"; }
@@ -99,7 +99,7 @@ install_scripts() {
     warn "ydea_realip installato (legacy opzionale)"
   fi
   
-  # Copia mail_ydea_down
+  # Copy mail_ydea_down
   if [[ -f "${NOTIFY_SCRIPT_DIR}/mail_ydea_down" ]]; then
     cp "${NOTIFY_SCRIPT_DIR}/mail_ydea_down" "$CHECKMK_NOTIFY_DIR/"
     chmod +x "${CHECKMK_NOTIFY_DIR}/mail_ydea_down"
@@ -151,7 +151,7 @@ setup_env() {
     cp "$env_file" "${env_file}.backup.$(date +%Y%m%d_%H%M%S)"
   fi
   
-  # Copia .env template se esiste (supporta più path)
+  # Copy .env template if it exists (supports multiple paths)
   local env_template=""
   local env_candidates=(
     "${SCRIPT_DIR}/.env"

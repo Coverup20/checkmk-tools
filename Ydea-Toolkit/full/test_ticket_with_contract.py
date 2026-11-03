@@ -33,7 +33,7 @@ else:
 YdeaAPI = ydea_toolkit.YdeaAPI  # type: ignore
 Logger = ydea_toolkit.Logger    # type: ignore
 
-# Costanti
+# Constants
 ANAGRAFICA_ID = 2339268
 
 
@@ -102,7 +102,7 @@ def main():
         
         # Step 3: Verify association
         print(" Step 3: Verifica dettagli ticket creato...")
-        time.sleep(2)  # Attendi propagazione
+        time.sleep(2)  # Wait for propagation
         
         details, status = api.api_call("GET", f"/ticket/{ticket_id}")
         if status != 200:

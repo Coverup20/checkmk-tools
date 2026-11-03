@@ -70,7 +70,7 @@ def print_header():
     print()
 
 
-# ===== FUNZIONI CONTROLLO =====
+# ===== CHECK FUNCTIONS =====
 
 def check_root():
     """Check root permissions"""
@@ -223,7 +223,7 @@ def install_scripts():
         (CHECKMK_NOTIFY_DIR / destination_name).chmod(0o755)
         success(f"{destination_name} installato da {source.name}")
 
-    # Copia eventuale notifier legacy (opzionale)
+    # Copy optional legacy notifier
     ydea_realip = notify_script_dir / "ydea_realip"
     if ydea_realip.exists():
         shutil.copy(ydea_realip, CHECKMK_NOTIFY_DIR / "ydea_realip")
@@ -239,7 +239,7 @@ def install_scripts():
     else:
         warn("File mail_ydea_down non trovato (opzionale)")
 
-    # Copia cache validator (obbligatorio)
+    # Copy cache validator (required)
     validator_source = None
     for candidate in ["ydea_cache_validator.py", "ydea_cache_validator"]:
         candidate_path = notify_script_dir / candidate
@@ -679,7 +679,7 @@ def create_cache_files():
     try:
         subprocess.run(["chown", "-R", f"{monitoring_user}:{monitoring_user}", str(cache_dir)], check=True)
     except Exception:
-        pass  # Non critico se il chown fallisce
+        pass  # Not critical if chown fails
 
     success(f"Cache inizializzata in {cache_dir}")
 
@@ -704,7 +704,7 @@ def backup_and_remove(path: Path, label: str):
 
 
 def remove_cron_entries():
-    """Rimuove cron entries ydea-health-monitor"""
+    """Remove ydea-health-monitor cron entries"""
     info("Rimozione cron job Ydea health monitor...")
     try:
         result = subprocess.run(
@@ -740,7 +740,7 @@ def remove_cron_entries():
 
 
 def remove_installation():
-    """Rimuove integrazione Ydea installata"""
+    """Remove installed Ydea integration"""
     print_header()
     check_root()
 
@@ -781,7 +781,7 @@ def remove_installation():
 
 
 def show_next_steps():
-    """Mostra prossimi passi"""
+    """Show next steps"""
     print()
     print(f"{Colors.GREEN}╔══════════════════════════════════════════════════════════════╗{Colors.NC}")
     print(f"{Colors.GREEN}║               Installazione Completata!                   ║{Colors.NC}")

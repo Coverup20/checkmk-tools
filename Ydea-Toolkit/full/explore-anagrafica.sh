@@ -56,7 +56,7 @@ for ENDPOINT in "${ENDPOINTS[@]}"; do
     
     echo ""
     
-    # Cerca campi contenenti "sla", "premium", "mon"
+    # Look for fields containing "sla", "premium", "mon"
     echo " Campi contenenti 'SLA', 'Premium' o 'Mon':"
     echo "$HTTP_BODY" | jq 'walk(if type == "object" then with_entries(select(.key | test("sla|premium|mon|contract|contratt"; "i"))) else . end)' 2>/dev/null || echo "None found"
     
@@ -106,7 +106,7 @@ if [[ "$COUNT" -gt 0 ]]; then
     echo "$MATCHING_TICKETS" | jq '[.[].keys[]] | unique | sort[]'
     echo ""
     
-    # Cerca campi custom o sla
+    # Look for custom fields or sla
     echo "customAttributes values ​​in the tickets of this registry:"
     echo "$MATCHING_TICKETS" | jq '[.[].customAttributes // {}] | unique'
 fi

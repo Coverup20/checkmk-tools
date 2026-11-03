@@ -26,7 +26,7 @@ echo " TEST CREAZIONE TICKET YDEA - Via Form HTML"
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
 
-# Funzione login
+# Login function
 login_ydea() {
     echo " Login a YDEA..."
     
@@ -96,7 +96,7 @@ get_ticket_form_token() {
     echo "$FORM_TOKEN"
 }
 
-# Funzione creazione ticket
+# Ticket creation function
 create_ticket() {
     local titolo="$1"
     local contratto="$2"
@@ -117,43 +117,43 @@ create_ticket() {
         return 1
     fi
     
-    # Dati estratti dal HAR (valori reali)
+    # Data extracted from the HAR (real values)
     # Adapt these IDs to your real data
     AZIENDA_ID="2339268"           # AZIENDA MONITORATA test
-    DESTINAZIONE_ID="2831588"       # Sede/destinazione
+    DESTINAZIONE_ID="2831588"       # Location/destination
     
-    # Crea multipart form data
+    # Build multipart form data
     BOUNDARY="----WebKitFormBoundary$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)"
     
-    # Costruisci body multipart
+    # Build multipart body
     BODY=""
     
-    # Titolo
+    # Title
     BODY+="--${BOUNDARY}\r\n"
     BODY+="Content-Disposition: form-data; name=\"appbundle_ticket[titolo]\"\r\n\r\n"
     BODY+="${titolo}\r\n"
     
-    # Tipo
+    # Type
     BODY+="--${BOUNDARY}\r\n"
     BODY+="Content-Disposition: form-data; name=\"appbundle_ticket[tipo]\"\r\n\r\n"
     BODY+="Server\r\n"
     
-    # Priorità
+    # Priority
     BODY+="--${BOUNDARY}\r\n"
     BODY+="Content-Disposition: form-data; name=\"appbundle_ticket[priorita]\"\r\n\r\n"
     BODY+="30\r\n"
     
-    # Fonte
+    # Source
     BODY+="--${BOUNDARY}\r\n"
     BODY+="Content-Disposition: form-data; name=\"appbundle_ticket[fonte]\"\r\n\r\n"
     BODY+="\r\n"
     
-    # Pagamento (from HAR: 61576)
+    # Payment (from HAR: 61576)
     BODY+="--${BOUNDARY}\r\n"
     BODY+="Content-Disposition: form-data; name=\"appbundle_ticket[pagamento]\"\r\n\r\n"
     BODY+="61576\r\n"
     
-    # ServiceLevelAgreement (se fornito)
+    # ServiceLevelAgreement (if provided)
     if [[ -n "$sla" ]]; then
         BODY+="--${BOUNDARY}\r\n"
         BODY+="Content-Disposition: form-data; name=\"appbundle_ticket[serviceLevelAgreement]\"\r\n\r\n"
@@ -165,7 +165,7 @@ create_ticket() {
     BODY+="Content-Disposition: form-data; name=\"appbundle_ticket[_token]\"\r\n\r\n"
     BODY+="${FORM_TOKEN}\r\n"
     
-    # Azienda
+    # Company (azienda)
     BODY+="--${BOUNDARY}\r\n"
     BODY+="Content-Disposition: form-data; name=\"azienda\"\r\n\r\n"
     BODY+="${AZIENDA_ID}\r\n"
