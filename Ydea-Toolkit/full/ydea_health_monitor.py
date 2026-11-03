@@ -11,7 +11,7 @@ Typically run via cron every 15 minutes.
 
 Version: 1.0.0 (ported from Bash)"""
 
-VERSION = "1.0.0"  # Versione script (aggiornare ad ogni modifica)
+VERSION = "1.0.0"  # Script version (update on every change)
 
 import sys
 import os
@@ -20,7 +20,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-# Import moduli locali
+# Import local modules
 script_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(script_dir))
 
@@ -35,7 +35,7 @@ if spec and spec.loader:
 else:
     raise ImportError("Cannot load ydea-toolkit.py")
 
-# Estrai classi necessarie
+# Extract required classes
 YdeaAPI = ydea_toolkit.YdeaAPI
 
 
@@ -60,7 +60,7 @@ DEFAULT_STATE = {
 }
 
 
-# ===== FUNZIONI UTILITY =====
+# ===== UTILITY FUNCTIONS =====
 
 def test_ydea_login() -> bool:
     """Test Ydea API login
@@ -123,7 +123,7 @@ def send_email_alert(subject: str, body: str) -> bool:
             Logger.error(f"Errore esecuzione script mail: {e}")
             return False
     else:
-        # Fallback: usa EmailNotifier
+        # Fallback: use EmailNotifier
         try:
             notifier = EmailNotifier(smtp_host="localhost", smtp_port=25)
             notifier.send_email(ALERT_EMAIL, subject, body, html=False)
@@ -182,7 +182,7 @@ def build_recovery_alert(last_failure_timestamp: str) -> tuple[str, str]:
     
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    # Converti timestamp se disponibile
+    # Convert timestamp if available
     last_failure_str = "N/A"
     if last_failure_timestamp:
         try:
@@ -210,7 +210,7 @@ Ydea Health automatic monitor"""
 def main():
     """Main function"""
     
-    # Inizializza state manager
+    # Initialize state manager
     state = StateManager(STATE_FILE, default_state=DEFAULT_STATE)
     
     # Read current status
@@ -224,7 +224,7 @@ def main():
         # ===== YDEA UP =====
         Logger.success(" Ydea API raggiungibile")
         
-        # Se era down e abbiamo notificato, invia recovery email
+        # If it was down and we had notified, send recovery email
         if current_status == "down" and was_notified:
             Logger.info("Ydea tornato online, invio notifica di recovery")
             

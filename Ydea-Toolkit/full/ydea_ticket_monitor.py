@@ -13,7 +13,7 @@ Usage:
 
 Version: 1.0.0 (ported from Bash)"""
 
-VERSION = "1.0.0"  # Versione script (aggiornare ad ogni modifica)
+VERSION = "1.0.0"  # Script version (update on every change)
 
 import sys
 import os
@@ -23,7 +23,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
-# Import moduli locali
+# Import local modules
 script_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(script_dir))
 
@@ -38,7 +38,7 @@ if spec and spec.loader:
 else:
     raise ImportError("Cannot load ydea-toolkit.py")
 
-# Estrai classi necessarie
+# Extract required classes
 YdeaAPI = ydea_toolkit.YdeaAPI
 TrackingSystem = ydea_toolkit.TrackingSystem
 
@@ -49,7 +49,7 @@ CLEANUP_MARKER = Path("/tmp/ydea_last_cleanup")
 CLEANUP_INTERVAL_HOURS = 6
 
 
-# ===== FUNZIONI UTILITY =====
+# ===== UTILITY FUNCTIONS =====
 
 def log_ticket_event(event_type: str, ticket_id: int, details: str = ""):
     """Log ticket event
@@ -102,7 +102,7 @@ def get_previous_states(tracking: TrackingSystem) -> Dict[int, Dict[str, Any]]:
         tickets = tracking_data.get('tickets', [])
         
         for ticket in tickets:
-            if ticket.get('resolved_at') is None:  # Solo ticket aperti
+            if ticket.get('resolved_at') is None:  # Only open tickets
                 tid = ticket.get('ticket_id')
                 if tid:
                     previous[tid] = {
@@ -156,22 +156,22 @@ def detect_changes(
     else:
         current_assegnato = "Non assegnato"
     
-    # Rileva modifica descrizione
+    # Detect description change
     if prev_desc and current_desc != prev_desc:
         log_ticket_event("DESCRIZIONE-MODIFICATA", ticket_id, 
                         f"[{codice}] Host: {host}, Service: {service}")
     
-    # Rileva modifica priorità
+    # Detect priority change
     if current_prio != prev_prio:
         log_ticket_event("PRIORITA-MODIFICATA", ticket_id,
                         f"[{codice}] {prev_prio} → {current_prio} - Host: {host}, Service: {service}")
     
-    # Rileva cambio assegnazione
+    # Detect assignment change
     if current_assegnato != prev_assegnato:
         log_ticket_event("ASSEGNAZIONE-MODIFICATA", ticket_id,
                         f"[{codice}] {prev_assegnato} → {current_assegnato} - Host: {host}, Service: {service}")
     
-    # Rileva ticket risolto
+    # Detect resolved ticket
     resolved_states = ['Effettuato', 'Chiuso', 'Completato', 'Risolto']
     if current_stato in resolved_states and prev_stato != current_stato:
         log_ticket_event("RISOLTO", ticket_id,
@@ -233,16 +233,16 @@ def main():
     Logger.info("=" * 60)
     Logger.info(" Avvio monitoraggio ticket tracciati")
     
-    # Inizializza tracking e API
+    # Initialize tracking and API
     tracking = TrackingSystem()
     api = YdeaAPI()
     
-    # Mostra statistiche iniziali
+    # Show initial statistics
     stats = get_tracking_stats(tracking)
     Logger.info(f" Stato: {stats['total_tickets']} totali "
                f"({stats['open_tickets']} aperti, {stats['resolved_tickets']} risolti)")
     
-    # Salva stati precedenti
+    # Save previous states
     previous_states = get_previous_states(tracking)
     
     Logger.info(" Aggiornamento stati ticket...")
@@ -254,7 +254,7 @@ def main():
         Logger.error(f"Errore aggiornamento tracking: {e}")
         sys.exit(1)
     
-    # Ottieni dati aggiornati dall'API
+    # Get updated data from the API
     try:
         api.ensure_token()
         api_response, status_code = api.api_call("GET", "/tickets?limit=100")
@@ -263,7 +263,7 @@ def main():
         Logger.error(f"Errore recupero ticket da API: {e}")
         api_tickets = []
     
-    # Rileva e logga cambiamenti
+    # Detect and log changes
     for ticket_id, prev_data in previous_states.items():
         # Trova ticket corrispondente nell'API
         current_ticket = next(

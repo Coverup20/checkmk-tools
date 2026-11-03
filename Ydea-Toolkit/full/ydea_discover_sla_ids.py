@@ -22,7 +22,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
-# Import moduli locali
+# Import local modules
 script_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(script_dir))
 
@@ -60,7 +60,7 @@ SUBCATEGORIES = [
 SLA_NAME = "TK25/003209 SLA Personalizzata"
 
 
-# ===== FUNZIONI HELPER =====
+# ===== HELPER FUNCTIONS =====
 
 def print_header(title: str):
     """Print formatted header"""
@@ -79,7 +79,7 @@ def save_dump(filename: str, data: Dict[str, Any]):
     Logger.debug(f"Dump completo salvato in {filename}")
 
 
-# ===== DISCOVERY CATEGORIE =====
+# ===== CATEGORY DISCOVERY =====
 
 def discover_categories() -> Dict[str, Any]:
     """Discovery categories and subcategories
@@ -101,7 +101,7 @@ def discover_categories() -> Dict[str, Any]:
         # Salva dump completo
         save_dump("categories-full-dump.json", categories_data)
         
-        # Cerca macro categoria
+        # Look for macro category
         macro_cat_id = None
         objs = categories_data.get("objs", [])
         
@@ -118,7 +118,7 @@ def discover_categories() -> Dict[str, Any]:
             for cat in objs:
                 print(f"  {cat.get('id')} → {cat.get('nome')}")
         
-        # Cerca sottocategorie
+        # Look for subcategories
         subcategory_list = []
         found_count = 0
         
@@ -156,7 +156,7 @@ def discover_categories() -> Dict[str, Any]:
         return {}
 
 
-# ===== DISCOVERY SLA =====
+# ===== SLA DISCOVERY =====
 
 def discover_sla() -> Dict[str, Any]:
     """Custom SLA discovery
@@ -170,12 +170,12 @@ def discover_sla() -> Dict[str, Any]:
     try:
         api = YdeaAPI()
         
-        # Prova endpoint /sla
+        # Try /sla endpoint
         sla_data, status_code = api.api_call("GET", "/sla")
         
         if status_code not in [200, 201] or not sla_data or not sla_data.get("objs"):
             Logger.warn("Nessuna SLA trovata o endpoint non disponibile")
-            # Prova endpoint alternativo /slas
+            # Try alternative /slas endpoint
             sla_data, status_code = api.api_call("GET", "/slas")
         
         if status_code not in [200, 201] or not sla_data:
@@ -185,7 +185,7 @@ def discover_sla() -> Dict[str, Any]:
         # Salva dump completo
         save_dump("sla-full-dump.json", sla_data)
         
-        # Cerca SLA specifica
+        # Look for specific SLA
         sla_id = None
         objs = sla_data.get("objs", [])
         
@@ -225,7 +225,7 @@ def discover_sla() -> Dict[str, Any]:
         return {}
 
 
-# ===== DISCOVERY PRIORITÀ =====
+# ===== PRIORITY DISCOVERY =====
 
 def discover_priorities() -> Dict[str, Any]:
     """Discovery priority
@@ -247,7 +247,7 @@ def discover_priorities() -> Dict[str, Any]:
         # Salva dump completo
         save_dump("priorities-full-dump.json", priorities_data)
         
-        # Cerca priorità "Bassa"
+        # Look for priority "Bassa"
         low_priority_id = None
         objs = priorities_data.get("objs", [])
         
@@ -301,10 +301,10 @@ def main():
         Logger.error(f"Errore autenticazione: {e}")
         sys.exit(1)
     
-    # Discovery categorie
+    # Category discovery
     categories_json = discover_categories()
     
-    # Discovery SLA
+    # SLA discovery
     sla_json = discover_sla()
     
     # Discovery priorità

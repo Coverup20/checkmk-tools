@@ -2,15 +2,15 @@
 ################################################################################
 # Script to test the creation of a ticket with associated contract
 # 
-# PREREQUISITI:
+# PREREQUISITES:
 # 1. You must have created a contract in Ydea UI for the registry number 2339268
 # 2. The contract must have SLA "Premium_Mon" configured
 # 3. You need to pass the contract ID as a parameter
 #
-# USO:
+# USAGE:
 #   ./test-ticket-with-contract.sh <CONTRATTO_ID>
 #
-# ESEMPIO:
+# EXAMPLE:
 #   ./test-ticket-with-contract.sh 168912
 #
 # The script:
@@ -152,7 +152,7 @@ echo "   - Ticket Codice: ${TICKET_CODICE}"
 echo ""
 # Step 4: Verify the created ticket
 echo -e "${YELLOW} Step 3: Verifica dettagli ticket creato...${NC}"
-sleep 2  # Pausa per permettere a Ydea di processare
+sleep 2  # Pause to let Ydea process
 
 # Use direct curl for the GET too
 TICKET_DETAILS=$(curl -s -X GET "https://my.ydea.cloud/app_api_v2/ticket/${TICKET_ID}" \

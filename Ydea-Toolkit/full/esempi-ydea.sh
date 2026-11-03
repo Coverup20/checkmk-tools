@@ -14,12 +14,12 @@ fi
 echo "=== EXAMPLES OF USE YDEA TOOLKIT ==="
 echo
 
-# === ESEMPIO 1: Report giornaliero ticket ===
+# === EXAMPLE 1: Daily ticket report ===
 esempio_report_giornaliero() {
   echo " REPORT TICKET GIORNALIERO"
   echo "================================"
   
-  # Ticket aperti
+  # Open tickets
   echo " Ticket APERTI:"
   $TOOLKIT list 100 open | jq -r '.data[] | "  #\(.id) - \(.title) [prio: \(.priority)]"' 2>/dev/null || echo "Mistake"
   
@@ -31,7 +31,7 @@ esempio_report_giornaliero() {
   
   echo
   
-  # Statistiche
+  # Statistics
   echo " STATISTICHE:"
   local total_open=$($TOOLKIT list 1000 open | jq '.total // 0' 2>/dev/null)
   local total_closed=$($TOOLKIT list 1000 closed | jq '.total // 0' 2>/dev/null)
@@ -95,12 +95,12 @@ esempio_cerca_e_aggiorna() {
   fi
 }
 
-# === ESEMPIO 4: Workflow completo ===
+# === EXAMPLE 4: Complete workflow ===
 esempio_workflow_completo() {
   echo " WORKFLOW COMPLETO"
   echo "================================"
   
-  # 1. Crea ticket
+  # 1. Create ticket
   echo "1⃣ Creazione ticket..."
   local result=$($TOOLKIT create "Test workflow" "Ticket di test per workflow automatico" "normal")
   local ticket_id=$(echo "$result" | jq -r '.id // empty')
@@ -112,11 +112,11 @@ esempio_workflow_completo() {
   
   echo "Ticket #$ticket_id created"
   
-  # 2. Recupera dettagli
+  # 2. Retrieve details
   echo "2⃣ Recupero dettagli..."
   $TOOLKIT get "$ticket_id" | jq '{id, title, status, priority, created_at}'
   
-  # 3. Aggiungi commento
+  # 3. Add comment
   echo "3⃣ Added comment..."
   $TOOLKIT comment "$ticket_id" "Inizio lavorazione ticket"
   
@@ -124,7 +124,7 @@ esempio_workflow_completo() {
   echo "4⃣ Status update to 'in progress'..."
   $TOOLKIT update "$ticket_id" '{"status":"in_progress"}'
   
-  # 5. Aggiungi nota finale e chiudi
+  # 5. Add final note and close
   echo "5⃣ Added final note..."
   $TOOLKIT comment "$ticket_id" "Lavorazione completata con successo"
   
@@ -156,7 +156,7 @@ esempio_export_csv() {
   head -5 "$output_file"
 }
 
-# === MENU INTERATTIVO ===
+# === INTERACTIVE MENU ===
 show_menu() {
   echo
   echo "Choose an example to run:"

@@ -94,7 +94,7 @@ def main():
     if env_file.exists():
         try:
             from dotenv import load_dotenv, dotenv_values
-            # Prova a caricare se python-dotenv installato, altrimenti parse manuale semplice
+            # Try to load if python-dotenv is installed, otherwise simple manual parse
             config = {}
             with open(env_file) as f:
                 for line in f:
@@ -119,7 +119,7 @@ def main():
     # 3. API connection
     test_start("Test Connessione Ydea API")
     try:
-        # Carica modulo ydea_toolkit dinamicamente
+        # Load ydea_toolkit module dynamically
         spec = importlib.util.spec_from_file_location("ydea_toolkit", ydea_toolkit_path)
         if spec and spec.loader:
             mod = importlib.util.module_from_spec(spec)
@@ -144,7 +144,7 @@ def main():
         else:
             test_warn(f"Cache non trovato (normale se primo avvio): {p.name}")
 
-    # 5. Riepilogo
+    # 5. Summary
     print(f"\n{Colors.BLUE}=== RIEPILOGO ==={Colors.NC}")
     print(f"Test totali:  {total_tests}")
     print(f"Passati:      {Colors.GREEN}{passed_tests}{Colors.NC}")

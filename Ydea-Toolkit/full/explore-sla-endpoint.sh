@@ -13,7 +13,7 @@ echo ""
 
 ensure_token
 
-# Test 1: Cerca endpoint /sla
+# Test 1: Look for /sla endpoint
 echo "TEST 1: GET /sla (list of available SLAs)"
 echo "────────────────────────────────────────────────────────────────────"
 RESPONSE=$(ydea_api GET "/sla?limit=10" || echo '{"error": "endpoint not found"}')
@@ -21,7 +21,7 @@ echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
 echo ""
 echo ""
 
-# Test 2: Cerca nella struttura anagrafica
+# Test 2: Look in the anagrafica structure
 echo "TEST 2: GET /personal data/2339268 (search for default SLA)"
 echo "────────────────────────────────────────────────────────────────────"
 RESPONSE=$(ydea_api GET "/anagrafiche/2339268" || echo '{"error": "endpoint not found"}')
@@ -32,7 +32,7 @@ echo "$RESPONSE" | jq 'keys | map(select(test("sla"; "i")))' 2>/dev/null || echo
 echo ""
 echo ""
 
-# Test 3: Cerca nella struttura contratti
+# Test 3: Look in the contratti structure
 echo "TEST 3: GET /contratti/180437 (cerca SLA nel contratto)"
 echo "────────────────────────────────────────────────────────────────────"
 RESPONSE=$(ydea_api GET "/contratti/180437" || echo '{"error": "endpoint not found"}')
@@ -44,7 +44,7 @@ echo ""
 echo ""
 
 # Test 4: Test UPDATE ticket with SLA
-TICKET_ID="1630352"  # Ticket TEST 2 creato in precedenza
+TICKET_ID="1630352"  # Ticket TEST 2 created earlier
 echo "TEST 4: PATCH /ticket/${TICKET_ID} (try to add SLA to existing ticket)"
 echo "────────────────────────────────────────────────────────────────────"
 
@@ -107,7 +107,7 @@ fi
 echo ""
 echo ""
 
-# Test 6: Cerca nella documentazione/schema API
+# Test 6: Look in API documentation/schema
 echo "TEST 6: GET /api-docs o /schema (se disponibile)"
 echo "────────────────────────────────────────────────────────────────────"
 
