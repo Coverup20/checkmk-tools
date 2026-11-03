@@ -13,10 +13,14 @@
 #
 #   bind 127.0.0.0/8 or ::1                   -> LOOPBACK
 #   bind 0.0.0.0 / ::, port blocked by fw     -> FILTERED  (not a problem)
-#   bind 0.0.0.0 / ::, port admitted by fw    -> EXPOSED
+#   bind non-loopback, admitted, public IP    -> EXPOSED   (reachable from internet)
+#   bind non-loopback, admitted, private only -> LAN       (reachable on local network)
 #   bind a specific address                   -> same rule, on that address
 #   firewall unreadable                       -> UNKNOWN   (not knowing != protected)
-#   no active firewall                        -> EXPOSED for every non-loopback bind
+#   no active firewall                        -> EXPOSED (public IP) or LAN (private only)
+#
+# On hosts with only private IP addresses, upstream NAT or port forwarding cannot
+# be determined or excluded from this host alone.
 #
 # Firewall rules are not tracked per interface here, so a specific-address bind
 # is judged by the same rule set as a wildcard bind.
@@ -40,19 +44,71 @@
 # Compatible with Python 3.9+, the oldest interpreter in the fleet.
 
 import datetime
+import ipaddress
 import json
 import os
 import re
 import subprocess
 import sys
 
+PRIVATE_NETWORKS = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("fc00::/7"),
+    ipaddress.ip_network("fe80::/10"),
+    ipaddress.ip_network("::1/128"),
+]
+
+
+def is_private_ip(ip_str):
+    """Return True if ip_str is in one of the private/internal/loopback CIDRs."""
+    try:
+        addr = ipaddress.ip_address(ip_str.strip())
+        return any(addr in net for net in PRIVATE_NETWORKS)
+    except ValueError:
+        return False
+
+
+def get_host_ip_addresses():
+    """Collect host IP addresses via `ip -o addr` or fallback `hostname -I`."""
+    code, out, _ = run(["ip", "-o", "addr", "show"], timeout=10)
+    addrs = []
+    if code == 0:
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) >= 4 and parts[2] in ("inet", "inet6"):
+                ip = parts[3].split("/")[0]
+                addrs.append(ip)
+        if addrs:
+            return addrs
+    code_h, out_h, _ = run(["hostname", "-I"], timeout=10)
+    if code_h == 0 and out_h.strip():
+        return out_h.split()
+    return []
+
+
+def host_has_public_ip(ip_list):
+    """Return True if any address in ip_list is not private/loopback. Default True if list is empty."""
+    if not ip_list:
+        return True
+    for ip in ip_list:
+        if not is_private_ip(ip):
+            return True
+    return False
+
+
 SERVICE_EXPOSURE = "Network.Exposure"
 SERVICE_LISTENERS = "Network.Listeners"
 SERVICE_FIREWALL = "Network.Firewall"
 CONTROL = "DE.CM-01"
-VERSION = "1.0.1"
+VERSION = "1.1.0"
 
 BASELINE_PATH = "/var/lib/check_mk_agent/network_exposure_baseline.json"
+NAT_NOTICE = " (NAT or port forwarding upstream not visible from this host)"
 
 # A baseline older than this cannot confirm that the listener set is still normal.
 BASELINE_MAX_AGE_DAYS = int(os.environ.get("CHECK_NETWORK_BASELINE_MAX_AGE_DAYS", "90"))
@@ -301,21 +357,22 @@ def read_firewall():
 
 ## Classification
 
-def classify(bind, port, proto, fw):
+def classify(bind, port, proto, fw, has_public_ip=True):
     """Classify one listener against the firewall picture.
 
-    Returns LOOPBACK, FILTERED, EXPOSED or UNKNOWN. Pure function."""
+    Returns LOOPBACK, FILTERED, EXPOSED, LAN or UNKNOWN. Pure function."""
     if bind.startswith(LOOPBACK_PREFIX) or bind in LOOPBACK_V6:
         return "LOOPBACK"
     if not fw.get("readable"):
         return "UNKNOWN"
+    target = "EXPOSED" if has_public_ip else "LAN"
     if fw.get("active"):
         admitted = fw.get("admitted", set())
         if (port, proto) in admitted or (port, None) in admitted:
-            return "EXPOSED"
+            return target
         return "FILTERED"
     # Firewall not active or input policy ACCEPT -> non-loopback is reachable
-    return "EXPOSED"
+    return target
 
 
 def listener_key(item):
@@ -323,13 +380,17 @@ def listener_key(item):
     return "%s:%s:%d" % (item["proto"], item["bind"], item["port"])
 
 
-def perfdata_string(total, exposed, filtered, loopback, new_since, rules):
-    """Format perfdata line according to brief:
-    listeners_total|exposed|filtered|loopback|new_since_baseline|firewall_rules"""
+# Metric continuity note: starting with v1.1.0, 'exposed' counts only sockets
+# reachable from the internet (host has public IP). Sockets on internal-only hosts
+# are counted in 'lan'. A time-series chart spanning this update will show a step
+# that reflects this classification refinement, not a real host change.
+def perfdata_string(total, exposed, lan, filtered, loopback, new_since, rules):
+    """Format perfdata line:
+    listeners_total=%d|exposed=%d|lan=%d|filtered=%d|loopback=%d|new_since_baseline=%d|firewall_rules=%d"""
     return (
-        "listeners_total=%d|exposed=%d|filtered=%d|loopback=%d|"
+        "listeners_total=%d|exposed=%d|lan=%d|filtered=%d|loopback=%d|"
         "new_since_baseline=%d|firewall_rules=%d"
-        % (total, exposed, filtered, loopback, new_since, rules)
+        % (total, exposed, lan, filtered, loopback, new_since, rules)
     )
 
 
@@ -344,7 +405,7 @@ def load_baseline(path=BASELINE_PATH):
         return None
 
 
-def save_baseline(listeners, fw, today, path=BASELINE_PATH):
+def save_baseline(listeners, fw, today, path=BASELINE_PATH, has_public_ip=True):
     """Write current listeners to the baseline file."""
     data = {
         "created": today.isoformat(),
@@ -352,7 +413,7 @@ def save_baseline(listeners, fw, today, path=BASELINE_PATH):
     }
     for item in listeners:
         k = listener_key(item)
-        cl = classify(item["bind"], item["port"], item["proto"], fw)
+        cl = classify(item["bind"], item["port"], item["proto"], fw, has_public_ip)
         data["listeners"][k] = {
             "proto": item["proto"],
             "bind": item["bind"],
@@ -420,91 +481,107 @@ def format_port_names(rows, with_source):
 
 ## Evaluation
 
-def evaluate_exposure(listeners, fw, baseline, today, max_age_days=BASELINE_MAX_AGE_DAYS):
+def evaluate_exposure(listeners, fw, baseline, today, max_age_days=BASELINE_MAX_AGE_DAYS, has_public_ip=True):
     """Evaluate Network.Exposure. Pure function.
 
     Returns (state, perfdata, message)."""
     if listeners is None:
         return 3, "-", "UNKNOWN [%s]: listener list could not be retrieved" % CONTROL
 
-    counts = {"LOOPBACK": 0, "FILTERED": 0, "EXPOSED": 0, "UNKNOWN": 0}
+    counts = {"LOOPBACK": 0, "FILTERED": 0, "EXPOSED": 0, "LAN": 0, "UNKNOWN": 0}
     classified = []
-    group_a_exposed = []
-    group_b_exposed = []
+    group_a_reachable = []
+    group_b_reachable = []
 
     for item in listeners:
-        cl = classify(item["bind"], item["port"], item["proto"], fw)
+        cl = classify(item["bind"], item["port"], item["proto"], fw, has_public_ip)
         counts[cl] = counts.get(cl, 0) + 1
         classified.append((item, cl))
-        if cl == "EXPOSED":
+        if cl in ("EXPOSED", "LAN"):
             grp, name, source = group_of(item["port"])
             if grp == "A":
-                group_a_exposed.append((item, name, source))
+                group_a_reachable.append((item, name, source))
             elif grp == "B":
-                group_b_exposed.append((item, name, None))
+                group_b_reachable.append((item, name, None))
 
     rules_count = fw.get("rules", 0)
+    nat_tag = NAT_NOTICE if (not has_public_ip and counts["LAN"] > 0) else ""
 
     # First run without baseline: WARNING, never OK
     if baseline is None:
         perf = perfdata_string(
-            len(listeners), counts["EXPOSED"], counts["FILTERED"],
-            counts["LOOPBACK"], counts["EXPOSED"], rules_count
+            len(listeners), counts["EXPOSED"], counts["LAN"],
+            counts["FILTERED"], counts["LOOPBACK"],
+            counts["EXPOSED"] + counts["LAN"], rules_count
         )
-        if group_a_exposed:
-            details = format_port_names(port_names(group_a_exposed, classified), with_source=True)
-            return 2, perf, (
-                "CRITICAL [%s]: group A listener(s) exposed: %s" % (CONTROL, details)
+        if group_a_reachable:
+            details = format_port_names(port_names(group_a_reachable, classified), with_source=True)
+            return 1, perf, (
+                "WARNING [%s]: no baseline found (%s) - first run on this host, "
+                "group A listener(s) active: %s; run with --accept-baseline to establish "
+                "baseline (%d exposed, %d lan, %d filtered, %d loopback)%s"
+                % (CONTROL, BASELINE_PATH, details, counts["EXPOSED"], counts["LAN"],
+                   counts["FILTERED"], counts["LOOPBACK"], nat_tag)
             )
         return 1, perf, (
             "WARNING [%s]: no baseline found (%s) - first run on this host, "
-            "cannot determine which exposures are expected; run with "
-            "--accept-baseline to establish baseline (%d exposed, %d filtered, "
-            "%d loopback)"
-            % (CONTROL, BASELINE_PATH, counts["EXPOSED"], counts["FILTERED"], counts["LOOPBACK"])
+            "cannot determine which exposures are expected; run with --accept-baseline to establish "
+            "baseline (%d exposed, %d lan, %d filtered, %d loopback)%s"
+            % (CONTROL, BASELINE_PATH, counts["EXPOSED"], counts["LAN"],
+               counts["FILTERED"], counts["LOOPBACK"], nat_tag)
         )
 
     # Compare against baseline
     baseline_listeners = baseline.get("listeners", {})
-    new_exposed = []
-    for item, cl in classified:
-        if cl == "EXPOSED":
-            k = listener_key(item)
-            b_entry = baseline_listeners.get(k)
-            if not b_entry or b_entry.get("classification") != "EXPOSED":
-                new_exposed.append(item)
+    new_reachable = [
+        item for item, cl in classified
+        if cl in ("EXPOSED", "LAN") and listener_key(item) not in baseline_listeners
+    ]
+    new_group_a = [item for item in new_reachable if group_of(item["port"])[0] == "A"]
+    new_other = [item for item in new_reachable if group_of(item["port"])[0] != "A"]
 
     perf = perfdata_string(
-        len(listeners), counts["EXPOSED"], counts["FILTERED"],
-        counts["LOOPBACK"], len(new_exposed), rules_count
+        len(listeners), counts["EXPOSED"], counts["LAN"],
+        counts["FILTERED"], counts["LOOPBACK"],
+        len(new_reachable), rules_count
     )
 
-    # CRIT if any Group A listener is EXPOSED
-    if group_a_exposed:
-        details = format_port_names(port_names(group_a_exposed, classified), with_source=True)
+    # 1. New unbaselined Group A listener -> CRITICAL
+    if new_group_a:
+        new_group_a_tuples = [(i, group_of(i["port"])[1], group_of(i["port"])[2]) for i in new_group_a]
+        details = format_port_names(port_names(new_group_a_tuples, classified), with_source=True)
         return 2, perf, (
-            "CRITICAL [%s]: group A listener(s) exposed: %s" % (CONTROL, details)
+            "CRITICAL [%s]: new unbaselined group A listener(s) detected: %s%s"
+            % (CONTROL, details, nat_tag)
         )
 
-    # WARN if new EXPOSED listener not in baseline
-    if new_exposed:
+    # 2. New listener not in Group A -> WARNING
+    if new_other:
         summary = ", ".join(
-            "%d/%s (%s)" % (i["port"], i["proto"], i["bind"]) for i in new_exposed
+            "%d/%s (%s)" % (i["port"], i["proto"], i["bind"]) for i in new_other
         )
         return 1, perf, (
-            "WARNING [%s]: %d new exposed listener(s) not in baseline: %s"
-            % (CONTROL, len(new_exposed), summary)
+            "WARNING [%s]: %d new exposed/lan listener(s) not in baseline: %s%s"
+            % (CONTROL, len(new_other), summary, nat_tag)
         )
 
-    # WARN if group B listener is exposed (even if in baseline)
-    if group_b_exposed:
-        summary = format_port_names(port_names(group_b_exposed, classified), with_source=False)
+    # 3. Group A listener active (baselined) -> WARNING
+    if group_a_reachable:
+        details = format_port_names(port_names(group_a_reachable, classified), with_source=True)
         return 1, perf, (
-            "WARNING [%s]: group B service(s) exposed: %s (non-critical list)"
-            % (CONTROL, summary)
+            "WARNING [%s]: group A listener(s) active (baselined): %s%s"
+            % (CONTROL, details, nat_tag)
         )
 
-    # Check baseline age
+    # 4. Group B service active -> WARNING
+    if group_b_reachable:
+        summary = format_port_names(port_names(group_b_reachable, classified), with_source=False)
+        return 1, perf, (
+            "WARNING [%s]: group B service(s) active: %s (non-critical list)%s"
+            % (CONTROL, summary, nat_tag)
+        )
+
+    # 5. Check baseline age
     baseline_date_str = baseline.get("created")
     age_days = 0
     if baseline_date_str:
@@ -522,11 +599,11 @@ def evaluate_exposure(listeners, fw, baseline, today, max_age_days=BASELINE_MAX_
             % (CONTROL, age_days, max_age_days)
         )
 
-    # OK: no group A exposed, no new exposures
-    detail = "%d exposed, %d filtered, %d loopback" % (
-        counts["EXPOSED"], counts["FILTERED"], counts["LOOPBACK"]
+    # 6. OK: no unauthorized exposures
+    return 0, perf, (
+        "OK [%s]: no unauthorized exposures (%d exposed, %d lan, %d filtered, %d loopback)%s"
+        % (CONTROL, counts["EXPOSED"], counts["LAN"], counts["FILTERED"], counts["LOOPBACK"], nat_tag)
     )
-    return 0, perf, "OK [%s]: no unauthorized exposures (%s)" % (CONTROL, detail)
 
 
 def evaluate_listeners(listeners, baseline, today, max_age_days=BASELINE_MAX_AGE_DAYS):
@@ -709,7 +786,7 @@ def self_test():
     fw_allowing_9999["admitted"] = {(443, "tcp"), (9999, "tcp")}
     st, perf, msg = evaluate_exposure(listeners_with_new, fw_allowing_9999, base_clean, today)
     expect("6. new exposed listener gives Exposure WARN",
-           st == 1 and "1 new exposed listener" in msg and "9999/tcp" in msg, msg)
+           st == 1 and ("1 new exposed listener" in msg or "1 new exposed/lan listener" in msg) and "9999/tcp" in msg, msg)
 
     # 7. Group A port exposed (3389 RDP) -> Exposure CRIT with citation
     listeners_rdp = [
@@ -728,8 +805,8 @@ def self_test():
     fw_allowing_ssh = dict(fw_active_drop)
     fw_allowing_ssh["admitted"] = {(22, "tcp")}
     st, perf, msg = evaluate_exposure(listeners_ssh_exposed, fw_allowing_ssh, None, today)
-    expect("8. exposed 22 SSH gives CRITICAL with citation",
-           st == 2 and "22/tcp SSH [ACN BL01/250626; CISA BOD 23-02]" in msg, msg)
+    expect("8. first run with 22 SSH gives WARNING (not CRITICAL)",
+           st == 1 and "22/tcp SSH" in msg and "WARNING" in msg, msg)
 
     # 9. Group A port exposed (445 SMB) -> Exposure CRIT with citation
     listeners_smb = [
@@ -771,7 +848,7 @@ def self_test():
     }
     st, perf, msg = evaluate_exposure(listeners_frps, fw_blocking_all, base_frps_filtered, today)
     expect("11. port 16568 FILTERED gives OK",
-           st == 0 and "0 exposed, 1 filtered" in msg, msg)
+           st == 0 and ("0 exposed, 1 filtered" in msg or "0 exposed, 0 lan, 1 filtered" in msg), msg)
 
     # 12. Group B port exposed (1433 MSSQL) -> WARN (not CRIT)
     listeners_mssql = [
@@ -936,9 +1013,9 @@ def self_test():
            msg_exp)
 
     # 32. Perfdata matches required format
-    perf_test = perfdata_string(10, 2, 3, 5, 1, 4)
+    perf_test = perfdata_string(10, 2, 1, 3, 4, 1, 4)
     expect("32. perfdata string format conforms to brief",
-           perf_test == "listeners_total=10|exposed=2|filtered=3|loopback=5|new_since_baseline=1|firewall_rules=4",
+           perf_test == "listeners_total=10|exposed=2|lan=1|filtered=3|loopback=4|new_since_baseline=1|firewall_rules=4",
            perf_test)
 
     # 33. Dual-stack group A port (22 SSH on IPv4 and IPv6, both EXPOSED): named once, counted twice
@@ -949,8 +1026,8 @@ def self_test():
     fw_allowing_dual_ssh = dict(fw_active_drop)
     fw_allowing_dual_ssh["admitted"] = {(22, "tcp")}
     st, perf, msg = evaluate_exposure(listeners_dual_ssh, fw_allowing_dual_ssh, None, today)
-    expect("dual-stack group A port is named once but counted twice",
-           st == 2 and msg.count("22/tcp SSH") == 1 and "exposed=2" in perf
+    expect("dual-stack group A port on first run gives WARNING named once",
+           st == 1 and msg.count("22/tcp SSH") == 1 and "exposed=2" in perf
            and "IPv4" not in msg and "IPv6" not in msg,
            msg + " | " + perf)
 
@@ -960,9 +1037,42 @@ def self_test():
         {"proto": "tcp", "bind": "::1", "port": 22, "process": "sshd"},
     ]
     st, perf, msg = evaluate_exposure(listeners_mixed_ssh, fw_allowing_dual_ssh, None, today)
-    expect("same port EXPOSED on IPv4 and LOOPBACK on IPv6 stays distinct",
-           st == 2 and "22/tcp SSH (IPv4) [ACN BL01/250626; CISA BOD 23-02]" in msg
-           and "22/tcp SSH [" not in msg and "exposed=1" in perf and "loopback=1" in perf,
+    expect("same port EXPOSED on IPv4 and LOOPBACK on IPv6 on first run gives WARNING",
+           st == 1 and "22/tcp SSH (IPv4)" in msg and "exposed=1" in perf and "loopback=1" in perf,
+           msg + " | " + perf)
+
+    # 35. Group A listener already in baseline -> gives WARNING (baselined)
+    base_ssh_baselined = {
+        "created": today.isoformat(),
+        "listeners": {
+            "tcp:0.0.0.0:22": {"proto": "tcp", "bind": "0.0.0.0", "port": 22,
+                               "classification": "EXPOSED", "first_seen": today.isoformat()}
+        },
+    }
+    st, perf, msg = evaluate_exposure(listeners_ssh_exposed, fw_allowing_ssh, base_ssh_baselined, today)
+    expect("35. group A listener in baseline gives WARNING (baselined)",
+           st == 1 and "group A listener(s) active (baselined)" in msg and "22/tcp SSH" in msg, msg)
+
+    # 36. Host with has_public_ip=False classifies non-loopback as LAN with NAT notice
+    base_nginx_lan = {
+        "created": today.isoformat(),
+        "listeners": {
+            "tcp:0.0.0.0:443": {"proto": "tcp", "bind": "0.0.0.0", "port": 443,
+                                "classification": "LAN", "first_seen": today.isoformat()}
+        },
+    }
+    listeners_nginx = [
+        {"proto": "tcp", "bind": "0.0.0.0", "port": 443, "process": "nginx"}
+    ]
+    st, perf, msg = evaluate_exposure(listeners_nginx, fw_active_drop, base_nginx_lan, today, has_public_ip=False)
+    expect("36. private-only host classifies as LAN with NAT notice",
+           st == 0 and "lan=1" in perf and "exposed=0" in perf and NAT_NOTICE in msg,
+           msg + " | " + perf)
+
+    # 37. Host with has_public_ip=False with new unbaselined group A gives CRITICAL
+    st, perf, msg = evaluate_exposure(listeners_rdp, fw_allowing_rdp, base_clean, today, has_public_ip=False)
+    expect("37. private-only host with new unbaselined group A gives CRITICAL",
+           st == 2 and "CRITICAL" in msg and "3389/tcp RDP" in msg and NAT_NOTICE in msg,
            msg + " | " + perf)
 
     print("\n%d/%d passed" % (ran - failures, ran))
@@ -974,6 +1084,8 @@ def self_test():
 def check():
     print(LOCAL_SECTION)
     today = datetime.date.today()
+    host_ips = get_host_ip_addresses()
+    has_public = host_has_public_ip(host_ips)
 
     # 1. Listeners collection: ss preferred, netstat fallback
     listeners = None
@@ -994,7 +1106,7 @@ def check():
             print("ERROR: cannot accept baseline when listeners cannot be collected",
                   file=sys.stderr)
             sys.exit(2)
-        save_baseline(listeners, fw, today, BASELINE_PATH)
+        save_baseline(listeners, fw, today, BASELINE_PATH, has_public_ip=has_public)
         print("Baseline accepted with %d listeners saved to %s"
               % (len(listeners), BASELINE_PATH))
         return
@@ -1003,7 +1115,9 @@ def check():
     baseline = load_baseline(BASELINE_PATH)
 
     # 5. Service 1: Network.Exposure
-    st_exp, perf_exp, msg_exp = evaluate_exposure(listeners, fw, baseline, today)
+    st_exp, perf_exp, msg_exp = evaluate_exposure(
+        listeners, fw, baseline, today, has_public_ip=has_public
+    )
     print(local_line(st_exp, SERVICE_EXPOSURE, perf_exp, msg_exp))
 
     # 6. Service 2: Network.Listeners
