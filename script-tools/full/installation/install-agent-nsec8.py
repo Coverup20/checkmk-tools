@@ -220,7 +220,7 @@ def install_prereqs() -> None:
     if not cmd_exists("socat"):
         die("socat non disponibile dopo installazione — impossibile continuare")
 
-    # ar — richiesto dalla dependency chain binutils
+    # ar — required by the binutils dependency chain
     if not cmd_exists("ar"):
         log(
             "Installazione catena dipendenze binutils "

@@ -181,10 +181,10 @@ def filter_scripts_by_ns8_modules(scripts: List[Tuple[str, str]], modules: List[
     if not modules:
         return scripts, []
 
-    # Prefissi moduli attivi (es: ['mail', 'webtop', 'nethvoice', 'samba'])
+    # Active module prefixes (e.g., ['mail', 'webtop', 'nethvoice', 'samba'])
     active_prefixes = set()
     for m in modules:
-        # Rimuovi suffisso numerico: mail1 → mail, webtop2 → webtop
+        # Strip numeric suffix: mail1 → mail, webtop2 → webtop
         prefix = m.rstrip('0123456789')
         active_prefixes.add(prefix)
 
@@ -340,33 +340,33 @@ def parse_selection(selection: str, max_idx: int) -> List[int]:
         return list(range(1, max_idx + 1))
     
     if selection.lower() == 'r':
-        return []  # Gestito separatamente
-    
+        return []  # Handled separately
+
     indices = []
     for part in selection.split(','):
         part = part.strip()
-        
-        # Gestione range: "1-5" → [1,2,3,4,5]
+
+        # Range handling: "1-5" → [1,2,3,4,5]
         if '-' in part:
             try:
                 start, end = part.split('-', 1)
                 start = int(start.strip())
                 end = int(end.strip())
-                
-                # Valida range
+
+                # Validate range
                 if 1 <= start <= max_idx and 1 <= end <= max_idx and start <= end:
                     indices.extend(range(start, end + 1))
             except (ValueError, AttributeError):
-                # Ignora range malformati
+                # Ignore malformed ranges
                 pass
-        
-        # Gestione singoli numeri: "3" → [3]
+
+        # Single number handling: "3" → [3]
         elif part.isdigit():
             idx = int(part)
             if 1 <= idx <= max_idx:
                 indices.append(idx)
-    
-    return sorted(set(indices))  # Rimuovi duplicati e ordina
+
+    return sorted(set(indices))  # Remove duplicates and sort
 
 
 def install_scripts(scripts: List[Tuple[str, str]], selected_indices: List[int]) -> int:

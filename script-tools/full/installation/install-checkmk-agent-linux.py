@@ -1283,7 +1283,7 @@ def ask_scripts(repo_path: Path) -> Tuple[str, bool, str]:
     if filter_cat is None:
         print("  → Tutte le categorie")
 
-    # ── Passo 2: Raccolta launcher dalla categoria selezionata ───────────────
+    # ── Step 2: Collect launchers from the selected category ──────────────────
     selected_cats = [filter_cat] if filter_cat else categories
     all_launchers: List[Tuple[str, str]] = []  # (stem, categoria)
     for cat_name in selected_cats:
