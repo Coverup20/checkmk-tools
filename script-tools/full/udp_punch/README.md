@@ -24,6 +24,17 @@ Both peers punch towards the public endpoint of the other; keepalives every
   (default 32 packets), cumulative ACKs, retransmission and a reliable FIN
   (maximum payload 1150 bytes).
 
+## Session keys and forward secrecy
+
+At every start each peer generates a fresh X25519 keypair. The HELLO and
+HELLO_ACK frames are protected with a key derived from the PSK alone and carry
+the ephemeral public key; the session keys are then derived from the PSK mixed
+with the ECDH shared secret, with both public keys as salt and s2c or c2s as
+info. A later compromise of the PSK alone therefore does not reveal recorded
+sessions. Every frame uses a fresh random 12-byte nonce and the receiver keeps
+a bounded cache of the nonces it has already authenticated, so no state on disk
+can make a nonce repeat.
+
 ## Deploy
 
 PSK (32-byte hex, mode 600) on both peers:

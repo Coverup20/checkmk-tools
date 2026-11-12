@@ -27,16 +27,18 @@ import sys
 import threading
 import time
 
-from protocol import (CTRL_KEEPALIVE, CTRL_PUNCH, CTRL_PUNCH_ACK, MAX_PAYLOAD,
-                      T_ACK, T_CTRL, T_DATA, T_FIN, T_FIN_ACK, T_OPEN,
-                      T_OPEN_ACK, T_OPEN_FAIL, T_RESET, Crypto)
+from protocol import (CTRL_KEEPALIVE, CTRL_PUNCH, CTRL_PUNCH_ACK, HELLO_EXTRA,
+                      MAX_PAYLOAD, PUB_LEN, T_ACK, T_CTRL, T_DATA, T_FIN,
+                      T_FIN_ACK, T_HELLO, T_HELLO_ACK, T_OPEN, T_OPEN_ACK,
+                      T_OPEN_FAIL, T_RESET, Crypto, new_ephemeral,
+                      session_keys)
 
 try:
     import pwd
 except ImportError:  # non-POSIX: only numeric uids are accepted
     pwd = None
 
-VERSION = "p4"
+VERSION = "p5"
 
 
 def log(msg):
@@ -231,11 +233,13 @@ class PunchPeer:
         self.role = cfg["role"]
         self.state_dir = cfg.get("state_dir", "/var/lib/cmk-punch")
         psk = load_psk(cfg["psk_file"])
-        epoch = self._next_epoch()
-        if self.role == "server":
-            self.crypto = Crypto(psk, epoch, "s2c", "c2s")
-        else:
-            self.crypto = Crypto(psk, epoch, "c2s", "s2c")
+        self.psk = psk
+        self.eph, self.eph_pub = new_ephemeral()
+        self.boot = Crypto(psk, send_dir="boot", recv_dir="boot")
+        self.crypto = None
+        self.handshake_s = float(cfg.get("handshake_interval_s", 1.0))
+        self.last_hello = 0.0
+        self.sessions = 0
         self.bind = parse_endpoint(cfg["udp_bind"])
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(self.bind)
@@ -318,34 +322,19 @@ class PunchPeer:
         sock.listen(16)
         return sock
 
-    def _next_epoch(self):
-        path = os.path.join(self.state_dir, "nonce_epoch")
-        try:
-            with open(path, "r", encoding="ascii") as fh:
-                value = int(fh.read().strip(), 16)
-        except (OSError, ValueError):
-            value = int.from_bytes(os.urandom(4), "big")
-        value = (value + 1) & 0xFFFFFFFF
-        if value == 0:
-            value = 1
-        try:
-            os.makedirs(self.state_dir, exist_ok=True)
-            tmp = path + ".tmp"
-            with open(tmp, "w", encoding="ascii") as fh:
-                fh.write("%08x\n" % value)
-                fh.flush()
-                os.fsync(fh.fileno())
-            os.replace(tmp, path)
-        except OSError as exc:
-            log("cannot persist nonce epoch: %s" % exc)
-        return struct.pack("!I", value)
 
     def send(self, mtype, stream=0, seq=0, ack=0, flags=0, payload=b"", addr=None):
         addr = addr or self.peer
         if not addr:
             return
+        if mtype in (T_HELLO, T_HELLO_ACK):
+            layer = self.boot
+        else:
+            layer = self.crypto
+            if layer is None:
+                return
         try:
-            self.sock.sendto(self.crypto.seal(mtype, stream, seq, ack, flags, payload), addr)
+            self.sock.sendto(layer.seal(mtype, stream, seq, ack, flags, payload), addr)
         except OSError as exc:
             log("send error: %s" % exc)
 
@@ -483,6 +472,13 @@ class PunchPeer:
         st = Stream(sid, conn, self.window)
         self.streams[sid] = st
         deadline = time.time() + self.ack_timeout * self.retries
+        while self.crypto is None and time.time() < deadline and not self.stop.is_set():
+            time.sleep(0.1)
+        if self.crypto is None:
+            log("stream %d: no session, closing" % sid)
+            st.close()
+            self.streams.pop(sid, None)
+            return
         while time.time() < deadline and not st.closed:
             self.send(T_OPEN, sid)
             end = time.time() + self.ack_timeout * 2
@@ -534,11 +530,45 @@ class PunchPeer:
         self.send(T_OPEN_ACK, sid)
         threading.Thread(target=self.reader_thread, args=(st,), daemon=True).start()
 
-    def handle_frame(self, frame, addr):
+    @staticmethod
+    def open_with(layer, frame):
         try:
-            mtype, sid, seq, _ack, _flags, payload = self.crypto.open(frame)
+            return layer.open(frame)
         except Exception:
+            return None
+
+    def handle_hello(self, mtype, payload, addr):
+        if len(payload) < PUB_LEN:
             return
+        peer_pub = payload[:PUB_LEN]
+        self.last_peer_rx = time.time()
+        if self.peer is None:
+            log("peer endpoint learned from handshake: %s:%d" % addr)
+        elif addr != self.peer:
+            log("peer endpoint changed: %s:%d -> %s:%d" % (self.peer + addr))
+        self.peer = addr
+        self.punched = True
+        keys = session_keys(self.psk, self.eph, self.eph_pub, peer_pub)
+        send_dir, recv_dir = ("s2c", "c2s") if self.role == "server" else ("c2s", "s2c")
+        self.crypto = Crypto.from_keys(keys[send_dir], keys[recv_dir])
+        self.sessions += 1
+        log("session established with %s:%d (%s, #%d)"
+            % (addr[0], addr[1], "HELLO" if mtype == T_HELLO else "HELLO_ACK",
+               self.sessions))
+        if mtype == T_HELLO:
+            self.send(T_HELLO_ACK, payload=self.eph_pub + os.urandom(HELLO_EXTRA))
+
+    def handle_frame(self, frame, addr):
+        hello = self.open_with(self.boot, frame)
+        if hello is not None and hello[0] in (T_HELLO, T_HELLO_ACK):
+            self.handle_hello(hello[0], hello[5], addr)
+            return
+        if self.crypto is None:
+            return
+        opened = self.open_with(self.crypto, frame)
+        if opened is None:
+            return
+        mtype, sid, seq, _ack, _flags, payload = opened
         self.last_peer_rx = time.time()
         if self.peer is None:
             self.peer = addr
@@ -625,7 +655,10 @@ class PunchPeer:
         if (self.cfg.get("use_stun", True) and self.cfg.get("stun_server")
                 and not self.streams and now - self.last_stun >= self.restun_delay):
             self.restun()
-        if self.peer and not self.punched and now - self.last_punch >= self.punch_s:
+        if self.peer and self.crypto is None and now - self.last_hello >= self.handshake_s:
+            self.send(T_HELLO, payload=self.eph_pub + os.urandom(HELLO_EXTRA))
+            self.last_hello = now
+        if self.peer and self.crypto is not None and not self.punched and now - self.last_punch >= self.punch_s:
             self.send_ctrl(CTRL_PUNCH)
             self.last_punch = now
         if self.peer and now - self.last_keepalive >= self.keepalive_s:

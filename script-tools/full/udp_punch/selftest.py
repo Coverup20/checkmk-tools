@@ -61,12 +61,8 @@ def crypto_checks(psk):
         raise AssertionError("replayed frame accepted")
     except ValueError:
         pass
-    stale = Crypto(psk, b"\x00\x00\x00\x01", "c2s", "s2c").seal(T_DATA, 1, seq=2, payload=b"y")
-    try:
-        b.open(stale)
-        raise AssertionError("stale epoch accepted")
-    except ValueError:
-        pass
+    frames = {Crypto(psk, b"\x00\x00\x00\x02", "c2s", "s2c").seal(T_DATA, 1, seq=2, payload=b"y")[5:17] for _ in range(200)}
+    assert len(frames) == 200, "nonce repeated"
     try:
         a.open(frame)
         raise AssertionError("frame accepted with the wrong direction key")
@@ -282,6 +278,28 @@ def unix_socket_checks(tmp, psk_path, echo_addr):
     print("unix socket allowed_exe: OK (%s)" % real_exe)
 
 
+def handshake_checks(psk):
+    from protocol import Crypto, T_DATA, new_ephemeral, session_keys
+    a_priv, a_pub = new_ephemeral()
+    b_priv, b_pub = new_ephemeral()
+    ka = session_keys(psk, a_priv, a_pub, b_pub)
+    kb = session_keys(psk, b_priv, b_pub, a_pub)
+    assert ka["s2c"] == kb["s2c"], "the two sides derive different s2c keys"
+    assert ka["c2s"] == kb["c2s"], "the two sides derive different c2s keys"
+    c_priv, c_pub = new_ephemeral()
+    kc = session_keys(psk, a_priv, a_pub, c_pub)
+    assert kc["s2c"] != ka["s2c"], "session keys ignore the peer ephemeral key"
+    layer = Crypto.from_keys(ka["s2c"], ka["c2s"])
+    frame = layer.seal(T_DATA, 1, payload=b"x")
+    boot = Crypto(psk, send_dir="boot", recv_dir="boot")
+    try:
+        boot.open(frame)
+        raise AssertionError("the boot key opened a session frame")
+    except ValueError:
+        pass
+    print("handshake checks: OK")
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="punch-selftest-")
     psk_path = os.path.join(tmp, "psk")
@@ -290,6 +308,7 @@ def main():
         fh.write(psk.hex())
 
     crypto_checks(psk)
+    handshake_checks(psk)
     if not hasattr(os, "getuid"):
         raise SystemExit("this self-test needs /proc and getuid (POSIX only)")
     uid_lookup_check()
@@ -297,6 +316,8 @@ def main():
 
     echo_addr = echo_server()
     server, host, tcp_port, server_file = start_pair(tmp, psk_path, echo_addr, "main")
+    assert server.crypto is not None, "server did not complete the handshake"
+    assert host.crypto is not None, "host did not complete the handshake"
 
     client = socket.create_connection(("127.0.0.1", tcp_port), timeout=10)
     payload = b"hello-punch"
