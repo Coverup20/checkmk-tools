@@ -8,21 +8,24 @@ Wire format:
 
 Each direction has its own AEAD key, derived from the PSK with HKDF-SHA256:
     server -> host uses info "s2c", host -> server uses info "c2s".
-Nonce = 4-byte persisted epoch + 8-byte counter. The epoch is increased at
-every process start and written to disk before any frame leaves, so a
-restarted peer never reuses a nonce. A receiver rejects any frame whose epoch
-is older than the newest epoch it has already authenticated.
+Every frame uses a fresh random 12-byte nonce, so no state on disk can ever
+make a nonce repeat; the receiver keeps a bounded cache of nonces already
+authenticated and drops a frame whose nonce it has seen.
 """
 
 from __future__ import annotations
 
+import os
 import struct
 from collections import deque
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric.x25519 import (X25519PrivateKey,
+                                                              X25519PublicKey)
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 MAGIC = b"CP01"
 WIRE = struct.Struct("!4sB12s")
@@ -38,6 +41,11 @@ T_FIN = 6
 T_FIN_ACK = 7
 T_OPEN_FAIL = 8
 T_RESET = 9
+T_HELLO = 10
+T_HELLO_ACK = 11
+
+PUB_LEN = 32
+HELLO_EXTRA = 16
 
 CTRL_PUNCH = b"PUNCH"
 CTRL_PUNCH_ACK = b"PUNCH_ACK"
@@ -50,25 +58,51 @@ def derive_key(psk: bytes, label: str) -> bytes:
                 info=b"cmk-punch/" + label.encode("ascii")).derive(psk)
 
 
-class Crypto:
-    """AEAD wrapper: per-direction keys, epoch-counter nonces, replay window."""
+def new_ephemeral():
+    """Fresh X25519 private key and its raw 32-byte public key."""
+    key = X25519PrivateKey.generate()
+    return key, key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
 
-    def __init__(self, psk: bytes, epoch: bytes, send_dir: str, recv_dir: str) -> None:
+
+def session_keys(psk, eph, pub_local, pub_peer):
+    """Per-direction session keys bound to both ephemeral public keys.
+
+    The ECDH secret is mixed with the PSK, so a later compromise of the PSK
+    alone does not reproduce these keys and recorded sessions stay unreadable.
+    """
+    shared = eph.exchange(X25519PublicKey.from_public_bytes(pub_peer))
+    first, second = sorted((pub_local, pub_peer))
+    salt = first + second
+    ikm = psk + shared
+    return {label: HKDF(algorithm=hashes.SHA256(), length=32, salt=salt,
+                        info=b"cmk-punch/session/" + label.encode("ascii")).derive(ikm)
+            for label in ("s2c", "c2s")}
+
+
+class Crypto:
+    """AEAD wrapper: per-direction keys, random nonces, bounded replay cache."""
+
+    def __init__(self, psk: bytes, epoch: bytes = b"\x00\x00\x00\x00",
+                 send_dir: str = "s2c", recv_dir: str = "c2s") -> None:
         if len(psk) != 32:
             raise ValueError("PSK must be exactly 32 bytes")
-        if len(epoch) != 4:
-            raise ValueError("epoch must be 4 bytes")
         self._send = ChaCha20Poly1305(derive_key(psk, send_dir))
         self._recv = ChaCha20Poly1305(derive_key(psk, recv_dir))
-        self._epoch = epoch
-        self._counter = 0
-        self._max_epoch = b"\x00\x00\x00\x00"
         self._seen = deque(maxlen=4096)
         self._seen_set = set()
 
+    @classmethod
+    def from_keys(cls, send_key, recv_key):
+        """Layer built from explicit 32-byte keys, used after the handshake."""
+        obj = cls.__new__(cls)
+        obj._send = ChaCha20Poly1305(send_key)
+        obj._recv = ChaCha20Poly1305(recv_key)
+        obj._seen = deque(maxlen=4096)
+        obj._seen_set = set()
+        return obj
+
     def seal(self, mtype, stream=0, seq=0, ack=0, flags=0, payload=b""):
-        self._counter += 1
-        nonce = self._epoch + struct.pack("!Q", self._counter)
+        nonce = os.urandom(12)
         aad = MAGIC + bytes([mtype])
         plain = PLAIN.pack(flags, stream, seq, ack) + payload
         return WIRE.pack(MAGIC, mtype, nonce) + self._send.encrypt(nonce, plain, aad)
@@ -79,20 +113,13 @@ class Crypto:
         magic, mtype, nonce = WIRE.unpack_from(frame, 0)
         if magic != MAGIC:
             raise ValueError("bad magic")
-        epoch = nonce[:4]
-        if epoch < self._max_epoch:
-            raise ValueError("stale epoch")
-        if epoch == self._max_epoch and nonce in self._seen_set:
+        if nonce in self._seen_set:
             raise ValueError("replayed frame")
         aad = MAGIC + bytes([mtype])
         try:
             plain = self._recv.decrypt(nonce, frame[WIRE.size:], aad)
         except InvalidTag:
             raise ValueError("authentication failed")
-        if epoch > self._max_epoch:
-            self._max_epoch = epoch
-            self._seen.clear()
-            self._seen_set.clear()
         if len(plain) < PLAIN.size:
             raise ValueError("plaintext too short")
         flags, stream, seq, ack = PLAIN.unpack_from(plain, 0)
