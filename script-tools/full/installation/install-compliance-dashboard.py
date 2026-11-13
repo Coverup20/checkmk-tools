@@ -29,7 +29,7 @@ import pprint
 import shutil
 import sys
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 # Service name prefixes that make up the compliance posture. Kept as a regex
 # alternation because CheckMK filters services by regex, not by tag.
@@ -230,7 +230,8 @@ def service_view(user, name, title, description, service_regex, states=None):
         "icon": "services",
         "hidden": False,
         "hidebutton": False,
-        "public": True,
+        # owner-scoped: visible only to the owner, like the other custom dashboards
+        "public": False,
         "add_context_to_title": True,
         "is_show_more": False,
         "packaged": False,
@@ -341,7 +342,7 @@ def build_dashboard(user):
             "show_title": True,
             "hidden": False,
             "hidebutton": False,
-            "public": True,
+            "public": False,
             "public_token_id": None,
             "single_infos": [],
             "context": {},
