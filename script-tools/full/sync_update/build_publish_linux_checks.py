@@ -12,7 +12,7 @@ is the script itself. The downloader on the host (sync_linuxchecks.py) reads
 the manifest and installs the checks of its own categories without cloning
 the repository.
 
-Version: 1.0.0"""
+Version: 1.1.0"""
 
 import argparse
 import hashlib
@@ -24,7 +24,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 TAG_PREFIX = "linuxchecks-"
 MANIFEST_ASSET = "manifest.json"
@@ -37,7 +37,30 @@ KNOWN_CATEGORIES = [
     "proxmox",
     "ubuntu",
     "tmate-server",
+    # Monitoring-server checks, selected explicitly by the hosts that need them.
+    "checkmk",
+    "checkmk-sp",
+    "checkmk-us",
+    # Lab-only prototypes, requested explicitly by the single lab node.
+    "ns8-prototypes",
 ]
+
+# Categories that do not live under <root>/script-check-<name>/full.
+CATEGORY_SOURCES = {
+    # checkmk is the generic monitoring-server category; checkmk-sp is its own
+    # copy so the SP server can diverge without touching the generic one.
+    "checkmk": "script-checkmk/full",
+    "checkmk-sp": "script-checkmk-sp/full",
+    "checkmk-us": "script-checkmk-us/full",
+    "ns8-prototypes": "script-check-ns8/prototypes",
+}
+
+
+def category_dir(root, category):
+    """Directory that holds the sources of a category."""
+    if category in CATEGORY_SOURCES:
+        return Path(root) / CATEGORY_SOURCES[category]
+    return Path(root) / (CATEGORY_PREFIX + category) / "full"
 
 
 class BuildError(Exception):
@@ -62,9 +85,9 @@ def checkout_root(script_path):
     return Path(script_path).resolve().parents[3]
 
 
-def source_files(category_dir):
+def source_files(full_dir):
     """Check scripts of a category, same rule used by the deploy tooling."""
-    full_dir = Path(category_dir) / "full"
+    full_dir = Path(full_dir)
     if not full_dir.is_dir():
         return []
     return sorted(path for path in full_dir.glob("check*.py") if path.is_file())
@@ -78,11 +101,11 @@ def build(root, categories, out_dir, tag):
 
     checks = []
     for category in categories:
-        category_dir = root / (CATEGORY_PREFIX + category)
-        if not category_dir.is_dir():
+        source_dir = category_dir(root, category)
+        if not source_dir.is_dir():
             info(f"{category}: category directory not found, skipped")
             continue
-        for source in source_files(category_dir):
+        for source in source_files(source_dir):
             asset_name = f"{category}--{source.name}"
             asset_path = out_dir / asset_name
             shutil.copyfile(source, asset_path)

@@ -17,7 +17,7 @@ left untouched.
 No GitHub account and no repository clone are needed: the assets of a public
 release are plain HTTPS downloads.
 
-Version: 1.0.0"""
+Version: 1.1.0"""
 
 import argparse
 import hashlib
@@ -32,7 +32,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 DEFAULT_REPO = "Coverup20/checkmk-tools"
 TAG_PREFIX = "linuxchecks-"
@@ -52,6 +52,14 @@ KNOWN_CATEGORIES = [
     "proxmox",
     "ubuntu",
     "tmate-server",
+    # Monitoring-server checks: never auto-detected, selected explicitly with
+    # --categories by the hosts that need them.
+    "checkmk",
+    "checkmk-sp",
+    "checkmk-us",
+    # Lab-only prototypes of the NS8 category, requested explicitly by the
+    # single lab node; production NS8 hosts keep using ns8.
+    "ns8-prototypes",
 ]
 
 
