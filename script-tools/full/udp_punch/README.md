@@ -198,6 +198,28 @@ rehearse an installation under a directory without touching systemd,
 without enabling it; the status and uninstall subcommands inspect and remove
 one peer, and uninstall --purge also deletes configuration and state.
 
+## Windows host
+
+The host role also runs on Windows, where it forwards each stream to a local
+TCP target - the CheckMK Windows agent listens on 127.0.0.1:6556 - because
+the command pipe used on Linux is not available there. The server role stays
+Linux-only: it needs systemd, the Unix socket and the CheckMK site.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install_udp_punch_windows.ps1
+powershell -ExecutionPolicy Bypass -File .\install_udp_punch_windows.ps1 `
+    -PskFile .\psk -Peer <server>:6015
+```
+
+The script installs under C:\ProgramData\cmk-punch, writes host.json,
+generates or imports the pre-shared key with a restricted ACL, opens the UDP
+port in Windows Firewall and registers the scheduled task cmk-punch-host,
+which starts the peer at boot as SYSTEM; the log is peer.log in the logs
+directory. -Staging writes only the files and needs no elevation,
+-NoStart registers the task without starting it, -Uninstall removes task,
+firewall rule and code, and -Uninstall -Purge also deletes configuration,
+key and state.
+
 ## Re-STUN backoff
 
 restun_interval_s (default 300) is the first interval between two re-STUN
