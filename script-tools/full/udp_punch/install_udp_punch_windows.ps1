@@ -75,6 +75,7 @@ param(
     [string]$PskFile = "",
     [string]$InstallDir = "C:\ProgramData\cmk-punch",
     [string]$AdvertiseIp = "",
+    [string]$ExeDir = "",
     [switch]$NoFirewallRule,
     [switch]$NoStart,
     [switch]$Staging,
@@ -241,14 +242,32 @@ if ($Uninstall) {
 }
 
 Require-Admin
-foreach ($name in @("protocol.py", "punch_peer.py")) {
-    if (-not (Test-Path (Join-Path $PSScriptRoot $name))) {
-        Fail "$name is missing next to this installer"
+
+$exePath = $null
+if ($ExeDir) {
+    $exePath = Join-Path $ExeDir "cmk-punch.exe"
+    if (-not (Test-Path $exePath)) {
+        Fail "cmk-punch.exe not found in $ExeDir"
+    }
+} else {
+    $autoExe = Join-Path $PSScriptRoot "dist\cmk-punch\cmk-punch.exe"
+    if (Test-Path $autoExe) {
+        $exePath = $autoExe
     }
 }
-$Python = Find-Python
-Test-Cryptography $Python
-Info "using $Python"
+
+if ($exePath) {
+    Info "using the executable $exePath"
+} else {
+    foreach ($name in @("protocol.py", "punch_peer.py")) {
+        if (-not (Test-Path (Join-Path $PSScriptRoot $name))) {
+            Fail "$name is missing next to this installer"
+        }
+    }
+    $Python = Find-Python
+    Test-Cryptography $Python
+    Info "using $Python"
+}
 if (-not $NoAvExclusion) {
     Set-AvExclusion $InstallDir
 }
@@ -258,12 +277,17 @@ if ((Test-Path $ConfigPath) -and -not $Force) {
 }
 
 New-Item -ItemType Directory -Force -Path $PeerDir, $EtcDir, $StateDir, $LogDir | Out-Null
-foreach ($name in @("protocol.py", "punch_peer.py")) {
-    $dest = Join-Path $PeerDir $name
-    Backup-File $dest
-    Copy-Item (Join-Path $PSScriptRoot $name) $dest -Force
+if ($exePath) {
+    Copy-Item (Join-Path (Split-Path $exePath -Parent) "*") $PeerDir -Recurse -Force
+    Info "installed the executable in $PeerDir"
+} else {
+    foreach ($name in @("protocol.py", "punch_peer.py")) {
+        $dest = Join-Path $PeerDir $name
+        Backup-File $dest
+        Copy-Item (Join-Path $PSScriptRoot $name) $dest -Force
+    }
+    Info "installed the peer code in $PeerDir"
 }
-Info "installed the peer code in $PeerDir"
 
 if (Test-Path $PskPath) {
     Info "reusing the existing PSK $PskPath"
@@ -305,10 +329,17 @@ if ($Peer) {
     Info "wrote $PeerFilePath"
 }
 
-$runContent = @"
+if ($exePath) {
+    $runContent = @"
+@echo off
+"$PeerDir\cmk-punch.exe" --config "$ConfigPath" >> "$LogPath" 2>&1
+"@
+} else {
+    $runContent = @"
 @echo off
 "$Python" "$PeerDir\punch_peer.py" --config "$ConfigPath" >> "$LogPath" 2>&1
 "@
+}
 Set-Content -Path $RunCmd -Value $runContent -Encoding ASCII
 Info "wrote $RunCmd"
 
@@ -322,6 +353,8 @@ if (-not $Staging -and -not $NoFirewallRule) {
 }
 
 if (-not $Staging) {
+    Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
     $action = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" -Argument "/c `"$RunCmd`""
     $trigger = New-ScheduledTaskTrigger -AtStartup
     $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
@@ -336,8 +369,10 @@ if (-not $Staging) {
     Info "staging: firewall, task and start skipped"
 }
 
+$mode = if ($exePath) { "executable" } else { "python" }
 Write-Host ""
 Info "installation complete for the host role"
+Write-Host "  mode:        $mode"
 Write-Host "  install dir: $InstallDir"
 Write-Host "  config:      $ConfigPath"
 Write-Host "  psk:         $PskPath (restricted ACL)"
