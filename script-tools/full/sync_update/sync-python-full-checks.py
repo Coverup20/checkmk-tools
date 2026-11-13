@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """sync-python-full-checks.py - Synchronize and deploy Python local checks
 
-Copy Python checks from category_dir/full/*.py to /usr/lib/check_mk_agent/local/
-(without .py extension). Category directories are an explicit allowlist
+Copy Python checks from category_dir/full/ to the agent local directory: on
+POSIX the sources are .py files deployed without extension to
+/usr/lib/check_mk_agent/local, on Windows they are .exe builds deployed to
+C:/ProgramData/checkmk/agent/local. Category directories are an explicit allowlist
 (KNOWN_CATEGORIES below), not a glob pattern - a directory not in that list
 (e.g. script-notify-checkmk, manually-deployed notification scripts) is never
 touched by this tool, regardless of its name.
 
-Used by install-checkmk-agent-linux.py as STEP 2.
+Used by install-checkmk-agent-linux.py as STEP 2 on POSIX and by the Windows
+scheduled task on Windows.
 
 Topics:
   --repo Path local repository (default: /opt/checkmk-tools)
@@ -23,7 +26,7 @@ Topics:
   --exclude-file File with script names to exclude (one per line)
                    Default: /etc/checkmk-python-full-sync.exclude
 
-Version: 1.5.0"""
+Version: 1.6.0"""
 
 import argparse
 import os
@@ -33,12 +36,26 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Set, Tuple
 
-VERSION = "1.5.0"
-TEMP_DIR_DEFAULT = "/tmp/checkmk-sync-preview"
+VERSION = "1.6.0"
+IS_WINDOWS = os.name == "nt"
+SOURCE_SUFFIX = ".exe" if IS_WINDOWS else ".py"
+TEMP_DIR_DEFAULT = (
+    str(Path(os.environ.get("TEMP", "C:/Windows/Temp")) / "checkmk-sync-preview")
+    if IS_WINDOWS else "/tmp/checkmk-sync-preview"
+)
 
-REPO_DEFAULT = Path("/opt/checkmk-tools")
-TARGET_DEFAULT = "/usr/lib/check_mk_agent/local"
-EXCLUDE_FILE_DEFAULT = "/etc/checkmk-python-full-sync.exclude"
+REPO_DEFAULT = (
+    Path("C:/ProgramData/checkmk/agent/checkmk-tools")
+    if IS_WINDOWS else Path("/opt/checkmk-tools")
+)
+TARGET_DEFAULT = (
+    "C:/ProgramData/checkmk/agent/local"
+    if IS_WINDOWS else "/usr/lib/check_mk_agent/local"
+)
+EXCLUDE_FILE_DEFAULT = (
+    "C:/ProgramData/checkmk/agent/python-sync.exclude"
+    if IS_WINDOWS else "/etc/checkmk-python-full-sync.exclude"
+)
 
 # Explicit allowlist of category directories this tool will ever touch - no
 # glob pattern anywhere. A directory not in this list (e.g. script-notify-checkmk,
@@ -61,7 +78,9 @@ KNOWN_CATEGORIES = [
 # ─── Utilities ────────────────────────────────────────────────────────────────
 
 def set_executable(path: Path) -> None:
-    """Makes the file executable (rwxr-xr-x)."""
+    """Makes the file executable (rwxr-xr-x); no-op on Windows."""
+    if IS_WINDOWS:
+        return
     current = path.stat().st_mode
     path.chmod(current | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
@@ -86,8 +105,12 @@ def load_exclude_list(exclude_file: Path) -> Set[str]:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            # Normalize: strip .py extension if present, keep stem
-            name = line.replace(".py", "") if line.endswith(".py") else line
+            # Normalize: strip the source extension if present, keep the stem
+            name = line
+            for suffix in (".py", ".exe"):
+                if name.endswith(suffix):
+                    name = name[: -len(suffix)]
+                    break
             excluded.add(name)
     except OSError:
         print(f"  [WARN] Cannot read exclude file: {exclude_file}", file=sys.stderr)
@@ -183,7 +206,8 @@ def find_launchers(category_dir: Path,
     if not full_dir.is_dir():
         return []
     # Only files starting with "check" → excludes daemons, utilities, etc.
-    launchers = sorted(f for f in full_dir.glob("*.py") if f.stem.startswith("check"))
+    launchers = sorted(f for f in full_dir.glob("*" + SOURCE_SUFFIX)
+                       if f.stem.startswith("check"))
     if scripts_filter:
         launchers = [l for l in launchers if l.stem in scripts_filter]
     return launchers
@@ -201,14 +225,13 @@ def list_all_launchers(repo: Path) -> List[Path]:
     for cat in all_category_dirs(repo):
         full_dir = cat / "full"
         if full_dir.is_dir():
-            result.extend(sorted(full_dir.glob("*.py")))
+            result.extend(sorted(full_dir.glob("*" + SOURCE_SUFFIX)))
     return result
 
 
 def deploy_name(launcher: Path) -> str:
-    """Calculate the destination file name (without .py)."""
-    name = launcher.stem  # rimuove .py
-    return name
+    """Destination name: the stem on POSIX, the full name on Windows."""
+    return launcher.name if IS_WINDOWS else launcher.stem
 
 
 # ─── Deploy ───────────────────────────────────────────────────────────────────
@@ -266,7 +289,7 @@ def sync_category(category_dir: Path, target_dir: Path,
             try:
                 dest_path.write_bytes(src_content)
                 set_executable(dest_path)
-                print(f"  [UPDATED] {launcher.name} → {dest_path}")
+                print(f"  [UPDATED] {launcher.name} -> {dest_path}")
                 updated += 1
             except OSError as e:
                 print(f"  [ERROR] {launcher.name}: {e}")
@@ -278,7 +301,7 @@ def sync_category(category_dir: Path, target_dir: Path,
             try:
                 dest_path.write_bytes(src_content)
                 set_executable(dest_path)
-                print(f"  [DEPLOYED] {launcher.name} → {dest_path}")
+                print(f"  [DEPLOYED] {launcher.name} -> {dest_path}")
                 deployed += 1
             except OSError as e:
                 print(f"  [ERROR] {launcher.name}: {e}")
@@ -392,10 +415,13 @@ def run(repo: Path, target_dir: Path, category: str, all_categories: bool,
     if not is_temp and not scripts_filter and not all_categories and (category == "auto" or is_full_explicit_set):
         total_removed = remove_orphans(repo, effective_target, current_stems, exclude_set)
 
-    print("─" * 40)
+    print("-" * 40)
     if is_temp:
         print(f"[OK] Anteprima in: {effective_target}")
-        print(f"     Per deployare davvero: cp {effective_target}/* {target_dir}/")
+        if IS_WINDOWS:
+            print(f"     Per deployare davvero: copy {effective_target}\\* {target_dir}\\")
+        else:
+            print(f"     Per deployare davvero: cp {effective_target}/* {target_dir}/")
     print(f"[OK] Riepilogo: {total_deployed} deployati, {total_updated} aggiornati, {total_skipped} invariati, {total_excluded} esclusi, {total_removed} rimossi")
     return 0
 
@@ -440,7 +466,20 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def _utf8_stdio() -> None:
+    """Keep non-ASCII output from failing on a redirected Windows console."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
+
 def main() -> int:
+    _utf8_stdio()
     args = parse_args()
     repo = Path(args.repo)
     target = Path(args.target)

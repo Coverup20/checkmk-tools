@@ -60,3 +60,7 @@ network-topology-*.json
 # udp punch build artifacts
 script-tools/full/udp_punch/build/
 script-tools/full/udp_punch/dist/
+
+# sync tool build artifacts
+script-tools/full/sync_update/build/
+script-tools/full/sync_update/dist/
