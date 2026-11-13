@@ -153,6 +153,46 @@ monitored host, so cmk -D shows the program line and cmk -vvn reports agent
 Success with cmk_time_ds between 11 and 13 seconds; the server journal logs one
 "connection from uid=SITE_UID pid=... accepted" line per poll.
 
+## Install on a peer
+
+Each peer is installed on the machine itself; nothing is pushed from the
+other side. The installer lives next to the rest of the toolset and needs
+python3-cryptography on the target. Both peers must allow the UDP port
+selected with --udp-bind (default 6015) inbound.
+
+With a terminal on stdin the installer asks for the missing values, shows
+each default in brackets and prints a summary before writing anything;
+--non-interactive forces the flag-only behaviour and --yes skips the final
+confirmation.
+
+Server side, the CheckMK host:
+
+```bash
+sudo python3 install_udp_punch.py install --role server \
+    --stun-server <stun-server>:3478 \
+    --unix-owner <checkmk-site-user> \
+    --peer <other-peer-public-address>:6015
+```
+
+Host side, the monitored host:
+
+```bash
+sudo python3 install_udp_punch.py install --role host \
+    --stun-server <stun-server>:3478 \
+    --peer <other-peer-public-address>:6015
+```
+
+The first run generates /etc/cmk-punch/psk and prints its sha256; copy that
+file to the other peer and install it there with --psk-file PATH so both
+sides share the same key. The installer verifies the source files, backs up
+every file it replaces, writes the configuration and the systemd unit, and
+starts the unit. The server role also installs the datasource client and
+prints the CheckMK rule to configure by hand. Useful flags: --root DIR to
+rehearse an installation under a directory without touching systemd,
+--force to replace an existing configuration, --no-start to write the unit
+without enabling it; the status and uninstall subcommands inspect and remove
+one peer, and uninstall --purge also deletes configuration and state.
+
 ## Re-STUN backoff
 
 restun_interval_s (default 300) is the first interval between two re-STUN
