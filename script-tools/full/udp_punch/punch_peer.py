@@ -38,7 +38,7 @@ try:
 except ImportError:  # non-POSIX: only numeric uids are accepted
     pwd = None
 
-VERSION = "p5"
+VERSION = "p6"
 
 
 def log(msg):
@@ -287,6 +287,10 @@ class PunchPeer:
             self.target = None if self.command else parse_endpoint(cfg["target"])
         self.allowed_uids = self._resolve_uids(cfg.get("allowed_uids"))
         self.allowed_exe = [os.path.realpath(p) for p in (cfg.get("allowed_exe") or [])]
+        self.rate_limit = float(cfg.get("rate_limit_pps", 200))
+        self.rate = {}
+        if self.tcp_listener is not None and not self.allowed_uids and not self.allowed_exe:
+            raise ValueError("tcp_listen requires allowed_uids or allowed_exe")
 
     @staticmethod
     def _resolve_uids(values):
@@ -537,6 +541,30 @@ class PunchPeer:
         except Exception:
             return None
 
+    def rate_ok(self, addr):
+        """Token bucket per source address, applied before any decryption."""
+        limit = self.rate_limit
+        if limit <= 0:
+            return True
+        now = time.monotonic()
+        if len(self.rate) > 256:
+            stale = [a for a, s in self.rate.items() if now - s[1] > 60]
+            for a in stale:
+                self.rate.pop(a, None)
+            if len(self.rate) > 256:
+                self.rate.clear()
+        state = self.rate.get(addr)
+        if state is None:
+            state = [limit, now]
+            self.rate[addr] = state
+        tokens = min(limit, state[0] + (now - state[1]) * limit)
+        state[1] = now
+        if tokens < 1.0:
+            state[0] = tokens
+            return False
+        state[0] = tokens - 1.0
+        return True
+
     def handle_hello(self, mtype, payload, addr):
         if len(payload) < PUB_LEN:
             return
@@ -559,6 +587,8 @@ class PunchPeer:
             self.send(T_HELLO_ACK, payload=self.eph_pub + os.urandom(HELLO_EXTRA))
 
     def handle_frame(self, frame, addr):
+        if not self.rate_ok(addr):
+            return
         hello = self.open_with(self.boot, frame)
         if hello is not None and hello[0] in (T_HELLO, T_HELLO_ACK):
             self.handle_hello(hello[0], hello[5], addr)
