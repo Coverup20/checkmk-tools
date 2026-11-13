@@ -4,6 +4,11 @@ Repository synchronization and script/config update utilities.
 
 ## Auto-Git-Sync (Timer-Based Model)
 
+> The two scripts of this legacy mechanism now live in `old/`
+> (`auto_git_sync.py` and `sync-python-full-checks.py`). They are kept for
+> reference and for the legacy installer path; new hosts use the release-based
+> sync described below.
+
 The auto-git-sync system keeps `/opt/checkmk-tools/` synchronized with the upstream repository using a Python-managed, systemd timer-based architecture.
 
 ### Architecture
@@ -160,6 +165,11 @@ python3 sync_linuxchecks.py --categories ubuntu --target /tmp/local-preview --dr
 - **Atomic install:** the verified copy is staged, then copied to a temporary
   name inside the target directory and renamed over the destination, so the
   agent never runs a half-written check.
+- **Platform guard:** an explicit base category that contradicts the detected
+  platform (ubuntu on an NS8 node, ns8 on a Proxmox host, and so on) is
+  refused; add-on categories (tmate-server, checkmk, checkmk-sp, checkmk-us,
+  ns8-prototypes) are always allowed. --allow-mismatch overrides the guard on
+  purpose.
 - **Exclusions:** `/etc/checkmk-python-full-sync.exclude` is honored, one check
   name per line; excluded checks are neither installed nor removed.
 - **Prune:** only checks previously deployed by this tool (tracked in
