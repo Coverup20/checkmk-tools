@@ -56,3 +56,7 @@ network-topology-*.json
 
 # MCP config (local only)
 .mcp.json
+
+# udp punch build artifacts
+script-tools/full/udp_punch/build/
+script-tools/full/udp_punch/dist/

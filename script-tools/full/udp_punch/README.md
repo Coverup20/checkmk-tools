@@ -211,6 +211,14 @@ powershell -ExecutionPolicy Bypass -File .\install_udp_punch_windows.ps1 `
     -PskFile .\psk -Peer <server>:6015
 ```
 
+build_udp_punch_exe.ps1 builds a self-contained executable with PyInstaller in
+onedir mode: dist\cmk-punch\cmk-punch.exe plus its `_internal` directory, about
+25 MB, no Python needed on the target. When that folder exists next to the
+installer the installer uses it automatically; -ExeDir points to another
+build. -CertificateThumbprint signs the executable with signtool when a
+code-signing certificate is available, otherwise the build is unsigned and the
+antivirus exclusion still applies.
+
 The script installs under C:\ProgramData\cmk-punch, writes host.json,
 generates or imports the pre-shared key with a restricted ACL, opens the UDP
 port in Windows Firewall and registers the scheduled task cmk-punch-host,
