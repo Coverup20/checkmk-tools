@@ -58,6 +58,7 @@ Server configuration, `/etc/cmk-punch/server.json`:
   "unix_mode": "0660",
   "unix_owner": "monitoring",
   "allowed_uids": ["monitoring"],
+  "rate_limit_pps": 200,
   "keepalive_s": 15,
   "punch_interval_s": 1.0,
   "restun_max_interval_s": 1800,
@@ -116,6 +117,12 @@ primary group), allowed_uids (peer uids from SO_PEERCRED), allowed_exe
 (optional, resolved paths from /proc/pid/exe; only usable when credentials are
 available). At least one of tcp_listen and unix_listen must be set, otherwise
 the server refuses to start.
+
+The TCP listener refuses to start when neither allowed_uids nor allowed_exe is
+configured, so a plain TCP path can never be opened without an admission gate.
+Incoming datagrams are rate limited per source address before any decryption
+(rate_limit_pps, default 200, 0 disables); two streams from one legitimate
+peer stay far below that.
 
 On the CheckMK side the socket is used with the rule "Individual program call
 instead of agent access", which runs, as the site user,

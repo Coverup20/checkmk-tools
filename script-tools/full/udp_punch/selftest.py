@@ -115,6 +115,8 @@ def make_cfg(tmp, psk_path, role, peer_file, tcp_port, echo_addr, extra=None, tc
     if role == "server":
         if tcp:
             base["tcp_listen"] = "127.0.0.1:%d" % tcp_port
+        if "allowed_uids" not in base and "allowed_exe" not in base:
+            base["allowed_uids"] = [os.getuid()]
     else:
         base["target"] = "%s:%d" % echo_addr
     if extra:
@@ -300,6 +302,31 @@ def handshake_checks(psk):
     print("handshake checks: OK")
 
 
+def gate_requirement_check(tmp, psk_path, echo_addr):
+    cfg = make_cfg(tmp, psk_path, "server", os.path.join(tmp, "server-nogate.json"),
+                   free_port(), echo_addr, {"allowed_uids": []})
+    try:
+        PunchPeer(cfg)
+        raise AssertionError("a TCP listener started without any admission gate")
+    except ValueError:
+        pass
+    print("gate requirement: OK (tcp_listen refused without allowed_uids)")
+
+
+def rate_limit_check(tmp, psk_path, echo_addr):
+    cfg = make_cfg(tmp, psk_path, "server", os.path.join(tmp, "server-rate.json"),
+                   free_port(), echo_addr, {"rate_limit_pps": 5})
+    peer = PunchPeer(cfg)
+    try:
+        addr = ("127.0.0.1", 12345)
+        allowed = sum(1 for _ in range(10) if peer.rate_ok(addr))
+        assert allowed == 5, allowed
+        assert peer.rate_ok(("127.0.0.1", 54321)), "a second source was limited"
+    finally:
+        peer.shutdown()
+    print("rate limit: OK (5 of 10 from one source, another source allowed)")
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="punch-selftest-")
     psk_path = os.path.join(tmp, "psk")
@@ -313,6 +340,8 @@ def main():
         raise SystemExit("this self-test needs /proc and getuid (POSIX only)")
     uid_lookup_check()
     restun_backoff_check(tmp, psk_path)
+    gate_requirement_check(tmp, psk_path, ("127.0.0.1", 9))
+    rate_limit_check(tmp, psk_path, ("127.0.0.1", 9))
 
     echo_addr = echo_server()
     server, host, tcp_port, server_file = start_pair(tmp, psk_path, echo_addr, "main")
