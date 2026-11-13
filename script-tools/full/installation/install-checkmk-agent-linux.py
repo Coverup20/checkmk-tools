@@ -797,13 +797,16 @@ def _build_sync_cmd(py_bin: str, sync_script: Path, repo_path: Path,
 
 
 def _find_sync_script(repo_path: Path) -> Path:
-    candidate = repo_path / "script-tools/full/sync_update/sync-python-full-checks.py"
-    if not candidate.exists():
-        print(f"[ERROR] Script sync non trovato: {candidate}", file=sys.stderr)
-        sys.exit(1)
-    # Rendi eseguibile
-    candidate.chmod(candidate.stat().st_mode | 0o111)
-    return candidate
+    candidates = [
+        repo_path / "script-tools/full/sync_update/sync-python-full-checks.py",
+        repo_path / "script-tools/full/sync_update/old/sync-python-full-checks.py",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            candidate.chmod(candidate.stat().st_mode | 0o111)
+            return candidate
+    print(f"[ERROR] Script sync non trovato: {candidates[0]}", file=sys.stderr)
+    sys.exit(1)
 
 
 def install_python_sync_systemd(repo_path: Path, target: str,

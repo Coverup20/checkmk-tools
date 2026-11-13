@@ -17,7 +17,7 @@ left untouched.
 No GitHub account and no repository clone are needed: the assets of a public
 release are plain HTTPS downloads.
 
-Version: 1.1.0"""
+Version: 1.2.0"""
 
 import argparse
 import hashlib
@@ -32,7 +32,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 DEFAULT_REPO = "Coverup20/checkmk-tools"
 TAG_PREFIX = "linuxchecks-"
@@ -122,6 +122,28 @@ def load_exclude_list(exclude_file):
     return excluded
 
 
+# Base platform categories: exactly one applies to a host. The other
+# categories (tmate-server, checkmk, checkmk-sp, checkmk-us, ns8-prototypes)
+# are add-ons that can coexist with any base.
+BASE_CATEGORIES = ("ns7", "ns8", "nsec8", "proxmox", "ubuntu")
+
+
+def detect_base_platform():
+    """Short name of the base platform of this host, or None if unknown."""
+    if shutil.which("pveversion") or Path("/etc/pve").is_dir():
+        return "proxmox"
+    if Path("/etc/openwrt_release").is_file():
+        return "nsec8"
+    if Path("/etc/nethserver-release").is_file():
+        return "ns7"
+    if (Path("/etc/nethserver/api-server.env").is_file()
+            or Path("/etc/nethserver/core.env").is_file()):
+        return "ns8"
+    if shutil.which("dpkg") or shutil.which("apt-get"):
+        return "ubuntu"
+    return None
+
+
 def detect_categories():
     """Short names of the categories that apply to this host.
 
@@ -129,23 +151,29 @@ def detect_categories():
     time) plus zero or more role add-ons that can coexist with any base.
     """
     categories = []
-
-    if shutil.which("pveversion") or Path("/etc/pve").is_dir():
-        categories.append("proxmox")
-    elif Path("/etc/openwrt_release").is_file():
-        categories.append("nsec8")
-    elif Path("/etc/nethserver-release").is_file():
-        categories.append("ns7")
-    elif (Path("/etc/nethserver/api-server.env").is_file()
-          or Path("/etc/nethserver/core.env").is_file()):
-        categories.append("ns8")
-    elif shutil.which("dpkg") or shutil.which("apt-get"):
-        categories.append("ubuntu")
-
+    base = detect_base_platform()
+    if base:
+        categories.append(base)
     if shutil.which("tmate-ssh-server"):
         categories.append("tmate-server")
-
     return categories
+
+
+def category_platform_error(categories, base, allow_mismatch):
+    """Return an error when an explicit base category contradicts the host.
+
+    Add-on categories are always allowed; a base category that is not the
+    detected platform (e.g. ubuntu on an NS8 node) is refused unless the
+    caller passes --allow-mismatch.
+    """
+    if not base or allow_mismatch:
+        return None
+    requested = [c for c in categories if c in BASE_CATEGORIES]
+    foreign = [c for c in requested if c != base]
+    if foreign:
+        return (f"this host is {base}: refusing base category "
+                f"{', '.join(foreign)} (use --allow-mismatch to override)")
+    return None
 
 
 # ─── HTTP ─────────────────────────────────────────────────────────────────────
@@ -414,6 +442,11 @@ def run_sync(args):
         if unknown:
             raise SyncError("unknown category: " + ", ".join(unknown))
 
+    error = category_platform_error(categories, detect_base_platform(),
+                                    args.allow_mismatch)
+    if error:
+        raise SyncError(error)
+
     staging = Path(args.staging)
     if not args.dry_run:
         staging.mkdir(parents=True, exist_ok=True)
@@ -558,6 +591,20 @@ def self_test():
         expect("check_other" in load_state(staging)["deployed"],
                "state keeps the checks outside the subset")
 
+        print("platform guard")
+        expect(category_platform_error(["ubuntu"], "ubuntu", False) is None,
+               "ubuntu on ubuntu is allowed")
+        expect(category_platform_error(["ubuntu"], "ns8", False) is not None,
+               "ubuntu on ns8 is refused")
+        expect(category_platform_error(["ns8"], "ubuntu", False) is not None,
+               "ns8 on ubuntu is refused")
+        expect(category_platform_error(["checkmk-us"], "ns8", False) is None,
+               "add-on categories are never blocked")
+        expect(category_platform_error(["ubuntu"], "ns8", True) is None,
+               "--allow-mismatch overrides the guard")
+        expect(category_platform_error(["ubuntu"], None, False) is None,
+               "unknown platform does not block")
+
         print("dry run changes nothing")
         (target / "check_first").unlink()
         args.dry_run = True
@@ -615,6 +662,9 @@ def parse_args():
                         help=f"checks to skip, one per line (default: {DEFAULT_EXCLUDE_FILE})")
     parser.add_argument("--scripts",
                         help="comma-separated deployed names to handle (subset)")
+    parser.add_argument("--allow-mismatch", action="store_true",
+                        help="allow a base category that does not match the "
+                             "detected platform (refused by default)")
     parser.add_argument("--no-prune", action="store_true",
                         help="do not remove checks that left the release")
     parser.add_argument("--dry-run", action="store_true",
