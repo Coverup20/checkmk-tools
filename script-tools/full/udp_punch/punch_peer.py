@@ -28,9 +28,9 @@ import threading
 import time
 
 from protocol import (CTRL_KEEPALIVE, CTRL_PUNCH, CTRL_PUNCH_ACK, HELLO_EXTRA,
-                      MAX_PAYLOAD, PUB_LEN, T_ACK, T_CTRL, T_DATA, T_FIN,
-                      T_FIN_ACK, T_HELLO, T_HELLO_ACK, T_OPEN, T_OPEN_ACK,
-                      T_OPEN_FAIL, T_RESET, Crypto, new_ephemeral,
+                      MAX_PAYLOAD, PAD_SIZE, PUB_LEN, T_ACK, T_CTRL, T_DATA,
+                      T_FIN, T_FIN_ACK, T_HELLO, T_HELLO_ACK, T_OPEN,
+                      T_OPEN_ACK, T_OPEN_FAIL, T_RESET, Crypto, new_ephemeral,
                       session_keys)
 
 try:
@@ -38,7 +38,7 @@ try:
 except ImportError:  # non-POSIX: only numeric uids are accepted
     pwd = None
 
-VERSION = "p6"
+VERSION = "p7"
 
 
 def log(msg):
@@ -235,7 +235,8 @@ class PunchPeer:
         psk = load_psk(cfg["psk_file"])
         self.psk = psk
         self.eph, self.eph_pub = new_ephemeral()
-        self.boot = Crypto(psk, send_dir="boot", recv_dir="boot")
+        self.pad = bool(cfg.get("pad_frames", True))
+        self.boot = Crypto(psk, send_dir="boot", recv_dir="boot", pad=self.pad)
         self.crypto = None
         self.handshake_s = float(cfg.get("handshake_interval_s", 1.0))
         self.last_hello = 0.0
@@ -578,7 +579,8 @@ class PunchPeer:
         self.punched = True
         keys = session_keys(self.psk, self.eph, self.eph_pub, peer_pub)
         send_dir, recv_dir = ("s2c", "c2s") if self.role == "server" else ("c2s", "s2c")
-        self.crypto = Crypto.from_keys(keys[send_dir], keys[recv_dir])
+        self.crypto = Crypto.from_keys(keys[send_dir], keys[recv_dir],
+                                       pad=self.pad)
         self.sessions += 1
         log("session established with %s:%d (%s, #%d)"
             % (addr[0], addr[1], "HELLO" if mtype == T_HELLO else "HELLO_ACK",
@@ -785,9 +787,11 @@ class PunchPeer:
             fh.write("%s:%d\n" % addr)
 
     def run(self):
-        log("cmk-punch %s starting (role=%s, allowed_uids=%s, allowed_exe=%s)"
+        log("cmk-punch %s starting (role=%s, allowed_uids=%s, allowed_exe=%s,"
+            " pad=%s)"
             % (VERSION, self.role, sorted(self.allowed_uids) or "any",
-               self.allowed_exe or "any"))
+               self.allowed_exe or "any",
+               "%d B" % PAD_SIZE if self.pad else "off"))
         if self.cfg.get("use_stun", True) and self.cfg.get("stun_server"):
             try:
                 public = stun_discover(self.sock, self.cfg["stun_server"])

@@ -4,7 +4,13 @@
 Wire format:
     MAGIC (4) | TYPE (1) | NONCE (12) | CIPHERTEXT
     CIPHERTEXT = ChaCha20-Poly1305(PLAINTEXT, AAD = MAGIC + TYPE)
-    PLAINTEXT  = FLAGS (1) | STREAM_ID (4) | SEQ (4) | ACK (4) | PAYLOAD
+    PLAINTEXT  = FLAGS (1) | STREAM_ID (4) | SEQ (4) | ACK (4) | PLEN (2)
+                 | PAYLOAD (PLEN) | PADDING
+
+Every datagram is exactly PAD_SIZE bytes on the wire. PLAIN carries its own
+payload length and the remaining bytes are random padding, so neither the
+type of a frame nor the size of the data it carries is visible to an observer
+of the link.
 
 Each direction has its own AEAD key, derived from the PSK with HKDF-SHA256:
     server -> host uses info "s2c", host -> server uses info "c2s".
@@ -29,8 +35,10 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 MAGIC = b"CP01"
 WIRE = struct.Struct("!4sB12s")
-PLAIN = struct.Struct("!BIII")
+PLAIN = struct.Struct("!BIIIH")
+TAG_LEN = 16
 MAX_PAYLOAD = 1150
+PAD_SIZE = 1200  # every datagram on the wire is exactly this many bytes
 
 T_CTRL = 1
 T_OPEN = 2
@@ -83,32 +91,42 @@ class Crypto:
     """AEAD wrapper: per-direction keys, random nonces, bounded replay cache."""
 
     def __init__(self, psk: bytes, epoch: bytes = b"\x00\x00\x00\x00",
-                 send_dir: str = "s2c", recv_dir: str = "c2s") -> None:
+                 send_dir: str = "s2c", recv_dir: str = "c2s",
+                 pad: bool = True) -> None:
         if len(psk) != 32:
             raise ValueError("PSK must be exactly 32 bytes")
         self._send = ChaCha20Poly1305(derive_key(psk, send_dir))
         self._recv = ChaCha20Poly1305(derive_key(psk, recv_dir))
         self._seen = deque(maxlen=4096)
         self._seen_set = set()
+        self.pad = bool(pad)
 
     @classmethod
-    def from_keys(cls, send_key, recv_key):
+    def from_keys(cls, send_key, recv_key, pad: bool = True):
         """Layer built from explicit 32-byte keys, used after the handshake."""
         obj = cls.__new__(cls)
         obj._send = ChaCha20Poly1305(send_key)
         obj._recv = ChaCha20Poly1305(recv_key)
         obj._seen = deque(maxlen=4096)
         obj._seen_set = set()
+        obj.pad = bool(pad)
         return obj
 
     def seal(self, mtype, stream=0, seq=0, ack=0, flags=0, payload=b""):
+        if len(payload) > MAX_PAYLOAD:
+            raise ValueError("payload longer than MAX_PAYLOAD")
         nonce = os.urandom(12)
         aad = MAGIC + bytes([mtype])
-        plain = PLAIN.pack(flags, stream, seq, ack) + payload
+        plain = PLAIN.pack(flags, stream, seq, ack, len(payload)) + payload
+        if self.pad:
+            target = PAD_SIZE - WIRE.size - TAG_LEN
+            if len(plain) > target:
+                raise ValueError("frame does not fit in PAD_SIZE")
+            plain += os.urandom(target - len(plain))
         return WIRE.pack(MAGIC, mtype, nonce) + self._send.encrypt(nonce, plain, aad)
 
     def open(self, frame):
-        if len(frame) < WIRE.size + 16:
+        if len(frame) < WIRE.size + TAG_LEN:
             raise ValueError("frame too short")
         magic, mtype, nonce = WIRE.unpack_from(frame, 0)
         if magic != MAGIC:
@@ -122,9 +140,12 @@ class Crypto:
             raise ValueError("authentication failed")
         if len(plain) < PLAIN.size:
             raise ValueError("plaintext too short")
-        flags, stream, seq, ack = PLAIN.unpack_from(plain, 0)
+        flags, stream, seq, ack, plen = PLAIN.unpack_from(plain, 0)
+        body = plain[PLAIN.size:]
+        if plen > len(body):
+            raise ValueError("payload length beyond frame")
         if len(self._seen) == self._seen.maxlen:
             self._seen_set.discard(self._seen[0])
         self._seen.append(nonce)
         self._seen_set.add(nonce)
-        return mtype, stream, seq, ack, flags, plain[PLAIN.size:]
+        return mtype, stream, seq, ack, flags, body[:plen]
