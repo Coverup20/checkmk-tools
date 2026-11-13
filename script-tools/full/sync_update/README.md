@@ -101,7 +101,8 @@ Linux is the file stem without extension:
 ```json
 {
   "tag": "linuxchecks-2026.11.13",
-  "categories": ["ns7", "ns8", "nsec8", "proxmox", "ubuntu", "tmate-server"],
+  "categories": ["ns7", "ns8", "nsec8", "proxmox", "ubuntu", "tmate-server",
+                 "checkmk", "checkmk-us"],
   "checks": [
     {
       "category": "ubuntu",
@@ -143,7 +144,15 @@ python3 sync_linuxchecks.py --categories ubuntu --target /tmp/local-preview --dr
 
 - **Category detection:** `auto` recognizes NS7, NS8, NethSecurity 8, Proxmox
   and generic Debian/Ubuntu, plus the `tmate-server` role on any base, with the
-  same rules as `sync-python-full-checks.py`.
+  same rules as `sync-python-full-checks.py`. The `checkmk` and `checkmk-us`
+  categories are never auto-detected: the monitoring servers request them
+  explicitly with `--categories`, e.g. `--categories ubuntu,checkmk-us`.
+  `checkmk` is the generic monitoring-server category (`script-checkmk/full`);
+  `checkmk-sp` is its own copy (`script-checkmk-sp/full`), so the SP server can
+  diverge from the generic set. A host requests one of them, not both.
+  `ns8-prototypes` comes from `script-check-ns8/prototypes` instead of
+  `full` and is requested only by the lab NS8 node; production NS8 hosts keep
+  using `ns8`.
 - **Atomic install:** the verified copy is staged, then copied to a temporary
   name inside the target directory and renamed over the destination, so the
   agent never runs a half-written check.
@@ -196,3 +205,29 @@ action: no script here disables or removes `auto-git-sync`.
 5. Rollback: re-enable `auto-git-sync` and disable
    `cmk-local-checks-sync.timer`. The checks already deployed stay in place,
    so service discovery does not flap during the switch.
+
+### Scripts still executed from inside the clone
+
+A few scheduled jobs run scripts that live in the clone: the weekly CheckMK
+upgrade, the daily/weekly backup management and the agent autoupdate. They
+must be moved out before the clone can be removed. `migrate_clone_consumers.py`
+copies the known payloads to `/usr/local/lib/checkmk-tools-upgrade`, rewrites
+the exact absolute paths in the crontab and in the systemd unit files, and
+saves every replaced file under `/var/backups/cmk-migration/<timestamp>`:
+
+```bash
+# What would change, no writes
+python3 migrate_clone_consumers.py
+
+# Apply, then confirm the schedule still resolves the new paths
+python3 migrate_clone_consumers.py --apply
+
+# Restore the units from a backup (the crontab is reported, never rewritten)
+python3 migrate_clone_consumers.py --rollback /var/backups/cmk-migration/<timestamp>
+```
+
+The CheckMK upgrade wrapper looks for its backend as a sibling file first, so
+copying `upgrade-checkmk.py` and `upgrade_checkmk.py` into the same directory
+is enough; the absolute paths inside it are only fallbacks. Payloads that are
+not present on a host are skipped, so the same command is safe on every
+server.
