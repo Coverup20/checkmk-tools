@@ -142,6 +142,10 @@ python3 sync_linuxchecks.py --categories ubuntu --target /tmp/local-preview --dr
 
 ### Behavior and Safety
 
+- **Category layout:** only `<category>/full/` enters the release. A script
+  parked in `<category>/fixing/` stays in the repository with its history but
+  is neither built nor deployed, and the downloader prunes it from the hosts
+  that had it.
 - **Category detection:** `auto` recognizes NS7, NS8, NethSecurity 8, Proxmox
   and generic Debian/Ubuntu, plus the `tmate-server` role on any base, with the
   same rules as `sync-python-full-checks.py`. The `checkmk` and `checkmk-us`
