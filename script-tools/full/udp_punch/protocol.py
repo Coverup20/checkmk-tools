@@ -7,6 +7,10 @@ Wire format:
     PLAINTEXT  = FLAGS (1) | STREAM_ID (4) | SEQ (4) | ACK (4) | PLEN (2)
                  | PAYLOAD (PLEN) | PADDING
 
+The HELLO payload may carry a trailer with the sender's own address on the
+path to the peer, so the other side can report which address is behind the
+NAT; see encode_peer_info and decode_peer_info.
+
 Every datagram is exactly PAD_SIZE bytes on the wire. PLAIN carries its own
 payload length and the remaining bytes are random padding, so neither the
 type of a frame nor the size of the data it carries is visible to an observer
@@ -59,6 +63,9 @@ CTRL_PUNCH = b"PUNCH"
 CTRL_PUNCH_ACK = b"PUNCH_ACK"
 CTRL_KEEPALIVE = b"KEEPALIVE"
 
+PEER_INFO_MAGIC = b"IP01"
+PEER_INFO_MAX = 64
+
 
 def derive_key(psk: bytes, label: str) -> bytes:
     """Per-direction key, so the two directions never share a key stream."""
@@ -85,6 +92,29 @@ def session_keys(psk, eph, pub_local, pub_peer):
     return {label: HKDF(algorithm=hashes.SHA256(), length=32, salt=salt,
                         info=b"cmk-punch/session/" + label.encode("ascii")).derive(ikm)
             for label in ("s2c", "c2s")}
+
+
+def encode_peer_info(address):
+    """Trailer for HELLO: the sender's own address towards the peer."""
+    raw = address.encode("ascii", "replace")[:PEER_INFO_MAX]
+    return PEER_INFO_MAGIC + bytes([len(raw)]) + raw
+
+
+def decode_peer_info(payload):
+    """Address carried by a HELLO trailer, or None when there is none."""
+    offset = PUB_LEN
+    if len(payload) < offset + 5:
+        return None
+    if payload[offset:offset + 4] != PEER_INFO_MAGIC:
+        return None
+    length = payload[offset + 4]
+    raw = payload[offset + 5:offset + 5 + length]
+    if length == 0 or len(raw) != length:
+        return None
+    try:
+        return raw.decode("ascii")
+    except UnicodeDecodeError:
+        return None
 
 
 class Crypto:

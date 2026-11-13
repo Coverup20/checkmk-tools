@@ -30,7 +30,8 @@ import time
 from protocol import (CTRL_KEEPALIVE, CTRL_PUNCH, CTRL_PUNCH_ACK, HELLO_EXTRA,
                       MAX_PAYLOAD, PAD_SIZE, PUB_LEN, T_ACK, T_CTRL, T_DATA,
                       T_FIN, T_FIN_ACK, T_HELLO, T_HELLO_ACK, T_OPEN,
-                      T_OPEN_ACK, T_OPEN_FAIL, T_RESET, Crypto, new_ephemeral,
+                      T_OPEN_ACK, T_OPEN_FAIL, T_RESET, Crypto,
+                      decode_peer_info, encode_peer_info, new_ephemeral,
                       session_keys)
 
 try:
@@ -38,7 +39,7 @@ try:
 except ImportError:  # non-POSIX: only numeric uids are accepted
     pwd = None
 
-VERSION = "p7"
+VERSION = "p8"
 
 
 def log(msg):
@@ -48,6 +49,20 @@ def log(msg):
 def parse_endpoint(text):
     host, port = text.rsplit(":", 1)
     return host, int(port)
+
+
+def local_address(peer):
+    """Local address the kernel uses to reach peer, or None."""
+    if not peer:
+        return None
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.connect(peer)
+        return probe.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        probe.close()
 
 
 def load_psk(path):
@@ -247,6 +262,7 @@ class PunchPeer:
         self.sock.settimeout(0.5)
         self.local_udp = self.sock.getsockname()
         self.peer = None
+        self.peer_real_ip = None
         self.peer_file = cfg["peer_file"]
         self.keepalive_s = float(cfg.get("keepalive_s", 15))
         self.restun_s = float(cfg.get("restun_interval_s", 300))
@@ -566,6 +582,24 @@ class PunchPeer:
         state[0] = tokens - 1.0
         return True
 
+    def own_address(self, peer):
+        return (self.cfg.get("advertise_ip")
+                or local_address(peer) or self.local_udp[0])
+
+    def hello_payload(self, peer=None):
+        address = self.own_address(peer or self.peer)
+        return (self.eph_pub + encode_peer_info(address)
+                + os.urandom(HELLO_EXTRA))
+
+    def write_peer_real_ip(self, address):
+        try:
+            os.makedirs(self.state_dir, exist_ok=True)
+            path = os.path.join(self.state_dir, "peer_real_ip.txt")
+            with open(path, "w", encoding="ascii") as fh:
+                fh.write("%s\n" % address)
+        except OSError as exc:
+            log("cannot write peer_real_ip.txt: %s" % exc)
+
     def handle_hello(self, mtype, payload, addr):
         if len(payload) < PUB_LEN:
             return
@@ -585,8 +619,13 @@ class PunchPeer:
         log("session established with %s:%d (%s, #%d)"
             % (addr[0], addr[1], "HELLO" if mtype == T_HELLO else "HELLO_ACK",
                self.sessions))
+        info = decode_peer_info(payload)
+        if info and info != self.peer_real_ip:
+            self.peer_real_ip = info
+            self.write_peer_real_ip(info)
+            log("peer real address %s" % info)
         if mtype == T_HELLO:
-            self.send(T_HELLO_ACK, payload=self.eph_pub + os.urandom(HELLO_EXTRA))
+            self.send(T_HELLO_ACK, payload=self.hello_payload(addr))
 
     def handle_frame(self, frame, addr):
         if not self.rate_ok(addr):
@@ -688,7 +727,7 @@ class PunchPeer:
                 and not self.streams and now - self.last_stun >= self.restun_delay):
             self.restun()
         if self.peer and self.crypto is None and now - self.last_hello >= self.handshake_s:
-            self.send(T_HELLO, payload=self.eph_pub + os.urandom(HELLO_EXTRA))
+            self.send(T_HELLO, payload=self.hello_payload())
             self.last_hello = now
         if self.peer and self.crypto is not None and not self.punched and now - self.last_punch >= self.punch_s:
             self.send_ctrl(CTRL_PUNCH)

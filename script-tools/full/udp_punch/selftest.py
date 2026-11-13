@@ -11,7 +11,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import punch_peer
-from protocol import MAX_PAYLOAD, PAD_SIZE, Crypto, T_DATA
+from protocol import MAX_PAYLOAD, PAD_SIZE, PUB_LEN, Crypto, T_DATA, decode_peer_info, encode_peer_info
 from punch_peer import PunchPeer, socket_uid
 
 
@@ -347,6 +347,16 @@ def padding_checks(psk):
     print("padding: OK (every frame %d bytes, payload restored)" % PAD_SIZE)
 
 
+def peer_info_checks():
+    sample = "192.0.2.10"
+    blob = encode_peer_info(sample)
+    payload = b"\x00" * PUB_LEN + blob + b"\x01" * 16
+    assert decode_peer_info(payload) == sample, decode_peer_info(payload)
+    assert decode_peer_info(b"\x00" * PUB_LEN + b"\x01" * 16) is None
+    assert decode_peer_info(b"\x00" * 16) is None
+    print("peer info: OK (%s)" % sample)
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="punch-selftest-")
     psk_path = os.path.join(tmp, "psk")
@@ -356,6 +366,7 @@ def main():
 
     crypto_checks(psk)
     padding_checks(psk)
+    peer_info_checks()
     handshake_checks(psk)
     if not hasattr(os, "getuid"):
         raise SystemExit("this self-test needs /proc and getuid (POSIX only)")
@@ -368,6 +379,8 @@ def main():
     server, host, tcp_port, server_file = start_pair(tmp, psk_path, echo_addr, "main")
     assert server.crypto is not None, "server did not complete the handshake"
     assert host.crypto is not None, "host did not complete the handshake"
+    assert server.peer_real_ip == "127.0.0.1", server.peer_real_ip
+    print("peer real address: OK (%s)" % server.peer_real_ip)
 
     client = socket.create_connection(("127.0.0.1", tcp_port), timeout=10)
     payload = b"hello-punch"
