@@ -21,7 +21,11 @@ Both peers punch towards the public endpoint of the other; keepalives every
   two-byte payload length; everything after the payload is random padding.
 - AEAD ChaCha20-Poly1305 with a 32-byte PSK; 4096-entry replay window.
 - Types: CTRL (PUNCH/PUNCH_ACK/KEEPALIVE), OPEN, OPEN_ACK, OPEN_FAIL, DATA,
-  ACK, FIN, FIN_ACK, RESET.
+  ACK, FIN, FIN_ACK, RESET. HELLO and HELLO_ACK also carry the sender's own
+  address towards the peer (an IP01 trailer after the ephemeral key); the
+  receiver logs it as "peer real address" and writes it to
+  peer_real_ip.txt in the state directory. The advertise_ip configuration key
+  overrides the detected address.
 - Streams multiplexed on one UDP socket; per direction a Go-Back-N window
   (default 32 packets), cumulative ACKs, retransmission and a reliable FIN
   (maximum payload 1150 bytes).
@@ -91,6 +95,7 @@ Host configuration, `/etc/cmk-punch/host.json`:
   "state_dir": "/var/lib/cmk-punch",
   "pad_frames": true,
   "target_command": "/usr/bin/check_mk_agent",
+  "advertise_ip": "<host-address-towards-the-peer>",
   "keepalive_s": 15,
   "punch_interval_s": 1.0
 }
