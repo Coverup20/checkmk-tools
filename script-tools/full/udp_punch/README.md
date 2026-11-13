@@ -16,13 +16,25 @@ Both peers punch towards the public endpoint of the other; keepalives every
 
 ## Wire protocol
 
-- Frame: CP01 | type | nonce(12) | ciphertext.
+- Frame: CP01 | type | nonce(12) | ciphertext, always 1200 bytes on the
+  wire. The plaintext starts with flags, stream id, sequence, ack and a
+  two-byte payload length; everything after the payload is random padding.
 - AEAD ChaCha20-Poly1305 with a 32-byte PSK; 4096-entry replay window.
 - Types: CTRL (PUNCH/PUNCH_ACK/KEEPALIVE), OPEN, OPEN_ACK, OPEN_FAIL, DATA,
   ACK, FIN, FIN_ACK, RESET.
 - Streams multiplexed on one UDP socket; per direction a Go-Back-N window
   (default 32 packets), cumulative ACKs, retransmission and a reliable FIN
   (maximum payload 1150 bytes).
+
+## Metadata
+
+Padding is on by default (pad_frames, true). Every datagram is exactly
+PAD_SIZE bytes - 1200 - whatever it carries, so an observer of the link
+cannot tell control frames from data frames and cannot read the size of a
+chunk from a frame. What remains visible: the number of frames, that is the
+order of magnitude of the transfer, and the schedule of the poller, which
+belongs to the monitoring system and not to the tunnel. Hiding either would
+need constant-rate cover traffic.
 
 ## Session keys and forward secrecy
 
@@ -57,6 +69,7 @@ Server configuration, `/etc/cmk-punch/server.json`:
   "unix_listen": "/run/cmk-punch/agent.sock",
   "unix_mode": "0660",
   "unix_owner": "monitoring",
+  "pad_frames": true,
   "allowed_uids": ["monitoring"],
   "rate_limit_pps": 200,
   "keepalive_s": 15,
@@ -76,6 +89,7 @@ Host configuration, `/etc/cmk-punch/host.json`:
   "stun_server": "<stun-server>:3478",
   "peer_file": "/etc/cmk-punch/peer.json",
   "state_dir": "/var/lib/cmk-punch",
+  "pad_frames": true,
   "target_command": "/usr/bin/check_mk_agent",
   "keepalive_s": 15,
   "punch_interval_s": 1.0
@@ -84,6 +98,9 @@ Host configuration, `/etc/cmk-punch/host.json`:
 
 Use target_command to run the agent and forward its stdout; target stays
 available for a plain TCP destination.
+
+Update both peers in the same change: with the payload length field the frame
+layout changed, so an old peer cannot read frames from a new one.
 
 ## Admission control before OPEN
 

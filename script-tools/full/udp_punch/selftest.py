@@ -11,7 +11,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import punch_peer
-from protocol import Crypto, T_DATA
+from protocol import MAX_PAYLOAD, PAD_SIZE, Crypto, T_DATA
 from punch_peer import PunchPeer, socket_uid
 
 
@@ -327,6 +327,26 @@ def rate_limit_check(tmp, psk_path, echo_addr):
     print("rate limit: OK (5 of 10 from one source, another source allowed)")
 
 
+def padding_checks(psk):
+    a = Crypto(psk, b"\x00\x00\x00\x02", "c2s", "s2c")
+    b = Crypto(psk, b"\x00\x00\x00\x02", "s2c", "c2s")
+    for n in (0, 1, 100, 1150):
+        frame = a.seal(T_DATA, 1, seq=n + 1, payload=b"z" * n)
+        assert len(frame) == PAD_SIZE, (n, len(frame))
+        assert b.open(frame)[5] == b"z" * n, n
+    plain = Crypto(psk, b"\x00\x00\x00\x02", "c2s", "s2c", pad=False)
+    plain_rx = Crypto(psk, b"\x00\x00\x00\x02", "s2c", "c2s", pad=False)
+    frame = plain.seal(T_DATA, 1, seq=99, payload=b"y")
+    assert len(frame) < PAD_SIZE, len(frame)
+    assert plain_rx.open(frame)[5] == b"y"
+    try:
+        a.seal(T_DATA, 1, payload=b"x" * (MAX_PAYLOAD + 1))
+        raise AssertionError("oversized payload accepted")
+    except ValueError:
+        pass
+    print("padding: OK (every frame %d bytes, payload restored)" % PAD_SIZE)
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="punch-selftest-")
     psk_path = os.path.join(tmp, "psk")
@@ -335,6 +355,7 @@ def main():
         fh.write(psk.hex())
 
     crypto_checks(psk)
+    padding_checks(psk)
     handshake_checks(psk)
     if not hasattr(os, "getuid"):
         raise SystemExit("this self-test needs /proc and getuid (POSIX only)")
