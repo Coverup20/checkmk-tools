@@ -20,7 +20,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.6.1"
+VERSION = "1.6.2"
 REPORT_FILE = Path("/tmp/checkmk-upgrade-report.txt")
 BACKUP_DIR = Path("/opt/omd/backups")
 EMAIL_FROM = "no-reply@nethesis.it"
@@ -423,6 +423,25 @@ def build_message(status: str, site_name: str, version: str, details: str = "") 
     return subject, body
 
 
+def detect_site() -> str:
+    """Return the name of the first OMD site found, or an empty string."""
+    sites = Path("/omd/sites")
+    if not sites.is_dir():
+        return ""
+    for site_dir in sites.iterdir():
+        if site_dir.is_dir() and (site_dir / "etc").exists():
+            return site_dir.name
+    return ""
+
+
+def site_is_running(site_name: str) -> bool:
+    """True when 'omd status' reports the site as running."""
+    if not site_name:
+        return False
+    out = run_cmd(["omd", "status", site_name])
+    return "Overall state:" in out.stdout and "running" in out.stdout
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Wrapper upgrade-checkmk con esiti strutturati")
     parser.add_argument("--email", default="", help="Email destinatario report esito")
@@ -483,9 +502,21 @@ def main() -> int:
     if forward and forward[0] == "--":
         forward = forward[1:]
 
-    # Add --dry-run to forward args if specified
+    # Snapshot the site before doing anything: a failure that happens before the
+    # upgrade starts must be told apart from a real failed upgrade.
+    pre_site = detect_site()
+    pre_version = get_current_version(pre_site) if pre_site else "unknown"
+    pre_running = site_is_running(pre_site) if pre_site else False
+    pre_backup = get_latest_backup(pre_site) if pre_site else None
+
+    # A dry run must never touch the site. The backend (upgrade-checkmk.sh /
+    # upgrade_checkmk.py) has no simulation mode, so forwarding --dry-run made
+    # it exit with an argparse usage error; the wrapper then treated that as a
+    # failed upgrade and rolled back to an older backup, stopping the site.
     if args.dry_run:
-        forward = ["--dry-run"] + forward
+        print(f"[DRY_RUN] site={pre_site or '?'} version={pre_version} backend={script}")
+        print("[DRY_RUN] nessuna operazione eseguita sul sito")
+        return 0
 
     # Fix ownership before upgrade to prevent backup failures caused by
     # root-owned files inside the OMD site tree
@@ -574,7 +605,30 @@ def main() -> int:
             print(f"[WARN] Agent update detail: {agent_result['detail']}")
             return 0
 
-    backup = get_latest_backup(site_name)
+    rollback_site = site_name or pre_site
+    post_version = get_current_version(rollback_site) if rollback_site else "unknown"
+    post_backup = get_latest_backup(rollback_site) if rollback_site else None
+    upgrade_started = (post_version != pre_version) or (post_backup != pre_backup)
+
+    if not upgrade_started:
+        # The backend failed before changing anything. Restoring the newest
+        # backup in this situation can lose data (the backup may be days old)
+        # and, when that backup's OMD version has since been removed, leaves the
+        # site stopped. Leave the site exactly as it was.
+        if pre_running and rollback_site and not site_is_running(rollback_site):
+            run_cmd(["omd", "start", rollback_site])
+            print(f"[INFO] sito {rollback_site} riavviato dopo il fallimento")
+        subject, body = build_message(
+            "FAILED",
+            rollback_site or "unknown",
+            post_version,
+            "upgrade non avviato: nessun cambiamento rilevato, nessun rollback eseguito",
+        )
+        send_mail(args.email, subject, body)
+        print("FAILED: upgrade non avviato, rollback non eseguito (nessun cambiamento rilevato)")
+        return 1
+
+    backup = post_backup
     if backup is not None:
         rollback_ok, detail = execute_rollback(site_name, backup)
         if rollback_ok:
