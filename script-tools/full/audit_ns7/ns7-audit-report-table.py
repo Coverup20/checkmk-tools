@@ -26,7 +26,7 @@ Output: directory /tmp/ns7-audit-YYYYMMDD-HHMMSS/
 Usage:
   ns7-audit-report-table.py [--output-dir DIR] [--pdf|--no-pdf] [--self-test] [--version]
 
-Version: 1.1.0
+Version: 1.1.1
 """
 
 import getpass
@@ -47,7 +47,7 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 
 # Domain maximum password age used only when the domain policy cannot be read.
 DEFAULT_MAX_PWD_AGE_DAYS = 42
@@ -642,6 +642,24 @@ def get_password_policy() -> Dict[str, object]:
     return parse_password_settings(out)
 
 
+def password_status(last_change: datetime, max_age: int, now: datetime) -> Tuple[str, str, str, int]:
+    """Return (last change, expiry, status, days left) for a password."""
+    expires = last_change + timedelta(days=max_age)
+    days_left = (expires.date() - now.date()).days
+    if days_left < 0:
+        status = "Expired"
+    elif days_left <= 7:
+        status = "Expiring soon"
+    else:
+        status = "Valid"
+    return (
+        last_change.strftime("%Y-%m-%d"),
+        expires.strftime("%Y-%m-%d"),
+        status,
+        days_left,
+    )
+
+
 def collect_password_expiry_table(output_dir: Path, policy: Dict[str, object]) -> None:
     """Collect password expiry for every user according to the domain policy."""
     log_info("Collecting password expiration dates...")
@@ -691,21 +709,16 @@ def collect_password_expiry_table(output_dir: Path, policy: Dict[str, object]) -
             rows.append((username, "N/A", "N/A", "Parse error"))
             continue
 
-        expires = last_change + timedelta(days=max_age)
-        days_left = (expires - now).days
-        if days_left < 0:
+        last_date, expires_str, status, days_left = password_status(last_change, max_age, now)
+        if status == "Expired":
             expired += 1
-            status = "Expired"
-        elif days_left <= 7:
+        elif status == "Expiring soon":
             expiring += 1
-            status = "Expiring soon"
-        else:
-            status = "Valid"
 
         rows.append((
             username,
-            last_change.strftime("%Y-%m-%d"),
-            expires.strftime("%Y-%m-%d"),
+            last_date,
+            expires_str,
             "%s (%d days)" % (status, days_left),
         ))
 
@@ -1612,6 +1625,21 @@ default:user::rwx
     if rows != expected:
         print("FAIL: parse_getfacl -> %r" % (rows,))
         failures += 1
+
+    base_now = datetime(2026, 11, 19, 12, 0, 0)
+    status_cases = [
+        (datetime(2026, 11, 19), 30, "Valid", 30),
+        (datetime(2026, 10, 25), 30, "Expiring soon", 5),
+        (datetime(2026, 10, 10), 30, "Expired", -10),
+    ]
+    for last_change, max_age, want_status, want_days in status_cases:
+        _, _, status, days = password_status(last_change, max_age, base_now)
+        if status != want_status or days != want_days:
+            print(
+                "FAIL: password_status(%s, %d) -> %s/%d, expected %s/%d"
+                % (last_change.date(), max_age, status, days, want_status, want_days)
+            )
+            failures += 1
 
     if failures == 0:
         print("PASS: ns7-audit-report-table.py self-test")
