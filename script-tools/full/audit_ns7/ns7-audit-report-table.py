@@ -12,12 +12,13 @@ Report sections:
   6) WebTop 5 mail shares (PostgreSQL 9.2+ or MySQL, skipped when absent)
 
 The Samba DC of a NethServer 7 machine runs inside the systemd-nspawn
-container "nsdc", so every samba-tool call is executed through:
+container "nsdc", so every samba-tool call is executed inside it via
+nsenter against the container init PID:
 
-    systemd-run -M nsdc -t /usr/bin/samba-tool ...
+    nsenter -t <leader> -m -u -i -p -- env PYTHONIOENCODING=utf-8 samba-tool ...
 
-This form is non-interactive: stdout carries the command output while
-systemd-run writes its transient-unit banner on stderr (it is filtered).
+No pty is allocated, so hundreds of calls do not exhaust the container
+PTYs (systemd-run -t does).
 
 Output: directory /tmp/ns7-audit-YYYYMMDD-HHMMSS/
         (00_report.html and 00_report.pdf, produced by a built-in
@@ -26,7 +27,7 @@ Output: directory /tmp/ns7-audit-YYYYMMDD-HHMMSS/
 Usage:
   ns7-audit-report-table.py [--output-dir DIR] [--pdf|--no-pdf] [--self-test] [--version]
 
-Version: 1.1.1
+Version: 1.1.8
 """
 
 import getpass
@@ -39,6 +40,7 @@ import smtplib
 import socket
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timedelta, timezone
 from email import encoders
 from email.mime.base import MIMEBase
@@ -47,7 +49,8 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-VERSION = "1.1.1"
+VERSION = "1.1.8"
+PDF_FOOTER = ""
 
 # Domain maximum password age used only when the domain policy cannot be read.
 DEFAULT_MAX_PWD_AGE_DAYS = 42
@@ -158,10 +161,15 @@ def run_command(cmd: List[str], timeout: int = 60) -> Tuple[int, str, str]:
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            universal_newlines=True,
+            universal_newlines=False,
+            stdin=subprocess.DEVNULL,
             timeout=timeout,
         )
-        return result.returncode, result.stdout, result.stderr
+        return (
+            result.returncode,
+            result.stdout.decode("utf-8", "replace"),
+            result.stderr.decode("utf-8", "replace"),
+        )
     except subprocess.TimeoutExpired:
         return 124, "", "Timeout"
     except FileNotFoundError:
@@ -170,18 +178,62 @@ def run_command(cmd: List[str], timeout: int = 60) -> Tuple[int, str, str]:
         return 1, "", str(exc)
 
 
-def run_nsdc(args: List[str], timeout: int = 60) -> Tuple[int, str, str]:
-    """Run a command inside the nsdc container via systemd-run.
+TOOL_NOISE_RE = re.compile(
+    r"^(Traceback \(most recent call last\):|  File \"|File \"|"
+    r"return self\.run\(|self\.out\.write\(|"
+    r"[A-Za-z_]+Error: [^ ])"
+)
 
-    Returns (exit_code, stdout, filtered_stderr). The systemd-run banner
-    ("Running as unit ...", "Press ^] three times ...") is removed.
+
+def filter_tool_noise(text: str) -> str:
+    """Drop samba-tool Python traceback lines from command output."""
+    kept = [line for line in text.splitlines() if not TOOL_NOISE_RE.match(line)]
+    return "\n".join(kept)
+
+
+_NSDC_LEADER = None
+
+
+def nsdc_leader() -> str:
+    """Return the PID of the container init, for nsenter."""
+    global _NSDC_LEADER
+    if _NSDC_LEADER:
+        return _NSDC_LEADER
+    rc, out, _ = run_command(["machinectl", "show", NSDC_MACHINE, "-p", "Leader"], timeout=10)
+    if rc == 0:
+        for line in out.splitlines():
+            if line.startswith("Leader="):
+                pid = line.split("=", 1)[1].strip()
+                if pid and pid != "0":
+                    _NSDC_LEADER = pid
+    return _NSDC_LEADER or ""
+
+
+def run_nsdc(args: List[str], timeout: int = 60) -> Tuple[int, str, str]:
+    """Run a command inside the nsdc container.
+
+    Uses nsenter against the container init: systemd-run -t allocates a pty
+    for every call and leaks them, so a full audit (hundreds of samba-tool
+    calls) ends with "Failed to get machine PTY". nsenter needs no pty.
+    PYTHONIOENCODING=utf-8 keeps samba-tool from dying with UnicodeEncodeError
+    on names with non-ASCII characters.
     """
-    cmd = ["systemd-run", "-M", NSDC_MACHINE, "-t"] + args
+    leader = nsdc_leader()
+    if leader:
+        cmd = [
+            "nsenter", "-t", leader, "-m", "-u", "-i", "-p", "--",
+            "/usr/bin/env", "PYTHONIOENCODING=utf-8",
+        ] + args
+    else:
+        cmd = [
+            "systemd-run", "-M", NSDC_MACHINE, "-t",
+            "/usr/bin/env", "PYTHONIOENCODING=utf-8",
+        ] + args
     rc, out, err = run_command(cmd, timeout=timeout)
 
     noise = ("Running as unit", "Press ^]", "disconnect TTY")
     clean_lines = [l for l in err.splitlines() if not any(n in l for n in noise)]
-    return rc, out, "\n".join(clean_lines).strip()
+    return rc, filter_tool_noise(out), "\n".join(clean_lines).strip()
 
 
 def getent_name(kind: str, identifier: str) -> Optional[str]:
@@ -448,11 +500,16 @@ def mysql_query(sql: str, database: Optional[str] = None, timeout: int = 20) -> 
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            universal_newlines=True,
+            universal_newlines=False,
+            stdin=subprocess.DEVNULL,
             timeout=timeout,
             env=env,
         )
-        return result.returncode, result.stdout, result.stderr
+        return (
+            result.returncode,
+            result.stdout.decode("utf-8", "replace"),
+            result.stderr.decode("utf-8", "replace"),
+        )
     except subprocess.TimeoutExpired:
         return 124, "", "Timeout"
     except FileNotFoundError:
@@ -469,10 +526,15 @@ def psql_query(sql: str, database: str = "webtop5", timeout: int = 20) -> Tuple[
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            universal_newlines=True,
+            universal_newlines=False,
+            stdin=subprocess.DEVNULL,
             timeout=timeout,
         )
-        return result.returncode, result.stdout, result.stderr
+        return (
+            result.returncode,
+            result.stdout.decode("utf-8", "replace"),
+            result.stderr.decode("utf-8", "replace"),
+        )
     except FileNotFoundError:
         # Fallback for older util-linux without runuser.
         shell_cmd = "psql -t -A -F '|' -d %s -c %s" % (shlex.quote(database), shlex.quote(sql))
@@ -797,10 +859,13 @@ def collect_ad_groups_table(output_dir: Path) -> int:
         )
         members: List[str] = []
         computers: List[str] = []
-        if rc == 0 and members_out.strip():
+        if any(line.startswith("ERROR") for line in members_out.splitlines()):
+            log_warn("Cannot list members of %s" % group)
+            members.append("(unavailable)")
+        elif rc == 0 and members_out.strip():
             for member in members_out.splitlines():
                 member = member.strip()
-                if not member:
+                if not member or "codec" in member:
                     continue
                 if member.endswith("$"):
                     computers.append(member)
@@ -848,7 +913,10 @@ def collect_ad_groups_table(output_dir: Path) -> int:
         if members:
             for member in members:
                 group_table_rows.append([group, member])
-        elif not computers:
+        elif computers:
+            for computer in computers:
+                group_table_rows.append([group, computer])
+        else:
             group_table_rows.append([group, "(no members)"])
     REPORT_BLOCKS.append({
         "title": "Active Directory Groups",
@@ -869,7 +937,10 @@ def collect_ad_groups_table(output_dir: Path) -> int:
             if members:
                 for member in members:
                     handle.write("| %s | %s |\n" % (group, member))
-            elif not computers:
+            elif computers:
+                for computer in computers:
+                    handle.write("| %s | %s |\n" % (group, computer))
+            else:
                 handle.write("| %s | (no members) |\n" % group)
         handle.write("\n")
 
@@ -887,7 +958,11 @@ def collect_domain_computers(output_dir: Path, info: Dict[str, object]) -> int:
         log_warn("Cannot list computer accounts")
         return 0
 
-    computers = sorted(line.strip() for line in out.splitlines() if line.strip())
+    computers = sorted(
+        line.strip()
+        for line in out.splitlines()
+        if line.strip() and not line.startswith("ERROR") and "codec" not in line
+    )
 
     print()
     print("=" * 90)
@@ -1026,6 +1101,35 @@ def collect_shares_table(output_dir: Path) -> int:
 # Section 6: WebTop 5 mail shares
 # ---------------------------------------------------------------------------
 
+def load_ad_guid_names() -> Dict[str, str]:
+    """Map AD objectGUID to account name for WebTop user UUIDs.
+
+    WebTop stores principals as LDAP objectGUID strings, but core.users only
+    contains accounts that logged in at least once. The missing ones are
+    resolved against the AD database itself.
+    """
+    mapping: Dict[str, str] = {}
+    sam_db = "/var/lib/samba/private/sam.ldb"
+    for filter_expr, name_attr in (
+        ("(objectClass=user)", "sAMAccountName"),
+        ("(objectClass=group)", "cn"),
+    ):
+        rc, out, _ = run_nsdc(
+            ["/usr/bin/ldbsearch", "-H", sam_db, filter_expr, "objectGUID", name_attr],
+            timeout=60,
+        )
+        if rc != 0:
+            continue
+        guid = None
+        for line in out.splitlines():
+            if line.startswith("objectGUID:"):
+                guid = line.split(":", 1)[1].strip().lower()
+            elif line.startswith(name_attr + ":") and guid:
+                mapping[guid] = line.split(":", 1)[1].strip()
+                guid = None
+    return mapping
+
+
 def collect_webtop_sharing(output_dir: Path, engine: str) -> int:
     """Collect WebTop 5 mail sharing information when WebTop is installed."""
     md_file = output_dir / "03_webtop_shares.md"
@@ -1058,6 +1162,14 @@ def collect_webtop_sharing(output_dir: Path, engine: str) -> int:
         if len(parts) >= 2 and parts[0].strip():
             uuid_map[parts[0].strip().lower()] = parts[1].strip()
 
+    ad_map = load_ad_guid_names()
+    uuid_map.update({key: value for key, value in ad_map.items() if key not in uuid_map})
+
+    def resolve_uuid(value: str) -> str:
+        if not value:
+            return ""
+        return uuid_map.get(value) or "(removed: %s)" % value
+
     sql = (
         "SELECT s.share_id, s.user_uid, s.key, sd.user_uid, sd.value "
         "FROM core.shares s LEFT JOIN core.shares_data sd ON s.share_id = sd.share_id "
@@ -1069,6 +1181,7 @@ def collect_webtop_sharing(output_dir: Path, engine: str) -> int:
     else:
         rc, out, err = mysql_query(sql.replace("core.", "core_"), database="webtop5", timeout=30)
 
+    removed = 0
     if rc != 0:
         log_warn("Cannot read WebTop shares: %s" % (err or "unknown error"))
         shares_data: List[Tuple[str, str, str]] = []
@@ -1080,11 +1193,22 @@ def collect_webtop_sharing(output_dir: Path, engine: str) -> int:
                 continue
             owner_uuid = parts[1].strip().lower()
             shared_uuid = parts[3].strip().lower()
+            if not shared_uuid:
+                # LEFT JOIN row without a principal: not a real share.
+                continue
             value = parts[4].strip() if len(parts) > 4 else ""
-            owner = uuid_map.get(owner_uuid, owner_uuid)
-            shared = uuid_map.get(shared_uuid, shared_uuid)
+            owner = resolve_uuid(owner_uuid)
+            shared = resolve_uuid(shared_uuid)
             perm = "RW" if "shareIdentity" in value and "true" in value else "RO"
+            if shared.startswith("(removed:"):
+                removed += 1
             shares_data.append((owner, shared, perm))
+
+    if removed:
+        log_warn(
+            "%d WebTop share rows reference principals no longer in AD "
+            "(WebTop keeps them after account deletion)" % removed
+        )
 
     REPORT_BLOCKS.append({
         "title": "WebTop Mail Shares",
@@ -1105,6 +1229,11 @@ def collect_webtop_sharing(output_dir: Path, engine: str) -> int:
             handle.write("|------|----|------|\n")
             for owner, shared, perm in shares_data:
                 handle.write("| %s | %s | %s |\n" % (owner, shared, perm))
+            if removed:
+                handle.write(
+                    "\n**Removed principals:** %d rows reference accounts no longer "
+                    "in AD; WebTop keeps them after account deletion.\n" % removed
+                )
         else:
             handle.write("*No mail shares configured*\n")
         handle.write("\n")
@@ -1242,6 +1371,7 @@ class SimplePdfWriter:
     MARGIN = 40
     ROW_H = 12
     HEADER_H = 14
+    FOOTER: str = ""
 
     def __init__(self) -> None:
         self.pages: List[str] = []
@@ -1266,7 +1396,17 @@ class SimplePdfWriter:
     def _fill_rect(self, x: float, y: float, width: float, height: float, gray: float) -> None:
         self.ops.append("%.2f g %.1f %.1f %.1f %.1f re f 0 g" % (gray, x, y, width, height))
 
+    def _footer(self) -> None:
+        """Draw the optional footer text at the bottom of the current page."""
+        if not self.FOOTER:
+            return
+        text = " ".join(str(self.FOOTER).split())
+        width = len(text) * 3.6
+        x = max(float(self.MARGIN), (self.PAGE_W - width) / 2.0)
+        self._text(x, 18, 7, text)
+
     def _new_page(self) -> None:
+        self._footer()
         self.pages.append("\n".join(self.ops))
         self.ops = []
         self.y = float(self.PAGE_H - self.MARGIN)
@@ -1332,6 +1472,7 @@ class SimplePdfWriter:
         self.y -= 8
 
     def save(self, path: Path) -> None:
+        self._footer()
         self.pages.append("\n".join(self.ops))
         self.ops = []
         page_count = len(self.pages)
@@ -1376,6 +1517,7 @@ class SimplePdfWriter:
 def generate_pdf(output_dir: Path) -> Path:
     """Render the collected blocks to a PDF using only the standard library."""
     writer = SimplePdfWriter()
+    writer.FOOTER = PDF_FOOTER
     meta = "Host: %s  |  Generated: %s  |  Version: %s" % (
         socket.gethostname(),
         datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
@@ -1641,6 +1783,32 @@ default:user::rwx
             )
             failures += 1
 
+    noisy = (
+        "PC-ONE$\n"
+        "Traceback (most recent call last):\n"
+        "  File \"/usr/lib64/python3.6/site-packages/samba/netcmd/__init__.py\", line 186, in _run\n"
+        "return self.run(*args, **kwargs)\n"
+        "self.out.write(\"%s\\n\" % msg.get(\"samaccountname\", idx=0))\n"
+        "UnicodeEncodeError: 'ascii' codec can't encode character\n"
+        "PC-TWO$\n"
+    )
+    if filter_tool_noise(noisy) != "PC-ONE$\nPC-TWO$":
+        print("FAIL: filter_tool_noise -> %r" % filter_tool_noise(noisy))
+        failures += 1
+
+    writer = SimplePdfWriter()
+    writer.FOOTER = "footer@example.test"
+    writer.add_block("T", ["A"], [["v%d" % i] for i in range(120)])
+    fd, pdf_name = tempfile.mkstemp(suffix=".pdf")
+    os.close(fd)
+    pdf_path = Path(pdf_name)
+    writer.save(pdf_path)
+    pdf_bytes = pdf_path.read_bytes()
+    pdf_path.unlink()
+    if pdf_bytes.count(b"footer@example.test") < 2:
+        print("FAIL: PDF footer missing on every page")
+        failures += 1
+
     if failures == 0:
         print("PASS: ns7-audit-report-table.py self-test")
         return 0
@@ -1666,11 +1834,12 @@ def main() -> int:
     do_check = False
     pdf_mode = "auto"
 
+    global PDF_FOOTER
     index = 1
     while index < len(sys.argv):
         arg = sys.argv[index]
         if arg == "--help":
-            print("Usage: ns7-audit-report-table.py [--output-dir DIR] [--pdf|--no-pdf] [--check] [--self-test] [--version]")
+            print("Usage: ns7-audit-report-table.py [--output-dir DIR] [--pdf|--no-pdf] [--check] [--self-test] [--version] [--footer TEXT]")
             return 0
         if arg == "--version":
             print(VERSION)
@@ -1693,6 +1862,10 @@ def main() -> int:
             continue
         if arg == "--output-dir" and index + 1 < len(sys.argv):
             output_base = Path(sys.argv[index + 1])
+            index += 2
+            continue
+        if arg == "--footer" and index + 1 < len(sys.argv):
+            PDF_FOOTER = sys.argv[index + 1]
             index += 2
             continue
         index += 1
