@@ -327,6 +327,89 @@ def rate_limit_check(tmp, psk_path, echo_addr):
     print("rate limit: OK (5 of 10 from one source, another source allowed)")
 
 
+def session_watchdog_check(tmp, psk_path, echo_addr):
+    """session_health() must drop a dead session and give up on a dead link."""
+    cfg = make_cfg(tmp, psk_path, "server",
+                   os.path.join(tmp, "server-health.json"), free_port(),
+                   echo_addr, {"session_dead_s": 5, "bootstrap_timeout_s": 30})
+    peer = PunchPeer(cfg)
+    try:
+        now = time.time()
+        peer.down_since = now - 10
+        assert peer.session_health(now) == "none", "gave up too early"
+        peer.down_since = now - 31
+        assert peer.session_health(now) == "restart", "did not give up"
+        peer.crypto = Crypto(bytes(32))  # stand-in for a live session
+        peer.last_peer_rx = now - 1
+        assert peer.session_health(now) == "none", "dropped a live session"
+        peer.last_peer_rx = now - 6
+        assert peer.session_health(now) == "rekey", "kept a silent session"
+        peer.drop_session(now)
+        assert peer.crypto is None and peer.down_since == now
+    finally:
+        peer.shutdown()
+    print("session watchdog: OK (rekey after 5s, restart after 30s)")
+
+
+def watchdog_giveup_check(tmp, psk_path, echo_addr):
+    """With no peer at all the process exits non-zero so the service restarts."""
+    cfg = make_cfg(tmp, psk_path, "server",
+                   os.path.join(tmp, "server-giveup.json"), free_port(),
+                   echo_addr, {"bootstrap_timeout_s": 2})
+    peer = PunchPeer(cfg)
+    rc = peer.run()
+    peer.shutdown()
+    assert rc == 1, rc
+    print("watchdog give-up: OK (exit code %d with no session)" % rc)
+
+
+def watchdog_recovery_check(tmp, psk_path, echo_addr):
+    """A restarted side must not leave the other stuck on its old keys."""
+    tcp_port = free_port()
+    server_file = os.path.join(tmp, "server-peer-watchdog.json")
+    host_file = os.path.join(tmp, "host-peer-watchdog.json")
+    short = {"session_dead_s": 2, "keepalive_s": 1, "bootstrap_timeout_s": 60}
+    server = PunchPeer(make_cfg(tmp, psk_path, "server", server_file, tcp_port,
+                                echo_addr, short))
+    host = PunchPeer(make_cfg(tmp, psk_path, "host", host_file, tcp_port,
+                              echo_addr, short))
+    with open(server_file, "w", encoding="utf-8") as fh:
+        json.dump({"peer": "127.0.0.1:%d" % host.local_udp[1]}, fh)
+    with open(host_file, "w", encoding="utf-8") as fh:
+        json.dump({"peer": "127.0.0.1:%d" % server.local_udp[1]}, fh)
+    threading.Thread(target=server.run, daemon=True).start()
+    threading.Thread(target=host.run, daemon=True).start()
+    time.sleep(1.5)
+    assert host.crypto is not None and server.crypto is not None, "no initial session"
+    server.shutdown()  # the server comes back with a fresh ephemeral key
+    server2 = None
+    try:
+        deadline = time.time() + 8
+        while host.crypto is not None and time.time() < deadline:
+            time.sleep(0.2)
+        assert host.crypto is None, "host kept the stale session"
+        server2 = PunchPeer(make_cfg(tmp, psk_path, "server", server_file,
+                                     tcp_port, echo_addr, short))
+        threading.Thread(target=server2.run, daemon=True).start()
+        deadline = time.time() + 10
+        while ((host.crypto is None or server2.crypto is None)
+               and time.time() < deadline):
+            time.sleep(0.2)
+        assert host.crypto is not None and server2.crypto is not None, \
+            "tunnel did not recover"
+        payload = b"after-watchdog"
+        client = socket.create_connection(("127.0.0.1", tcp_port), timeout=10)
+        client.sendall(payload)
+        got = recv_exact(client, len(payload))
+        client.close()
+        assert got == payload, got
+    finally:
+        host.shutdown()
+        if server2 is not None:
+            server2.shutdown()
+    print("watchdog recovery: OK (stale session dropped, tunnel re-established)")
+
+
 def padding_checks(psk):
     a = Crypto(psk, b"\x00\x00\x00\x02", "c2s", "s2c")
     b = Crypto(psk, b"\x00\x00\x00\x02", "s2c", "c2s")
@@ -374,6 +457,8 @@ def main():
     restun_backoff_check(tmp, psk_path)
     gate_requirement_check(tmp, psk_path, ("127.0.0.1", 9))
     rate_limit_check(tmp, psk_path, ("127.0.0.1", 9))
+    session_watchdog_check(tmp, psk_path, ("127.0.0.1", 9))
+    watchdog_giveup_check(tmp, psk_path, ("127.0.0.1", 9))
 
     echo_addr = echo_server()
     server, host, tcp_port, server_file = start_pair(tmp, psk_path, echo_addr, "main")
@@ -416,6 +501,7 @@ def main():
 
     uid_gate_checks(tmp, psk_path, echo_addr)
     unix_socket_checks(tmp, psk_path, echo_addr)
+    watchdog_recovery_check(tmp, psk_path, echo_addr)
     print("SELFTEST PASS")
     return 0
 
