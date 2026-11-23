@@ -85,7 +85,7 @@ param(
     [switch]$Purge
 )
 
-$ScriptVersion = "1.0.0"
+$ScriptVersion = "1.1.0"
 $ErrorActionPreference = "Stop"
 $TaskName = "cmk-punch-host"
 $FirewallName = "cmk-punch host UDP"
@@ -316,6 +316,8 @@ $config = [ordered]@{
     target = $Target
     keepalive_s = 15
     punch_interval_s = 1.0
+    session_dead_s = 45
+    bootstrap_timeout_s = 120
 }
 if ($StunServer) { $config["stun_server"] = $StunServer }
 if ($AdvertiseIp) { $config["advertise_ip"] = $AdvertiseIp }
@@ -332,12 +334,18 @@ if ($Peer) {
 if ($exePath) {
     $runContent = @"
 @echo off
+:loop
 "$PeerDir\cmk-punch.exe" --config "$ConfigPath" >> "$LogPath" 2>&1
+ping -n 6 127.0.0.1 > nul
+goto loop
 "@
 } else {
     $runContent = @"
 @echo off
+:loop
 "$Python" "$PeerDir\punch_peer.py" --config "$ConfigPath" >> "$LogPath" 2>&1
+ping -n 6 127.0.0.1 > nul
+goto loop
 "@
 }
 Set-Content -Path $RunCmd -Value $runContent -Encoding ASCII

@@ -51,6 +51,37 @@ sessions. Every frame uses a fresh random 12-byte nonce and the receiver keeps
 a bounded cache of the nonces it has already authenticated, so no state on disk
 can make a nonce repeat.
 
+## Session watchdog and automatic recovery (p9)
+
+Because a restart generates a new ephemeral keypair, the two sides no longer
+share the same session keys. A peer that believes it still has a session would
+never send HELLO again, so without a watchdog a restart of one side could leave
+the tunnel dead on stale keys until a manual restart - for example when the
+restarted side is behind NAT and its own HELLO to the peer is lost by a stale
+mapping.
+
+Both roles now run the same watchdog in tick():
+
+- a session that has received no authenticated frame for session_dead_s
+  (default 45, three keepalives) is dropped: the keys are forgotten, its
+  streams are closed and HELLO starts again immediately. The peer learns the
+  new endpoint from the HELLO source address.
+- a peer that still has no session after bootstrap_timeout_s (default 120)
+  exits with code 1. systemd (Restart=always, RestartSec=5) and the Windows
+  task (run.cmd loops with a 5 second pause) restart it, so both sides keep
+  restarting until the link is established.
+
+Both keys are per-peer configuration; the decision logic is
+PunchPeer.session_health() and is covered by selftest.py (rekey after
+session_dead_s, give-up after bootstrap_timeout_s, and an end-to-end test that
+kills one side, waits for the other to drop the stale session and checks that
+the tunnel recovers by itself with a new stream).
+
+This change does not alter the wire format: a p9 peer interoperates with a p8
+peer, so the two sides can be updated one at a time. A p9 side also heals a
+restart of a p8 side; the opposite direction only works once the restarted
+side runs p9.
+
 ## Deploy
 
 PSK (32-byte hex, mode 600) on both peers:
@@ -78,6 +109,8 @@ Server configuration, `/etc/cmk-punch/server.json`:
   "rate_limit_pps": 200,
   "keepalive_s": 15,
   "punch_interval_s": 1.0,
+  "session_dead_s": 45,
+  "bootstrap_timeout_s": 120,
   "restun_max_interval_s": 1800,
   "restun_interval_s": 300
 }
@@ -97,7 +130,9 @@ Host configuration, `/etc/cmk-punch/host.json`:
   "target_command": "/usr/bin/check_mk_agent",
   "advertise_ip": "<host-address-towards-the-peer>",
   "keepalive_s": 15,
-  "punch_interval_s": 1.0
+  "punch_interval_s": 1.0,
+  "session_dead_s": 45,
+  "bootstrap_timeout_s": 120
 }
 ```
 

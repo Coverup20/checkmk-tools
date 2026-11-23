@@ -34,7 +34,7 @@ import sys
 import time
 from pathlib import Path
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 HERE = Path(__file__).resolve().parent
 CODE_DIR = "/opt/cmk-punch"
@@ -313,6 +313,8 @@ def build_config(role, args, p):
             fail("the host role needs --target-command or --target")
     cfg["keepalive_s"] = args.keepalive
     cfg["punch_interval_s"] = args.punch_interval
+    cfg["session_dead_s"] = args.session_dead
+    cfg["bootstrap_timeout_s"] = args.bootstrap_timeout
     if role == "server":
         cfg["restun_max_interval_s"] = args.restun_max
         cfg["restun_interval_s"] = args.restun
@@ -543,6 +545,8 @@ def build_parser():
     inst.add_argument("--no-start", action="store_true")
     inst.add_argument("--keepalive", type=float, default=15.0)
     inst.add_argument("--punch-interval", type=float, default=1.0)
+    inst.add_argument("--session-dead", type=float, default=45.0)
+    inst.add_argument("--bootstrap-timeout", type=float, default=120.0)
     inst.add_argument("--restun", type=float, default=300.0)
     inst.add_argument("--restun-max", type=float, default=1800.0)
     inst.add_argument("--unix-listen", default=None, metavar="PATH")

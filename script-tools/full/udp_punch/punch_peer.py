@@ -39,7 +39,7 @@ try:
 except ImportError:  # non-POSIX: only numeric uids are accepted
     pwd = None
 
-VERSION = "p8"
+VERSION = "p9"
 
 
 def log(msg):
@@ -270,6 +270,10 @@ class PunchPeer:
         self.restun_delay = self.restun_s
         self.last_stun = 0.0
         self.peer_silence_s = float(cfg.get("peer_silence_s", 45))
+        self.session_dead_s = float(cfg.get("session_dead_s", 45))
+        self.bootstrap_timeout_s = float(cfg.get("bootstrap_timeout_s", 120))
+        self.down_since = time.time()
+        self.exit_code = 0
         self.last_peer_rx = 0.0
         self.local_endpoint = None
         self.punch_s = float(cfg.get("punch_interval_s", 1.0))
@@ -378,6 +382,37 @@ class PunchPeer:
             log("peer endpoint set to %s" % (value,))
         except (OSError, ValueError, KeyError, TypeError) as exc:
             log("cannot read peer file: %s" % exc)
+
+    def session_health(self, now=None):
+        """Watchdog decision for the link: "none", "rekey" or "restart".
+
+        A peer that believes it still has a session never sends HELLO again;
+        if the other side restarted, its fresh ephemeral key can never match
+        the old one and the tunnel stays dead until a manual restart. Here a
+        session that has been silent for session_dead_s is dropped so HELLO
+        starts again, and a link that is still down after bootstrap_timeout_s
+        asks for a process restart (systemd Restart=always, Windows task).
+        """
+        now = time.time() if now is None else now
+        if self.crypto is not None:
+            if now - self.last_peer_rx > self.session_dead_s:
+                return "rekey"
+            return "none"
+        if now - self.down_since > self.bootstrap_timeout_s:
+            return "restart"
+        return "none"
+
+    def drop_session(self, now):
+        """Forget the session: the next tick sends a fresh HELLO."""
+        where = "%s:%d" % self.peer if self.peer else "peer"
+        log("session with %s silent for %ds: dropping keys and re-handshaking"
+            % (where, int(now - self.last_peer_rx)))
+        self.crypto = None
+        self.punched = False
+        self.last_hello = 0.0
+        self.down_since = now
+        for st in list(self.streams.values()):
+            self.drop_stream(st)
 
     def restun(self):
         self.last_stun = time.time()
@@ -723,6 +758,15 @@ class PunchPeer:
     def tick(self):
         now = time.time()
         self.refresh_peer()
+        action = self.session_health(now)
+        if action == "rekey":
+            self.drop_session(now)
+        elif action == "restart":
+            log("no session for %ds, exiting so the service can restart"
+                % int(now - self.down_since))
+            self.exit_code = 1
+            self.stop.set()
+            return
         if (self.cfg.get("use_stun", True) and self.cfg.get("stun_server")
                 and not self.streams and now - self.last_stun >= self.restun_delay):
             self.restun()
@@ -856,6 +900,7 @@ class PunchPeer:
                 % (self.cfg["unix_listen"], self.cfg.get("unix_mode", "0660"),
                    self.cfg.get("unix_owner") or "-"))
         self.recv_loop()
+        return self.exit_code
 
     def shutdown(self, *_args):
         self.stop.set()
@@ -891,7 +936,7 @@ def main():
     peer = PunchPeer(cfg)
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, peer.shutdown)
-    peer.run()
+    sys.exit(peer.run() or 0)
 
 
 if __name__ == "__main__":
