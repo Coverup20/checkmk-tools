@@ -285,6 +285,35 @@ timeout 20 bash -c 'exec 3<>/dev/tcp/127.0.0.1/6010; head -6 <&3'
 
 It must return the agent header line and the hostname of the monitored host.
 
+## Status dashboard
+
+punch_dashboard.py collects the state of every server instance from
+/etc/cmk-punch (unit active, restart count, peer real address, last handshake
+or teardown from the journal) and serves one HTML page plus /api/status and
+/api/probe?inst=NAME on a loopback address. The probe runs the agent client
+through the instance Unix socket with a timeout, so the test button shows the
+end-to-end result and not only the process state.
+
+Install on the monitoring host:
+
+```bash
+install -m 0755 punch_dashboard.py /cmk-punch/punch_dashboard.py
+```
+
+```ini
+[Service]
+ExecStart=/usr/bin/python3 /cmk-punch/punch_dashboard.py --listen 127.0.0.1:8099
+```
+
+Reach it through an SSH local forward, never from a public address:
+
+```bash
+ssh -N -L 8099:127.0.0.1:8099 <monitoring-host>
+```
+
+then open <http://127.0.0.1:8099/>. --once prints the JSON and exits,
+--self-test checks the journal parsing and the state classification.
+
 ## Prototype limits
 
 - Symmetric NAT: the mapping towards the STUN server can differ from the one
