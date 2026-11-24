@@ -30,7 +30,7 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 CONFIG_DIR = "/etc/cmk-punch"
 CODE_PATH = "/opt/cmk-punch/punch_peer.py"
@@ -40,6 +40,8 @@ JOURNAL_SINCE = "-30 days"
 MARKERS = ("session established with|dropping keys|"
            "exiting so the service can restart|cmk-punch p[0-9]+ starting|"
            "peer real address")
+STATUS_FILE = "/var/lib/cmk-punch-dashboard/status.json"
+REFRESH_S = 30
 CACHE_TTL = 10.0
 PROBE_TIMEOUT = 25
 
@@ -249,6 +251,30 @@ def cached_status(config_dir=CONFIG_DIR):
         return data
 
 
+def write_status(path, config_dir=CONFIG_DIR):
+    """Write the status JSON atomically, readable by the CheckMK site user."""
+    data = collect(config_dir)
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(data, fh)
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+
+
+def status_writer(path, refresh_s, config_dir, stop):
+    """Refresh the snapshot in the background, independent of HTTP requests."""
+    while not stop.is_set():
+        try:
+            write_status(path, config_dir)
+        except OSError as exc:
+            print("status snapshot failed: %s" % exc, file=sys.stderr,
+                  flush=True)
+        stop.wait(refresh_s)
+
+
 def probe(inst, timeout=PROBE_TIMEOUT):
     """Run the agent client through one instance's Unix socket."""
     data = cached_status()
@@ -448,6 +474,9 @@ def main():
     parser = argparse.ArgumentParser(description="UDP punch status dashboard")
     parser.add_argument("--listen", default="127.0.0.1:8099")
     parser.add_argument("--config-dir", default=CONFIG_DIR)
+    parser.add_argument("--status-file", default=STATUS_FILE,
+                        help="snapshot read by the CheckMK datasource program")
+    parser.add_argument("--refresh-s", type=float, default=REFRESH_S)
     parser.add_argument("--once", action="store_true",
                         help="print the status JSON and exit")
     parser.add_argument("--self-test", action="store_true")
@@ -459,6 +488,11 @@ def main():
         return
     host, port = args.listen.rsplit(":", 1)
     Handler.config_dir = args.config_dir
+    stop = threading.Event()
+    writer = threading.Thread(target=status_writer,
+                              args=(args.status_file, args.refresh_s,
+                                    args.config_dir, stop), daemon=True)
+    writer.start()
     server = ThreadingHTTPServer((host, int(port)), Handler)
     print("punch dashboard %s on http://%s:%s" % (VERSION, host, port),
           file=sys.stderr, flush=True)

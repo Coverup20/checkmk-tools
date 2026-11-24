@@ -314,6 +314,34 @@ ssh -N -L 8099:127.0.0.1:8099 <monitoring-host>
 then open <http://127.0.0.1:8099/>. --once prints the JSON and exits,
 --self-test checks the journal parsing and the state classification.
 
+## CheckMK integration
+
+punch_check.py is a CheckMK datasource program: it reads the status snapshot
+written by punch_dashboard.py and prints one local check per instance plus a
+summary, so the tunnels become native services with history and alarms. It
+runs as the CheckMK site user, which cannot read the system journal, so the
+snapshot is the data source; a missing or stale snapshot is reported as
+UNKNOWN on the UDP punch feed service.
+
+Create a host object (for example punch-tunnels) whose datasource is the
+program:
+
+```bash
+/usr/bin/python3 /usr/local/lib/cmk-punch/punch_check.py
+```
+
+punch_dashboard.py writes the snapshot every 30 seconds with
+--status-file (default /var/lib/cmk-punch-dashboard/status.json) and
+--refresh-s.
+
+checkmk/punch_snapin.py is a sidebar snapin for CheckMK 2.5: it renders the
+same snapshot in the navigation sidebar with a link to the services view.
+Install it under local/lib/python3/cmk/gui/plugins/sidebar/ and create a
+custom sidebar element of type "UDP punch" in Setup. The snapin is a
+CustomizableSidebarSnapin because the sidebar element page lists only
+customizable types, and it uses internal CheckMK interfaces: re-check it
+after a major upgrade.
+
 ## Prototype limits
 
 - Symmetric NAT: the mapping towards the STUN server can differ from the one
