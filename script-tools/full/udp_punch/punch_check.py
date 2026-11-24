@@ -21,7 +21,7 @@ import sys
 import tempfile
 import time
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 STATUS_FILE = "/var/lib/cmk-punch-dashboard/status.json"
 MAX_AGE_S = 300
 
@@ -72,7 +72,12 @@ def render(data):
 
 
 def main_lines(path, max_age, now=None):
-    """Local check lines for the snapshot at path, including feed health."""
+    """Local check lines for the snapshot at path, including feed health.
+
+    The feed line is emitted on every run, healthy or not: a service that only
+    appears when the snapshot is stale is never discovered, so a dead writer
+    would leave the tunnel services stale-but-green instead of alarming.
+    """
     now = time.time() if now is None else now
     try:
         age = int(now - os.path.getmtime(path))
@@ -84,7 +89,8 @@ def main_lines(path, max_age, now=None):
         data = read_status(path)
     except (OSError, ValueError) as exc:
         return ['3 "UDP punch feed" - status snapshot unreadable: %s' % exc]
-    return render(data)
+    return (['0 "UDP punch feed" age=%d snapshot %ds old' % (age, age)]
+            + render(data))
 
 
 def self_test():
@@ -108,7 +114,9 @@ def self_test():
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(rows, fh)
         fresh = main_lines(path, 300, now=time.time())
-        assert fresh[2] == '2 "UDP punch summary" - 1 of 2 up', fresh
+        assert len(fresh) == 4, fresh
+        assert fresh[0].startswith('0 "UDP punch feed" age='), fresh
+        assert fresh[3] == '2 "UDP punch summary" - 1 of 2 up', fresh
         stale = main_lines(path, 300, now=time.time() + 400)
         assert "stale" in stale[0], stale
         with open(path, "w", encoding="utf-8") as fh:
