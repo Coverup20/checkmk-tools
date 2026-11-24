@@ -10,7 +10,7 @@ The installer is idempotent: running it again updates the script and the
 schedule in place. --uninstall removes the schedule and the script but leaves
 the checks already deployed in the agent local directory untouched.
 
-Version: 1.0.0"""
+Version: 1.0.1"""
 
 import argparse
 import os
@@ -21,7 +21,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 SERVICE_NAME = "cmk-local-checks-sync.service"
 TIMER_NAME = "cmk-local-checks-sync.timer"
@@ -70,7 +70,9 @@ def info(message):
 
 def run(command, check=False):
     """Run a command as a list and return the CompletedProcess."""
-    return subprocess.run(command, capture_output=True, text=True, check=check)
+    return subprocess.run(command, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, universal_newlines=True,
+                          check=check)
 
 
 def is_openwrt():
@@ -132,8 +134,9 @@ def crontab_write(text):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
         return
-    result = subprocess.run(["crontab", "-"], input=text, text=True,
-                            capture_output=True)
+    result = subprocess.run(["crontab", "-"], input=text,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            universal_newlines=True)
     if result.returncode != 0:
         raise InstallError(f"crontab update failed: {result.stderr.strip()}")
 

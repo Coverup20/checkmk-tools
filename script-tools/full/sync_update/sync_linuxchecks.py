@@ -17,7 +17,7 @@ left untouched.
 No GitHub account and no repository clone are needed: the assets of a public
 release are plain HTTPS downloads.
 
-Version: 1.2.0"""
+Version: 1.3.0"""
 
 import argparse
 import hashlib
@@ -32,7 +32,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 DEFAULT_REPO = "Coverup20/checkmk-tools"
 TAG_PREFIX = "linuxchecks-"
@@ -65,6 +65,15 @@ KNOWN_CATEGORIES = [
 
 class SyncError(Exception):
     """Fatal error that stops the run with exit code 1."""
+
+
+class TransientError(SyncError):
+    """Upstream or network problem: skip this run and let the timer retry."""
+
+
+def is_transient_http_code(code):
+    """True for HTTP statuses that mean 'try again later'."""
+    return code >= 500 or code in (408, 429)
 
 
 # ─── Utilities ────────────────────────────────────────────────────────────────
@@ -179,7 +188,12 @@ def category_platform_error(categories, base, allow_mismatch):
 # ─── HTTP ─────────────────────────────────────────────────────────────────────
 
 def http_json(url):
-    """Fetch and decode a JSON document."""
+    """Fetch and decode a JSON document.
+
+    A 5xx, 408 or 429 status and any network failure raise TransientError so
+    the caller can skip the run instead of failing the service; the timer
+    retries in a few minutes. Client errors and invalid payloads stay fatal.
+    """
     request = urllib.request.Request(url, headers={
         "User-Agent": USER_AGENT,
         "Accept": "application/vnd.github+json",
@@ -187,19 +201,29 @@ def http_json(url):
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             return json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, OSError, ValueError) as error:
+    except urllib.error.HTTPError as error:
+        if is_transient_http_code(error.code):
+            raise TransientError(f"request failed: {url} ({error})")
+        raise SyncError(f"request failed: {url} ({error})")
+    except (urllib.error.URLError, OSError) as error:
+        raise TransientError(f"request failed: {url} ({error})")
+    except ValueError as error:
         raise SyncError(f"request failed: {url} ({error})")
 
 
 def http_download(url, destination):
-    """Stream a URL into a file."""
+    """Stream a URL into a file; network failures are transient."""
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
         with urllib.request.urlopen(request, timeout=120) as response, \
                 open(destination, "wb") as handle:
             shutil.copyfileobj(response, handle, length=65536)
-    except (urllib.error.URLError, OSError) as error:
+    except urllib.error.HTTPError as error:
+        if is_transient_http_code(error.code):
+            raise TransientError(f"download failed: {url} ({error})")
         raise SyncError(f"download failed: {url} ({error})")
+    except (urllib.error.URLError, OSError) as error:
+        raise TransientError(f"download failed: {url} ({error})")
 
 
 def fetch_release(repo, tag, api_base):
@@ -380,7 +404,10 @@ def apply_release(release, categories, args):
             partial = staged_file.with_name(staged_file.name + ".new")
             http_download(url, partial)
             if sha256_file(partial) != expected_hash:
-                partial.unlink(missing_ok=True)
+                try:
+                    partial.unlink()
+                except FileNotFoundError:
+                    pass
                 raise SyncError(f"{name}: sha256 mismatch, download discarded")
             os.replace(partial, staged_file)
             info(f"{name}: downloaded and verified")
@@ -611,6 +638,21 @@ def self_test():
         stats = apply_release(release, ["ubuntu"], args)
         expect(stats["deployed"] == 0, "dry run deploys nothing")
         expect(not (target / "check_first").exists(), "dry run leaves target alone")
+
+        print("transient upstream errors")
+        expect(is_transient_http_code(500) and is_transient_http_code(503)
+               and is_transient_http_code(429) and is_transient_http_code(408),
+               "5xx, 429 and 408 are transient")
+        expect(not is_transient_http_code(400) and not is_transient_http_code(404)
+               and not is_transient_http_code(403),
+               "4xx are not transient")
+        try:
+            http_json((root / "missing.json").as_uri())
+            expect(False, "a missing URL must raise")
+        except TransientError:
+            expect(True, "network failure is transient")
+        except SyncError:
+            expect(False, "network failure must be transient")
     except Exception as error:  # pragma: no cover - self test guard
         print(f"  [FAIL] unexpected exception: {error}")
         failures.append("exception")
@@ -688,6 +730,11 @@ def main():
         if args.list:
             return list_checks(args)
         run_sync(args)
+        return 0
+    except TransientError as error:
+        print(f"[WARN] {error}", file=sys.stderr, flush=True)
+        print("[WARN] upstream unavailable, skipping this run; "
+              "the timer retries shortly", file=sys.stderr, flush=True)
         return 0
     except SyncError as error:
         print(f"[ERROR] {error}", file=sys.stderr, flush=True)
