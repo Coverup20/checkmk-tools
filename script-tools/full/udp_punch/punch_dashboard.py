@@ -30,7 +30,7 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 CONFIG_DIR = "/etc/cmk-punch"
 CODE_PATH = "/opt/cmk-punch/punch_peer.py"
@@ -41,7 +41,7 @@ MARKERS = ("session established with|dropping keys|"
            "exiting so the service can restart|cmk-punch p[0-9]+ starting|"
            "peer real address")
 STATUS_FILE = "/var/lib/cmk-punch-dashboard/status.json"
-REFRESH_S = 30
+REFRESH_S = 60
 CACHE_TTL = 10.0
 PROBE_TIMEOUT = 25
 
@@ -275,6 +275,17 @@ def status_writer(path, refresh_s, config_dir, stop):
         stop.wait(refresh_s)
 
 
+def snapshot_or_collect(path, config_dir=CONFIG_DIR):
+    """Serve the background snapshot while it is fresh, collect only as fallback."""
+    try:
+        if time.time() - os.path.getmtime(path) <= REFRESH_S * 3:
+            with open(path, "r", encoding="utf-8") as fh:
+                return json.load(fh)
+    except (OSError, ValueError):
+        pass
+    return cached_status(config_dir)
+
+
 def probe(inst, timeout=PROBE_TIMEOUT):
     """Run the agent client through one instance's Unix socket."""
     data = cached_status()
@@ -404,6 +415,7 @@ refresh();setInterval(refresh,15000);
 
 class Handler(BaseHTTPRequestHandler):
     config_dir = CONFIG_DIR
+    status_file = STATUS_FILE
 
     def log_message(self, *_args):
         pass
@@ -428,7 +440,7 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
         if parsed.path == "/api/status":
-            self.send_json(cached_status(self.config_dir))
+            self.send_json(snapshot_or_collect(self.status_file, self.config_dir))
             return
         if parsed.path == "/api/probe":
             query = urllib.parse.parse_qs(parsed.query)
@@ -488,6 +500,7 @@ def main():
         return
     host, port = args.listen.rsplit(":", 1)
     Handler.config_dir = args.config_dir
+    Handler.status_file = args.status_file
     stop = threading.Event()
     writer = threading.Thread(target=status_writer,
                               args=(args.status_file, args.refresh_s,

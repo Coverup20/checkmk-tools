@@ -297,13 +297,17 @@ end-to-end result and not only the process state.
 Install on the monitoring host:
 
 ```bash
-install -m 0755 punch_dashboard.py /cmk-punch/punch_dashboard.py
+install -m 0755 punch_dashboard.py /opt/cmk-punch/punch_dashboard.py
 ```
 
 ```ini
 [Service]
-ExecStart=/usr/bin/python3 /cmk-punch/punch_dashboard.py --listen 127.0.0.1:8099
+ExecStart=/usr/bin/python3 /opt/cmk-punch/punch_dashboard.py --listen 127.0.0.1:8099
 ```
+
+The dashboard, punch_check.py and the sidebar snapin are not covered by
+install_udp_punch.py: they are installed by hand, so a rebuilt monitoring host
+needs these steps repeated.
 
 Reach it through an SSH local forward, never from a public address:
 
@@ -320,8 +324,10 @@ punch_check.py is a CheckMK datasource program: it reads the status snapshot
 written by punch_dashboard.py and prints one local check per instance plus a
 summary, so the tunnels become native services with history and alarms. It
 runs as the CheckMK site user, which cannot read the system journal, so the
-snapshot is the data source; a missing or stale snapshot is reported as
-UNKNOWN on the UDP punch feed service.
+snapshot is the data source. The UDP punch feed service is emitted on every
+run and turns UNKNOWN when the snapshot is missing or older than --max-age
+(300 s by default), so a dead writer cannot leave the tunnel services stale
+and green.
 
 Create a host object (for example punch-tunnels) whose datasource is the
 program:
@@ -330,7 +336,7 @@ program:
 /usr/bin/python3 /usr/local/lib/cmk-punch/punch_check.py
 ```
 
-punch_dashboard.py writes the snapshot every 30 seconds with
+punch_dashboard.py writes the snapshot every 60 seconds with
 --status-file (default /var/lib/cmk-punch-dashboard/status.json) and
 --refresh-s.
 
