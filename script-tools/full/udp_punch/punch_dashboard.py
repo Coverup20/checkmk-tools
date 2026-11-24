@@ -30,13 +30,16 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 CONFIG_DIR = "/etc/cmk-punch"
 CODE_PATH = "/opt/cmk-punch/punch_peer.py"
 AGENT_CLIENT = "/usr/local/lib/cmk-punch/cmk_punch_agent.py"
 SITE_USER = "monitoring"
-JOURNAL_LINES = 80
+JOURNAL_SINCE = "-30 days"
+MARKERS = ("session established with|dropping keys|"
+           "exiting so the service can restart|cmk-punch p[0-9]+ starting|"
+           "peer real address")
 CACHE_TTL = 10.0
 PROBE_TIMEOUT = 25
 
@@ -112,9 +115,15 @@ def unit_restarts(unit):
 
 
 def journal_events(unit):
-    """Recent journal events as (epoch seconds, message), oldest first."""
-    _code, out, _ = run(["journalctl", "-u", unit, "-n", str(JOURNAL_LINES),
-                         "--no-pager", "-o", "json"], timeout=10)
+    """Handshake and lifecycle events as (epoch seconds, message), oldest first.
+
+    The journal is filtered on the journald side: the agent poll writes one
+    connection line per check, so a plain tail would push the last handshake
+    out of the window within hours and make every row look down.
+    """
+    _code, out, _ = run(["journalctl", "-u", unit, "--since", JOURNAL_SINCE,
+                         "--grep", MARKERS, "--no-pager", "-o", "json"],
+                        timeout=15)
     events = []
     for line in out.splitlines():
         try:
@@ -177,12 +186,15 @@ def read_state(state_dir):
 
 
 def classify(active, summary):
-    """up / down / restarting, from the unit state and the journal summary."""
+    """up / down / restarting / unknown from unit state and journal."""
     if active != "active":
         return "restarting" if summary["restart_at"] is not None else "down"
     handshake = summary["handshake_at"]
     if not isinstance(handshake, float):
-        return "down"
+        if any(summary[key] is not None
+               for key in ("teardown_at", "restart_at", "start_at")):
+            return "down"
+        return "unknown"
     for key in ("teardown_at", "restart_at"):
         stamp = summary[key]
         if isinstance(stamp, float) and stamp > handshake:
@@ -287,7 +299,7 @@ tr:last-child td{border-bottom:0}
 td.mono,.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12.5px}
 .chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;
 font-weight:600;background:var(--chip)}
-.up{color:var(--ok)}.down{color:var(--bad)}.restarting{color:var(--warn)}
+.up{color:var(--ok)}.down{color:var(--bad)}.restarting{color:var(--warn)}.unknown{color:var(--warn)}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;
 margin-right:6px;background:currentColor}
 button{font:inherit;padding:4px 10px;border-radius:8px;border:1px solid var(--line);
@@ -322,7 +334,7 @@ async function refresh(){
  const data=await res.json();
  document.getElementById('version').textContent='code '+data.version;
  document.getElementById('updated').textContent='updated '+new Date().toLocaleTimeString();
- let up=0,down=0,restarting=0;
+ let up=0,down=0,restarting=0,unknown=0;
  rows.textContent='';
  for(const r of data.instances){
   const tr=document.createElement('tr');
@@ -333,11 +345,11 @@ async function refresh(){
   st.className=r.status;
   cell(tr,'td',(r.real_ip||'-')+(r.peer?('  '+r.peer):''),'mono');
   cell(tr,'td',r.udp_bind||'-','mono');
-  cell(tr,'td','up since '+fmtAge(r.handshake_ago)+
+  cell(tr,'td',(r.handshake_ago!==null?('up since '+fmtAge(r.handshake_ago)):'no session')+
     (r.teardown_ago!==null?' · teardown '+fmtAge(r.teardown_ago)+' ago':''),
     'mono');
   cell(tr,'td',String(r.restarts===null?'-':r.restarts));
-  cell(tr,'td','started '+fmtAge(r.started_ago)+' ago','mono');
+  cell(tr,'td',(r.started_ago!==null?('started '+fmtAge(r.started_ago)+' ago'):'-'),'mono');
   const td=document.createElement('td');
   const btn=document.createElement('button');btn.textContent='test';
   const out=document.createElement('div');out.className='result';
@@ -350,10 +362,12 @@ async function refresh(){
    btn.disabled=false};
   td.appendChild(btn);td.appendChild(out);tr.appendChild(td);
   rows.appendChild(tr);
-  if(r.status==='up')up++;else if(r.status==='down')down++;else restarting++;
+  if(r.status==='up')up++;else if(r.status==='down')down++;
+  else if(r.status==='restarting')restarting++;else unknown++;
  }
  document.getElementById('counts').textContent=
-  up+' up · '+down+' down · '+restarting+' restarting';
+  up+' up · '+down+' down · '+restarting+' restarting'+
+  (unknown?(' · '+unknown+' unknown'):'');
  }catch(e){document.getElementById('updated').textContent='error '+e}
 }
 refresh();setInterval(refresh,15000);
@@ -420,6 +434,11 @@ def self_test():
                                    "teardown_at": None}) == "restarting"
     assert classify("inactive", {"restart_at": None, "handshake_at": None,
                                  "teardown_at": None}) == "down"
+    assert classify("active", {"restart_at": None, "handshake_at": None,
+                               "teardown_at": None, "start_at": None}) == "unknown"
+    assert classify("active", {"restart_at": None, "handshake_at": None,
+                               "teardown_at": None,
+                               "start_at": 90.0}) == "down"
     assert load_instances("/nonexistent") == {}
     print("SELFTEST PASS")
     return 0
