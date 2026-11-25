@@ -1,0 +1,69 @@
+name: self-tests
+
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - "script-tools/full/udp_punch/**"
+      - "script-tools/full/sync_update/**"
+      - ".github/workflows/self-tests.yml"
+  pull_request:
+    paths:
+      - "script-tools/full/udp_punch/**"
+      - "script-tools/full/sync_update/**"
+      - ".github/workflows/self-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  udp-punch-and-sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip cryptography
+
+      - name: Compile every Python file of the two tools
+        run: |
+          python - <<'PY'
+          import pathlib
+          import sys
+
+          roots = [
+              pathlib.Path("script-tools/full/udp_punch"),
+              pathlib.Path("script-tools/full/sync_update"),
+          ]
+          failures = 0
+          for root in roots:
+              for path in sorted(root.rglob("*.py")):
+                  if "__pycache__" in path.parts:
+                      continue
+                  try:
+                      compile(path.read_text(encoding="utf-8"), str(path), "exec")
+                  except SyntaxError as exc:
+                      print("FAIL %s: %s" % (path, exc))
+                      failures += 1
+                  else:
+                      print("OK   %s" % path)
+          sys.exit(1 if failures else 0)
+          PY
+
+      - name: Run the offline self-tests
+        run: |
+          cd script-tools/full/udp_punch
+          python punch_dashboard.py --self-test
+          python punch_check.py --self-test
+          python selftest.py
+          cd ../sync_update
+          python sync_linuxchecks.py --self-test
+          python install_sync_linux.py --self-test
