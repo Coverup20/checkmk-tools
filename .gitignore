@@ -64,3 +64,9 @@ script-tools/full/udp_punch/dist/
 # sync tool build artifacts
 script-tools/full/sync_update/build/
 script-tools/full/sync_update/dist/
+
+# Scratch and build output kept in the repository root (never commit)
+/dist/
+/tmp/
+/var/
+/*.tar
