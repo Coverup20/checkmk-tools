@@ -40,7 +40,7 @@ try:
 except ImportError:  # non-POSIX: only numeric uids are accepted
     pwd = None
 
-VERSION = "p14"
+VERSION = "p15"
 
 
 def log(msg):
@@ -61,6 +61,9 @@ def nat_verdict(stun, observed):
     mapping that was renewed between the two observations.
     """
     if not stun or not observed:
+        return None
+    if stun[0] in ("0.0.0.0", "::", ""):
+        # STUN did not give a public mapping: there is nothing to compare.
         return None
     if tuple(stun) == tuple(observed):
         return "cone"
@@ -988,9 +991,8 @@ class PunchPeer:
                 log("PUBLIC endpoint %s:%d (local %s:%d)" % (public[0], public[1], self.local_udp[0], self.local_udp[1]))
                 self.local_endpoint = public
             except Exception as exc:
-                log("STUN failed: %s" % exc)
-                self.write_endpoint(self.local_udp)
-                self.local_endpoint = self.local_udp
+                log("STUN failed: %s (endpoint unknown until the next attempt)" % exc)
+                self.local_endpoint = None
         else:
             self.write_endpoint(self.local_udp)
             self.local_endpoint = self.local_udp
