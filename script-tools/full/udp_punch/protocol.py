@@ -69,13 +69,16 @@ CTRL_STATUS = b"STATUS"
 PEER_INFO_MAGIC = b"IP01"
 PEER_INFO_MAX = 64
 
-# Identity block carried by HELLO and HELLO_ACK (p11):
-#   ID_MAGIC (4) | ephemeral X25519 public key (32) | Ed25519 public key (32)
-#   | Ed25519 signature (64)
+# Identity block carried by HELLO and HELLO_ACK (p13):
+#   ID_MAGIC (4) | PROTO (1) | ephemeral X25519 public key (32)
+#   | Ed25519 public key (32) | Ed25519 signature (64)
+# PROTO is inside the signed transcript, so a peer cannot claim a version it
+# does not speak: the receiver verifies the signature over the bytes it read.
 ID_MAGIC = b"ID01"
+PROTO_VERSION = 13
 ID_PUB_LEN = 32
 SIG_LEN = 64
-HELLO_HEAD = 4 + ID_PUB_LEN + ID_PUB_LEN + SIG_LEN
+HELLO_HEAD = 4 + 1 + ID_PUB_LEN + ID_PUB_LEN + SIG_LEN
 HELLO_TRANSCRIPT = {
     T_HELLO: b"cmk-punch/hello/v1",
     T_HELLO_ACK: b"cmk-punch/hello_ack/v1",
@@ -96,22 +99,24 @@ def identity_public(private_key):
     return private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
 
 
-def _hello_transcript(kind, eph, ident, peer_eph=None, peer_id=None):
-    data = HELLO_TRANSCRIPT[kind] + eph + ident
+def _hello_transcript(kind, ver, eph, ident, peer_eph=None, peer_id=None):
+    data = HELLO_TRANSCRIPT[kind] + bytes([ver]) + eph + ident
     if peer_eph is not None:
         data += peer_eph + peer_id
     return data
 
 
-def sign_hello(private_key, eph, kind, peer_eph=None, peer_id=None):
+def sign_hello(private_key, eph, kind, peer_eph=None, peer_id=None,
+               ver=PROTO_VERSION):
     """Identity block for HELLO (kind T_HELLO) or HELLO_ACK."""
     ident = identity_public(private_key)
-    sig = private_key.sign(_hello_transcript(kind, eph, ident, peer_eph, peer_id))
-    return ID_MAGIC + eph + ident + sig
+    sig = private_key.sign(_hello_transcript(kind, ver, eph, ident,
+                                             peer_eph, peer_id))
+    return ID_MAGIC + bytes([ver]) + eph + ident + sig
 
 
 def verify_hello(payload, kind, trusted_public, own_eph, own_id):
-    """Return (ephemeral, identity) when the block is signed by the pinned key.
+    """Return (version, ephemeral, identity) for a block signed by the pinned key.
 
     HELLO is signed over the sender's own values; HELLO_ACK also covers the
     values carried by the HELLO it answers, so a recorded ACK cannot be
@@ -121,20 +126,21 @@ def verify_hello(payload, kind, trusted_public, own_eph, own_id):
         raise ValueError("hello payload too short")
     if payload[:4] != ID_MAGIC:
         raise ValueError("bad hello identity magic")
-    eph = payload[4:4 + ID_PUB_LEN]
-    ident = payload[4 + ID_PUB_LEN:4 + 2 * ID_PUB_LEN]
-    sig = payload[4 + 2 * ID_PUB_LEN:HELLO_HEAD]
+    ver = payload[4]
+    eph = payload[5:5 + ID_PUB_LEN]
+    ident = payload[5 + ID_PUB_LEN:5 + 2 * ID_PUB_LEN]
+    sig = payload[5 + 2 * ID_PUB_LEN:HELLO_HEAD]
     if ident != trusted_public:
         raise ValueError("unexpected identity key")
     if kind == T_HELLO:
-        data = _hello_transcript(kind, eph, ident)
+        data = _hello_transcript(kind, ver, eph, ident)
     else:
-        data = _hello_transcript(kind, eph, ident, own_eph, own_id)
+        data = _hello_transcript(kind, ver, eph, ident, own_eph, own_id)
     try:
         Ed25519PublicKey.from_public_bytes(ident).verify(sig, data)
     except Exception:
         raise ValueError("bad identity signature")
-    return eph, ident
+    return ver, eph, ident
 
 
 def derive_key(psk: bytes, label: str) -> bytes:

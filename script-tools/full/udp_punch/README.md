@@ -22,11 +22,11 @@ Both peers punch towards the public endpoint of the other; keepalives every
 - AEAD ChaCha20-Poly1305 with a 32-byte PSK; 4096-entry replay window.
 - Types: CTRL (PUNCH/PUNCH_ACK/KEEPALIVE/STATUS), OPEN, OPEN_ACK, OPEN_FAIL,
   DATA, ACK, FIN, FIN_ACK, RESET. HELLO and HELLO_ACK carry an identity block
-  (magic ID01, ephemeral X25519 key, Ed25519 public key, signature) and may
-  carry a trailer with the sender's own address on the path to the peer (an
-  IP01 trailer after the identity block); the receiver logs it as "peer real
-  address" and writes it to peer_real_ip.txt in the state directory. The
-  advertise_ip configuration key overrides the detected address.
+  (magic ID01, protocol byte, ephemeral X25519 key, Ed25519 public key,
+  signature) and may carry a trailer with the sender's own address on the path
+  to the peer (an IP01 trailer after the identity block); the receiver logs it
+  as "peer real address" and writes it to peer_real_ip.txt in the state
+  directory. The advertise_ip configuration key overrides the detected address.
 - Streams multiplexed on one UDP socket; per direction a Go-Back-N window
   (default 32 packets), cumulative ACKs, retransmission and a reliable FIN
   (maximum payload 1150 bytes).
@@ -270,11 +270,17 @@ planned as a later protocol step.
 
 Each side owns an Ed25519 identity: identity.key holds its 32-byte seed (mode
 600) and the other side pins its public key in trusted_identity, one identity
-per pair. HELLO carries the sender's ephemeral X25519 key, its public identity
-and a signature over both; HELLO_ACK signs its own values together with the
-ones it answers, so a recorded ACK cannot be replayed into another handshake.
-Session keys are HKDF over the X25519 shared secret mixed with the pair PSK,
-with both identities in the salt.
+per pair. HELLO carries a protocol byte, the sender's ephemeral X25519 key, its
+public identity and a signature over all three; HELLO_ACK signs its own values
+together with the ones it answers, so a recorded ACK cannot be replayed into
+another handshake. Session keys are HKDF over the X25519 shared secret mixed
+with the pair PSK, with both identities in the salt.
+
+The protocol byte is inside the signed transcript, so a peer cannot claim a
+version it does not speak. The receiver logs "peer speaks protocol N" when it
+differs from its own, which makes a peer left behind by an upgrade visible at
+the first handshake instead of as a silent failure. A layout change still
+requires both sides to be updated together.
 
 A peer that presents the right PSK but an identity that is not pinned is
 rejected before any stream is opened, so a leaked key alone is no longer
@@ -478,8 +484,10 @@ choice is not lost.
   shows as the peer view; a peer with an older build sends nothing and the
   column stays empty.
 
-- Protocol version in HELLO (open). A peer running an older build, or a locally
-  patched one, is not visible in the status output.
+- Protocol version in HELLO (mitigated). The signed identity block carries the
+  protocol byte, the receiver logs a mismatch at handshake and the peer status
+  reports it; the layout still changes when the protocol does, so both sides
+  are updated together.
 
 - Python 3.6 compatibility (open). The source targets modern Python; a host
   with 3.6 needs a local patch to the future import at every update.

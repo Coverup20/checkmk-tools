@@ -28,19 +28,19 @@ import threading
 import time
 
 from protocol import (CTRL_KEEPALIVE, CTRL_PUNCH, CTRL_PUNCH_ACK, CTRL_STATUS,
-                      HELLO_EXTRA, MAX_PAYLOAD, PAD_SIZE, PUB_LEN, T_ACK,
-                      T_CTRL, T_DATA, T_FIN, T_FIN_ACK, T_HELLO, T_HELLO_ACK,
-                      T_OPEN, T_OPEN_ACK, T_OPEN_FAIL, T_RESET, Crypto,
-                      decode_peer_info, encode_peer_info, identity_public,
-                      load_identity, new_ephemeral, session_keys, sign_hello,
-                      verify_hello)
+                      HELLO_EXTRA, MAX_PAYLOAD, PAD_SIZE, PROTO_VERSION, PUB_LEN,
+                      T_ACK, T_CTRL, T_DATA, T_FIN, T_FIN_ACK, T_HELLO,
+                      T_HELLO_ACK, T_OPEN, T_OPEN_ACK, T_OPEN_FAIL, T_RESET,
+                      Crypto, decode_peer_info, encode_peer_info,
+                      identity_public, load_identity, new_ephemeral,
+                      session_keys, sign_hello, verify_hello)
 
 try:
     import pwd
 except ImportError:  # non-POSIX: only numeric uids are accepted
     pwd = None
 
-VERSION = "p12"
+VERSION = "p13"
 
 
 def log(msg):
@@ -301,6 +301,7 @@ class PunchPeer:
         self.started_at = time.time()
         self.session_since = None
         self.peer_status = None
+        self.peer_version = None
         self.last_peer_mtime = 0.0
         self.streams = {}
         self.next_sid = struct.unpack("!I", os.urandom(4))[0] or 1
@@ -386,6 +387,7 @@ class PunchPeer:
     def send_status(self):
         data = {
             "v": VERSION,
+            "proto": self.peer_version,
             "role": self.role,
             "session": self.crypto is not None,
             "streams": len(self.streams),
@@ -687,11 +689,16 @@ class PunchPeer:
 
     def handle_hello(self, mtype, payload, addr):
         try:
-            peer_pub, peer_id = verify_hello(payload, mtype, self.trusted_id,
-                                             self.eph_pub, self.id_pub)
+            peer_ver, peer_pub, peer_id = verify_hello(payload, mtype,
+                                                        self.trusted_id,
+                                                        self.eph_pub, self.id_pub)
         except ValueError as exc:
             log("handshake rejected from %s:%d: %s" % (addr[0], addr[1], exc))
             return
+        self.peer_version = peer_ver
+        if peer_ver != PROTO_VERSION:
+            log("peer speaks protocol %d, this build is %d" % (peer_ver,
+                                                               PROTO_VERSION))
         self.last_peer_rx = time.time()
         self.peer_eph_pub, self.peer_id_pub = peer_pub, peer_id
         if self.peer is None:
