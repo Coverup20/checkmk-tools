@@ -40,7 +40,7 @@ try:
 except ImportError:  # non-POSIX: only numeric uids are accepted
     pwd = None
 
-VERSION = "p17"
+VERSION = "p18"
 
 
 def log(msg):
@@ -50,6 +50,34 @@ def log(msg):
 def parse_endpoint(text):
     host, port = text.rsplit(":", 1)
     return host, int(port)
+
+
+def check_reachable(host, port=0, timeout=2.0):
+    """True when the host answers ICMP or TCP, False when neither answers.
+
+    None means no check could run (no ping and no port to try). A blocked
+    ICMP is expected on some appliances, so a failed ping falls through to
+    the TCP connection when a port is known.
+    """
+    tried = False
+    try:
+        result = subprocess.run(
+            ["ping", "-c", "1", "-W", str(max(1, int(timeout))), host],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=timeout + 1)
+        tried = True
+        if result.returncode == 0:
+            return True
+    except (OSError, subprocess.SubprocessError):
+        pass
+    if port:
+        tried = True
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except OSError:
+            pass
+    return False if tried else None
 
 
 def nat_verdict(stun, observed):
@@ -323,6 +351,13 @@ class PunchPeer:
         self.peer_status = None
         self.peer_version = None
         self.nat_verdict = None
+        target = cfg.get("target") or ""
+        self.liveness_target = cfg.get("liveness_target") or (
+            target.rsplit(":", 1)[0] if target else None)
+        self.liveness_port = int(target.rsplit(":", 1)[1]) if target else 0
+        self.liveness_s = float(cfg.get("liveness_interval_s", 60))
+        self.last_liveness = 0.0
+        self.target_alive = None
         self.last_peer_mtime = 0.0
         self.streams = {}
         self.next_sid = struct.unpack("!I", os.urandom(4))[0] or 1
@@ -405,6 +440,19 @@ class PunchPeer:
     def send_ctrl(self, payload):
         self.send(T_CTRL, payload=payload)
 
+    def check_liveness(self):
+        """Independent reachability test of the target, run outside the loop."""
+        alive = check_reachable(self.liveness_target, self.liveness_port, 2.0)
+        if alive != self.target_alive:
+            if alive is True:
+                state = "reachable"
+            elif alive is False:
+                state = "unreachable"
+            else:
+                state = "unknown"
+            log("target %s is %s" % (self.liveness_target, state))
+            self.target_alive = alive
+
     def send_status(self):
         def fmt(addr):
             return "%s:%d" % addr if addr else None
@@ -422,6 +470,7 @@ class PunchPeer:
             "nat": self.nat_verdict,
             "target": self.cfg.get("target"),
             "managed_host_ip": self.cfg.get("managed_host_ip"),
+            "target_alive": self.target_alive,
         }
         self.send_ctrl(CTRL_STATUS + json.dumps(data, sort_keys=True).encode("utf-8"))
 
@@ -890,6 +939,9 @@ class PunchPeer:
                 and now - self.last_status >= self.status_s):
             self.send_status()
             self.last_status = now
+        if (self.liveness_target and now - self.last_liveness >= self.liveness_s):
+            self.last_liveness = now
+            threading.Thread(target=self.check_liveness, daemon=True).start()
         for st in list(self.streams.values()):
             with st.cond:
                 if st.closed:
