@@ -416,6 +416,17 @@ def peer_status_check(tmp, psk_path, echo_addr):
     print("peer status: OK (host view received, unknown CTRL ignored)")
 
 
+def nat_checks():
+    from punch_peer import nat_verdict
+    assert nat_verdict(None, ("203.0.113.5", 6015)) is None
+    assert nat_verdict(("203.0.113.5", 6015), None) is None
+    assert nat_verdict(("203.0.113.5", 6015), ("203.0.113.5", 6015)) == "cone"
+    assert nat_verdict(("203.0.113.5", 6015), ("203.0.113.5", 6016)) == "symmetric"
+    assert (nat_verdict(("203.0.113.5", 6015), ("198.51.100.7", 6015))
+            == "mapping-changed")
+    print("nat verdict: OK (cone / symmetric / mapping-changed)")
+
+
 def gate_requirement_check(tmp, psk_path, echo_addr):
     cfg = make_cfg(tmp, psk_path, "server", os.path.join(tmp, "server-nogate.json"),
                    free_port(), echo_addr, {"allowed_uids": []})
@@ -567,6 +578,7 @@ def main():
     peer_info_checks()
     identity_checks(tmp)
     handshake_checks(psk, tmp)
+    nat_checks()
     if not hasattr(os, "getuid"):
         raise SystemExit("this self-test needs /proc and getuid (POSIX only)")
     uid_lookup_check()

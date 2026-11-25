@@ -40,7 +40,7 @@ try:
 except ImportError:  # non-POSIX: only numeric uids are accepted
     pwd = None
 
-VERSION = "p13"
+VERSION = "p14"
 
 
 def log(msg):
@@ -50,6 +50,23 @@ def log(msg):
 def parse_endpoint(text):
     host, port = text.rsplit(":", 1)
     return host, int(port)
+
+
+def nat_verdict(stun, observed):
+    """Compare our STUN mapping with the address the peer observes for us.
+
+    cone: the same address both ways. symmetric: same IP but a different port,
+    so the NAT maps per destination and hole punching will not work.
+    mapping-changed: the IP itself differs, which means several paths or a
+    mapping that was renewed between the two observations.
+    """
+    if not stun or not observed:
+        return None
+    if tuple(stun) == tuple(observed):
+        return "cone"
+    if stun[0] == observed[0]:
+        return "symmetric"
+    return "mapping-changed"
 
 
 def local_address(peer):
@@ -302,6 +319,7 @@ class PunchPeer:
         self.session_since = None
         self.peer_status = None
         self.peer_version = None
+        self.nat_verdict = None
         self.last_peer_mtime = 0.0
         self.streams = {}
         self.next_sid = struct.unpack("!I", os.urandom(4))[0] or 1
@@ -385,6 +403,8 @@ class PunchPeer:
         self.send(T_CTRL, payload=payload)
 
     def send_status(self):
+        def fmt(addr):
+            return "%s:%d" % addr if addr else None
         data = {
             "v": VERSION,
             "proto": self.peer_version,
@@ -394,6 +414,9 @@ class PunchPeer:
             "uptime_s": int(time.time() - self.started_at),
             "session_age_s": (int(time.time() - self.session_since)
                               if self.session_since else None),
+            "stun_endpoint": fmt(self.local_endpoint),
+            "observed_peer": fmt(self.peer),
+            "nat": self.nat_verdict,
         }
         self.send_ctrl(CTRL_STATUS + json.dumps(data, sort_keys=True).encode("utf-8"))
 
@@ -405,6 +428,18 @@ class PunchPeer:
         if not isinstance(data, dict):
             return
         data["received_wall"] = int(time.time())
+        observed = None
+        raw_observed = data.get("observed_peer")
+        if isinstance(raw_observed, str) and ":" in raw_observed:
+            try:
+                observed = parse_endpoint(raw_observed)
+            except ValueError:
+                observed = None
+        verdict = nat_verdict(self.local_endpoint, observed)
+        if verdict != self.nat_verdict:
+            log("local NAT mapping: %s (stun %s, peer sees %s)"
+                % (verdict or "unknown", self.local_endpoint, observed))
+            self.nat_verdict = verdict
         self.peer_status = data
         try:
             os.makedirs(self.state_dir, exist_ok=True)
