@@ -73,6 +73,8 @@ param(
     [string]$Peer = "",
     [string]$Target = "127.0.0.1:6556",
     [string]$PskFile = "",
+    [string]$TrustedIdentity = "",
+    [string]$IdentityFile = "",
     [string]$InstallDir = "C:\ProgramData\cmk-punch",
     [string]$AdvertiseIp = "",
     [string]$ExeDir = "",
@@ -85,7 +87,7 @@ param(
     [switch]$Purge
 )
 
-$ScriptVersion = "1.1.0"
+$ScriptVersion = "1.2.0"
 $ErrorActionPreference = "Stop"
 $TaskName = "cmk-punch-host"
 $FirewallName = "cmk-punch host UDP"
@@ -97,6 +99,7 @@ $LogDir = Join-Path $InstallDir "logs"
 $ConfigPath = Join-Path $EtcDir "host.json"
 $PeerFilePath = Join-Path $EtcDir "peer.json"
 $PskPath = Join-Path $EtcDir "psk"
+$IdentityPath = if ($IdentityFile) { $IdentityFile } else { Join-Path $EtcDir "identity.key" }
 $RunCmd = Join-Path $InstallDir "run.cmd"
 $LogPath = Join-Path $LogDir "peer.log"
 
@@ -105,8 +108,32 @@ function Fail($Message) {
     exit 1
 }
 
+function Get-Sha256([string]$Path) {
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = [IO.File]::OpenRead($Path)
+        try { $bytes = $sha.ComputeHash($stream) } finally { $stream.Dispose() }
+    } finally { $sha.Dispose() }
+    return (($bytes | ForEach-Object { $_.ToString("x2") }) -join "")
+}
+
 function Info($Message) {
     Write-Host "[INFO] $Message"
+}
+
+function Get-IdentityPublicKey([string]$Path) {
+    $out = $null
+    if ($script:exePath) {
+        $exe = Join-Path $script:PeerDir "cmk-punch.exe"
+        $out = & $exe --identity-pubkey --identity-file $Path 2>&1
+    } else {
+        $py = Get-Command python -ErrorAction SilentlyContinue
+        if (-not $py) { Fail "python is needed to print the identity public key" }
+        $out = & $py.Source (Join-Path $script:PeerDir "punch_peer.py") --identity-pubkey --identity-file $Path 2>&1
+    }
+    $hex = @($out) | Where-Object { "$_" -match "^[0-9a-fA-F]{64}$" } | Select-Object -Last 1
+    if (-not $hex) { Fail "cannot read the identity public key: $out" }
+    return "$hex"
 }
 
 function Require-Admin {
@@ -302,14 +329,36 @@ if (Test-Path $PskPath) {
     [IO.File]::WriteAllText($PskPath, (New-Psk) + "`n", (New-Object System.Text.ASCIIEncoding))
     Info "generated a new PSK"
 }
-$hash = (Get-FileHash -Path $PskPath -Algorithm SHA256).Hash.ToLower()
+$hash = Get-Sha256 $PskPath
 if (-not $Staging) {
     Protect-File $PskPath
 }
 
+if (-not (Test-Path $IdentityPath)) {
+    $parent = Split-Path $IdentityPath -Parent
+    if ($parent) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+    [IO.File]::WriteAllText($IdentityPath, (New-Psk) + "`n", (New-Object System.Text.ASCIIEncoding))
+    Info "generated identity $IdentityPath"
+}
+if (-not $Staging) {
+    Protect-File $IdentityPath
+}
+if (-not $TrustedIdentity) {
+    $identityPub = Get-IdentityPublicKey $IdentityPath
+    Info "this side's identity public key: $identityPub"
+    Fail "-TrustedIdentity is required: the 64-hex public key of the server side"
+}
+if ($TrustedIdentity -notmatch "^[0-9a-fA-F]{64}$") {
+    Fail "-TrustedIdentity must be 64 hex characters"
+}
+$identityPub = Get-IdentityPublicKey $IdentityPath
+Info "identity public key: $identityPub (pin it on the server side)"
+
 $config = [ordered]@{
     role = "host"
     psk_file = $PskPath
+    identity_key = $IdentityPath
+    trusted_identity = $TrustedIdentity.ToLower()
     udp_bind = $UdpBind
     peer_file = $PeerFilePath
     state_dir = $StateDir
@@ -385,9 +434,12 @@ Write-Host "  install dir: $InstallDir"
 Write-Host "  config:      $ConfigPath"
 Write-Host "  psk:         $PskPath (restricted ACL)"
 Write-Host "  psk sha256:  $hash"
+Write-Host "  identity:    $IdentityPath (restricted ACL)"
+Write-Host "  public key:  $identityPub"
 Write-Host "  target:      $Target"
 Write-Host "  log:         $LogPath"
 Write-Host ""
 Write-Host "  Copy the psk file to the other peer and install it there so both share the same key."
+Write-Host "  Pin this side's public key on the server side as trusted_identity."
 Write-Host "  Check the peer with: Get-ScheduledTaskInfo -TaskName $TaskName"
 Write-Host "  Log tail: Get-Content '$LogPath' -Tail 20"

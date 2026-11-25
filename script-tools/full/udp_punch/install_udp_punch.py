@@ -10,6 +10,7 @@ Usage:
     install_udp_punch.py install --role host --stun-server HOST:PORT [--target-command CMD]
     install_udp_punch.py rotate-psk --role server [--instance NAME] [--psk-file PATH|-]
     install_udp_punch.py rotate-psk --role host [--instance NAME] [--psk-file PATH|-]
+    install_udp_punch.py pubkey [--identity PATH]
     install_udp_punch.py uninstall --role server|host [--purge]
     install_udp_punch.py status --role server|host
 
@@ -27,7 +28,7 @@ A --root directory installs everything under that directory instead of /,
 skips systemctl and skips the user lookup, so an installation can be
 rehearsed without touching the running system.
 
-Version: 1.3.0"""
+Version: 1.4.0"""
 
 import argparse
 import hashlib
@@ -45,7 +46,7 @@ try:
 except ImportError:  # Windows: only a staged run is possible there
     pwd = None
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 HERE = Path(__file__).resolve().parent
 CODE_DIR = "/opt/cmk-punch"
@@ -179,6 +180,7 @@ def paths(root, role):
         "agent": resolve(root, AGENT_DIR),
         "config": conf / CONFIG_NAME[role],
         "psk": conf / "psk",
+        "identity": conf / "identity.key",
         "peer": conf / "peer.json",
         "unit": resolve(root, UNITS_DIR) / UNIT_NAME[role],
     }
@@ -296,6 +298,9 @@ def install_psk(args, p):
 
 def build_config(role, args, p):
     cfg = {"role": role, "psk_file": str(p["psk"]), "udp_bind": args.udp_bind}
+    if getattr(args, "identity_path", None):
+        cfg["identity_key"] = args.identity_path
+        cfg["trusted_identity"] = args.trusted_identity.lower()
     if args.stun_server:
         cfg["stun_server"] = args.stun_server
     cfg["peer_file"] = str(p["peer"])
@@ -461,6 +466,17 @@ def install(args):
     if args.role == "server":
         check_server_users(args)
     p = paths(args.root, args.role)
+    id_path = identity_path_for(args.root, getattr(args, "identity_key", ""))
+    p["identity"] = id_path
+    pub = load_or_create_identity(id_path)
+    args.identity_path = str(id_path)
+    args.trusted_identity = (getattr(args, "trusted_identity", "") or "").strip()
+    if (len(args.trusted_identity) != 64
+            or any(c not in "0123456789abcdefABCDEF" for c in args.trusted_identity)):
+        fail("--trusted-identity is required: it is the 64-hex public key of the "
+             "other side (print it there with: install_udp_punch.py pubkey)")
+    log("identity public key: %s" % pub)
+    log("pin this value on the other side as --trusted-identity")
     if p["config"].exists() and not args.force:
         fail("%s exists, use --force to replace it (a backup is kept)"
              % p["config"])
@@ -529,7 +545,7 @@ def status(role, args):
     if not is_staged(args):
         state = run_optional(["systemctl", "is-active", UNIT_NAME[role]]).stdout.strip()
         print("unit:  %s (%s)" % (UNIT_NAME[role], state or "not installed"))
-    for key in ("code", "config", "psk", "peer", "unit"):
+    for key in ("code", "config", "psk", "identity", "peer", "unit"):
         path = p[key]
         if path.exists():
             mode = path.stat().st_mode & 0o777
@@ -573,6 +589,35 @@ def write_private(path, text):
         fh.write(text + "\n")
     os.chmod(tmp, 0o600)
     os.replace(str(tmp), str(path))
+
+
+def identity_path_for(root, given=None):
+    if given:
+        return Path(given) if root == "/" else resolve(root, given)
+    return resolve(root, CONF_DIR) / "identity.key"
+
+
+def public_key_hex(path):
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+    text = path.read_text(encoding="ascii").strip()
+    try:
+        seed = bytes.fromhex(text)
+    except ValueError:
+        fail("%s does not contain a hex seed" % path)
+    if len(seed) != 32:
+        fail("%s must contain a 32-byte seed" % path)
+    key = Ed25519PrivateKey.from_private_bytes(seed)
+    return key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw).hex()
+
+
+def load_or_create_identity(path):
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_private(path, os.urandom(32).hex())
+        # stderr: `pubkey --generate` must leave stdout with the key only.
+        print("[INFO] generated identity %s" % path, file=sys.stderr)
+    return public_key_hex(path)
 
 
 def rotate_psk(args):
@@ -631,6 +676,16 @@ def rotate_psk(args):
     return 0
 
 
+def print_pubkey(args):
+    path = identity_path_for(args.root, getattr(args, "identity", ""))
+    if not path.exists():
+        if not getattr(args, "generate", False):
+            fail("identity not found: %s (use --generate to create it)" % path)
+        load_or_create_identity(path)
+    print(public_key_hex(path))
+    return 0
+
+
 def build_parser():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--root", default="/",
@@ -649,6 +704,8 @@ def build_parser():
     inst.add_argument("--udp-bind", default=None, metavar="HOST:PORT")
     inst.add_argument("--peer", default="", metavar="HOST:PORT")
     inst.add_argument("--psk-file", default="", metavar="PATH")
+    inst.add_argument("--identity-key", default="", metavar="PATH")
+    inst.add_argument("--trusted-identity", default="", metavar="HEX")
     inst.add_argument("--force", action="store_true")
     inst.add_argument("--no-start", action="store_true")
     inst.add_argument("--keepalive", type=float, default=15.0)
@@ -685,6 +742,11 @@ def build_parser():
                      help="read the new key from a file, or from stdin with -")
     rot.add_argument("--dry-run", action="store_true")
     rot.add_argument("--no-restart", action="store_true")
+
+    pk = sub.add_parser("pubkey", parents=[common],
+                        help="print the identity public key")
+    pk.add_argument("--identity", default="", metavar="PATH")
+    pk.add_argument("--generate", action="store_true")
     return parser
 
 
@@ -699,6 +761,8 @@ def main(argv):
         uninstall(args.role, args)
     elif args.command == "rotate-psk":
         return rotate_psk(args)
+    elif args.command == "pubkey":
+        return print_pubkey(args)
     else:
         status(args.role, args)
     return 0

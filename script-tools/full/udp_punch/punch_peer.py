@@ -31,15 +31,16 @@ from protocol import (CTRL_KEEPALIVE, CTRL_PUNCH, CTRL_PUNCH_ACK, HELLO_EXTRA,
                       MAX_PAYLOAD, PAD_SIZE, PUB_LEN, T_ACK, T_CTRL, T_DATA,
                       T_FIN, T_FIN_ACK, T_HELLO, T_HELLO_ACK, T_OPEN,
                       T_OPEN_ACK, T_OPEN_FAIL, T_RESET, Crypto,
-                      decode_peer_info, encode_peer_info, new_ephemeral,
-                      session_keys)
+                      decode_peer_info, encode_peer_info, identity_public,
+                      load_identity, new_ephemeral, session_keys, sign_hello,
+                      verify_hello)
 
 try:
     import pwd
 except ImportError:  # non-POSIX: only numeric uids are accepted
     pwd = None
 
-VERSION = "p9"
+VERSION = "p11"
 
 
 def log(msg):
@@ -249,6 +250,17 @@ class PunchPeer:
         self.state_dir = cfg.get("state_dir", "/var/lib/cmk-punch")
         psk = load_psk(cfg["psk_file"])
         self.psk = psk
+        self.id_key = load_identity(cfg["identity_key"])
+        self.id_pub = identity_public(self.id_key)
+        try:
+            trusted = bytes.fromhex(cfg.get("trusted_identity", ""))
+        except ValueError:
+            trusted = b""
+        if len(trusted) != 32:
+            raise ValueError("trusted_identity must be a 32-byte Ed25519 public key in hex")
+        self.trusted_id = trusted
+        self.peer_eph_pub = None
+        self.peer_id_pub = None
         self.eph, self.eph_pub = new_ephemeral()
         self.pad = bool(cfg.get("pad_frames", True))
         self.boot = Crypto(psk, send_dir="boot", recv_dir="boot", pad=self.pad)
@@ -621,10 +633,10 @@ class PunchPeer:
         return (self.cfg.get("advertise_ip")
                 or local_address(peer) or self.local_udp[0])
 
-    def hello_payload(self, peer=None):
+    def hello_payload(self, peer=None, kind=T_HELLO, peer_eph=None, peer_id=None):
         address = self.own_address(peer or self.peer)
-        return (self.eph_pub + encode_peer_info(address)
-                + os.urandom(HELLO_EXTRA))
+        block = sign_hello(self.id_key, self.eph_pub, kind, peer_eph, peer_id)
+        return block + encode_peer_info(address) + os.urandom(HELLO_EXTRA)
 
     def write_peer_real_ip(self, address):
         try:
@@ -636,17 +648,22 @@ class PunchPeer:
             log("cannot write peer_real_ip.txt: %s" % exc)
 
     def handle_hello(self, mtype, payload, addr):
-        if len(payload) < PUB_LEN:
+        try:
+            peer_pub, peer_id = verify_hello(payload, mtype, self.trusted_id,
+                                             self.eph_pub, self.id_pub)
+        except ValueError as exc:
+            log("handshake rejected from %s:%d: %s" % (addr[0], addr[1], exc))
             return
-        peer_pub = payload[:PUB_LEN]
         self.last_peer_rx = time.time()
+        self.peer_eph_pub, self.peer_id_pub = peer_pub, peer_id
         if self.peer is None:
             log("peer endpoint learned from handshake: %s:%d" % addr)
         elif addr != self.peer:
             log("peer endpoint changed: %s:%d -> %s:%d" % (self.peer + addr))
         self.peer = addr
         self.punched = True
-        keys = session_keys(self.psk, self.eph, self.eph_pub, peer_pub)
+        keys = session_keys(self.psk, self.eph, self.eph_pub, peer_pub,
+                            self.id_pub, peer_id)
         send_dir, recv_dir = ("s2c", "c2s") if self.role == "server" else ("c2s", "s2c")
         self.crypto = Crypto.from_keys(keys[send_dir], keys[recv_dir],
                                        pad=self.pad)
@@ -660,7 +677,8 @@ class PunchPeer:
             self.write_peer_real_ip(info)
             log("peer real address %s" % info)
         if mtype == T_HELLO:
-            self.send(T_HELLO_ACK, payload=self.hello_payload(addr))
+            self.send(T_HELLO_ACK,
+                      payload=self.hello_payload(addr, T_HELLO_ACK, peer_pub, peer_id))
 
     def handle_frame(self, frame, addr):
         if not self.rate_ok(addr):
@@ -926,14 +944,41 @@ class PunchPeer:
 
 def main():
     parser = argparse.ArgumentParser(description="UDP punch tunnel peer")
-    parser.add_argument("--config", required=True)
+    parser.add_argument("--config")
     parser.add_argument("--no-stun", action="store_true")
+    parser.add_argument("--identity-pubkey", action="store_true",
+                        help="print the identity public key and exit")
+    parser.add_argument("--identity-file", default="")
+    parser.add_argument("--create-identity", action="store_true")
     args = parser.parse_args()
+    if args.identity_pubkey:
+        path = args.identity_file or "/etc/cmk-punch/identity.key"
+        if not os.path.exists(path):
+            if not args.create_identity:
+                log("identity not found: %s" % path)
+                return 1
+            parent = os.path.dirname(path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            with open(path, "w", encoding="ascii", newline="\n") as fh:
+                fh.write(os.urandom(32).hex() + "\n")
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass
+        print(identity_public(load_identity(path)).hex())
+        return 0
+    if not args.config:
+        parser.error("--config is required")
     with open(args.config, "r", encoding="utf-8") as fh:
         cfg = json.load(fh)
     if args.no_stun:
         cfg["use_stun"] = False
-    peer = PunchPeer(cfg)
+    try:
+        peer = PunchPeer(cfg)
+    except (ValueError, OSError) as exc:
+        log("configuration error: %s" % exc)
+        sys.exit(1)
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, peer.shutdown)
     sys.exit(peer.run() or 0)
