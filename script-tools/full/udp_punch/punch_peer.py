@@ -40,7 +40,7 @@ try:
 except ImportError:  # non-POSIX: only numeric uids are accepted
     pwd = None
 
-VERSION = "p15"
+VERSION = "p17"
 
 
 def log(msg):
@@ -420,6 +420,8 @@ class PunchPeer:
             "stun_endpoint": fmt(self.local_endpoint),
             "observed_peer": fmt(self.peer),
             "nat": self.nat_verdict,
+            "target": self.cfg.get("target"),
+            "managed_host_ip": self.cfg.get("managed_host_ip"),
         }
         self.send_ctrl(CTRL_STATUS + json.dumps(data, sort_keys=True).encode("utf-8"))
 

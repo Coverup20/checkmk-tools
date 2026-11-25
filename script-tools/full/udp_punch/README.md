@@ -345,6 +345,31 @@ The tunnel does not fix a symmetric NAT. When the verdict is symmetric the
 pair needs a port forward, a relay, or a network that maps ports consistently.
 Without a STUN server the verdict stays empty.
 
+## Host addresses from the tunnel
+
+Each tunnel knows an address for the host it serves: the target the peer
+forwards to, or the peer's own address. sync_punch_hosts.py writes that
+address into the CheckMK host configuration (ipaddress) and removes the
+real_ip label that used to carry it. A mapping file lists which instance
+belongs to which host; an entry marked manual takes the address from the
+real_ip label set by hand at install time and removes the label after the
+copy. That is how an appliance behind a proxy peer - a firewall whose agent
+is reached through another machine - gets the address its operator chose.
+
+The hosts need a host check that does not use ICMP, because the monitoring
+server cannot reach their private addresses: a host_check_commands rule with
+value ok covers them.
+
+```sh
+sync_punch_hosts.py --mapping /etc/cmk-punch/hosts.json --dry-run
+sync_punch_hosts.py --mapping /etc/cmk-punch/hosts.json
+```
+
+Run it from a timer. It talks to the local REST API with an automation user
+and the secret from the site's automation.secret file, and it activates the
+changes with cmk -O only when something moved. CMK_API_USER and CMK_SITE set
+the user and the site when the defaults do not fit.
+
 ## Windows host
 
 The host role also runs on Windows, where it forwards each stream to a local
