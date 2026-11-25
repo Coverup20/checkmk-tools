@@ -594,7 +594,12 @@ def main():
     unix_socket_checks(tmp, psk_path, echo_addr)
     watchdog_recovery_check(tmp, psk_path, echo_addr)
     print("SELFTEST PASS")
-    return 0
+    sys.stdout.flush()
+    sys.stderr.flush()
+    # Daemon peer threads may still hold the stderr buffer at interpreter
+    # shutdown, which aborts the process after a passing run (seen on 3.12 in
+    # CI: Fatal Python error, exit 134). Skip finalization on success.
+    os._exit(0)
 
 
 if __name__ == "__main__":
