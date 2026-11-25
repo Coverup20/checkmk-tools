@@ -294,6 +294,23 @@ the configuration and refuses to install without a trusted identity. pubkey
 with --generate prints the key before the first install, when the peer's key
 must be exchanged.
 
+## Another instance on the same host
+
+A host can run more than one server instance, one per pair. new-instance
+writes the whole instance from a template: a dedicated PSK, an identity, the
+configuration, the unit and the firewall rule. The peer's public key is
+required, and the instance prints its own so the peer can pin it.
+
+```sh
+install_udp_punch.py new-instance --name box2 --udp-port 6040 \
+    --trusted-identity <peer public key>
+```
+
+Each instance needs its own UDP port and its own key file: two instances
+sharing a PSK file is a bug, because rotating one silently changes the key of
+the other. --dry-run shows the plan; --force replaces an existing
+configuration after a backup.
+
 ## Windows host
 
 The host role also runs on Windows, where it forwards each stream to a local
@@ -437,10 +454,10 @@ choice is not lost.
   transfer and the poller cadence remain observable. Cover traffic at a
   constant rate is not implemented.
 
-- Server instance generator (open). The installer writes the config, the unit
-  and the state directory for one server instance per host, with fixed unit
-  names. A second server instance on the same host, its firewall rule and its
-  own socket and state paths are created by hand.
+- Server instance generator (mitigated). new-instance writes a whole server
+  instance from a template, with a dedicated PSK and identity, the unit and
+  the firewall rule; it still needs a free UDP port and the peer's public key
+  chosen by hand.
 
 - Peer-side status (open). The peer writes its public endpoint and the peer
   real address to its state directory, but not whether the session is alive;

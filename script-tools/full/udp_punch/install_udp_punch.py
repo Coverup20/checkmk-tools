@@ -11,6 +11,7 @@ Usage:
     install_udp_punch.py rotate-psk --role server [--instance NAME] [--psk-file PATH|-]
     install_udp_punch.py rotate-psk --role host [--instance NAME] [--psk-file PATH|-]
     install_udp_punch.py pubkey [--identity PATH]
+    install_udp_punch.py new-instance --name NAME --udp-port PORT --trusted-identity HEX [...]
     install_udp_punch.py uninstall --role server|host [--purge]
     install_udp_punch.py status --role server|host
 
@@ -28,7 +29,7 @@ A --root directory installs everything under that directory instead of /,
 skips systemctl and skips the user lookup, so an installation can be
 rehearsed without touching the running system.
 
-Version: 1.4.0"""
+Version: 1.5.0"""
 
 import argparse
 import hashlib
@@ -46,7 +47,7 @@ try:
 except ImportError:  # Windows: only a staged run is possible there
     pwd = None
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 
 HERE = Path(__file__).resolve().parent
 CODE_DIR = "/opt/cmk-punch"
@@ -686,6 +687,122 @@ def print_pubkey(args):
     return 0
 
 
+def new_instance(args):
+    if not is_staged(args) and getattr(os, "geteuid", lambda: 0)() != 0:
+        fail("run as root, or use --root for a staged test")
+    name = args.name or ""
+    if not name or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789-" for c in name):
+        fail("--name must contain only lowercase letters, digits and -")
+    trusted = (args.trusted_identity or "").strip().lower()
+    if (len(trusted) != 64
+            or any(c not in "0123456789abcdef" for c in trusted)):
+        fail("--trusted-identity is required: the 64-hex public key of the peer")
+    if not args.udp_port:
+        fail("--udp-port is required")
+    conf = resolve(args.root, CONF_DIR)
+    config_path = conf / ("server-%s.json" % name)
+    if config_path.exists() and not args.force:
+        fail("%s exists, use --force to replace it (a backup is kept)" % config_path)
+    code = resolve(args.root, CODE_DIR)
+    for source in TOOLSET:
+        if not (code / source).is_file():
+            fail("%s is missing: install the server role on this host first" % (code / source))
+    psk_path = conf / ("psk-%s" % name)
+    identity_path = identity_path_for(args.root, args.identity_key) if args.identity_key \
+        else conf / ("identity-%s.key" % name)
+    socket_path = args.socket or ("/run/cmk-punch/%s.sock" % name)
+    state_dir = args.state_dir or ("/var/lib/cmk-punch-%s" % name)
+    unit_name = "cmk-punch-server-%s.service" % name
+    unit_path = resolve(args.root, UNITS_DIR) / unit_name
+    owner = args.unix_owner or "monitoring"
+    print("new-instance plan")
+    print("  name:    %s" % name)
+    print("  config:  %s" % config_path)
+    print("  udp:     0.0.0.0:%d" % args.udp_port)
+    print("  socket:  %s (%s, owner %s)" % (socket_path, "0660", owner))
+    print("  state:   %s" % state_dir)
+    print("  psk:     %s (dedicated)" % psk_path)
+    print("  identity:%s" % identity_path)
+    print("  unit:    %s" % unit_name)
+    if args.dry_run:
+        print("  dry run: nothing was changed")
+        return 0
+    if interactive(args) and not args.yes:
+        if not ask_bool("Create the instance", True):
+            log("aborted")
+            return 0
+    conf.mkdir(parents=True, exist_ok=True)
+    if config_path.exists():
+        backup(config_path)
+    if psk_path.exists() and not args.rotate_psk:
+        log("reusing the existing PSK %s" % psk_path)
+    else:
+        if psk_path.exists():
+            backup(psk_path)
+        write_private(psk_path, os.urandom(32).hex())
+        log("generated a dedicated PSK %s" % psk_path)
+    pub = load_or_create_identity(identity_path)
+    cfg = {
+        "role": "server",
+        "psk_file": str(psk_path),
+        "identity_key": str(identity_path),
+        "trusted_identity": trusted,
+        "udp_bind": "0.0.0.0:%d" % args.udp_port,
+        "peer_file": str(conf / ("peer-%s.json" % name)),
+        "state_dir": state_dir,
+        "unix_listen": socket_path,
+        "unix_mode": "0660",
+        "unix_owner": owner,
+        "allowed_uids": [owner],
+    }
+    if args.stun_server:
+        cfg["stun_server"] = args.stun_server
+    write_json(config_path, cfg)
+    log("wrote %s" % config_path)
+    unit_path.parent.mkdir(parents=True, exist_ok=True)
+    unit_path.write_text("""[Unit]
+Description=CheckMK UDP punch server (%s peer)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=%s
+ExecStart=/usr/bin/python3 %s/punch_peer.py --config %s
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+""" % (name, code, code, config_path), encoding="utf-8")
+    os.chmod(unit_path, 0o644)
+    log("wrote %s" % unit_path)
+    if args.no_firewall or is_staged(args):
+        log("firewall not touched")
+    else:
+        status = run_optional(["ufw", "status"]).stdout or ""
+        if "Status: active" in status:
+            run(["ufw", "allow", "%d/udp" % args.udp_port])
+            log("ufw allow %d/udp" % args.udp_port)
+        else:
+            log("ufw is not active: open UDP %d yourself" % args.udp_port)
+    if is_staged(args):
+        log("staged install: skipping systemctl")
+    else:
+        run(["systemctl", "daemon-reload"])
+        if not args.no_start:
+            run(["systemctl", "enable", "--now", unit_name])
+            state = run_optional(["systemctl", "is-active", unit_name]).stdout.strip()
+            log("%s is %s" % (unit_name, state or "unknown"))
+        else:
+            log("unit written, not started")
+    print("  identity public key: %s" % pub)
+    log("on the peer: install with --trusted-identity %s" % pub)
+    log("the peer's public key goes into trusted_identity in %s" % config_path)
+    return 0
+
+
 def build_parser():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--root", default="/",
@@ -747,6 +864,22 @@ def build_parser():
                         help="print the identity public key")
     pk.add_argument("--identity", default="", metavar="PATH")
     pk.add_argument("--generate", action="store_true")
+
+    ni = sub.add_parser("new-instance", parents=[common],
+                        help="create another server instance on this host")
+    ni.add_argument("--name", required=True, metavar="NAME")
+    ni.add_argument("--udp-port", type=int, required=True)
+    ni.add_argument("--trusted-identity", required=True, metavar="HEX")
+    ni.add_argument("--identity-key", default="", metavar="PATH")
+    ni.add_argument("--socket", default="", metavar="PATH")
+    ni.add_argument("--state-dir", default="", metavar="PATH")
+    ni.add_argument("--unix-owner", default="monitoring", metavar="USER")
+    ni.add_argument("--stun-server", default="", metavar="HOST:PORT")
+    ni.add_argument("--force", action="store_true")
+    ni.add_argument("--rotate-psk", action="store_true")
+    ni.add_argument("--dry-run", action="store_true")
+    ni.add_argument("--no-start", action="store_true")
+    ni.add_argument("--no-firewall", action="store_true")
     return parser
 
 
@@ -763,6 +896,8 @@ def main(argv):
         return rotate_psk(args)
     elif args.command == "pubkey":
         return print_pubkey(args)
+    elif args.command == "new-instance":
+        return new_instance(args)
     else:
         status(args.role, args)
     return 0
