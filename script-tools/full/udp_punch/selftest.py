@@ -51,6 +51,29 @@ def free_port():
     return port
 
 
+_IDENTITIES = {}
+
+
+def new_identity(tmp, name):
+    """Write an Ed25519 seed file and return (path, raw public key)."""
+    from protocol import identity_public, load_identity
+    path = os.path.join(tmp, "identity-%s" % name)
+    with open(path, "w", encoding="ascii", newline="\n") as fh:
+        fh.write(os.urandom(32).hex() + "\n")
+    os.chmod(path, 0o600)
+    return path, identity_public(load_identity(path))
+
+
+def pair_identity(tmp, name="default"):
+    """Server and host identities of one logical pair, created once per tmp."""
+    key = (tmp, name)
+    if key not in _IDENTITIES:
+        s_path, s_pub = new_identity(tmp, "server-" + name)
+        h_path, h_pub = new_identity(tmp, "host-" + name)
+        _IDENTITIES[key] = (s_path, s_pub, h_path, h_pub)
+    return _IDENTITIES[key]
+
+
 def crypto_checks(psk):
     a = Crypto(psk, b"\x00\x00\x00\x02", "c2s", "s2c")
     b = Crypto(psk, b"\x00\x00\x00\x02", "s2c", "c2s")
@@ -100,9 +123,16 @@ def recv_exact(sock, size):
 
 
 def make_cfg(tmp, psk_path, role, peer_file, tcp_port, echo_addr, extra=None, tcp=True):
+    extra = dict(extra or {})
+    pair = extra.pop("_pair", "default")
+    s_path, s_pub, h_path, h_pub = pair_identity(tmp, pair)
+    identity = extra.pop("_identity", s_path if role == "server" else h_path)
+    trusted = extra.pop("_trusted", h_pub if role == "server" else s_pub)
     base = {
         "role": role,
         "psk_file": psk_path,
+        "identity_key": identity,
+        "trusted_identity": trusted.hex(),
         "udp_bind": "127.0.0.1:0",
         "peer_file": peer_file,
         "state_dir": os.path.join(tmp, "%s-%s" % (role, os.path.basename(peer_file))),
@@ -280,17 +310,22 @@ def unix_socket_checks(tmp, psk_path, echo_addr):
     print("unix socket allowed_exe: OK (%s)" % real_exe)
 
 
-def handshake_checks(psk):
-    from protocol import Crypto, T_DATA, new_ephemeral, session_keys
+def handshake_checks(psk, tmp):
+    from protocol import new_ephemeral, session_keys
+    a_path, a_id = new_identity(tmp, "hs-a")
+    b_path, b_id = new_identity(tmp, "hs-b")
+    c_path, c_id = new_identity(tmp, "hs-c")
     a_priv, a_pub = new_ephemeral()
     b_priv, b_pub = new_ephemeral()
-    ka = session_keys(psk, a_priv, a_pub, b_pub)
-    kb = session_keys(psk, b_priv, b_pub, a_pub)
+    ka = session_keys(psk, a_priv, a_pub, b_pub, a_id, b_id)
+    kb = session_keys(psk, b_priv, b_pub, a_pub, b_id, a_id)
     assert ka["s2c"] == kb["s2c"], "the two sides derive different s2c keys"
     assert ka["c2s"] == kb["c2s"], "the two sides derive different c2s keys"
-    c_priv, c_pub = new_ephemeral()
-    kc = session_keys(psk, a_priv, a_pub, c_pub)
-    assert kc["s2c"] != ka["s2c"], "session keys ignore the peer ephemeral key"
+    kc = session_keys(psk, a_priv, a_pub, b_pub, a_id, c_id)
+    assert kc["s2c"] != ka["s2c"], "session keys ignore the peer identity key"
+    d_priv, d_pub = new_ephemeral()
+    kd = session_keys(psk, a_priv, a_pub, d_pub, a_id, b_id)
+    assert kd["s2c"] != ka["s2c"], "session keys ignore the peer ephemeral key"
     layer = Crypto.from_keys(ka["s2c"], ka["c2s"])
     frame = layer.seal(T_DATA, 1, payload=b"x")
     boot = Crypto(psk, send_dir="boot", recv_dir="boot")
@@ -300,6 +335,59 @@ def handshake_checks(psk):
     except ValueError:
         pass
     print("handshake checks: OK")
+
+
+def identity_checks(tmp):
+    from protocol import (T_HELLO, identity_public, load_identity,
+                          new_ephemeral, sign_hello, verify_hello)
+    h_path, h_pub = new_identity(tmp, "unit-host")
+    s_path, s_pub = new_identity(tmp, "unit-server")
+    host_key = load_identity(h_path)
+    _eph, eph_pub = new_ephemeral()
+    block = sign_hello(host_key, eph_pub, T_HELLO)
+    got_eph, got_id = verify_hello(block, T_HELLO, h_pub, eph_pub, s_pub)
+    assert got_eph == eph_pub and got_id == h_pub, "valid HELLO rejected"
+    try:
+        verify_hello(block, T_HELLO, s_pub, eph_pub, s_pub)
+        raise AssertionError("a HELLO signed by another identity was accepted")
+    except ValueError:
+        pass
+    tampered = bytearray(block)
+    tampered[-1] ^= 0x01
+    try:
+        verify_hello(bytes(tampered), T_HELLO, h_pub, eph_pub, s_pub)
+        raise AssertionError("a tampered signature was accepted")
+    except ValueError:
+        pass
+    print("identity checks: OK (pinned key, wrong identity and tampering rejected)")
+
+
+def rogue_identity_check(tmp, psk_path, addr):
+    """The right PSK but an unpinned identity must not open a session."""
+    s_path, s_pub, h_path, h_pub = pair_identity(tmp, "legit")
+    server_file = os.path.join(tmp, "server-peer-rogue.json")
+    rogue_file = os.path.join(tmp, "host-peer-rogue.json")
+    tcp_port = free_port()
+    server = PunchPeer(make_cfg(tmp, psk_path, "server", server_file, tcp_port,
+                                addr, {"_pair": "legit"}))
+    rogue_path, _rogue_pub = new_identity(tmp, "rogue-host")
+    rogue = PunchPeer(make_cfg(tmp, psk_path, "host", rogue_file, 0, addr,
+                               {"_identity": rogue_path, "_trusted": s_pub}))
+    with open(server_file, "w", encoding="utf-8") as fh:
+        json.dump({}, fh)
+    with open(rogue_file, "w", encoding="utf-8") as fh:
+        json.dump({"peer": "127.0.0.1:%d" % server.local_udp[1]}, fh)
+    try:
+        threading.Thread(target=server.run, daemon=True).start()
+        threading.Thread(target=rogue.run, daemon=True).start()
+        time.sleep(1.5)
+        assert server.sessions == 0, "server accepted a HELLO from an unknown identity"
+        assert server.crypto is None, "server established a session with an unknown identity"
+        assert server.peer is None, "server adopted the endpoint of an unknown identity"
+    finally:
+        server.shutdown()
+        rogue.shutdown()
+    print("rogue identity: OK (PSK alone is not enough)")
 
 
 def gate_requirement_check(tmp, psk_path, echo_addr):
@@ -431,11 +519,12 @@ def padding_checks(psk):
 
 
 def peer_info_checks():
+    from protocol import HELLO_HEAD
     sample = "192.0.2.10"
     blob = encode_peer_info(sample)
-    payload = b"\x00" * PUB_LEN + blob + b"\x01" * 16
+    payload = b"\x00" * HELLO_HEAD + blob + b"\x01" * 16
     assert decode_peer_info(payload) == sample, decode_peer_info(payload)
-    assert decode_peer_info(b"\x00" * PUB_LEN + b"\x01" * 16) is None
+    assert decode_peer_info(b"\x00" * HELLO_HEAD + b"\x01" * 16) is None
     assert decode_peer_info(b"\x00" * 16) is None
     print("peer info: OK (%s)" % sample)
 
@@ -450,13 +539,15 @@ def main():
     crypto_checks(psk)
     padding_checks(psk)
     peer_info_checks()
-    handshake_checks(psk)
+    identity_checks(tmp)
+    handshake_checks(psk, tmp)
     if not hasattr(os, "getuid"):
         raise SystemExit("this self-test needs /proc and getuid (POSIX only)")
     uid_lookup_check()
     restun_backoff_check(tmp, psk_path)
     gate_requirement_check(tmp, psk_path, ("127.0.0.1", 9))
     rate_limit_check(tmp, psk_path, ("127.0.0.1", 9))
+    rogue_identity_check(tmp, psk_path, ("127.0.0.1", 9))
     session_watchdog_check(tmp, psk_path, ("127.0.0.1", 9))
     watchdog_giveup_check(tmp, psk_path, ("127.0.0.1", 9))
 

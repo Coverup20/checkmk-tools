@@ -21,11 +21,12 @@ Both peers punch towards the public endpoint of the other; keepalives every
   two-byte payload length; everything after the payload is random padding.
 - AEAD ChaCha20-Poly1305 with a 32-byte PSK; 4096-entry replay window.
 - Types: CTRL (PUNCH/PUNCH_ACK/KEEPALIVE), OPEN, OPEN_ACK, OPEN_FAIL, DATA,
-  ACK, FIN, FIN_ACK, RESET. HELLO and HELLO_ACK also carry the sender's own
-  address towards the peer (an IP01 trailer after the ephemeral key); the
-  receiver logs it as "peer real address" and writes it to
-  peer_real_ip.txt in the state directory. The advertise_ip configuration key
-  overrides the detected address.
+  ACK, FIN, FIN_ACK, RESET. HELLO and HELLO_ACK carry an identity block (magic
+  ID01, ephemeral X25519 key, Ed25519 public key, signature) and may carry a
+  trailer with the sender's own address on the path to the peer (an IP01
+  trailer after the identity block); the receiver logs it as "peer real
+  address" and writes it to peer_real_ip.txt in the state directory. The
+  advertise_ip configuration key overrides the detected address.
 - Streams multiplexed on one UDP socket; per direction a Go-Back-N window
   (default 32 packets), cumulative ACKs, retransmission and a reliable FIN
   (maximum payload 1150 bytes).
@@ -265,6 +266,34 @@ one pair limits the damage of a leaked key to that pair. It does not stop
 whoever holds the key from impersonating the peer: that needs an identity key,
 planned as a later protocol step.
 
+## Identities (p11)
+
+Each side owns an Ed25519 identity: identity.key holds its 32-byte seed (mode
+600) and the other side pins its public key in trusted_identity, one identity
+per pair. HELLO carries the sender's ephemeral X25519 key, its public identity
+and a signature over both; HELLO_ACK signs its own values together with the
+ones it answers, so a recorded ACK cannot be replayed into another handshake.
+Session keys are HKDF over the X25519 shared secret mixed with the pair PSK,
+with both identities in the salt.
+
+A peer that presents the right PSK but an identity that is not pinned is
+rejected before any stream is opened, so a leaked key alone is no longer
+enough to impersonate a host.
+
+Provisioning is out of band and local to each side:
+
+```sh
+install_udp_punch.py pubkey --generate        # print this side's public key
+install_udp_punch.py install --role host \
+    --identity-key /etc/cmk-punch/identity.key \
+    --trusted-identity <public key of the other side>
+```
+
+The installer creates identity.key when it is missing, writes both values into
+the configuration and refuses to install without a trusted identity. pubkey
+with --generate prints the key before the first install, when the peer's key
+must be exchanged.
+
 ## Windows host
 
 The host role also runs on Windows, where it forwards each stream to a local
@@ -400,9 +429,9 @@ choice is not lost.
   automatic fallback.
 
 - PSK distribution and rotation (mitigated). rotate-psk gives each pair its
-  own key file and describes the rotation procedure, but authentication still
-  rests on a secret both sides hold: whoever has the key can impersonate the
-  peer. An identity key (Ed25519, pinned on both sides) is the planned fix.
+  own key file and describes the rotation procedure, and p11 pins an Ed25519
+  identity per side, so the PSK is a second factor rather than the only
+  authentication: a leaked key alone no longer lets anyone impersonate a peer.
 
 - Metadata (open). Padding fixes the frame size, but the number of frames per
   transfer and the poller cadence remain observable. Cover traffic at a

@@ -31,6 +31,8 @@ from collections import deque
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey, Ed25519PublicKey)
 from cryptography.hazmat.primitives.asymmetric.x25519 import (X25519PrivateKey,
                                                               X25519PublicKey)
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
@@ -66,6 +68,73 @@ CTRL_KEEPALIVE = b"KEEPALIVE"
 PEER_INFO_MAGIC = b"IP01"
 PEER_INFO_MAX = 64
 
+# Identity block carried by HELLO and HELLO_ACK (p11):
+#   ID_MAGIC (4) | ephemeral X25519 public key (32) | Ed25519 public key (32)
+#   | Ed25519 signature (64)
+ID_MAGIC = b"ID01"
+ID_PUB_LEN = 32
+SIG_LEN = 64
+HELLO_HEAD = 4 + ID_PUB_LEN + ID_PUB_LEN + SIG_LEN
+HELLO_TRANSCRIPT = {
+    T_HELLO: b"cmk-punch/hello/v1",
+    T_HELLO_ACK: b"cmk-punch/hello_ack/v1",
+}
+
+
+def load_identity(path):
+    """Ed25519 private key from a file holding its 32-byte seed as hex."""
+    with open(path, "r", encoding="ascii") as fh:
+        seed = bytes.fromhex(fh.read().strip())
+    if len(seed) != 32:
+        raise ValueError("identity seed must be 32 bytes")
+    return Ed25519PrivateKey.from_private_bytes(seed)
+
+
+def identity_public(private_key):
+    """Raw 32-byte public key of an Ed25519 private key."""
+    return private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+
+
+def _hello_transcript(kind, eph, ident, peer_eph=None, peer_id=None):
+    data = HELLO_TRANSCRIPT[kind] + eph + ident
+    if peer_eph is not None:
+        data += peer_eph + peer_id
+    return data
+
+
+def sign_hello(private_key, eph, kind, peer_eph=None, peer_id=None):
+    """Identity block for HELLO (kind T_HELLO) or HELLO_ACK."""
+    ident = identity_public(private_key)
+    sig = private_key.sign(_hello_transcript(kind, eph, ident, peer_eph, peer_id))
+    return ID_MAGIC + eph + ident + sig
+
+
+def verify_hello(payload, kind, trusted_public, own_eph, own_id):
+    """Return (ephemeral, identity) when the block is signed by the pinned key.
+
+    HELLO is signed over the sender's own values; HELLO_ACK also covers the
+    values carried by the HELLO it answers, so a recorded ACK cannot be
+    replayed against another handshake.
+    """
+    if len(payload) < HELLO_HEAD:
+        raise ValueError("hello payload too short")
+    if payload[:4] != ID_MAGIC:
+        raise ValueError("bad hello identity magic")
+    eph = payload[4:4 + ID_PUB_LEN]
+    ident = payload[4 + ID_PUB_LEN:4 + 2 * ID_PUB_LEN]
+    sig = payload[4 + 2 * ID_PUB_LEN:HELLO_HEAD]
+    if ident != trusted_public:
+        raise ValueError("unexpected identity key")
+    if kind == T_HELLO:
+        data = _hello_transcript(kind, eph, ident)
+    else:
+        data = _hello_transcript(kind, eph, ident, own_eph, own_id)
+    try:
+        Ed25519PublicKey.from_public_bytes(ident).verify(sig, data)
+    except Exception:
+        raise ValueError("bad identity signature")
+    return eph, ident
+
 
 def derive_key(psk: bytes, label: str) -> bytes:
     """Per-direction key, so the two directions never share a key stream."""
@@ -79,15 +148,18 @@ def new_ephemeral():
     return key, key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
 
 
-def session_keys(psk, eph, pub_local, pub_peer):
-    """Per-direction session keys bound to both ephemeral public keys.
+def session_keys(psk, eph, pub_local, pub_peer, id_local, id_peer):
+    """Per-direction session keys bound to both sides' ephemeral and identity keys.
 
     The ECDH secret is mixed with the PSK, so a later compromise of the PSK
     alone does not reproduce these keys and recorded sessions stay unreadable.
+    The identities are part of the salt, so a session cannot be replayed under
+    a different identity.
     """
     shared = eph.exchange(X25519PublicKey.from_public_bytes(pub_peer))
     first, second = sorted((pub_local, pub_peer))
-    salt = first + second
+    id_first, id_second = sorted((id_local, id_peer))
+    salt = first + second + id_first + id_second
     ikm = psk + shared
     return {label: HKDF(algorithm=hashes.SHA256(), length=32, salt=salt,
                         info=b"cmk-punch/session/" + label.encode("ascii")).derive(ikm)
@@ -100,9 +172,8 @@ def encode_peer_info(address):
     return PEER_INFO_MAGIC + bytes([len(raw)]) + raw
 
 
-def decode_peer_info(payload):
+def decode_peer_info(payload, offset=HELLO_HEAD):
     """Address carried by a HELLO trailer, or None when there is none."""
-    offset = PUB_LEN
     if len(payload) < offset + 5:
         return None
     if payload[offset:offset + 4] != PEER_INFO_MAGIC:
