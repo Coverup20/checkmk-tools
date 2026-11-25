@@ -35,7 +35,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: python -m pip install --upgrade pip cryptography
+        run: python -m pip install --upgrade pip cryptography requests
 
       - name: Compile every Python file of the two tools
         run: |
