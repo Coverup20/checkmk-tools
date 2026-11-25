@@ -154,13 +154,14 @@ def make_cfg(tmp, psk_path, role, peer_file, tcp_port, echo_addr, extra=None, tc
     return base
 
 
-def start_pair(tmp, psk_path, echo_addr, tag, server_extra=None):
+def start_pair(tmp, psk_path, echo_addr, tag, server_extra=None, host_extra=None):
     tcp_port = free_port()
     server_file = os.path.join(tmp, "server-peer-%s.json" % tag)
     host_file = os.path.join(tmp, "host-peer-%s.json" % tag)
     server = PunchPeer(make_cfg(tmp, psk_path, "server", server_file, tcp_port,
                                 echo_addr, server_extra))
-    host = PunchPeer(make_cfg(tmp, psk_path, "host", host_file, tcp_port, echo_addr))
+    host = PunchPeer(make_cfg(tmp, psk_path, "host", host_file, tcp_port, echo_addr,
+                              host_extra))
     with open(server_file, "w", encoding="utf-8") as fh:
         json.dump({"peer": "127.0.0.1:%d" % host.local_udp[1]}, fh)
     with open(host_file, "w", encoding="utf-8") as fh:
@@ -390,6 +391,25 @@ def rogue_identity_check(tmp, psk_path, addr):
     print("rogue identity: OK (PSK alone is not enough)")
 
 
+def peer_status_check(tmp, psk_path, echo_addr):
+    interval = {"status_interval_s": 0.5}
+    server, host, _tcp, _ = start_pair(tmp, psk_path, echo_addr, "status",
+                                       interval, interval)
+    try:
+        time.sleep(1.5)
+        assert server.peer_status is not None, "no peer status received"
+        assert server.peer_status.get("role") == "host", server.peer_status
+        path = os.path.join(server.state_dir, "peer_status.json")
+        assert os.path.exists(path), path
+        host.send_ctrl(b"UNKNOWN-PAYLOAD")
+        time.sleep(0.4)
+        assert server.crypto is not None, "an unknown CTRL broke the session"
+    finally:
+        server.shutdown()
+        host.shutdown()
+    print("peer status: OK (host view received, unknown CTRL ignored)")
+
+
 def gate_requirement_check(tmp, psk_path, echo_addr):
     cfg = make_cfg(tmp, psk_path, "server", os.path.join(tmp, "server-nogate.json"),
                    free_port(), echo_addr, {"allowed_uids": []})
@@ -548,6 +568,7 @@ def main():
     gate_requirement_check(tmp, psk_path, ("127.0.0.1", 9))
     rate_limit_check(tmp, psk_path, ("127.0.0.1", 9))
     rogue_identity_check(tmp, psk_path, ("127.0.0.1", 9))
+    peer_status_check(tmp, psk_path, ("127.0.0.1", 9))
     session_watchdog_check(tmp, psk_path, ("127.0.0.1", 9))
     watchdog_giveup_check(tmp, psk_path, ("127.0.0.1", 9))
 

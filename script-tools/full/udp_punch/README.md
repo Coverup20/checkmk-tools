@@ -20,11 +20,11 @@ Both peers punch towards the public endpoint of the other; keepalives every
   wire. The plaintext starts with flags, stream id, sequence, ack and a
   two-byte payload length; everything after the payload is random padding.
 - AEAD ChaCha20-Poly1305 with a 32-byte PSK; 4096-entry replay window.
-- Types: CTRL (PUNCH/PUNCH_ACK/KEEPALIVE), OPEN, OPEN_ACK, OPEN_FAIL, DATA,
-  ACK, FIN, FIN_ACK, RESET. HELLO and HELLO_ACK carry an identity block (magic
-  ID01, ephemeral X25519 key, Ed25519 public key, signature) and may carry a
-  trailer with the sender's own address on the path to the peer (an IP01
-  trailer after the identity block); the receiver logs it as "peer real
+- Types: CTRL (PUNCH/PUNCH_ACK/KEEPALIVE/STATUS), OPEN, OPEN_ACK, OPEN_FAIL,
+  DATA, ACK, FIN, FIN_ACK, RESET. HELLO and HELLO_ACK carry an identity block
+  (magic ID01, ephemeral X25519 key, Ed25519 public key, signature) and may
+  carry a trailer with the sender's own address on the path to the peer (an
+  IP01 trailer after the identity block); the receiver logs it as "peer real
   address" and writes it to peer_real_ip.txt in the state directory. The
   advertise_ip configuration key overrides the detected address.
 - Streams multiplexed on one UDP socket; per direction a Go-Back-N window
@@ -311,6 +311,20 @@ sharing a PSK file is a bug, because rotating one silently changes the key of
 the other. --dry-run shows the plan; --force replaces an existing
 configuration after a backup.
 
+## Peer-side status (p12)
+
+Inside an established session the peer sends a CTRL STATUS frame every 30
+seconds (status_interval_s) with its version, role, session state, open
+streams and uptime. The server authenticates it like any other frame, keeps
+the last report in <state_dir>/peer_status.json and the dashboard shows it in
+the Peer view column. A server that predates this feature ignores an unknown
+CTRL payload, so the servers can be updated first and the peers later without
+breaking a pair.
+
+The report says only what the peer sees. A peer whose local agent is broken
+still reports a healthy session; it is the fetch through the socket that
+fails.
+
 ## Windows host
 
 The host role also runs on Windows, where it forwards each stream to a local
@@ -459,10 +473,10 @@ choice is not lost.
   the firewall rule; it still needs a free UDP port and the peer's public key
   chosen by hand.
 
-- Peer-side status (open). The peer writes its public endpoint and the peer
-  real address to its state directory, but not whether the session is alive;
-  only the server knows that. A peer that is up but cannot reach its local
-  agent looks healthy from the server side.
+- Peer-side status (mitigated). The peer sends a STATUS control frame inside
+  the session and the server keeps it in peer_status.json, which the dashboard
+  shows as the peer view; a peer with an older build sends nothing and the
+  column stays empty.
 
 - Protocol version in HELLO (open). A peer running an older build, or a locally
   patched one, is not visible in the status output.
