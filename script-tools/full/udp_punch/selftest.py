@@ -11,7 +11,8 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import punch_peer
-from protocol import MAX_PAYLOAD, PAD_SIZE, PUB_LEN, Crypto, T_DATA, decode_peer_info, encode_peer_info
+from protocol import (MAX_PAYLOAD, PAD_SIZE, PROTO_VERSION, PUB_LEN, Crypto,
+                      T_DATA, decode_peer_info, encode_peer_info)
 from punch_peer import PunchPeer, socket_uid
 
 
@@ -346,8 +347,12 @@ def identity_checks(tmp):
     host_key = load_identity(h_path)
     _eph, eph_pub = new_ephemeral()
     block = sign_hello(host_key, eph_pub, T_HELLO)
-    got_eph, got_id = verify_hello(block, T_HELLO, h_pub, eph_pub, s_pub)
+    got_ver, got_eph, got_id = verify_hello(block, T_HELLO, h_pub, eph_pub, s_pub)
+    assert got_ver == PROTO_VERSION, got_ver
     assert got_eph == eph_pub and got_id == h_pub, "valid HELLO rejected"
+    alt = sign_hello(host_key, eph_pub, T_HELLO, ver=99)
+    alt_ver, _alt_eph, _alt_id = verify_hello(alt, T_HELLO, h_pub, eph_pub, s_pub)
+    assert alt_ver == 99, "the signed protocol version was not returned"
     try:
         verify_hello(block, T_HELLO, s_pub, eph_pub, s_pub)
         raise AssertionError("a HELLO signed by another identity was accepted")
@@ -399,6 +404,7 @@ def peer_status_check(tmp, psk_path, echo_addr):
         time.sleep(1.5)
         assert server.peer_status is not None, "no peer status received"
         assert server.peer_status.get("role") == "host", server.peer_status
+        assert server.peer_version == PROTO_VERSION, server.peer_version
         path = os.path.join(server.state_dir, "peer_status.json")
         assert os.path.exists(path), path
         host.send_ctrl(b"UNKNOWN-PAYLOAD")
