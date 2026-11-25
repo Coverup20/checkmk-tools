@@ -6,11 +6,15 @@ on:
     paths:
       - "script-tools/full/udp_punch/**"
       - "script-tools/full/sync_update/**"
+      - "script-tools/full/vulnerability_management/**"
+      - "script-tools/full/webtop/**"
       - ".github/workflows/self-tests.yml"
   pull_request:
     paths:
       - "script-tools/full/udp_punch/**"
       - "script-tools/full/sync_update/**"
+      - "script-tools/full/vulnerability_management/**"
+      - "script-tools/full/webtop/**"
       - ".github/workflows/self-tests.yml"
   workflow_dispatch:
 
@@ -42,6 +46,8 @@ jobs:
           roots = [
               pathlib.Path("script-tools/full/udp_punch"),
               pathlib.Path("script-tools/full/sync_update"),
+              pathlib.Path("script-tools/full/vulnerability_management"),
+              pathlib.Path("script-tools/full/webtop"),
           ]
           failures = 0
           for root in roots:
@@ -67,3 +73,7 @@ jobs:
           cd ../sync_update
           python sync_linuxchecks.py --self-test
           python install_sync_linux.py --self-test
+          cd ../vulnerability_management
+          python ciso_enrich_advisories.py --self-test
+          cd ../webtop
+          python webtop_leave_report.py --self-test

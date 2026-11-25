@@ -7,8 +7,7 @@
 # Install the network exposure views and dashboard into a CheckMK site.
 #
 # The network exposure checks (Network.Exposure, Network.Listeners,
-# Network.Firewall from check_network_exposure.py, and Twingate.Client plus one
-# Twingate.Resource.<name> per resource from check_twingate_client.py) sit among
+# Network.Firewall from check_network_exposure.py) sit among
 # hundreds of ordinary services on every host. This script installs one
 # dashboard and four supporting views that select those services by name across
 # every monitored host, with no host list to maintain: a new host appears as
@@ -33,7 +32,7 @@ import pprint
 import shutil
 import sys
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 
 # Service name regexes. CheckMK filters services by regex, not by tag.
 # Twingate.Resource.<name> is matched by the Twingate. prefix alone, so new
@@ -369,8 +368,8 @@ def self_test():
         if not cond and detail:
             print("      %s" % detail)
 
-    # Service names exactly as the two check scripts emit them
-    # (check_network_exposure.py and check_twingate_client.py).
+    # Service names exactly as the check script emits them
+    # (check_network_exposure.py).
     emitted_network = ["Network.Exposure", "Network.Listeners", "Network.Firewall"]
     emitted_twingate = ["Twingate.Client", "Twingate.Resource.NS",
                         "Twingate.Resource.Office_VPC"]
