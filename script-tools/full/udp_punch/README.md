@@ -233,6 +233,38 @@ rehearse an installation under a directory without touching systemd,
 without enabling it; the status and uninstall subcommands inspect and remove
 one peer, and uninstall --purge also deletes configuration and state.
 
+## Keys per pair and rotation
+
+Every pair can have its own key instead of one key shared by every tunnel.
+The server keeps one file per instance (`psk-<instance>`, mode 600, root) and
+`server-<instance>.json` points at it; the peer keeps the path already written
+in its own config, normally `/etc/cmk-punch/psk`, so the peer configuration
+does not change.
+
+```sh
+install_udp_punch.py rotate-psk --role server --instance box
+install_udp_punch.py rotate-psk --role host --instance box --psk-file -
+```
+
+The server run generates the key (or reads it from `--psk-file`), backs up the
+old key and the configuration, writes the new key, updates `psk_file` and
+restarts the unit. It prints only the sha256 of the key and the path to feed
+to the other side. Transfer it with a pipe, never on a command line or into a
+terminal:
+
+```sh
+ssh server cat /etc/cmk-punch/psk-box \
+  | ssh peer install_udp_punch.py rotate-psk --role host --psk-file -
+```
+
+Both sides must be updated in the same window: with different keys the HELLO
+cannot be authenticated and the pair stays down until they match again. Use
+`--dry-run` to see the plan, `--no-restart` to write the files without
+restarting, and the `.bak-<timestamp>` files to roll back. A key dedicated to
+one pair limits the damage of a leaked key to that pair. It does not stop
+whoever holds the key from impersonating the peer: that needs an identity key,
+planned as a later protocol step.
+
 ## Windows host
 
 The host role also runs on Windows, where it forwards each stream to a local
@@ -348,10 +380,46 @@ CustomizableSidebarSnapin because the sidebar element page lists only
 customizable types, and it uses internal CheckMK interfaces: re-check it
 after a major upgrade.
 
-## Prototype limits
+## Roadmap and known limits
 
-- Symmetric NAT: the mapping towards the STUN server can differ from the one
-  towards the peer and the punch fails; this has to be detected and documented.
-- Throughput: stop-and-wait, about 1150 bytes per RTT per stream.
-- One peer per process; no relay, no automatic fallback.
-- The PSK has to be distributed out of band and rotated by hand.
+Status as of 2026-11-25. Closed items stay listed so the rationale behind each
+choice is not lost.
+
+- Symmetric NAT (open). The mapping towards the STUN server can differ from the
+  one towards the peer, so the punch fails. Neither is detected nor reported:
+  the server only sees an endpoint that never answers.
+
+- Throughput (open). Each frame carries at most 1150 bytes and the
+  per-direction window defaults to 32 frames (Go-Back-N, cumulative ACKs,
+  retransmission). There is no congestion control and the window is not
+  adaptive; a full agent fetch is about 100 frames.
+
+- One peer per process (mitigated). Each peer gets its own server instance,
+  with its own UDP port, socket, state directory and unit. A multi-peer server
+  that maps endpoint to session is not implemented, and there is no relay or
+  automatic fallback.
+
+- PSK distribution and rotation (mitigated). rotate-psk gives each pair its
+  own key file and describes the rotation procedure, but authentication still
+  rests on a secret both sides hold: whoever has the key can impersonate the
+  peer. An identity key (Ed25519, pinned on both sides) is the planned fix.
+
+- Metadata (open). Padding fixes the frame size, but the number of frames per
+  transfer and the poller cadence remain observable. Cover traffic at a
+  constant rate is not implemented.
+
+- Server instance generator (open). The installer writes the config, the unit
+  and the state directory for one server instance per host, with fixed unit
+  names. A second server instance on the same host, its firewall rule and its
+  own socket and state paths are created by hand.
+
+- Peer-side status (open). The peer writes its public endpoint and the peer
+  real address to its state directory, but not whether the session is alive;
+  only the server knows that. A peer that is up but cannot reach its local
+  agent looks healthy from the server side.
+
+- Protocol version in HELLO (open). A peer running an older build, or a locally
+  patched one, is not visible in the status output.
+
+- Python 3.6 compatibility (open). The source targets modern Python; a host
+  with 3.6 needs a local patch to the future import at every update.
