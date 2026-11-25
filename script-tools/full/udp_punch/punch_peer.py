@@ -27,10 +27,10 @@ import sys
 import threading
 import time
 
-from protocol import (CTRL_KEEPALIVE, CTRL_PUNCH, CTRL_PUNCH_ACK, HELLO_EXTRA,
-                      MAX_PAYLOAD, PAD_SIZE, PUB_LEN, T_ACK, T_CTRL, T_DATA,
-                      T_FIN, T_FIN_ACK, T_HELLO, T_HELLO_ACK, T_OPEN,
-                      T_OPEN_ACK, T_OPEN_FAIL, T_RESET, Crypto,
+from protocol import (CTRL_KEEPALIVE, CTRL_PUNCH, CTRL_PUNCH_ACK, CTRL_STATUS,
+                      HELLO_EXTRA, MAX_PAYLOAD, PAD_SIZE, PUB_LEN, T_ACK,
+                      T_CTRL, T_DATA, T_FIN, T_FIN_ACK, T_HELLO, T_HELLO_ACK,
+                      T_OPEN, T_OPEN_ACK, T_OPEN_FAIL, T_RESET, Crypto,
                       decode_peer_info, encode_peer_info, identity_public,
                       load_identity, new_ephemeral, session_keys, sign_hello,
                       verify_hello)
@@ -40,7 +40,7 @@ try:
 except ImportError:  # non-POSIX: only numeric uids are accepted
     pwd = None
 
-VERSION = "p11"
+VERSION = "p12"
 
 
 def log(msg):
@@ -296,6 +296,11 @@ class PunchPeer:
         self.punched = False
         self.last_punch = 0.0
         self.last_keepalive = 0.0
+        self.status_s = float(cfg.get("status_interval_s", 30))
+        self.last_status = 0.0
+        self.started_at = time.time()
+        self.session_since = None
+        self.peer_status = None
         self.last_peer_mtime = 0.0
         self.streams = {}
         self.next_sid = struct.unpack("!I", os.urandom(4))[0] or 1
@@ -378,6 +383,38 @@ class PunchPeer:
     def send_ctrl(self, payload):
         self.send(T_CTRL, payload=payload)
 
+    def send_status(self):
+        data = {
+            "v": VERSION,
+            "role": self.role,
+            "session": self.crypto is not None,
+            "streams": len(self.streams),
+            "uptime_s": int(time.time() - self.started_at),
+            "session_age_s": (int(time.time() - self.session_since)
+                              if self.session_since else None),
+        }
+        self.send_ctrl(CTRL_STATUS + json.dumps(data, sort_keys=True).encode("utf-8"))
+
+    def handle_peer_status(self, raw):
+        try:
+            data = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError):
+            return
+        if not isinstance(data, dict):
+            return
+        data["received_wall"] = int(time.time())
+        self.peer_status = data
+        try:
+            os.makedirs(self.state_dir, exist_ok=True)
+            path = os.path.join(self.state_dir, "peer_status.json")
+            tmp = path + ".new"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(data, fh, sort_keys=True)
+                fh.write("\n")
+            os.replace(tmp, path)
+        except OSError as exc:
+            log("cannot write peer_status.json: %s" % exc)
+
     def refresh_peer(self):
         try:
             mtime = os.path.getmtime(self.peer_file)
@@ -422,6 +459,7 @@ class PunchPeer:
         self.crypto = None
         self.punched = False
         self.last_hello = 0.0
+        self.session_since = None
         self.down_since = now
         for st in list(self.streams.values()):
             self.drop_stream(st)
@@ -668,6 +706,8 @@ class PunchPeer:
         self.crypto = Crypto.from_keys(keys[send_dir], keys[recv_dir],
                                        pad=self.pad)
         self.sessions += 1
+        self.session_since = time.time()
+        self.last_status = 0.0
         log("session established with %s:%d (%s, #%d)"
             % (addr[0], addr[1], "HELLO" if mtype == T_HELLO else "HELLO_ACK",
                self.sessions))
@@ -708,6 +748,8 @@ class PunchPeer:
                 self.send_ctrl(CTRL_PUNCH_ACK)
             elif payload == CTRL_PUNCH_ACK:
                 self.punched = True
+            elif payload.startswith(CTRL_STATUS):
+                self.handle_peer_status(payload[len(CTRL_STATUS):])
             return
         if mtype == T_OPEN and self.role == "host":
             self.handle_open(sid)
@@ -797,6 +839,10 @@ class PunchPeer:
         if self.peer and now - self.last_keepalive >= self.keepalive_s:
             self.send_ctrl(CTRL_KEEPALIVE)
             self.last_keepalive = now
+        if (self.peer and self.crypto is not None and self.status_s > 0
+                and now - self.last_status >= self.status_s):
+            self.send_status()
+            self.last_status = now
         for st in list(self.streams.values()):
             with st.cond:
                 if st.closed:

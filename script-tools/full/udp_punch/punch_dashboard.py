@@ -30,7 +30,7 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.2.1"
+VERSION = "1.3.0"
 
 CONFIG_DIR = "/etc/cmk-punch"
 CODE_PATH = "/opt/cmk-punch/punch_peer.py"
@@ -167,6 +167,21 @@ def summarise(events):
     return summary
 
 
+def read_peer_status(state_dir):
+    """The last STATUS report sent by the peer, with its age in seconds."""
+    if not state_dir:
+        return None, None
+    path = os.path.join(state_dir, "peer_status.json")
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return None, None
+    if not isinstance(data, dict):
+        return None, None
+    return data, int(time.time() - os.path.getmtime(path))
+
+
 def read_state(state_dir):
     """peer_real_ip.txt and endpoint.txt with their modification times."""
     out: dict[str, str | int | None] = {
@@ -219,6 +234,7 @@ def collect(config_dir=CONFIG_DIR):
         active = unit_active(inst["unit"])
         summary = summarise(journal_events(inst["unit"]))
         state = read_state(inst["state_dir"])
+        peer_status, peer_status_age = read_peer_status(inst["state_dir"])
         row = {
             "instance": inst["instance"],
             "unit": inst["unit"],
@@ -232,6 +248,8 @@ def collect(config_dir=CONFIG_DIR):
             "real_ip_age": state["real_ip_age"],
             "endpoint": state["endpoint"],
             "endpoint_age": state["endpoint_age"],
+            "peer_status": peer_status,
+            "peer_status_age": peer_status_age,
             "next": None,
         }
         row["started_ago"] = age(now, summary["start_at"])
@@ -355,7 +373,7 @@ journal; the test button runs a real agent fetch through the instance socket.</p
 <span class="chip" id="updated">loading</span>
 <span class="chip" id="counts"></span></div>
 <table><thead><tr>
-<th>Instance</th><th>Status</th><th>Peer seen as</th><th>UDP</th>
+<th>Instance</th><th>Status</th><th>Peer seen as</th><th>Peer view</th><th>UDP</th>
 <th>Session</th><th>Restarts</th><th>Since</th><th>Test</th>
 </tr></thead><tbody id="rows"></tbody></table>
 </div>
@@ -366,6 +384,13 @@ if(s<90)return s+' s';if(s<5400)return Math.round(s/60)+' min';
 return Math.round(s/3600)+' h'}
 function cell(tr,tag,text,cls){const td=document.createElement(tag);
 td.textContent=text;if(cls)td.className=cls;tr.appendChild(td);return td}
+function peerView(r){const s=r.peer_status;
+ if(!s)return '-';
+ const head=(s.role||'peer')+(s.v?(' '+s.v):'');
+ const sess=(s.session===false?'down':'up');
+ const streams=(typeof s.streams==='number'?(' · '+s.streams+' streams'):'');
+ const ageS=(r.peer_status_age!==null?(' · '+fmtAge(r.peer_status_age)+' ago'):'');
+ return head+' · '+sess+streams+ageS}
 async function refresh(){
  try{const res=await fetch('api/status',{cache:'no-store'});
  const data=await res.json();
@@ -381,6 +406,7 @@ async function refresh(){
   st.appendChild(document.createTextNode(r.status));
   st.className=r.status;
   cell(tr,'td',(r.real_ip||'-')+(r.peer?('  '+r.peer):''),'mono');
+  cell(tr,'td',peerView(r),'mono');
   cell(tr,'td',r.udp_bind||'-','mono');
   cell(tr,'td',(r.handshake_ago!==null?('up since '+fmtAge(r.handshake_ago)):'no session')+
     (r.teardown_ago!==null?' · teardown '+fmtAge(r.teardown_ago)+' ago':''),
