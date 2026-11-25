@@ -421,6 +421,7 @@ def nat_checks():
     assert nat_verdict(None, ("203.0.113.5", 6015)) is None
     assert nat_verdict(("203.0.113.5", 6015), None) is None
     assert nat_verdict(("203.0.113.5", 6015), ("203.0.113.5", 6015)) == "cone"
+    assert nat_verdict(("0.0.0.0", 6015), ("203.0.113.5", 6015)) is None
     assert nat_verdict(("203.0.113.5", 6015), ("203.0.113.5", 6016)) == "symmetric"
     assert (nat_verdict(("203.0.113.5", 6015), ("198.51.100.7", 6015))
             == "mapping-changed")
