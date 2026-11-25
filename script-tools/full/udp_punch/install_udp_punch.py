@@ -8,8 +8,15 @@ sent to the other peer, so each side is installed on its own.
 Usage:
     install_udp_punch.py install --role server --unix-owner USER --stun-server HOST:PORT [...]
     install_udp_punch.py install --role host --stun-server HOST:PORT [--target-command CMD]
+    install_udp_punch.py rotate-psk --role server [--instance NAME] [--psk-file PATH|-]
+    install_udp_punch.py rotate-psk --role host [--instance NAME] [--psk-file PATH|-]
     install_udp_punch.py uninstall --role server|host [--purge]
     install_udp_punch.py status --role server|host
+
+rotate-psk replaces the key of one side: the server gets a dedicated file per
+instance (server-<name>.json is pointed at psk-<name>), the host keeps the
+path already written in its config. The key is never printed: the command
+shows its sha256 and the path to feed to the other side with --psk-file -.
 
 With a terminal on stdin the install and uninstall commands ask for the
 values they need, showing the default in brackets; every option can also be
@@ -20,21 +27,25 @@ A --root directory installs everything under that directory instead of /,
 skips systemctl and skips the user lookup, so an installation can be
 rehearsed without touching the running system.
 
-Version: 1.1.0"""
+Version: 1.3.0"""
 
 import argparse
 import hashlib
 import importlib
 import json
 import os
-import pwd
 import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-VERSION = "1.2.0"
+try:
+    import pwd
+except ImportError:  # Windows: only a staged run is possible there
+    pwd = None
+
+VERSION = "1.3.0"
 
 HERE = Path(__file__).resolve().parent
 CODE_DIR = "/opt/cmk-punch"
@@ -43,7 +54,7 @@ STATE_DIR = "/var/lib/cmk-punch"
 AGENT_DIR = "/usr/local/lib/cmk-punch"
 UNITS_DIR = "/etc/systemd/system"
 
-TOOLSET: tuple[str, ...] = ("protocol.py", "punch_peer.py")
+TOOLSET = ["protocol.py", "punch_peer.py"]
 AGENT_CLIENT = "cmk_punch_agent.py"
 CONFIG_NAME = {"server": "server.json", "host": "host.json"}
 UNIT_NAME = {"server": "cmk-punch-server.service",
@@ -69,7 +80,8 @@ def fail(msg):
 
 
 def run(cmd):
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            universal_newlines=True)
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
         fail("%s failed: %s" % (" ".join(cmd), detail))
@@ -77,7 +89,8 @@ def run(cmd):
 
 
 def run_optional(cmd):
-    return subprocess.run(cmd, capture_output=True, text=True)
+    return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          universal_newlines=True)
 
 
 def resolve(root, path):
@@ -254,6 +267,9 @@ def check_server_users(args):
         fail("--unix-owner is required with --unix-listen")
     if is_staged(args):
         return
+    if pwd is None:
+        fail("user lookup is not available on this platform")
+    assert pwd is not None
     try:
         pwd.getpwnam(args.unix_owner)
     except KeyError:
@@ -270,12 +286,11 @@ def install_psk(args, p):
         text = Path(args.psk_file).read_text(encoding="ascii").strip()
         if len(text) != 64 or any(c not in "0123456789abcdefABCDEF" for c in text):
             fail("--psk-file must contain 32 bytes as hex")
-        psk.write_text(text.lower() + "\n", encoding="ascii")
+        write_private(psk, text.lower())
         log("copied the PSK from %s" % args.psk_file)
     else:
-        psk.write_text(os.urandom(32).hex() + "\n", encoding="ascii")
+        write_private(psk, os.urandom(32).hex())
         log("generated a new PSK")
-    os.chmod(psk, 0o600)
     return psk
 
 
@@ -523,6 +538,99 @@ def status(role, args):
             print("%-7s %s (missing)" % (key, path))
 
 
+def instance_paths(root, role, instance):
+    conf = resolve(root, CONF_DIR)
+    if instance:
+        return {
+            "conf": conf,
+            "config": conf / ("%s-%s.json" % (role, instance)),
+            "unit": "cmk-punch-%s-%s.service" % (role, instance),
+        }
+    return {
+        "conf": conf,
+        "config": conf / CONFIG_NAME[role],
+        "unit": UNIT_NAME[role],
+    }
+
+
+def read_key_text(args):
+    """Return the new key as 64 hex characters; the value is never echoed."""
+    if args.psk_file == "-":
+        text = sys.stdin.read()
+    elif args.psk_file:
+        text = Path(args.psk_file).read_text(encoding="ascii")
+    else:
+        return os.urandom(32).hex()
+    text = text.strip().lower()
+    if len(text) != 64 or any(c not in "0123456789abcdef" for c in text):
+        fail("the new key must be 32 bytes as 64 hex characters")
+    return text
+
+
+def write_private(path, text):
+    tmp = path.with_name(path.name + ".new")
+    with open(str(tmp), "w", encoding="ascii", newline="\n") as fh:
+        fh.write(text + "\n")
+    os.chmod(tmp, 0o600)
+    os.replace(str(tmp), str(path))
+
+
+def rotate_psk(args):
+    if args.instance and any(c not in "abcdefghijklmnopqrstuvwxyz0123456789-"
+                             for c in args.instance):
+        fail("instance name must contain only letters, digits and -")
+    if not is_staged(args) and getattr(os, "geteuid", lambda: 0)() != 0:
+        fail("run as root, or use --root for a staged test")
+    p = instance_paths(args.root, args.role, args.instance)
+    if not p["config"].exists():
+        fail("config not found: %s" % p["config"])
+    config = json.loads(p["config"].read_text(encoding="utf-8"))
+    current = config.get("psk_file") or str(p["conf"] / "psk")
+    if args.role == "server":
+        suffix = args.key_name or args.instance or "base"
+        key_path = p["conf"] / ("psk-%s" % suffix)
+    else:
+        key_path = Path(current)
+    new_key = read_key_text(args)
+    digest = hashlib.sha256(bytes.fromhex(new_key)).hexdigest()
+    print("rotate-psk plan")
+    print("  role:   %s" % args.role)
+    print("  config: %s" % p["config"])
+    if current != str(key_path):
+        print("  psk_file: %s -> %s" % (current, key_path))
+    print("  key:    %s" % key_path)
+    print("  unit:   %s" % p["unit"])
+    if args.dry_run:
+        print("  dry run: nothing was changed")
+        return 0
+    if interactive(args) and not args.yes:
+        if not ask_bool("Proceed with the rotation", True):
+            log("aborted")
+            return 0
+    if key_path.exists():
+        backup(key_path)
+    write_private(key_path, new_key)
+    log("wrote %s (mode 600)" % key_path)
+    if current != str(key_path):
+        backup(p["config"])
+        config["psk_file"] = str(key_path)
+        write_json(p["config"], config)
+        log("updated psk_file in %s" % p["config"])
+    print("  sha256: %s" % digest)
+    if args.role == "server":
+        log("peer side: rotate-psk --role host --psk-file - reads the key from stdin")
+        log("source: %s (pipe it, never paste it into a terminal)" % key_path)
+    if args.no_restart:
+        log("restart skipped: systemctl restart %s" % p["unit"])
+    elif is_staged(args):
+        log("staged install: skipping systemctl")
+    else:
+        run(["systemctl", "restart", p["unit"]])
+        state = run_optional(["systemctl", "is-active", p["unit"]]).stdout.strip()
+        log("%s is %s" % (p["unit"], state or "unknown"))
+    return 0
+
+
 def build_parser():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--root", default="/",
@@ -533,7 +641,7 @@ def build_parser():
                         help="skip the final confirmation")
     parser = argparse.ArgumentParser(
         description="Local installer for a UDP punch tunnel peer (v%s)" % VERSION)
-    sub = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(dest="command")
 
     inst = sub.add_parser("install", parents=[common], help="install one peer")
     inst.add_argument("--role", choices=("server", "host"))
@@ -565,15 +673,32 @@ def build_parser():
 
     st = sub.add_parser("status", parents=[common], help="show one peer")
     st.add_argument("--role", choices=("server", "host"), required=True)
+
+    rot = sub.add_parser("rotate-psk", parents=[common],
+                         help="replace the key of one side")
+    rot.add_argument("--role", choices=("server", "host"), required=True)
+    rot.add_argument("--instance", default="", metavar="NAME",
+                     help="instance suffix, e.g. box (server-box.json)")
+    rot.add_argument("--key-name", default="", metavar="NAME",
+                     help="server key file suffix (default: the instance name)")
+    rot.add_argument("--psk-file", default="", metavar="PATH|-",
+                     help="read the new key from a file, or from stdin with -")
+    rot.add_argument("--dry-run", action="store_true")
+    rot.add_argument("--no-restart", action="store_true")
     return parser
 
 
 def main(argv):
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if not args.command:
+        parser.error("a command is required: install, uninstall, status, rotate-psk")
     if args.command == "install":
         install(args)
     elif args.command == "uninstall":
         uninstall(args.role, args)
+    elif args.command == "rotate-psk":
+        return rotate_psk(args)
     else:
         status(args.role, args)
     return 0
