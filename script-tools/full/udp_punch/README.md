@@ -331,6 +331,20 @@ The report says only what the peer sees. A peer whose local agent is broken
 still reports a healthy session; it is the fetch through the socket that
 fails.
 
+## Symmetric NAT detection
+
+A NAT is symmetric when it opens a different public port for every
+destination, and then two peers behind symmetric NATs cannot punch a hole. The
+STATUS exchange makes it visible: each side reports its STUN endpoint and the
+address it observes for the peer, and each side compares the address its peer
+sees for it against its own STUN mapping. The verdict is cone (same address),
+symmetric (same IP, different port) or mapping-changed (different IP); it is
+logged when it changes and the dashboard shows it in the peer view.
+
+The tunnel does not fix a symmetric NAT. When the verdict is symmetric the
+pair needs a port forward, a relay, or a network that maps ports consistently.
+Without a STUN server the verdict stays empty.
+
 ## Windows host
 
 The host role also runs on Windows, where it forwards each stream to a local
@@ -451,9 +465,10 @@ after a major upgrade.
 Status as of 2026-11-25. Closed items stay listed so the rationale behind each
 choice is not lost.
 
-- Symmetric NAT (open). The mapping towards the STUN server can differ from the
-  one towards the peer, so the punch fails. Neither is detected nor reported:
-  the server only sees an endpoint that never answers.
+- Symmetric NAT (mitigated). The STATUS exchange compares the STUN mapping with
+  the address the peer observes, logs the verdict (cone, symmetric,
+  mapping-changed) and shows it in the peer view. The punch still fails behind
+  a symmetric NAT: the workaround stays out of band.
 
 - Throughput (open). Each frame carries at most 1150 bytes and the
   per-direction window defaults to 32 frames (Go-Back-N, cumulative ACKs,

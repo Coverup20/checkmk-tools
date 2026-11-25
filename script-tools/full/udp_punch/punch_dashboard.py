@@ -30,7 +30,7 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 CONFIG_DIR = "/etc/cmk-punch"
 CODE_PATH = "/opt/cmk-punch/punch_peer.py"
@@ -389,8 +389,9 @@ function peerView(r){const s=r.peer_status;
  const head=(s.role||'peer')+(s.v?(' '+s.v):'');
  const sess=(s.session===false?'down':'up');
  const streams=(typeof s.streams==='number'?(' · '+s.streams+' streams'):'');
+ const nat=(s.nat?(' · NAT '+s.nat):'');
  const ageS=(r.peer_status_age!==null?(' · '+fmtAge(r.peer_status_age)+' ago'):'');
- return head+' · '+sess+streams+ageS}
+ return head+' · '+sess+streams+nat+ageS}
 async function refresh(){
  try{const res=await fetch('api/status',{cache:'no-store'});
  const data=await res.json();
