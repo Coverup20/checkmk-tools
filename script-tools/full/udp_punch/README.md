@@ -370,6 +370,21 @@ and the secret from the site's automation.secret file, and it activates the
 changes with cmk -O only when something moved. CMK_API_USER and CMK_SITE set
 the user and the site when the defaults do not fit.
 
+## Host liveness and the agent, as two services
+
+A peer that proxies an appliance - its target is an appliance address - also
+tests that address on its own: ICMP first, then a TCP connection to the target
+port when ICMP is blocked. The result travels in the STATUS report, and the
+datasource program prints it as a local check. The host therefore has two
+services: Check_MK, which says whether the agent answers, and PUNCH.Liveness,
+which says whether the appliance answers at all. The host check stays "always
+assume host to be up": a broken agent must not look like a dead machine.
+
+The tunnel cannot report its own failure. When the tunnel is down both
+services go stale and alarm while the host stays up; telling "agent broken"
+from "machine dead" without the tunnel needs an out-of-band channel, which is
+not implemented.
+
 ## Windows host
 
 The host role also runs on Windows, where it forwards each stream to a local
