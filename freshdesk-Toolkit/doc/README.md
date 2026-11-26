@@ -43,6 +43,8 @@ credentials file), `FRESHDESK_CACHE_FILE` (dataset path), `FRESHDESK_TIMEOUT`.
 | `list [n]` | recent tickets, newest first |
 | `get <id>` | one ticket in full, with its conversations |
 | `search <term> [pages]` | recent tickets whose subject contains a term |
+| `search --query "<filters>"` | server-side filters over the whole history |
+| `find <term> [--limit n]` | free text in the exported dataset, offline |
 | `groups` | group name to id mapping |
 | `fields` | ticket fields and their allowed values |
 | `whoami` | the agent the API key belongs to |
@@ -66,6 +68,29 @@ freshdesk-toolkit.py export --since 2026-01-01
 freshdesk-toolkit.py stats --by group,month
 freshdesk-toolkit.py stats --by cf.tipo_intervento --group-id <group id> --top 10
 ```
+
+### Health and machine output
+
+| Command / option | Result |
+| --- | --- |
+| `guard` | env file and mode, credentials, group catalogue, dataset freshness |
+| `--self-test` | offline assertions, no network |
+| `--json` | raw objects instead of the human lines, for `jq` |
+
+`guard` exits 1 when the credentials are rejected, so a caller can gate on it.
+
+## Free text versus the search endpoint
+
+`/search/tickets` accepts only structured filters in the form `keyword:value`,
+joined by `AND`. It has no full-text mode: a bare word is rejected as invalid,
+and `subject:` is not a searchable field. Free text therefore has two homes:
+
+- `search <term> [pages]` matches the subject of the most recent pages;
+- `find <term>` matches subject, structured description, tags and custom
+  fields across the whole exported dataset, offline.
+
+`find` prints the age of the dataset when it is older than seven days, because
+an empty result on a stale dataset says nothing about the helpdesk.
 
 ## Why counting and exporting use different endpoints
 

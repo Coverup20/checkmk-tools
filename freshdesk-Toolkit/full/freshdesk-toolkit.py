@@ -4,7 +4,9 @@ freshdesk-toolkit - read-only Freshdesk CLI for ticket research and statistics
 
 Built for looking at a helpdesk, not for running it: list, read and search
 tickets, inspect the field catalogue, count matches server-side, pull a bulk
-dataset and aggregate it offline.
+dataset and aggregate it offline. `find` searches the exported dataset by free
+text, because the search endpoint only accepts structured filters. `guard`
+checks the env file, the credentials and the dataset before a session starts.
 
 Read-only by construction. There is no create, comment, update, close or
 delete command, and the generic api command refuses any method other than GET,
@@ -13,7 +15,7 @@ so this tool cannot change a ticket even by accident.
 Credentials come from an env file (default /opt/freshdesk-toolkit/.env), which
 must define FRESHDESK_DOMAIN and FRESHDESK_API_KEY.
 
-Version: 1.0.0
+Version: 1.1.0
 """
 #
 # Copyright (C) 2025 Nethesis S.r.l.
@@ -27,8 +29,9 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 ENV_FILE = os.environ.get("FRESHDESK_ENV", "/opt/freshdesk-toolkit/.env")
 HTTP_TIMEOUT = int(os.environ.get("FRESHDESK_TIMEOUT", "30"))
@@ -36,6 +39,9 @@ HTTP_TIMEOUT = int(os.environ.get("FRESHDESK_TIMEOUT", "30"))
 # Where 'export' writes its dataset and where 'stats' reads it back from.
 CACHE_FILE = os.environ.get("FRESHDESK_CACHE_FILE",
                             "/opt/freshdesk-toolkit/cache/tickets.jsonl")
+
+# Set by --json: print raw objects so the output can be piped to jq.
+JSON_OUT = False
 
 # Freshdesk code tables, needed to make a listing readable.
 STATUS_NAMES = {2: "Open", 3: "Pending", 4: "Resolved", 5: "Closed"}
@@ -140,16 +146,19 @@ def format_ticket_line(ticket, groups):
 def cmd_list(args):
     """List recent tickets, most recent first."""
     limit = int(args[0]) if args else 30
-    groups = group_names()
     query = urllib.parse.urlencode({
         "per_page": min(limit, 100),
         "order_by": "created_at",
         "order_type": "desc",
     })
-    tickets = api_get(f"/tickets?{query}") or []
-    for ticket in tickets[:limit]:
+    tickets = (api_get(f"/tickets?{query}") or [])[:limit]
+    if JSON_OUT:
+        print(json.dumps(tickets, indent=2, ensure_ascii=False))
+        return
+    groups = group_names()
+    for ticket in tickets:
         print(format_ticket_line(ticket, groups))
-    print(f"\n{len(tickets[:limit])} ticket(s)")
+    print(f"\n{len(tickets)} ticket(s)")
 
 
 def cmd_get(args):
@@ -158,6 +167,11 @@ def cmd_get(args):
         fail("usage: freshdesk-toolkit.py get <ticket_id>")
     ticket_id = args[0]
     ticket = api_get(f"/tickets/{ticket_id}")
+    conversations = api_get(f"/tickets/{ticket_id}/conversations") or []
+    if JSON_OUT:
+        print(json.dumps({"ticket": ticket, "conversations": conversations},
+                         indent=2, ensure_ascii=False))
+        return
     groups = group_names()
 
     print(f"#{ticket.get('id')}  {ticket.get('subject', '')}")
@@ -174,26 +188,48 @@ def cmd_get(args):
             print(f"  cf.{key:<9} {value}")
     print(f"\n{ticket.get('description_text', '').strip()}")
 
-    for conv in api_get(f"/tickets/{ticket_id}/conversations") or []:
+    for conv in conversations:
         kind = "private note" if conv.get("private") else "public reply"
         print(f"\n--- {kind}, {conv.get('created_at')}")
         print(conv.get("body_text", "").strip())
 
 
 def cmd_search(args):
-    """Filter recent tickets whose subject contains a term.
+    """Find tickets, either by subject locally or with a server-side query.
 
-    Done client-side on purpose: it keeps the behaviour predictable rather than
-    depending on how the helpdesk indexes a query server-side. For large or
-    historical questions, export once and use stats instead.
+    Without --query the term is matched client-side against the subjects of the
+    most recent pages: predictable, but it only sees those pages. With --query
+    the filter goes to the search endpoint in its native keyword:value syntax,
+    so it reaches the whole history:  search --query "subject:'SIP'"
     """
-    if not args:
-        fail("usage: freshdesk-toolkit.py search <term> [pages]")
-    term = args[0].lower()
-    pages = int(args[1]) if len(args) > 1 else 3
-    groups = group_names()
+    server_query = take_option(args, "--query", None)
+    if server_query is not None:
+        if ":" not in server_query:
+            fail("--query needs the server syntax keyword:value, for example:\n"
+                 "  search --query \"status:2 AND group_id:73604\"\n"
+                 "  search --query \"cf_tipo_intervento:'remoto'\"\n"
+                 "For free text over the whole history use 'find' instead:\n"
+                 "  export --since 2026-01-01   then   find \"SIP\"")
+        query = urllib.parse.urlencode({"query": f'"{server_query}"'})
+        result = api_get(f"/search/tickets?{query}") or {}
+        tickets = result.get("results") or []
+        if JSON_OUT:
+            print(json.dumps(tickets, indent=2, ensure_ascii=False))
+            return
+        groups = group_names()
+        for ticket in tickets:
+            print(format_ticket_line(ticket, groups))
+        print(f"\n{len(tickets)} shown, {result.get('total', len(tickets))} match(es) on the server")
+        return
 
-    found = 0
+    if not args:
+        fail("usage: freshdesk-toolkit.py search <term> [pages]\n"
+             "       freshdesk-toolkit.py search --query \"subject:'SIP'\"")
+    term = args[0]
+    pages = int(args[1]) if len(args) > 1 else 3
+
+    matches = []
+    lowered = term.lower()
     for page in range(1, pages + 1):
         query = urllib.parse.urlencode({
             "per_page": 100,
@@ -205,10 +241,60 @@ def cmd_search(args):
         if not tickets:
             break
         for ticket in tickets:
-            if term in (ticket.get("subject", "") or "").lower():
-                print(format_ticket_line(ticket, groups))
-                found += 1
-    print(f"\n{found} match(es) over {pages} page(s)")
+            if lowered in (ticket.get("subject", "") or "").lower():
+                matches.append(ticket)
+    if JSON_OUT:
+        print(json.dumps(matches, indent=2, ensure_ascii=False))
+        return
+    groups = group_names()
+    for ticket in matches:
+        print(format_ticket_line(ticket, groups))
+    print(f"\n{len(matches)} match(es) over {pages} page(s)")
+
+
+def cmd_find(args):
+    """Free-text search in the exported dataset: the whole history, offline.
+
+    The search endpoint only accepts structured filters (keyword:value), so free
+    text is matched here over subject, structured description, tags and custom
+    fields of the dataset 'export' writes. Groups show as ids on purpose: this
+    command does not touch the network.
+    """
+    if not args:
+        fail("usage: freshdesk-toolkit.py find <term> [--file <path>] [--limit <n>]")
+    term = args[0]
+    path = take_option(args, "--file", CACHE_FILE)
+    limit = int(take_option(args, "--limit", "50"))
+
+    tickets = read_export(path)
+    lowered = term.lower()
+    hits = []
+    for ticket in tickets:
+        fields = [str(ticket.get("subject") or ""), str(ticket.get("structured_description") or "")]
+        fields += [str(value) for value in (ticket.get("tags") or [])]
+        fields += [str(value) for value in (ticket.get("custom_fields") or {}).values() if value]
+        if lowered in " ".join(fields).lower():
+            hits.append(ticket)
+
+    if JSON_OUT:
+        print(json.dumps(hits[:limit], indent=2, ensure_ascii=False))
+        return
+    newest = max((ticket.get("updated_at") or "" for ticket in tickets), default="")
+    stale = ""
+    if newest:
+        try:
+            refreshed = datetime.strptime(newest, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            age = (datetime.now(timezone.utc) - refreshed).days
+            if age > 7:
+                stale = "  WARNING: %d days old, run 'export --since <date>' to refresh" % age
+        except ValueError:
+            pass
+    print("%d of %d ticket(s) contain %r (dataset %s, newest %s)%s"
+          % (len(hits), len(tickets), term, path, newest or "-", stale))
+    for ticket in hits[:limit]:
+        print(format_ticket_line(ticket, {}))
+    if len(hits) > limit:
+        print("... %d more, raise --limit" % (len(hits) - limit))
 
 
 def cmd_groups(_args):
@@ -277,6 +363,9 @@ def cmd_count(args):
              "\"status:2 AND priority:4\"")
     query = urllib.parse.urlencode({"query": f'"{args[0]}"'})
     result = api_get(f"/search/tickets?{query}") or {}
+    if JSON_OUT:
+        print(json.dumps({"query": args[0], "total": result.get("total", 0)}, indent=2))
+        return
     print(f"{result.get('total', 0)} ticket(s) match {args[0]}")
 
 
@@ -420,6 +509,110 @@ def cmd_stats(args):
             print(f"  {str(key):<{width}}  {count:>5}  {share:5.1f}%  {bar}")
 
 
+## Health
+
+
+def cmd_guard(_args):
+    """Validate configuration, credentials and the local dataset."""
+    present = os.path.exists(ENV_FILE)
+    report = {
+        "env_file": ENV_FILE,
+        "env_present": present,
+        "env_mode": oct(os.stat(ENV_FILE).st_mode & 0o777) if present else "",
+        "domain": os.environ.get("FRESHDESK_DOMAIN", ""),
+        "api_key": bool(os.environ.get("FRESHDESK_API_KEY")),
+        "whoami": "",
+        "groups": 0,
+        "dataset": "",
+        "dataset_tickets": 0,
+        "error": "",
+    }
+    ok = False
+    if report["domain"] and report["api_key"]:
+        try:
+            me = api_get("/agents/me") or {}
+            report["whoami"] = (me.get("contact") or {}).get("email") or ""
+            report["groups"] = len(group_names())
+            ok = True
+        except SystemExit:
+            # api_get already printed the HTTP error; keep the report together.
+            report["error"] = "credentials rejected, see the ERROR line above"
+    else:
+        report["error"] = "FRESHDESK_DOMAIN or FRESHDESK_API_KEY missing"
+
+    if os.path.exists(CACHE_FILE):
+        report["dataset"] = CACHE_FILE
+        try:
+            report["dataset_tickets"] = len(read_export(CACHE_FILE))
+        except SystemExit:
+            report["dataset_tickets"] = -1
+
+    if JSON_OUT:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return 0 if ok else 1
+
+    rows = [
+        ("env file", "%s%s" % (report["env_file"],
+                               " (%s)" % report["env_mode"] if report["env_mode"] else " (missing)")),
+        ("domain", report["domain"] or "-"),
+        ("api key", "set" if report["api_key"] else "MISSING"),
+        ("authenticated as", report["whoami"] or "-"),
+        ("groups", str(report["groups"])),
+        ("dataset", "%s (%d tickets)" % (report["dataset"], report["dataset_tickets"])
+         if report["dataset"] else "not exported"),
+    ]
+    if report["error"]:
+        rows.append(("error", report["error"]))
+    width = max(len(str(key)) for key, _ in rows)
+    for key, value in rows:
+        print("%-*s  %s" % (width, key, value))
+    return 0 if ok else 1
+
+
+def self_test():
+    """Offline assertions. No network, no credentials."""
+    failures = []
+    checks = []
+
+    def expect(name, got, want):
+        checks.append(name)
+        if got != want:
+            failures.append("%s: got %r, want %r" % (name, got, want))
+
+    ticket = {"id": 4321, "status": 2, "priority": 4, "group_id": 77,
+              "subject": "Server irraggiungibile", "deleted": False, "spam": False}
+    line = format_ticket_line(ticket, {77: "Infrastruttura"})
+    expect("line has id", "#4321" in line, True)
+    expect("line maps status", "Open" in line, True)
+    expect("line maps priority", "Urgent" in line, True)
+    expect("line maps group", "Infrastruttura" in line, True)
+
+    deleted = dict(ticket, deleted=True)
+    expect("line marks deleted", "[DELETED]" in format_ticket_line(deleted, {}), True)
+
+    expect("dimension group", ticket_dimension(ticket, "group", {77: "Infra"}), "Infra")
+    expect("dimension status", ticket_dimension(ticket, "status", {}), "Open")
+    expect("dimension priority", ticket_dimension(ticket, "priority", {}), "Urgent")
+    expect("dimension month", ticket_dimension(dict(ticket, created_at="2026-11-26T10:00:00Z"),
+                                               "month", {}), "2026-11")
+    expect("dimension cf", ticket_dimension({"custom_fields": {"tipo_intervento": "remoto"}},
+                                            "cf.tipo_intervento", {}), "remoto")
+    expect("dimension fallback", ticket_dimension({}, "type", {}), "-")
+
+    options = ["--since", "2026-01-01", "--out", "/tmp/x"]
+    expect("take_option value", take_option(options, "--since"), "2026-01-01")
+    expect("take_option removes pair", options, ["--out", "/tmp/x"])
+    expect("take_option default", take_option(options, "--top", "0"), "0")
+
+    expect("status table", STATUS_NAMES[5], "Closed")
+    expect("priority table", PRIORITY_NAMES[1], "Low")
+
+    print("Self-test: %d/%d passed" % (len(checks) - len(failures), len(checks)))
+    for failure in failures:
+        print("  FAIL %s" % failure)
+    return 0 if not failures else 1
+
+
 COMMANDS = {
     "list": cmd_list,
     "get": cmd_get,
@@ -431,6 +624,8 @@ COMMANDS = {
     "count": cmd_count,
     "export": cmd_export,
     "stats": cmd_stats,
+    "find": cmd_find,
+    "guard": cmd_guard,
 }
 
 
@@ -441,7 +636,10 @@ def usage():
     print("read:")
     print("  list [n]                    recent tickets, newest first (default 30)")
     print("  get <id>                    one ticket in full, with its conversations")
-    print("  search <term> [pages]       filter recent tickets by subject (default 3 pages)")
+    print("  search <term> [pages]       filter by subject over the recent pages")
+    print("  search --query \"status:2 AND group_id:73604\"")
+    print("                              server-side filters, whole history")
+    print("  find <term> [--limit n]     free text in the exported dataset, offline")
     print("  groups                      group name to id mapping")
     print("  fields                      ticket fields and their allowed values")
     print("  whoami                      the agent the API key belongs to")
@@ -455,10 +653,18 @@ def usage():
     print("                              priority, type, month, day, cf.<field>")
     print(f"\nenv file:  {ENV_FILE}")
     print(f"dataset:   {CACHE_FILE}")
+    print("\noptions:")
+    print("  --json                      print raw objects, for jq")
+    print("  --self-test                 offline assertions, no network")
+    print("\nHealth:")
+    print("  guard                       check env file, credentials and dataset")
     print("\nThis toolkit is read-only: it has no command that can change a ticket.")
 
 
 load_env(ENV_FILE)
+
+if len(sys.argv) > 1 and sys.argv[1] == "--self-test":
+    sys.exit(self_test())
 
 if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
     usage()
@@ -467,4 +673,9 @@ elif sys.argv[1] not in COMMANDS:
     usage()
     sys.exit(2)
 else:
-    COMMANDS[sys.argv[1]](sys.argv[2:])
+    # --json is accepted anywhere after the command, so it can trail a path.
+    arguments = sys.argv[2:]
+    if "--json" in arguments:
+        JSON_OUT = True
+        arguments = [item for item in arguments if item != "--json"]
+    sys.exit(COMMANDS[sys.argv[1]](arguments) or 0)
