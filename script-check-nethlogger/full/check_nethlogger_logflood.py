@@ -11,10 +11,6 @@ ones, groups the most recent messages to name the actual program and message
 pattern behind the flood. A short remediation hint is attached when the pattern
 is a known one (indexer loops, corrupted local databases, chatty agents).
 
-The transport and the analysis live in nl_common.py, shared with nl-toolkit.py
-so the two cannot drift apart. This file keeps what belongs to the check: the
-thresholds, the state mapping and the CheckMK output format.
-
 Two transports are used:
 
   * API key (required) - POST /adm/bulllog/api/noauth_getstats/ gives the log
@@ -44,38 +40,296 @@ Usage:
   check_nethlogger_logflood.py             normal run (CheckMK local check)
   check_nethlogger_logflood.py --self-test offline assertions, no network
 
-Version: 1.0.1
+Version: 1.0.2
 """
 
+import http.cookiejar
+import json
 import os
+import re
+import ssl
 import sys
+import time
+import urllib.parse
+import urllib.request
+from datetime import datetime, timedelta
 
-# The check runs from /opt/nethlogger-toolkit but may be reached through a
-# symlink placed in the site's local checks: both lookups have to work.
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, "/opt/nethlogger-toolkit")
-
-import nl_common as nl
-
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 
 ENV_FILE = os.environ.get("NETHLOGGER_ENV", "/opt/nethlogger-toolkit/.env")
-nl.load_env(ENV_FILE)
+
+
+def load_env(path):
+    """Populate os.environ from a KEY=VALUE file without overriding the real env."""
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, value = line.split("=", 1)
+        name = name.strip()
+        if name.startswith("export "):
+            name = name[len("export "):].strip()
+        os.environ.setdefault(name, value.strip().strip('"').strip("'"))
+
+
+load_env(ENV_FILE)
 
 BASE_URL = os.environ.get("NETHLOGGER_URL", "").rstrip("/")
+APIKEY_FILE = os.environ.get("NETHLOGGER_APIKEY_FILE", "/root/.netlogger-apikey")
+APIKEY = os.environ.get("NETHLOGGER_APIKEY", "")
+UI_USER = os.environ.get("NETHLOGGER_UI_USER", "")
+UI_PASS_FILE = os.environ.get("NETHLOGGER_UI_PASS_FILE", "/root/.netlogger-uipass")
+UI_PASS_KEY = os.environ.get("NETHLOGGER_UI_PASS_KEY", "NETHLOGGER_PASS")
+UI_PASS = os.environ.get("NETHLOGGER_UI_PASS", "")
+LOCATION = os.environ.get("NETHLOGGER_LOCATION", "")
 WINDOW_HOURS = int(os.environ.get("NETHLOGGER_WINDOW_HOURS", "24"))
 WARN_LOGS = int(os.environ.get("NETHLOGGER_WARN_LOGS", "1000000"))
 CRIT_LOGS = int(os.environ.get("NETHLOGGER_CRIT_LOGS", "10000000"))
 TOP_HOSTS = int(os.environ.get("NETHLOGGER_TOP_HOSTS", "5"))
 SAMPLE_ROWS = int(os.environ.get("NETHLOGGER_SAMPLE_ROWS", "500"))
+INSECURE = os.environ.get("NETHLOGGER_INSECURE", "") == "1"
+TIMEOUT = 90
 
-LEVELS = nl.LEVELS
+LEVELS = ("err", "warning", "info", "debug")
 
 
-## Check output
+## Helpers
+
+def ssl_context():
+    ctx = ssl.create_default_context()
+    if INSECURE:
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
+def read_secret(path, key=None):
+    with open(path, "r", encoding="utf-8") as handle:
+        content = handle.read()
+    if key:
+        for line in content.splitlines():
+            line = line.strip()
+            if line.startswith("#") or "=" not in line:
+                continue
+            name, value = line.split("=", 1)
+            if name.strip() == key:
+                return value.strip().strip('"').strip("'")
+    return content.strip()
+
+
+def multipart(fields):
+    boundary = "----nethlogger%d" % int(time.time() * 1000)
+    lines = []
+    for name, value in fields:
+        lines.append("--%s\r\n" % boundary)
+        lines.append("Content-Disposition: form-data; name=\"%s\"\r\n\r\n" % name)
+        lines.append("%s\r\n" % value)
+    lines.append("--%s--\r\n" % boundary)
+    body = "".join(lines).encode("utf-8")
+    return body, "multipart/form-data; boundary=%s" % boundary
+
+
+def http_post(url, fields, opener=None, form=False):
+    if form:
+        body = urllib.parse.urlencode(fields).encode("utf-8")
+        content_type = "application/x-www-form-urlencoded"
+    else:
+        body, content_type = multipart(fields)
+    request = urllib.request.Request(
+        url, data=body, method="POST",
+        headers={"Content-Type": content_type, "Accept": "application/json, text/html"},
+    )
+    if opener:
+        with opener.open(request, timeout=TIMEOUT) as response:
+            return response.read()
+    with urllib.request.urlopen(request, timeout=TIMEOUT, context=ssl_context()) as response:
+        return response.read()
+
+
+def window():
+    end = datetime.now()
+    start = end - timedelta(hours=WINDOW_HOURS)
+    return start, end
+
+
+def api_stamp(moment):
+    return moment.strftime("%Y%m%d%H%M")
+
+
+def ui_stamp(moment):
+    return moment.strftime("%d/%m/%Y %H:%M")
+
+
+## Transport: API key
+
+def fetch_stats(apikey, start, end):
+    fields = [
+        ("APIKEY", apikey),
+        ("DATE_START", api_stamp(start)),
+        ("DATE_END", api_stamp(end)),
+    ]
+    raw = http_post(BASE_URL + "/adm/bulllog/api/noauth_getstats/", fields)
+    text = raw.decode("utf-8", "replace").strip()
+    if not text.startswith("{"):
+        raise RuntimeError("stats endpoint returned: %s" % text[:120])
+    return json.loads(text)
+
+
+def assets_from_stats(stats):
+    hosts = []
+    for company in stats.values():
+        for name, asset in (company.get("assets") or {}).items():
+            counters = asset.get("counters") or {}
+            hosts.append({
+                "name": name,
+                "alias": asset.get("alias") or "",
+                "counters": counters,
+                "total": int(counters.get("total") or 0),
+            })
+    hosts.sort(key=lambda item: item["total"], reverse=True)
+    return hosts
+
+
+## Transport: UI session
+
+def ui_login():
+    jar = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPCookieProcessor(jar),
+        urllib.request.HTTPSHandler(context=ssl_context()),
+    )
+    fields = [
+        ("action", "login"),
+        ("user", UI_USER),
+        ("pass", UI_PASS or read_secret(UI_PASS_FILE, UI_PASS_KEY)),
+        ("proto", ""),
+        ("lang", "en"),
+    ]
+    page = http_post(BASE_URL + "/adm/auth/login/", fields, opener=opener, form=True)
+    if b"login" in page[:4000] and b"nome utente" in page.lower():
+        raise RuntimeError("UI login rejected")
+    return opener
+
+
+def search_messages(opener, host, level, start, end, length):
+    form = [
+        ("location", LOCATION),
+        ("host[]", host),
+        ("msg", ""),
+        ("priority", level),
+        ("program", "*"),
+        ("cyber_rules", "*"),
+        ("date", ui_stamp(start)),
+        ("date2", ui_stamp(end)),
+        ("recperpag", "100"),
+        ("orderby", "DESC"),
+    ]
+    page = http_post(BASE_URL + "/adm/bulllog/reports/", form, opener=opener, form=True)
+    text = page.decode("utf-8", "replace")
+    match = re.search(r'd\.params\s*=\s*"([^"]*)"', text)
+    if not match or not match.group(1):
+        return []
+    columns = ("tag", "priority", "host", "date", "time", "program", "msg")
+    query = [("draw", "1")]
+    for index, name in enumerate(columns):
+        query.append(("columns[%d][data]" % index, name))
+        query.append(("columns[%d][name]" % index, ""))
+        query.append(("columns[%d][searchable]" % index, "false" if index == 0 else "true"))
+        query.append(("columns[%d][orderable]" % index, "false"))
+        query.append(("columns[%d][search][value]" % index, ""))
+        query.append(("columns[%d][search][regex]" % index, "false"))
+    query.extend([
+        ("start", "0"),
+        ("length", str(length)),
+        ("search[value]", ""),
+        ("search[regex]", "false"),
+        ("location", LOCATION),
+        ("params", match.group(1)),
+        ("default_ord", "DESC"),
+        ("reload", "0"),
+        ("pagination_action", ""),
+    ])
+    raw = http_post(BASE_URL + "/adm/bulllog/ajax_json_reports/", query, opener=opener, form=True)
+    payload = json.loads(raw.decode("utf-8", "replace"))
+    return payload.get("data") or []
+
+
+## Analysis
+
+NUMBERS = re.compile(r"\d+")
+QUOTED = re.compile(r"['\"][^'\"]{6,}['\"]")
+PROCESS = re.compile(r"^\([^)]{1,60}\):\s*")
+
+
+def normalize_message(message):
+    text = PROCESS.sub("", message or "")
+    text = QUOTED.sub("<value>", text)
+    text = NUMBERS.sub("N", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:120]
+
+
+def top_patterns(rows):
+    """Return the dominant program and its most frequent message pattern.
+
+    The share that matters is the program share: one faulty service usually
+    emits several wording variants of the same error, so counting exact
+    messages would split the flood across near-duplicates.
+    """
+    if not rows:
+        return []
+    total = len(rows)
+    programs = {}
+    for row in rows:
+        name = row.get("program") or "?"
+        programs[name] = programs.get(name, 0) + 1
+    program, program_count = max(programs.items(), key=lambda item: item[1])
+    subset = [row for row in rows if (row.get("program") or "?") == program]
+    patterns = {}
+    for row in subset:
+        key = normalize_message(row.get("msg") or "")
+        patterns[key] = patterns.get(key, 0) + 1
+    pattern, count = max(patterns.items(), key=lambda item: item[1])
+    return [{
+        "program": program,
+        "program_share": 100.0 * program_count / total,
+        "pattern": pattern,
+        "count": count,
+        "share": 100.0 * count / len(subset),
+    }]
+
+
+def remediation(program, pattern):
+    text = ("%s %s" % (program, pattern)).lower()
+    if "ambiguous column name" in text or "tracker-miner" in text or "tracker-extract" in text:
+        return ("GNOME Tracker indexer loop: reset the index on the host "
+                "(tracker3 reset -s -r for the affected user) or mask "
+                "tracker-miner-fs-3 and tracker-extract-3")
+    if "no such file or directory" in text and "tmp" in text:
+        return ("the process retries a temporary file that no longer exists: "
+                "find the producer of the file and stop the loop")
+    if "stopped target basic.target" in text or "starting basic.target" in text:
+        return ("systemd is cycling through its targets: the host is likely in a "
+                "restart loop (check journalctl -b -1, the watchdog and any unit "
+                "with Restart=always that keeps failing)")
+    if "cups" in text or "printer" in text:
+        return "printing subsystem retry loop: check the printer queue on the host"
+    if "dhcp" in text and "decline" in text:
+        return "duplicate DHCP leases: check the client and the DHCP server"
+    return "process retry loop: identify the program on the host and stop the loop"
+
 
 def state_for(total):
-    return nl.state_for(total, WARN_LOGS, CRIT_LOGS)
+    if total >= CRIT_LOGS:
+        return 2
+    if total >= WARN_LOGS:
+        return 1
+    return 0
 
 
 def format_counters(counters):
@@ -90,31 +344,28 @@ def host_line(host, patterns, reason_error):
     if patterns:
         top = patterns[0]
         message += '; top: %s %.0f%% "%s"' % (top["program"], top["program_share"], top["pattern"][:90])
-        message += " | solution: " + nl.remediation(top["program"], top["pattern"])
+        message += " | solution: " + remediation(top["program"], top["pattern"])
     elif reason_error:
         message += "; reason unavailable: %s" % reason_error
     message = message.replace("\n", " ")
     return "%d %s.%s - %s" % (state, "NethLogger", host["name"], message)
 
 
+## Check
+
 def run():
     if not BASE_URL:
         print("3 NethLogger.Config - NETHLOGGER_URL is not set")
         return 1
-
-    client = nl.NethLogger(ENV_FILE)
     try:
-        apikey = client.apikey()
+        apikey = APIKEY or read_secret(APIKEY_FILE)
     except OSError as error:
         print("3 NethLogger.Config - cannot read API key: %s" % error)
         return 1
-    if not apikey:
-        print("3 NethLogger.Config - the API key is empty")
-        return 1
 
-    start, end = nl.parse_window("%dh" % WINDOW_HOURS)
+    start, end = window()
     try:
-        hosts = client.assets(start, end)
+        hosts = assets_from_stats(fetch_stats(apikey, start, end))
     except Exception as error:
         print("3 NethLogger.API - %s" % error)
         return 1
@@ -126,9 +377,9 @@ def run():
 
     opener = None
     reason_error = ""
-    if client.has_ui() and (client.ui_pass_value or os.path.exists(client.ui_pass_file)):
+    if UI_USER and LOCATION and (UI_PASS or os.path.exists(UI_PASS_FILE)):
         try:
-            opener = client.opener()
+            opener = ui_login()
         except Exception as error:
             reason_error = "login failed: %s" % error
     else:
@@ -140,9 +391,8 @@ def run():
         patterns = []
         if opener and host["total"] >= WARN_LOGS:
             try:
-                rows = client.search(host=host["name"], program="*", level="err",
-                                     start=start, end=end, length=SAMPLE_ROWS)
-                patterns = nl.top_patterns(rows)
+                rows = search_messages(opener, host["name"], "err", start, end, SAMPLE_ROWS)
+                patterns = top_patterns(rows)
             except Exception as error:
                 reason_error = "search failed: %s" % error
         if state_for(host["total"]) == 2:
@@ -175,13 +425,13 @@ def self_test():
             print("FAIL %s (got %r, want %r)" % (name, got, want))
 
     expect("normalize strips process prefix",
-           nl.normalize_message("(tracker-extract-3:4231): Tracker-WARNING **: failed"),
+           normalize_message("(tracker-extract-3:4231): Tracker-WARNING **: failed"),
            "Tracker-WARNING **: failed")
     expect("normalize collapses numbers",
-           nl.normalize_message("error 42 at 15:25:11 on port 8080"),
+           normalize_message("error 42 at 15:25:11 on port 8080"),
            "error N at N:N:N on port N")
     expect("normalize replaces quoted paths",
-           nl.normalize_message("cannot read '/home/user/a.csv.tmp'"),
+           normalize_message("cannot read '/home/user/a.csv.tmp'"),
            "cannot read <value>")
 
     rows = [
@@ -189,24 +439,24 @@ def self_test():
         {"program": "tracker-miner-fs-3", "msg": "(tracker-extract-3:2): ambiguous column name: ROWID"},
         {"program": "cupsd", "msg": "printer offline"},
     ]
-    patterns = nl.top_patterns(rows)
+    patterns = top_patterns(rows)
     expect("top pattern picks majority", patterns[0]["program"], "tracker-miner-fs-3")
     expect("top pattern count", patterns[0]["count"], 2)
     expect("program share", round(patterns[0]["program_share"]), 67)
 
     expect("remediation for tracker",
-           "Tracker" in nl.remediation("tracker-miner-fs-3", "ambiguous column name: ROWID"), True)
+           "Tracker" in remediation("tracker-miner-fs-3", "ambiguous column name: ROWID"), True)
     expect("remediation for systemd cycling",
-           "restart loop" in nl.remediation("systemd", "Stopped target basic.target - Basic System."), True)
+           "restart loop" in remediation("systemd", "Stopped target basic.target - Basic System."), True)
     expect("remediation fallback",
-           nl.remediation("foo", "bar").startswith("process retry loop"), True)
+           remediation("foo", "bar").startswith("process retry loop"), True)
 
     stats = {"000000": {"display_name": "x", "assets": {
         "a": {"alias": "", "counters": {"err": 5, "total": 5}},
         "b": {"alias": "", "counters": {"info": 50, "total": 50}},
         "c": {"alias": "", "counters": {"total": 0}},
     }}}
-    ranked = nl.assets_from_stats(stats)
+    ranked = assets_from_stats(stats)
     expect("ranking is descending", [item["name"] for item in ranked], ["b", "a", "c"])
 
     global WARN_LOGS, CRIT_LOGS
