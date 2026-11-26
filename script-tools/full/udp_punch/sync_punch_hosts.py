@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""sync_punch_hosts.py - put each punch peer's declared address in its host
+"""sync_punch_hosts.py - keep each punch peer's address in its host label
 
 For every tunnel instance listed in the mapping file, reads the address the
 peer declared during the handshake (peer_real_ip.txt in the instance state
-directory) and writes it as the host's IPv4 address in CheckMK, removing the
-real_ip label that held the same value. Hosts whose address has not been
+directory) and keeps it in the host's real_ip label. The host's IPv4 address
+stays 127.0.0.1: the datasource program reaches the peer over the UNIX
+socket, so the address is descriptive and must not drive any connection.
+
+A manual entry takes the address from the label the operator set; the sync
+only pins its IPv4 address to 127.0.0.1. Hosts whose address has not been
 learned yet are left untouched.
 
 The host check must not use ICMP for these hosts: the monitoring server
@@ -31,8 +35,9 @@ import sys
 import urllib.error
 import urllib.request
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 
+LOOPBACK = "127.0.0.1"
 CONFIG_DIR = "/etc/cmk-punch"
 MAPPING = os.path.join(CONFIG_DIR, "hosts.json")
 DEFAULT_URL = "https://127.0.0.1/monitoring/check_mk/api/1.0"
@@ -246,18 +251,20 @@ def main(argv=None):
                     % (instance, host_name))
                 continue
             source = "peer"
-        if current == address and "real_ip" not in labels:
-            log("%-9s %-20s %s (already set)" % (instance, host_name, address))
+        # The address lives in the label; the host address is always loopback.
+        new_labels = labels if manual else dict(labels, real_ip=address)
+        if current == LOOPBACK and new_labels == labels:
+            log("%-9s %-20s real_ip %s, address %s (already set)"
+                % (instance, host_name, address, LOOPBACK))
             continue
-        new_labels = {k: v for k, v in labels.items() if k != "real_ip"}
-        log("%-9s %-20s %s -> %s from %s%s"
-            % (instance, host_name, current, address, source,
-               " (dry run)" if args.dry_run else ""))
+        log("%-9s %-20s address %s -> %s, real_ip %s from %s%s"
+            % (instance, host_name, current, LOOPBACK, new_labels.get("real_ip"),
+               source, " (dry run)" if args.dry_run else ""))
         if args.dry_run:
             changed += 1
             continue
         code, body = api.update(host_name,
-                                {"ipaddress": address, "labels": new_labels})
+                                {"ipaddress": LOOPBACK, "labels": new_labels})
         if code != 200:
             fail("update of %s failed: %s %s" % (host_name, code, body))
         changed += 1
