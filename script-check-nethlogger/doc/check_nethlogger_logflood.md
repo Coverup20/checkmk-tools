@@ -86,13 +86,9 @@ by the search page and must be copied from a logged-in session.
 
 ## Deployment
 
-The check shares its transport and analysis with `nl-toolkit.py`, in
-`nl_common.py`. The two files must stay together: the check imports
-`nl_common` from its own directory (or from `/opt/nethlogger-toolkit`).
-
 ```bash
 install -d -m 755 /opt/nethlogger-toolkit
-install -m 755 nl_common.py check_nethlogger_logflood.py /opt/nethlogger-toolkit/
+install -m 755 check_nethlogger_logflood.py /opt/nethlogger-toolkit/
 install -m 600 .env /opt/nethlogger-toolkit/.env
 /opt/nethlogger-toolkit/check_nethlogger_logflood.py
 ```
@@ -101,10 +97,6 @@ The file is a CheckMK local check: copy it without the extension into the local
 checks directory of the site, for example
 `/omd/sites/<site>/local/lib/check_mk/base/plugins/agent_based/` for an agent
 plugin, or the local checks directory for the classic local check protocol.
-A symlink is enough, and safer than a copy: it keeps `nl_common.py` reachable.
-
-For interactive queries over the same appliance see `nl-toolkit.md` in this
-directory.
 
 ## Notes and limitations
 
