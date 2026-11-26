@@ -348,17 +348,20 @@ Without a STUN server the verdict stays empty.
 ## Host addresses from the tunnel
 
 Each tunnel knows an address for the host it serves: the target the peer
-forwards to, or the peer's own address. sync_punch_hosts.py writes that
-address into the CheckMK host configuration (ipaddress) and removes the
-real_ip label that used to carry it. A mapping file lists which instance
-belongs to which host; an entry marked manual takes the address from the
-real_ip label set by hand at install time and removes the label after the
-copy. That is how an appliance behind a proxy peer - a firewall whose agent
-is reached through another machine - gets the address its operator chose.
+forwards to, or the peer's own address. sync_punch_hosts.py keeps that
+address in the host's real_ip label and pins the host's IPv4 address
+(ipaddress) to 127.0.0.1, so the address is descriptive and never drives a
+connection: the datasource program reaches the peer over the UNIX socket. A
+mapping file lists which instance belongs to which host; an entry marked
+manual takes the address from the real_ip label set by hand at install time
+and the sync only pins its IPv4 address to loopback. That is how an appliance
+behind a proxy peer - a firewall whose agent is reached through another
+machine - gets the address its operator chose.
 
-The hosts need a host check that does not use ICMP, because the monitoring
-server cannot reach their private addresses: a host_check_commands rule with
-value ok covers them.
+Because the host's IPv4 address is loopback, the default host check pings the
+monitoring server itself and stays green without reaching a private address.
+The agent data still decides whether the peer answers: a broken tunnel shows
+up as a stale Check_MK service, not as a dead host.
 
 ```sh
 sync_punch_hosts.py --mapping /etc/cmk-punch/hosts.json --dry-run
@@ -369,21 +372,6 @@ Run it from a timer. It talks to the local REST API with an automation user
 and the secret from the site's automation.secret file, and it activates the
 changes with cmk -O only when something moved. CMK_API_USER and CMK_SITE set
 the user and the site when the defaults do not fit.
-
-## Host liveness and the agent, as two services
-
-A peer that proxies an appliance - its target is an appliance address - also
-tests that address on its own: ICMP first, then a TCP connection to the target
-port when ICMP is blocked. The result travels in the STATUS report, and the
-datasource program prints it as a local check. The host therefore has two
-services: Check_MK, which says whether the agent answers, and PUNCH.Liveness,
-which says whether the appliance answers at all. The host check stays "always
-assume host to be up": a broken agent must not look like a dead machine.
-
-The tunnel cannot report its own failure. When the tunnel is down both
-services go stale and alarm while the host stays up; telling "agent broken"
-from "machine dead" without the tunnel needs an out-of-band channel, which is
-not implemented.
 
 ## Windows host
 
@@ -538,6 +526,15 @@ choice is not lost.
   the session and the server keeps it in peer_status.json, which the dashboard
   shows as the peer view; a peer with an older build sends nothing and the
   column stays empty.
+
+- Payload compression (open, deferred). The agent output compresses roughly 5
+  to 10 times, which cuts the number of frames by the same factor; with one
+  pair per host that is the difference between about 10 GB and 1 to 2 GB per
+  day at 50 hosts. It needs a protocol change (a flag bit in FLAGS, or a
+  capability negotiated in HELLO so one side can be updated at a time), block
+  buffering with a short flush, and explicit handling of a corrupt block.
+  Nothing in the tunnel depends on it today, so it stays documented until a
+  larger deployment makes it worth the protocol work.
 
 - Protocol version in HELLO (mitigated). The signed identity block carries the
   protocol byte, the receiver logs a mismatch at handshake and the peer status
